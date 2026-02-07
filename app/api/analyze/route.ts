@@ -46,7 +46,10 @@ Respond ONLY in this exact JSON format:
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  let body;
+  try { body = await request.json(); } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const { text, userContext } = body as { text?: string; userContext?: UserContext };
 
   if (!text || typeof text !== "string" || text.trim().length === 0) {
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     const fallback = heuristicScores(text);
-    return NextResponse.json({ error: "API key not configured", fallback });
+    return NextResponse.json({ ...fallback });
   }
 
   const prompt = buildPrompt(text, userContext);
@@ -87,17 +90,21 @@ export async function POST(request: NextRequest) {
   } catch {
     clearTimeout(timeout);
     const fallback = heuristicScores(text);
-    return NextResponse.json({ error: "Request failed", fallback });
+    return NextResponse.json({ error: "Request failed", ...fallback }, { status: 502 });
   }
 
   clearTimeout(timeout);
 
   if (!res.ok) {
     const fallback = heuristicScores(text);
-    return NextResponse.json({ error: `Anthropic API error: ${res.status}`, fallback });
+    return NextResponse.json({ error: `Anthropic API error: ${res.status}`, ...fallback }, { status: 502 });
   }
 
-  const data = await res.json();
+  let data;
+  try { data = await res.json(); } catch {
+    const fallback = heuristicScores(text);
+    return NextResponse.json({ error: "Failed to parse Anthropic response", ...fallback }, { status: 502 });
+  }
   const rawText = data.content?.[0]?.text || "";
   const clean = rawText.replace(/```json|```/g, "").trim();
 
@@ -114,7 +121,7 @@ export async function POST(request: NextRequest) {
       parsed = { originality: o, insight: ins, credibility: c, composite, verdict: composite >= 4 ? "quality" : "slop", reason: "Parsed from partial response" };
     } else {
       const fallback = heuristicScores(text);
-      return NextResponse.json({ error: "Failed to parse AI response", fallback });
+      return NextResponse.json({ error: "Failed to parse AI response", ...fallback }, { status: 502 });
     }
   }
 

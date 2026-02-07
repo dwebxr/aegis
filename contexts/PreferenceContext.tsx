@@ -42,6 +42,10 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     saveTimeoutRef.current = setTimeout(() => saveProfile(p), 500);
   }, []);
 
+  useEffect(() => {
+    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+  }, []);
+
   const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop") => {
     setProfile(prev => {
       const next = learn(prev, { action: "validate", topics, author, composite, verdict });

@@ -8,10 +8,12 @@ interface MiniChartProps {
 }
 
 export const MiniChart: React.FC<MiniChartProps> = ({ data, color, h = 48 }) => {
+  if (data.length === 0) return <svg width="100%" height={h} viewBox={`0 0 100 ${h}`} style={{ display: "block" }} />;
   const mx = Math.max(...data);
   const mn = Math.min(...data);
   const rg = mx - mn || 1;
-  const pts = data.map((v, i) => `${(i / (data.length - 1)) * 100},${h - ((v - mn) / rg) * (h - 8)}`).join(" ");
+  const len = data.length > 1 ? data.length - 1 : 1;
+  const pts = data.map((v, i) => `${(i / len) * 100},${h - ((v - mn) / rg) * (h - 8)}`).join(" ");
 
   return (
     <svg width="100%" height={h} viewBox={`0 0 100 ${h}`} preserveAspectRatio="none" style={{ display: "block" }}>

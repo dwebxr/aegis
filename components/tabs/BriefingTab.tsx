@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from "react";
 import { ContentCard } from "@/components/ui/ContentCard";
 import { generateBriefing } from "@/lib/briefing/ranker";
+import { colors, space, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import { createEmptyProfile } from "@/lib/preferences/types";
@@ -27,11 +28,18 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
 
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: mobile ? 22 : 28, fontWeight: 800, color: "#f1f5f9", margin: 0 }}>
+      <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
+        <h1 style={{
+          fontSize: mobile ? t.display.mobileSz : t.display.size,
+          fontWeight: t.display.weight,
+          lineHeight: t.display.lineHeight,
+          letterSpacing: t.display.letterSpacing,
+          color: colors.text.primary,
+          margin: 0,
+        }}>
           Your Briefing
         </h1>
-        <p style={{ fontSize: 13, color: "#64748b", marginTop: 6 }}>
+        <p style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
           {insightCount} insights selected from {briefing.totalItems} items
         </p>
       </div>
@@ -56,21 +64,21 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
       ) : (
         <div style={{
           textAlign: "center",
-          padding: 40,
-          color: "#64748b",
-          background: "rgba(255,255,255,0.02)",
-          borderRadius: 16,
-          border: "1px solid rgba(255,255,255,0.05)",
-          marginBottom: 16,
+          padding: space[10],
+          color: colors.text.muted,
+          background: colors.bg.surface,
+          borderRadius: radii.lg,
+          border: `1px solid ${colors.border.default}`,
+          marginBottom: space[4],
         }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>&#x1F50D;</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#94a3b8" }}>No priority items yet</div>
-          <div style={{ fontSize: 12, marginTop: 6 }}>Add sources and evaluate content to build your briefing</div>
+          <div style={{ fontSize: 32, marginBottom: space[3] }}>&#x1F50D;</div>
+          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>No priority items yet</div>
+          <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Add sources and evaluate content to build your briefing</div>
         </div>
       )}
 
       {briefing.serendipity && (
-        <div style={{ marginTop: 8, animation: `slideUp .3s ease ${briefing.priority.length * 0.06 + 0.1}s both` }}>
+        <div style={{ marginTop: space[2], animation: `slideUp .3s ease ${briefing.priority.length * 0.06 + 0.1}s both` }}>
           <ContentCard
             item={briefing.serendipity.item}
             variant="serendipity"
@@ -84,7 +92,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
       )}
 
       {briefing.filteredOut.length > 0 && (
-        <div style={{ marginTop: 20 }}>
+        <div style={{ marginTop: space[5] }}>
           <button
             onClick={() => setShowFiltered(!showFiltered)}
             style={{
@@ -92,16 +100,17 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
-              padding: "12px 16px",
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 12,
-              color: "#64748b",
-              fontSize: 12,
+              gap: space[2],
+              padding: `${space[3]}px ${space[4]}px`,
+              background: colors.bg.surface,
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: radii.md,
+              color: colors.text.muted,
+              fontSize: t.bodySm.size,
               fontWeight: 600,
               cursor: "pointer",
-              transition: "all .2s",
+              transition: transitions.normal,
+              fontFamily: "inherit",
             }}
           >
             <span style={{ transform: showFiltered ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .2s", display: "inline-block" }}>
@@ -111,7 +120,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           </button>
 
           {showFiltered && (
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: space[3] }}>
               {briefing.filteredOut.map((it, i) => (
                 <div key={it.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
                   <ContentCard

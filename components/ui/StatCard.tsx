@@ -1,6 +1,6 @@
 "use client";
-import React from "react";
-import { fonts } from "@/styles/theme";
+import React, { useState } from "react";
+import { fonts, colors, space, type as t, shadows, radii, transitions, kpiLabelStyle } from "@/styles/theme";
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -11,14 +11,58 @@ interface StatCardProps {
   mobile?: boolean;
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ icon, label, value, sub, color, mobile }) => (
-  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, padding: mobile ? "14px 14px" : "18px 20px", position: "relative", overflow: "hidden" }}>
-    <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: `${color}08` }} />
-    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-      <div style={{ color, opacity: 0.8 }}>{icon}</div>
-      <span style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{label}</span>
+export const StatCard: React.FC<StatCardProps> = ({ icon, label, value, sub, color, mobile }) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: colors.bg.surface,
+        border: `1px solid ${colors.border.default}`,
+        borderLeft: `3px solid ${color}`,
+        borderRadius: radii.lg,
+        padding: mobile ? `${space[4]}px ${space[4]}px` : `${space[5]}px ${space[6]}px`,
+        position: "relative",
+        overflow: "hidden",
+        transform: hovered ? "translateY(-2px)" : "translateY(0)",
+        boxShadow: hovered ? shadows.md : "none",
+        transition: transitions.normal,
+      }}
+    >
+      <div style={{
+        position: "absolute", top: -20, right: -20,
+        width: 80, height: 80, borderRadius: "50%",
+        background: `radial-gradient(circle, ${color}12, transparent 70%)`,
+      }} />
+
+      <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[3] }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: radii.sm,
+          background: `${color}15`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color,
+        }}>
+          {icon}
+        </div>
+        <span style={kpiLabelStyle}>{label}</span>
+      </div>
+
+      <div style={{
+        fontSize: mobile ? t.kpiValue.mobileSz : t.kpiValue.size,
+        fontWeight: t.kpiValue.weight,
+        lineHeight: t.kpiValue.lineHeight,
+        color: colors.text.primary,
+        fontFamily: fonts.mono,
+      }}>
+        {value}
+      </div>
+
+      {sub && (
+        <div style={{ fontSize: t.kpiSub.size, fontWeight: t.kpiSub.weight, color, marginTop: space[1], opacity: 0.8 }}>
+          {sub}
+        </div>
+      )}
     </div>
-    <div style={{ fontSize: mobile ? 22 : 26, fontWeight: 800, color: "#e2e8f0", fontFamily: fonts.mono }}>{value}</div>
-    {sub && <div style={{ fontSize: 10, color, marginTop: 2, fontWeight: 500 }}>{sub}</div>}
-  </div>
-);
+  );
+};

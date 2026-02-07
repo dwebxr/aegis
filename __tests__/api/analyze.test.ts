@@ -62,15 +62,14 @@ describe("POST /api/analyze", () => {
       expect(res.status).toBe(200);
       const data = await res.json();
 
-      expect(data.error).toContain("API key not configured");
-      expect(data.fallback).toBeDefined();
-      expect(data.fallback.originality).toBeGreaterThanOrEqual(0);
-      expect(data.fallback.originality).toBeLessThanOrEqual(10);
-      expect(data.fallback.insight).toBeGreaterThanOrEqual(0);
-      expect(data.fallback.credibility).toBeGreaterThanOrEqual(0);
-      expect(data.fallback.composite).toBeGreaterThanOrEqual(0);
-      expect(["quality", "slop"]).toContain(data.fallback.verdict);
-      expect(data.fallback.reason).toBeDefined();
+      // Fallback returns scores directly (flattened, no wrapper)
+      expect(data.originality).toBeGreaterThanOrEqual(0);
+      expect(data.originality).toBeLessThanOrEqual(10);
+      expect(data.insight).toBeGreaterThanOrEqual(0);
+      expect(data.credibility).toBeGreaterThanOrEqual(0);
+      expect(data.composite).toBeGreaterThanOrEqual(0);
+      expect(["quality", "slop"]).toContain(data.verdict);
+      expect(data.reason).toBeDefined();
     });
 
     it("returns quality verdict for clean content", async () => {
@@ -78,7 +77,7 @@ describe("POST /api/analyze", () => {
         text: "The research paper published in Nature demonstrates a novel approach to protein folding using AI models.",
       }));
       const data = await res.json();
-      expect(data.fallback.verdict).toBe("quality");
+      expect(data.verdict).toBe("quality");
     });
 
     it("returns slop verdict for clickbait content", async () => {
@@ -86,7 +85,7 @@ describe("POST /api/analyze", () => {
         text: "OMG!!! YOU WON'T BELIEVE THIS!!! AMAZING!!! SHOCKING!!! CLICK NOW!!!",
       }));
       const data = await res.json();
-      expect(data.fallback.verdict).toBe("slop");
+      expect(data.verdict).toBe("slop");
     });
 
     it("fallback scores reflect text quality heuristics", async () => {
@@ -95,8 +94,8 @@ describe("POST /api/analyze", () => {
         text: "According to https://nature.com the study found 95% accuracy in predictions.",
       }));
       const data = await res.json();
-      expect(data.fallback.credibility).toBeGreaterThan(5);
-      expect(data.fallback.insight).toBeGreaterThan(5);
+      expect(data.credibility).toBeGreaterThan(5);
+      expect(data.insight).toBeGreaterThan(5);
     });
 
     it("does not include vSignal/cContext/lSlop in fallback (no personalization)", async () => {
@@ -105,9 +104,9 @@ describe("POST /api/analyze", () => {
       }));
       const data = await res.json();
       // Fallback doesn't produce V/C/L scores
-      expect(data.fallback.vSignal).toBeUndefined();
-      expect(data.fallback.cContext).toBeUndefined();
-      expect(data.fallback.lSlop).toBeUndefined();
+      expect(data.vSignal).toBeUndefined();
+      expect(data.cContext).toBeUndefined();
+      expect(data.lSlop).toBeUndefined();
     });
   });
 
@@ -125,7 +124,7 @@ describe("POST /api/analyze", () => {
       expect(res.status).toBe(200);
       // Still uses fallback since no API key
       const data = await res.json();
-      expect(data.fallback).toBeDefined();
+      expect(data.originality).toBeDefined();
     });
 
     it("handles null userContext gracefully", async () => {

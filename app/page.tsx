@@ -144,7 +144,7 @@ export default function AegisApp() {
 
   return (
     <AppShell activeTab={tab} onTabChange={setTab}>
-      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} />}
+      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} />}
       {tab === "briefing" && <BriefingTab content={content} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} />}
       {tab === "incinerator" && (
         <IncineratorTab

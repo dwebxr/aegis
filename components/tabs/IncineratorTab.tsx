@@ -3,6 +3,7 @@ import React from "react";
 import { IncineratorViz } from "@/components/ui/IncineratorViz";
 import { ManualInput } from "@/components/sources/ManualInput";
 import { SignalComposer } from "@/components/ui/SignalComposer";
+import { colors, space, type as t, radii, kpiLabelStyle } from "@/styles/theme";
 import type { AnalyzeResponse } from "@/lib/types/api";
 
 interface IncineratorTabProps {
@@ -15,27 +16,45 @@ interface IncineratorTabProps {
 
 export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, nostrPubkey, mobile }) => {
   const stages: Array<[string, string, boolean, string]> = [
-    ["S1", "Heuristic Filter", isAnalyzing, "#818cf8"],
-    ["S2", "Structural", isAnalyzing, "#38bdf8"],
-    ["S3", "LLM Score", isAnalyzing, "#fbbf24"],
-    ["S4", "Cross-Valid", false, "#94a3b8"],
+    ["S1", "Heuristic Filter", isAnalyzing, colors.purple[400]],
+    ["S2", "Structural", isAnalyzing, colors.sky[400]],
+    ["S3", "LLM Score", isAnalyzing, colors.amber[400]],
+    ["S4", "Cross-Valid", false, colors.text.tertiary],
   ];
 
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: mobile ? 22 : 26, fontWeight: 800, color: "#f1f5f9", margin: 0 }}>Slop Incinerator + Signal</h1>
-        <p style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>Evaluate content quality & publish your insights</p>
+      <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
+        <h1 style={{
+          fontSize: mobile ? t.display.mobileSz : t.display.size,
+          fontWeight: t.display.weight,
+          lineHeight: t.display.lineHeight,
+          letterSpacing: t.display.letterSpacing,
+          color: colors.text.primary,
+          margin: 0,
+        }}>
+          Slop Incinerator + Signal
+        </h1>
+        <p style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
+          Evaluate content quality & publish your insights
+        </p>
       </div>
 
-      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 18, padding: mobile ? 18 : 28, marginBottom: 18 }}>
+      <div style={{
+        background: colors.bg.surface,
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: radii.xl,
+        padding: mobile ? space[5] : space[8],
+        marginBottom: mobile ? space[8] : space[12],
+        animation: isAnalyzing ? "glowPulse 2s infinite" : "none",
+      }}>
         <IncineratorViz active={isAnalyzing} mobile={mobile} />
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 8, marginTop: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: space[2], marginTop: space[4] }}>
           {stages.map(([s, n, a, c]) => (
-            <div key={s} style={{ textAlign: "center", padding: "10px 6px", background: "rgba(0,0,0,0.2)", borderRadius: 10 }}>
-              <div style={{ fontSize: 9, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>{s}</div>
-              <div style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 600, marginTop: 3 }}>{n}</div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: c, marginTop: 4, textTransform: "uppercase", animation: a ? "pulse 1.5s infinite" : "none" }}>
+            <div key={s} style={{ textAlign: "center", padding: `${space[3]}px ${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
+              <div style={{ ...kpiLabelStyle, letterSpacing: 1 }}>{s}</div>
+              <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, fontWeight: 600, marginTop: space[1] }}>{n}</div>
+              <div style={{ fontSize: t.tiny.size, fontWeight: 700, color: c, marginTop: space[1], textTransform: "uppercase", animation: a ? "pulse 1.5s infinite" : "none" }}>
                 &#x25CF; {a ? "ACTIVE" : "IDLE"}
               </div>
             </div>
@@ -43,22 +62,28 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onA
         </div>
       </div>
 
-      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 18, padding: mobile ? 18 : 28, marginBottom: 18 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#e2e8f0", marginBottom: 16 }}>Manual Analysis</div>
+      <div style={{
+        background: colors.bg.surface,
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: radii.xl,
+        padding: mobile ? space[5] : space[8],
+        marginBottom: mobile ? space[8] : space[12],
+      }}>
+        <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.secondary, marginBottom: space[4] }}>Manual Analysis</div>
         <ManualInput onAnalyze={onAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />
       </div>
 
       {onPublishSignal && (
         <div style={{
-          background: "linear-gradient(135deg, rgba(124,58,237,0.04), rgba(37,99,235,0.04))",
-          border: "1px solid rgba(124,58,237,0.15)",
-          borderRadius: 18,
-          padding: mobile ? 18 : 28,
+          background: `linear-gradient(135deg, rgba(124,58,237,0.04), rgba(37,99,235,0.04))`,
+          border: `1px solid rgba(124,58,237,0.15)`,
+          borderRadius: radii.xl,
+          padding: mobile ? space[5] : space[8],
         }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#c4b5fd", marginBottom: 4 }}>
+          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.purple[400], marginBottom: space[1] }}>
             Publish Signal
           </div>
-          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>
+          <div style={{ fontSize: t.bodySm.size, color: colors.text.muted, marginBottom: space[4] }}>
             Share your thoughts with self-evaluation. Published to Nostr relays & IC canister.
           </div>
           <SignalComposer

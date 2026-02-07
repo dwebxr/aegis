@@ -58,3 +58,13 @@ a {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(249,115,22,0.2); }
+  50% { box-shadow: 0 0 20px rgba(249,115,22,0.4); }
+}
+
+@keyframes subtleBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}

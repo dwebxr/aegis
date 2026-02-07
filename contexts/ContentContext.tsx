@@ -74,6 +74,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const analyze = useCallback(async (text: string, userContext?: UserContext | null): Promise<AnalyzeResponse> => {
     setIsAnalyzing(true);
+    try {
     const body: Record<string, unknown> = { text, source: "manual" };
     if (userContext) body.userContext = userContext;
     const res = await fetch("/api/analyze", {
@@ -82,11 +83,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      setIsAnalyzing(false);
       throw new Error(`Analyze API returned ${res.status}: ${res.statusText}`);
     }
     const data = await res.json();
-    setIsAnalyzing(false);
 
     const result: AnalyzeResponse = data.fallback || data;
 
@@ -140,6 +139,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     }
 
     return result;
+    } finally { setIsAnalyzing(false); }
   }, [isAuthenticated, principal]);
 
   const validateItem = useCallback((id: string) => {

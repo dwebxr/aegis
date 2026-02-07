@@ -1,10 +1,8 @@
 "use client";
-import React from "react";
-import { fonts } from "@/styles/theme";
-import { ScoreRing } from "./ScoreRing";
+import React, { useState } from "react";
+import { fonts, colors, space, type as t, shadows, radii, transitions, scoreGrade } from "@/styles/theme";
 import { ScoreBar } from "./ScoreBar";
 import { CheckIcon, XCloseIcon } from "@/components/icons";
-import { scoreColor } from "@/lib/utils/scores";
 import type { ContentItem } from "@/lib/types/content";
 
 type CardVariant = "default" | "priority" | "serendipity";
@@ -20,57 +18,103 @@ interface ContentCardProps {
   rank?: number;
 }
 
-const variantStyles: Record<CardVariant, { bg: string; border: string; textColor: string; topicBg: string; topicColor: string }> = {
-  default: {
-    bg: "", // set dynamically based on verdict
-    border: "",
-    textColor: "#cbd5e1",
-    topicBg: "rgba(139,92,246,0.12)",
-    topicColor: "#a78bfa",
-  },
-  priority: {
-    bg: "rgba(37,99,235,0.04)",
-    border: "1px solid rgba(37,99,235,0.12)",
-    textColor: "#cbd5e1",
-    topicBg: "rgba(139,92,246,0.12)",
-    topicColor: "#a78bfa",
-  },
-  serendipity: {
-    bg: "linear-gradient(135deg, rgba(124,58,237,0.06), rgba(37,99,235,0.04))",
-    border: "1px solid rgba(124,58,237,0.2)",
-    textColor: "#d8b4fe",
-    topicBg: "rgba(124,58,237,0.15)",
-    topicColor: "#c4b5fd",
-  },
-};
+function GradeBadge({ composite }: { composite: number }) {
+  const { grade, color, bg } = scoreGrade(composite);
+  return (
+    <div style={{
+      width: 40, height: 40, borderRadius: radii.sm,
+      background: bg, border: `1px solid ${color}30`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      flexShrink: 0,
+    }}>
+      <span style={{ fontSize: 18, fontWeight: 800, color, fontFamily: fonts.mono }}>{grade}</span>
+    </div>
+  );
+}
 
 function ScoreGrid({ item }: { item: ContentItem }) {
   const hasVCL = item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: space[3], marginBottom: space[4] }}>
       {hasVCL ? (
         <>
-          <ScoreBar label="V Signal" score={item.vSignal!} color="#a78bfa" />
-          <ScoreBar label="C Context" score={item.cContext!} color="#38bdf8" />
-          <ScoreBar label="L Slop" score={item.lSlop!} color="#f87171" />
+          <ScoreBar label="V Signal" score={item.vSignal!} color={colors.purple[400]} />
+          <ScoreBar label="C Context" score={item.cContext!} color={colors.sky[400]} />
+          <ScoreBar label="L Slop" score={item.lSlop!} color={colors.red[400]} />
         </>
       ) : (
         <>
-          <ScoreBar label="Originality" score={item.scores.originality} color="#818cf8" />
-          <ScoreBar label="Insight" score={item.scores.insight} color="#38bdf8" />
-          <ScoreBar label="Credibility" score={item.scores.credibility} color="#34d399" />
+          <ScoreBar label="Originality" score={item.scores.originality} color={colors.purple[500]} />
+          <ScoreBar label="Insight" score={item.scores.insight} color={colors.sky[400]} />
+          <ScoreBar label="Credibility" score={item.scores.credibility} color={colors.green[400]} />
         </>
       )}
     </div>
   );
 }
 
-function TopicTags({ topics, bg, color }: { topics: string[]; bg: string; color: string }) {
+function TopicTags({ topics }: { topics: string[] }) {
   if (topics.length === 0) return null;
   return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-      {topics.map(t => (
-        <span key={t} style={{ fontSize: 10, padding: "3px 10px", borderRadius: 12, background: bg, color, fontWeight: 600 }}>{t}</span>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: space[2] }}>
+      {topics.map(tp => (
+        <span key={tp} style={{
+          fontSize: t.caption.size, padding: "3px 10px", borderRadius: radii.pill,
+          background: `${colors.purple[400]}15`, color: colors.purple[400], fontWeight: 600,
+        }}>{tp}</span>
+      ))}
+    </div>
+  );
+}
+
+function RestoreButton({ item, onValidate }: { item: ContentItem; onValidate: (id: string) => void }) {
+  return (
+    <button onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
+      width: "100%", padding: `${space[2]}px ${space[3]}px`, background: colors.green.bg,
+      border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
+      color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+      transition: transitions.fast, fontFamily: "inherit",
+    }}>
+      <CheckIcon /> Not Slop
+    </button>
+  );
+}
+
+function deriveScoreTags(item: ContentItem): Array<{ label: string; color: string }> {
+  const tags: Array<{ label: string; color: string }> = [];
+  const hasVCL = item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
+
+  if (hasVCL) {
+    if (item.vSignal! >= 7) tags.push({ label: "High signal", color: colors.purple[400] });
+    if (item.cContext! >= 7) tags.push({ label: "Rich context", color: colors.sky[400] });
+    if (item.lSlop! >= 7) tags.push({ label: "High slop risk", color: colors.red[400] });
+    if (item.lSlop! <= 2) tags.push({ label: "Low noise", color: colors.green[400] });
+  } else {
+    if (item.scores.originality >= 8) tags.push({ label: "Original", color: colors.purple[400] });
+    if (item.scores.insight >= 8) tags.push({ label: "Insightful", color: colors.sky[400] });
+    if (item.scores.credibility >= 8) tags.push({ label: "Credible", color: colors.green[400] });
+    if (item.scores.credibility <= 3) tags.push({ label: "Low credibility", color: colors.red[400] });
+    if (item.scores.originality <= 2) tags.push({ label: "Derivative", color: colors.orange[400] });
+  }
+
+  return tags.slice(0, 2);
+}
+
+function ScoreTags({ item }: { item: ContentItem }) {
+  const tags = deriveScoreTags(item);
+  if (tags.length === 0) return null;
+  return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: space[2] }}>
+      {tags.map(tag => (
+        <span key={tag.label} style={{
+          fontSize: t.tiny.size, fontWeight: t.tiny.weight, letterSpacing: t.tiny.letterSpacing,
+          padding: "2px 8px", borderRadius: radii.pill,
+          background: `${tag.color}12`, color: tag.color,
+          border: `1px solid ${tag.color}20`, textTransform: "uppercase",
+        }}>
+          {tag.label}
+        </span>
       ))}
     </div>
   );
@@ -78,20 +122,22 @@ function TopicTags({ topics, bg, color }: { topics: string[]; bg: string; color:
 
 function ActionButtons({ item, onValidate, onFlag }: { item: ContentItem; onValidate: (id: string) => void; onFlag: (id: string) => void }) {
   return (
-    <div style={{ display: "flex", gap: 8 }}>
+    <div style={{ display: "flex", gap: space[2] }}>
       <button onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
-        flex: 1, padding: "9px 12px", background: "rgba(52,211,153,0.1)",
-        border: "1px solid rgba(52,211,153,0.3)", borderRadius: 10,
-        color: "#34d399", fontSize: 12, fontWeight: 600, cursor: "pointer",
+        flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.green.bg,
+        border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
+        color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+        transition: transitions.fast, fontFamily: "inherit",
       }}>
         <CheckIcon /> Validate
       </button>
       <button onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
-        flex: 1, padding: "9px 12px", background: "rgba(248,113,113,0.1)",
-        border: "1px solid rgba(248,113,113,0.3)", borderRadius: 10,
-        color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer",
+        flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.red.bg,
+        border: `1px solid ${colors.red.border}`, borderRadius: radii.md,
+        color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+        transition: transitions.fast, fontFamily: "inherit",
       }}>
         <XCloseIcon /> Flag Slop
       </button>
@@ -100,111 +146,158 @@ function ActionButtons({ item, onValidate, onFlag }: { item: ContentItem; onVali
 }
 
 export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, mobile, variant = "default", rank }) => {
+  const [hovered, setHovered] = useState(false);
   const isSlop = item.verdict === "slop";
-  const sc = scoreColor(item.scores.composite);
-  const vs = variantStyles[variant];
+  const gr = scoreGrade(item.scores.composite);
 
   const isLarge = variant === "priority" || variant === "serendipity";
-  const pad = isLarge ? (mobile ? "16px 14px" : "20px 24px") : (mobile ? "14px 14px" : "16px 20px");
+  const pad = isLarge ? (mobile ? `${space[4]}px ${space[4]}px` : `${space[5]}px ${space[6]}px`) : (mobile ? `${space[4]}px ${space[4]}px` : `${space[4]}px ${space[5]}px`);
 
-  const bg = variant === "default"
-    ? (isSlop ? "rgba(248,113,113,0.04)" : "rgba(52,211,153,0.03)")
-    : vs.bg;
-  const border = variant === "default"
-    ? `1px solid ${isSlop ? "rgba(248,113,113,0.12)" : "rgba(52,211,153,0.08)"}`
-    : vs.border;
-  const borderLeft = variant === "serendipity" ? undefined : `${isLarge ? 4 : 3}px solid ${sc}`;
+  const bg = variant === "serendipity"
+    ? `linear-gradient(135deg, rgba(124,58,237,0.06), rgba(37,99,235,0.04))`
+    : variant === "priority"
+      ? `rgba(37,99,235,0.04)`
+      : isSlop ? colors.red.bg : colors.green.bg;
+
+  const border = variant === "serendipity"
+    ? `1px solid rgba(124,58,237,0.2)`
+    : variant === "priority"
+      ? `1px solid rgba(37,99,235,0.12)`
+      : `1px solid ${isSlop ? colors.red.border : colors.green.border}`;
+
+  const borderLeft = variant === "serendipity" ? undefined : `${isLarge ? 4 : 3}px solid ${gr.color}`;
+
+  const hoverShadow = isSlop ? shadows.glow.orange : shadows.md;
 
   return (
-    <div onClick={onToggle} style={{
-      background: bg, border, borderRadius: isLarge ? 16 : 14, padding: pad,
-      cursor: "pointer", transition: "all 0.3s", marginBottom: isLarge ? 12 : 10,
-      borderLeft, position: variant !== "default" ? "relative" : undefined,
-      overflow: variant === "serendipity" ? "hidden" : undefined,
-    }}>
+    <div
+      onClick={onToggle}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: bg, border,
+        borderRadius: isLarge ? radii.lg : radii.md, padding: pad,
+        cursor: "pointer",
+        transition: transitions.normal,
+        marginBottom: isLarge ? space[3] : space[2],
+        borderLeft,
+        position: variant !== "default" ? "relative" : undefined,
+        overflow: variant === "serendipity" ? "hidden" : undefined,
+        transform: hovered ? "scale(1.008)" : "scale(1)",
+        boxShadow: hovered ? hoverShadow : "none",
+      }}
+    >
+      {/* Priority rank badge */}
       {variant === "priority" && rank !== undefined && (
         <div style={{
-          position: "absolute", top: mobile ? 10 : 14, right: mobile ? 10 : 16,
+          position: "absolute", top: mobile ? space[3] : space[4], right: mobile ? space[3] : space[4],
           width: 28, height: 28, borderRadius: "50%",
-          background: "linear-gradient(135deg, #2563eb, #7c3aed)",
+          background: `linear-gradient(135deg, ${colors.blue[600]}, ${colors.purple[600]})`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 12, fontWeight: 800, color: "#fff",
+          fontSize: t.bodySm.size, fontWeight: 800, color: "#fff",
         }}>
           {rank}
         </div>
       )}
 
+      {/* Serendipity ribbon */}
       {variant === "serendipity" && (
         <div style={{
           position: "absolute", top: 0, right: 0,
-          background: "linear-gradient(135deg, #7c3aed, #2563eb)",
-          padding: "4px 14px 4px 18px", borderBottomLeftRadius: 12,
-          fontSize: 10, fontWeight: 700, color: "#fff", letterSpacing: 0.5,
+          background: `linear-gradient(135deg, ${colors.purple[600]}, ${colors.blue[600]})`,
+          padding: `${space[1]}px ${space[4]}px ${space[1]}px 18px`, borderBottomLeftRadius: radii.md,
+          fontSize: t.caption.size, fontWeight: 700, color: "#fff", letterSpacing: 0.5,
         }}>
           SERENDIPITY
         </div>
       )}
 
-      <div style={{ display: "flex", gap: mobile ? (isLarge ? 12 : 10) : (isLarge ? 16 : 14), alignItems: "flex-start", ...(variant === "serendipity" ? { marginTop: 4 } : {}) }}>
-        {isLarge ? (
-          <>
-            <ScoreRing value={item.scores.composite} size={mobile ? 48 : 56} color={sc} />
-            <div style={{ flex: 1, minWidth: 0, paddingRight: variant === "serendipity" ? 90 : 36 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 16 }}>{item.avatar}</span>
-                <span style={{ fontWeight: 700, color: "#e2e8f0", fontSize: 14, fontFamily: fonts.mono }}>{item.author}</span>
-                <span style={{ fontSize: 10, color: "#64748b", background: "#1e293b", padding: "2px 8px", borderRadius: 5 }}>{item.source}</span>
-                {variant !== "serendipity" && <span style={{ fontSize: 10, color: "#64748b" }}>{item.timestamp}</span>}
-              </div>
-              <p style={{ color: vs.textColor, fontSize: mobile ? 13 : 15, lineHeight: 1.7, margin: 0, wordBreak: "break-word" }}>
-                {item.text}
-              </p>
-              {variant === "serendipity" && (
-                <div style={{ marginTop: 8, fontSize: 11, color: "#a78bfa", fontStyle: "italic" }}>
-                  Outside your usual topics — expanding your perspective
-                </div>
-              )}
-              <TopicTags topics={item.topics || []} bg={vs.topicBg} color={vs.topicColor} />
+      {/* Zone 1: Author Info Bar */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: space[2], flexWrap: "wrap",
+        paddingBottom: space[2],
+        borderBottom: `1px solid ${colors.border.subtle}`,
+        marginBottom: space[2],
+        ...(variant === "serendipity" ? { marginTop: space[1] } : {}),
+      }}>
+        <span style={{ fontSize: isLarge ? 16 : 18 }}>{item.avatar}</span>
+        <span style={{ fontWeight: 700, color: colors.text.secondary, fontSize: isLarge ? t.body.size : t.body.mobileSz, fontFamily: fonts.mono }}>{item.author}</span>
+        <span style={{
+          fontSize: t.caption.size, color: colors.text.muted,
+          background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
+        }}>{item.source}</span>
+        {variant !== "serendipity" && <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.timestamp}</span>}
+        {variant === "priority" && <div style={{ flex: 1 }} />}
+      </div>
+
+      {/* Zone 2: Body Content */}
+      <div style={{ display: "flex", gap: mobile ? space[3] : space[4], alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: 0, paddingRight: variant === "serendipity" ? 90 : (variant === "priority" ? 36 : 0) }}>
+          <p style={{
+            color: isSlop ? colors.text.tertiary : (variant === "serendipity" ? "#d8b4fe" : colors.text.tertiary),
+            fontSize: mobile ? t.body.mobileSz : (isLarge ? t.bodyLg.size : t.body.size),
+            lineHeight: isLarge ? t.bodyLg.lineHeight : t.body.lineHeight,
+            margin: 0,
+            textDecoration: isSlop && !isLarge ? "line-through" : "none",
+            opacity: isSlop && !isLarge ? 0.5 : 1,
+            wordBreak: "break-word",
+          }}>
+            {item.text}
+          </p>
+          {variant === "serendipity" && (
+            <div style={{ marginTop: space[2], fontSize: t.caption.size, color: colors.purple[400], fontStyle: "italic" }}>
+              Outside your usual topics — expanding your perspective
             </div>
-          </>
-        ) : (
-          <>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 18 }}>{item.avatar}</span>
-                <span style={{ fontWeight: 700, color: "#e2e8f0", fontSize: 13, fontFamily: fonts.mono }}>{item.author}</span>
-                <span style={{ fontSize: 10, color: "#64748b", background: "#1e293b", padding: "2px 6px", borderRadius: 5 }}>{item.source}</span>
-                <span style={{ fontSize: 10, color: "#64748b" }}>{item.timestamp}</span>
-              </div>
-              <p style={{ color: isSlop ? "#94a3b8" : "#cbd5e1", fontSize: mobile ? 13 : 14, lineHeight: 1.6, margin: 0, textDecoration: isSlop ? "line-through" : "none", opacity: isSlop ? 0.5 : 1, wordBreak: "break-word" }}>
-                {item.text}
-              </p>
+          )}
+        </div>
+
+        {/* Score badge (non-large cards) */}
+        {!isLarge && (
+          <div style={{ textAlign: "center", flexShrink: 0 }}>
+            <GradeBadge composite={item.scores.composite} />
+            <div style={{
+              marginTop: space[1], fontSize: t.tiny.size, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: 1,
+              color: isSlop ? colors.red[400] : colors.green[400],
+            }}>
+              {item.verdict}
             </div>
-            <div style={{ textAlign: "center" }}>
-              <ScoreRing value={item.scores.composite} size={mobile ? 42 : 50} color={sc} />
-              <div style={{ marginTop: 4, fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: isSlop ? "#f87171" : "#34d399" }}>
-                {item.verdict}
-              </div>
-            </div>
-          </>
+          </div>
+        )}
+
+        {/* Score badge (large cards) */}
+        {isLarge && (
+          <div style={{ flexShrink: 0, marginTop: space[1] }}>
+            <GradeBadge composite={item.scores.composite} />
+          </div>
         )}
       </div>
 
+      {/* Score indicator tags (always visible) */}
+      <ScoreTags item={item} />
+
+      {/* Zone 3: Topic tags (always visible) */}
+      {item.topics && item.topics.length > 0 && (
+        <TopicTags topics={item.topics} />
+      )}
+
+      {/* Expanded details */}
       {expanded && (
-        <div style={{ marginTop: isLarge ? 16 : 14, paddingTop: 14, borderTop: `1px solid ${variant === "serendipity" ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.06)"}` }}>
+        <div style={{
+          marginTop: space[4],
+          paddingTop: space[4],
+          borderTop: `1px solid ${variant === "serendipity" ? "rgba(124,58,237,0.15)" : colors.border.default}`,
+        }}>
           <ScoreGrid item={item} />
-          {variant === "default" && item.topics && item.topics.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-              {item.topics.map(t => (
-                <span key={t} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 12, background: vs.topicBg, color: vs.topicColor, fontWeight: 600 }}>{t}</span>
-              ))}
-            </div>
-          )}
           {item.reason && (
-            <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5, fontStyle: "italic", background: "rgba(0,0,0,0.2)", padding: "10px 14px", borderRadius: 10, marginBottom: 12 }}>
+            <div style={{
+              fontSize: t.bodySm.size, color: colors.text.tertiary, lineHeight: 1.5, fontStyle: "italic",
+              background: colors.bg.raised, padding: `${space[3]}px ${space[4]}px`, borderRadius: radii.md, marginBottom: space[3],
+            }}>
               {item.reason}
             </div>
           )}
+          {isSlop && !isLarge && <RestoreButton item={item} onValidate={onValidate} />}
           {(!isSlop || isLarge) && <ActionButtons item={item} onValidate={onValidate} onFlag={onFlag} />}
         </div>
       )}
