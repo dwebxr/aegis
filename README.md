@@ -1,36 +1,160 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Aegis - AI Content Quality Filter
+
+AI-powered content quality filtering and evaluation platform built on Next.js and Internet Computer.
+
+## Live
+
+- **Frontend**: https://aegis-kappa-eight.vercel.app
+- **Backend Canister**: [`rluf3-eiaaa-aaaam-qgjuq-cai`](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=rluf3-eiaaa-aaaam-qgjuq-cai)
+
+## Architecture
+
+```
+Frontend (Next.js / Vercel)          Internet Computer (Mainnet)
+┌──────────────────────────┐         ┌──────────────────────────┐
+│  Dashboard / Feed / Burn │         │  aegis_backend canister  │
+│  Sources / Analytics     │◄───────►│  (Motoko)                │
+│                          │         │                          │
+│  API Routes:             │         │  - Evaluation storage    │
+│  POST /api/analyze       │         │  - User profiles         │
+│  POST /api/fetch/url     │         │  - Source configs        │
+│  POST /api/fetch/rss     │         │  - Analytics queries     │
+│  POST /api/fetch/twitter │         │                          │
+│  POST /api/fetch/nostr   │         │  Internet Identity auth  │
+└───────────┬──────────────┘         └──────────────────────────┘
+            │
+            ▼
+   Anthropic Claude API
+   (Content analysis)
+```
+
+## Features
+
+- **AI Content Analysis** - Evaluates content quality using Claude with fallback heuristics
+- **Multi-source Ingestion** - Manual input, RSS feeds, URL extraction, X (Twitter), Nostr
+- **Quality Scoring** - Originality, Insight, Credibility breakdown with composite score (0-10)
+- **Verdict System** - Binary quality/slop classification with detailed reasoning
+- **Decentralized Storage** - Evaluations persisted on Internet Computer canisters
+- **Internet Identity Auth** - Passwordless authentication via ICP
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 14 (App Router), React 18, TypeScript |
+| Styling | CSS-in-JS (inline styles), dark theme |
+| Backend API | Next.js API Routes (Vercel Serverless) |
+| AI | Anthropic Claude (claude-sonnet-4-20250514) |
+| Blockchain | Internet Computer (Motoko canister) |
+| Auth | Internet Identity (@dfinity/auth-client 2.1.3) |
+| Deploy | Vercel (frontend), IC mainnet (backend) |
+
+## Project Structure
+
+```
+aegis/
+├── app/
+│   ├── page.tsx                     # Main app page
+│   ├── layout.tsx                   # Root layout + providers
+│   └── api/
+│       ├── analyze/route.ts         # Anthropic Claude evaluation
+│       └── fetch/
+│           ├── url/route.ts         # URL article extraction
+│           ├── rss/route.ts         # RSS feed parsing
+│           ├── twitter/route.ts     # X API search
+│           └── nostr/route.ts       # Nostr relay query
+├── components/
+│   ├── layout/                      # AppShell, Sidebar, MobileNav
+│   ├── ui/                          # ScoreBar, ScoreRing, StatCard, etc.
+│   ├── tabs/                        # Dashboard, Feed, Incinerator, Sources, Analytics
+│   ├── sources/                     # ManualInput, URLExtractor, RSS/Twitter/Nostr configs
+│   ├── auth/                        # LoginButton, UserBadge
+│   └── Providers.tsx                # AuthProvider + ContentProvider wrapper
+├── contexts/
+│   ├── AuthContext.tsx               # Internet Identity auth state
+│   └── ContentContext.tsx            # Content CRUD + IC canister sync
+├── lib/
+│   ├── ic/
+│   │   ├── agent.ts                 # HttpAgent creation
+│   │   ├── actor.ts                 # Canister actor factory
+│   │   └── declarations/            # Candid types + IDL factory
+│   ├── types/                       # TypeScript type definitions
+│   └── utils/                       # Score computation, constants
+├── canisters/
+│   └── aegis_backend/
+│       ├── main.mo                  # Motoko canister (persistent actor)
+│       ├── types.mo                 # Type definitions
+│       └── aegis_backend.did        # Candid interface
+├── dfx.json                         # IC project config
+└── next.config.js                   # Webpack polyfills for @dfinity
+```
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- [dfx](https://internetcomputer.org/docs/current/developer-docs/getting-started/install/) (for canister development)
+
+### Local Development
 
 ```bash
+npm install
+cp .env.example .env.local  # Add your ANTHROPIC_API_KEY
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Required
+ANTHROPIC_API_KEY=sk-ant-...
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# IC Mainnet (default)
+NEXT_PUBLIC_IC_HOST=https://icp-api.io
+NEXT_PUBLIC_CANISTER_ID=rluf3-eiaaa-aaaam-qgjuq-cai
+NEXT_PUBLIC_INTERNET_IDENTITY_URL=https://identity.ic0.app
 
-## Learn More
+# IC Local (for canister development)
+# NEXT_PUBLIC_IC_HOST=http://127.0.0.1:4943
+# NEXT_PUBLIC_CANISTER_ID=uxrrr-q7777-77774-qaaaq-cai
+# NEXT_PUBLIC_INTERNET_IDENTITY_URL=http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai
+```
 
-To learn more about Next.js, take a look at the following resources:
+### Canister Development
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Start local replica
+dfx start --background
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Deploy canister locally
+dfx deploy aegis_backend
 
-## Deploy on Vercel
+# Deploy to IC mainnet
+DFX_WARNING=-mainnet_plaintext_identity dfx deploy aegis_backend --network ic --identity default
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Canister Interface
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```candid
+service : {
+  // Queries (free, ~200-500ms)
+  getProfile : (principal) -> (opt UserProfile) query;
+  getEvaluation : (text) -> (opt ContentEvaluation) query;
+  getUserEvaluations : (principal, nat, nat) -> (vec ContentEvaluation) query;
+  getUserAnalytics : (principal) -> (AnalyticsResult) query;
+  getUserSourceConfigs : (principal) -> (vec SourceConfigEntry) query;
+
+  // Updates (cycles cost, ~2s)
+  saveEvaluation : (ContentEvaluation) -> (text);
+  updateEvaluation : (text, bool, bool) -> (bool);
+  batchSaveEvaluations : (vec ContentEvaluation) -> (nat);
+  updateDisplayName : (text) -> (bool);
+  saveSourceConfig : (SourceConfigEntry) -> (text);
+  deleteSourceConfig : (text) -> (bool);
+}
+```
+
+## License
+
+MIT

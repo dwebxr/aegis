@@ -1,0 +1,66 @@
+type Verdict = variant { quality; slop };
+type ContentSource = variant { manual; rss; url; twitter; nostr };
+
+type ScoreBreakdown = record {
+  originality : nat8;
+  insight : nat8;
+  credibility : nat8;
+  compositeScore : float64;
+};
+
+type ContentEvaluation = record {
+  id : text;
+  owner : principal;
+  author : text;
+  avatar : text;
+  text : text;
+  source : ContentSource;
+  sourceUrl : opt text;
+  scores : ScoreBreakdown;
+  verdict : Verdict;
+  reason : text;
+  createdAt : int;
+  validated : bool;
+  flagged : bool;
+};
+
+type UserProfile = record {
+  principal : principal;
+  displayName : opt text;
+  createdAt : int;
+  totalEvaluations : nat;
+  totalQuality : nat;
+  totalSlop : nat;
+};
+
+type AnalyticsResult = record {
+  totalEvaluations : nat;
+  totalQuality : nat;
+  totalSlop : nat;
+  averageComposite : float64;
+  recentCount7d : nat;
+};
+
+type SourceConfigEntry = record {
+  id : text;
+  owner : principal;
+  sourceType : text;
+  configJson : text;
+  enabled : bool;
+  createdAt : int;
+};
+
+service : {
+  getProfile : (principal) -> (opt UserProfile) query;
+  getEvaluation : (text) -> (opt ContentEvaluation) query;
+  getUserEvaluations : (principal, nat, nat) -> (vec ContentEvaluation) query;
+  getUserAnalytics : (principal) -> (AnalyticsResult) query;
+  getUserSourceConfigs : (principal) -> (vec SourceConfigEntry) query;
+
+  saveEvaluation : (ContentEvaluation) -> (text);
+  updateEvaluation : (text, bool, bool) -> (bool);
+  batchSaveEvaluations : (vec ContentEvaluation) -> (nat);
+  updateDisplayName : (text) -> (bool);
+  saveSourceConfig : (SourceConfigEntry) -> (text);
+  deleteSourceConfig : (text) -> (bool);
+};

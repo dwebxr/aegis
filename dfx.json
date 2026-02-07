@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "canisters": {
+    "aegis_backend": {
+      "type": "motoko",
+      "main": "canisters/aegis_backend/main.mo"
+    },
+    "internet_identity": {
+      "type": "pull",
+      "id": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env.ic",
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:4943",
+      "type": "ephemeral",
+      "replica": {
+        "subnet_type": "application"
+      }
+    },
+    "ic": {
+      "providers": ["https://icp-api.io"],
+      "type": "persistent"
+    }
+  }
+}
