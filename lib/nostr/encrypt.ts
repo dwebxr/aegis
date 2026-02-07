@@ -1,9 +1,6 @@
 import { v2 as nip44 } from "nostr-tools/nip44";
 
-/**
- * Encrypt a message for a specific recipient using NIP-44.
- * Ensures relay operators cannot read D2A content exchanges.
- */
+/** NIP-44 encryption — relay operators cannot read D2A exchanges. */
 export function encryptMessage(
   plaintext: string,
   senderSk: Uint8Array,
@@ -13,9 +10,6 @@ export function encryptMessage(
   return nip44.encrypt(plaintext, conversationKey);
 }
 
-/**
- * Decrypt a NIP-44 encrypted message from a sender.
- */
 export function decryptMessage(
   ciphertext: string,
   recipientSk: Uint8Array,

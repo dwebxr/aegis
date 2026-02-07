@@ -19,7 +19,6 @@ interface LearnEvent {
   verdict: "quality" | "slop";
 }
 
-// --- Learning deltas (per plan) ---
 const VALIDATE_TOPIC_DELTA = 0.1;
 const FLAG_TOPIC_DELTA = -0.05;
 const VALIDATE_AUTHOR_DELTA = 0.2;
@@ -37,14 +36,12 @@ export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPr
   const next = structuredClone(profile);
   const now = Date.now();
 
-  // --- Topic affinities ---
   const topicDelta = event.action === "validate" ? VALIDATE_TOPIC_DELTA : FLAG_TOPIC_DELTA;
   for (const topic of event.topics) {
     const current = next.topicAffinities[topic] ?? 0;
     next.topicAffinities[topic] = clamp(current + topicDelta, TOPIC_AFFINITY_FLOOR, TOPIC_AFFINITY_CAP);
   }
 
-  // --- Author trust ---
   if (event.author) {
     const existing: AuthorTrust = next.authorTrust[event.author] ?? { validates: 0, flags: 0, trust: 0 };
     if (event.action === "validate") {
@@ -57,7 +54,6 @@ export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPr
     next.authorTrust[event.author] = existing;
   }
 
-  // --- Calibration threshold ---
   if (event.action === "validate" && event.composite >= BORDERLINE_LOW && event.composite <= BORDERLINE_HIGH) {
     next.calibration.qualityThreshold = Math.max(1, next.calibration.qualityThreshold + THRESHOLD_LOWER);
   }
@@ -65,14 +61,12 @@ export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPr
     next.calibration.qualityThreshold = Math.min(9, next.calibration.qualityThreshold + THRESHOLD_RAISE);
   }
 
-  // --- Counters ---
   if (event.action === "validate") {
     next.totalValidated += 1;
   } else {
     next.totalFlagged += 1;
   }
 
-  // --- Recent topics (sliding window) ---
   for (const topic of event.topics) {
     next.recentTopics.push({ topic, timestamp: now, weight: 1 });
   }
@@ -109,7 +103,6 @@ export function getContext(profile: UserPreferenceProfile): UserContext {
     .slice(0, 10)
     .map(([k]) => k);
 
-  // Deduplicate recent topics, weighted by recency
   const seen = new Set<string>();
   const recentTopics: string[] = [];
   for (const rt of [...profile.recentTopics].sort((a, b) => b.timestamp - a.timestamp)) {

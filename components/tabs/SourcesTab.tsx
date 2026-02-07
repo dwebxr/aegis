@@ -85,7 +85,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const inputStyle: React.CSSProperties = {
     width: "100%", background: "#0c1322", border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: 10, padding: "10px 14px", color: "#e2e8f0", fontSize: 13,
-    fontFamily: "inherit", outline: "none", boxSizing: "border-box" as const,
+    fontFamily: "inherit", outline: "none", boxSizing: "border-box",
   };
 
   const btnStyle = (disabled: boolean, loading: boolean): React.CSSProperties => ({

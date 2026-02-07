@@ -29,7 +29,6 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   const [profile, setProfile] = useState<UserPreferenceProfile>(emptyProfile);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load profile when user authenticates
   useEffect(() => {
     if (isAuthenticated && principalText) {
       setProfile(loadProfile(principalText));
@@ -38,7 +37,6 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     }
   }, [isAuthenticated, principalText]);
 
-  // Debounced save to localStorage
   const debouncedSave = useCallback((p: UserPreferenceProfile) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => saveProfile(p), 500);

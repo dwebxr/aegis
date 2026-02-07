@@ -81,6 +81,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      setIsAnalyzing(false);
+      throw new Error(`Analyze API returned ${res.status}: ${res.statusText}`);
+    }
     const data = await res.json();
     setIsAnalyzing(false);
 
@@ -132,7 +136,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         createdAt: BigInt(evaluation.createdAt * 1_000_000),
         validated: evaluation.validated,
         flagged: evaluation.flagged,
-      }).catch(() => {});
+      }).catch((err: unknown) => console.warn("IC saveEvaluation failed:", err));
     }
 
     return result;
@@ -145,7 +149,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         preferenceCallbacks.onValidate(item.topics || [], item.author, item.scores.composite, item.verdict);
       }
       if (item && actorRef.current && isAuthenticated) {
-        actorRef.current.updateEvaluation(id, true, item.flagged).catch(() => {});
+        actorRef.current.updateEvaluation(id, true, item.flagged)
+          .catch((err: unknown) => console.warn("IC updateEvaluation (validate) failed:", err));
       }
       return prev.map(c => c.id === id ? { ...c, validated: true } : c);
     });
@@ -158,14 +163,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         preferenceCallbacks.onFlag(item.topics || [], item.author, item.scores.composite, item.verdict);
       }
       if (actorRef.current && isAuthenticated) {
-        actorRef.current.updateEvaluation(id, false, true).catch(() => {});
+        actorRef.current.updateEvaluation(id, false, true)
+          .catch((err: unknown) => console.warn("IC updateEvaluation (flag) failed:", err));
       }
-      return prev.map(c => c.id === id ? {
-        ...c,
-        verdict: "slop" as const,
-        scores: { ...c.scores, composite: 1.0 },
-        flagged: true,
-      } : c);
+      return prev.map(c => c.id === id ? { ...c, flagged: true } : c);
     });
   }, [isAuthenticated, preferenceCallbacks]);
 

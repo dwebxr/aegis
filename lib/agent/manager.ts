@@ -65,7 +65,7 @@ export class AgentManager {
 
     // Periodic presence
     this.presenceInterval = setInterval(() => {
-      this.broadcastMyPresence();
+      this.broadcastMyPresence().catch(err => console.warn("Presence broadcast failed:", err));
     }, PRESENCE_BROADCAST_INTERVAL_MS);
 
     // Initial peer discovery
@@ -73,7 +73,7 @@ export class AgentManager {
 
     // Periodic discovery
     this.discoveryInterval = setInterval(() => {
-      this.discoverAndNegotiate();
+      this.discoverAndNegotiate().catch(err => console.warn("Discovery/negotiate failed:", err));
     }, DISCOVERY_POLL_INTERVAL_MS);
 
     // Subscribe to incoming D2A messages

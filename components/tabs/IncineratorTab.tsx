@@ -6,19 +6,18 @@ import { SignalComposer } from "@/components/ui/SignalComposer";
 import type { AnalyzeResponse } from "@/lib/types/api";
 
 interface IncineratorTabProps {
-  isProc: boolean;
+  isAnalyzing: boolean;
   onAnalyze: (text: string) => Promise<AnalyzeResponse>;
   onPublishSignal?: (text: string, scores: AnalyzeResponse) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
-  isAnalyzing: boolean;
   nostrPubkey?: string | null;
   mobile?: boolean;
 }
 
-export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isProc, onAnalyze, onPublishSignal, isAnalyzing, nostrPubkey, mobile }) => {
+export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, nostrPubkey, mobile }) => {
   const stages: Array<[string, string, boolean, string]> = [
-    ["S1", "Semantic Dedup", isProc, "#818cf8"],
-    ["S2", "Structural", isProc, "#38bdf8"],
-    ["S3", "LLM Score", isProc, "#fbbf24"],
+    ["S1", "Heuristic Filter", isAnalyzing, "#818cf8"],
+    ["S2", "Structural", isAnalyzing, "#38bdf8"],
+    ["S3", "LLM Score", isAnalyzing, "#fbbf24"],
     ["S4", "Cross-Valid", false, "#94a3b8"],
   ];
 
@@ -30,7 +29,7 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isProc, onAnalyz
       </div>
 
       <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 18, padding: mobile ? 18 : 28, marginBottom: 18 }}>
-        <IncineratorViz active={isProc} mobile={mobile} />
+        <IncineratorViz active={isAnalyzing} mobile={mobile} />
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 8, marginTop: 16 }}>
           {stages.map(([s, n, a, c]) => (
             <div key={s} style={{ textAlign: "center", padding: "10px 6px", background: "rgba(0,0,0,0.2)", borderRadius: 10 }}>

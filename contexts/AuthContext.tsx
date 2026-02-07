@@ -43,6 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPrincipal(id.getPrincipal());
       }
       setIsLoading(false);
+    }).catch((err) => {
+      console.error("AuthClient.create() failed:", err);
+      setIsLoading(false);
     });
   }, []);
 

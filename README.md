@@ -1,6 +1,6 @@
-# Aegis - AI Content Quality Filter
+# Aegis — D2A Social Agent Platform
 
-AI-powered content quality filtering and evaluation platform built on Next.js and Internet Computer.
+Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol.
 
 ## Live
 
@@ -10,32 +10,53 @@ AI-powered content quality filtering and evaluation platform built on Next.js an
 ## Architecture
 
 ```
-Frontend (Next.js / Vercel)          Internet Computer (Mainnet)
-┌──────────────────────────┐         ┌──────────────────────────┐
-│  Dashboard / Feed / Burn │         │  aegis_backend canister  │
-│  Sources / Analytics     │◄───────►│  (Motoko)                │
-│                          │         │                          │
-│  API Routes:             │         │  - Evaluation storage    │
-│  POST /api/analyze       │         │  - User profiles         │
-│  POST /api/fetch/url     │         │  - Source configs        │
-│  POST /api/fetch/rss     │         │  - Analytics queries     │
-│  POST /api/fetch/twitter │         │                          │
-│  POST /api/fetch/nostr   │         │  Internet Identity auth  │
-└───────────┬──────────────┘         └──────────────────────────┘
+Browser                                  Internet Computer (Mainnet)
+┌───────────────────────────────────┐    ┌──────────────────────────┐
+│  Next.js 14 (App Router)         │    │  aegis_backend canister  │
+│                                   │    │  (Motoko)                │
+│  Tabs:                            │    │                          │
+│    Dashboard / Briefing / Burn    │◄──►│  - Evaluation storage    │
+│    Sources / Analytics            │    │  - User profiles         │
+│                                   │    │  - Source configs         │
+│  API Routes:                      │    │  - Analytics queries     │
+│    POST /api/analyze              │    │                          │
+│    POST /api/fetch/{url,rss,      │    │  Internet Identity auth  │
+│         twitter,nostr}            │    └──────────────────────────┘
+│                                   │
+│  Client-side:                     │    Nostr Relays
+│    Preference learning engine     │◄──►┌──────────────────────────┐
+│    Briefing ranker                │    │  Signal publishing       │
+│    Nostr identity (IC-derived)    │    │  D2A agent discovery     │
+│    D2A agent manager              │    │  Encrypted handshakes    │
+└───────────┬───────────────────────┘    └──────────────────────────┘
             │
             ▼
    Anthropic Claude API
-   (Content analysis)
+   (V/C/L scoring + fallback heuristics)
 ```
 
 ## Features
 
-- **AI Content Analysis** - Evaluates content quality using Claude with fallback heuristics
-- **Multi-source Ingestion** - Manual input, RSS feeds, URL extraction, X (Twitter), Nostr
-- **Quality Scoring** - Originality, Insight, Credibility breakdown with composite score (0-10)
-- **Verdict System** - Binary quality/slop classification with detailed reasoning
-- **Decentralized Storage** - Evaluations persisted on Internet Computer canisters
-- **Internet Identity Auth** - Passwordless authentication via ICP
+### Personalization Engine
+- Learns from Validate/Flag feedback — topic affinities, author trust, quality threshold calibration
+- Scoring: `S = (V_signal * C_context) / (L_slop + 0.5)` with per-user context
+- Profile stored in localStorage (primary) with IC canister sync
+
+### Zero Feed Briefing
+- Ranks content by composite score, topic relevance, author trust, and recency
+- Surfaces 3-5 priority items + 1 serendipity pick (high novelty, outside your bubble)
+- Background ingestion from configured sources with quick heuristic pre-filter
+
+### Signal Publishing
+- Deterministic Nostr keypair derived from IC Principal (no extra key management)
+- Self-evaluated posts published as Kind 1 events with `aegis-score` tags
+- Client-side signing — private key never leaves the browser
+
+### D2A Agent Communication
+- Agents broadcast topic interests via NIP-78 replaceable events
+- Peer discovery with Jaccard resonance matching
+- Content negotiation over ephemeral Nostr events (Kind 21078)
+- NIP-44 encrypted delivery — relay operators cannot read exchanges
 
 ## Tech Stack
 
@@ -44,49 +65,75 @@ Frontend (Next.js / Vercel)          Internet Computer (Mainnet)
 | Frontend | Next.js 14 (App Router), React 18, TypeScript |
 | Styling | CSS-in-JS (inline styles), dark theme |
 | Backend API | Next.js API Routes (Vercel Serverless) |
-| AI | Anthropic Claude (claude-sonnet-4-20250514) |
+| AI | Anthropic Claude (claude-sonnet-4-20250514) + fallback heuristics |
 | Blockchain | Internet Computer (Motoko canister) |
 | Auth | Internet Identity (@dfinity/auth-client 2.1.3) |
+| Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
+| Test | Jest + ts-jest (164 tests, 12 suites) |
 
 ## Project Structure
 
 ```
 aegis/
 ├── app/
-│   ├── page.tsx                     # Main app page
-│   ├── layout.tsx                   # Root layout + providers
+│   ├── page.tsx                         # Main app page
+│   ├── layout.tsx                       # Root layout + providers
 │   └── api/
-│       ├── analyze/route.ts         # Anthropic Claude evaluation
+│       ├── analyze/route.ts             # Claude V/C/L scoring + fallback
 │       └── fetch/
-│           ├── url/route.ts         # URL article extraction
-│           ├── rss/route.ts         # RSS feed parsing
-│           ├── twitter/route.ts     # X API search
-│           └── nostr/route.ts       # Nostr relay query
+│           ├── url/route.ts             # URL article extraction
+│           ├── rss/route.ts             # RSS feed parsing
+│           ├── twitter/route.ts         # X API search
+│           └── nostr/route.ts           # Nostr relay query
 ├── components/
-│   ├── layout/                      # AppShell, Sidebar, MobileNav
-│   ├── ui/                          # ScoreBar, ScoreRing, StatCard, etc.
-│   ├── tabs/                        # Dashboard, Feed, Incinerator, Sources, Analytics
-│   ├── sources/                     # ManualInput, URLExtractor, RSS/Twitter/Nostr configs
-│   ├── auth/                        # LoginButton, UserBadge
-│   └── Providers.tsx                # AuthProvider + ContentProvider wrapper
+│   ├── layout/                          # AppShell, Sidebar, MobileNav
+│   ├── tabs/                            # Dashboard, Briefing, Incinerator, Sources, Analytics
+│   ├── ui/                              # ContentCard, ScoreRing, SignalComposer, AgentStatusBadge
+│   ├── sources/                         # ManualInput
+│   ├── auth/                            # LoginButton, UserBadge
+│   └── Providers.tsx                    # Auth + Content + Preference + Agent providers
 ├── contexts/
-│   ├── AuthContext.tsx               # Internet Identity auth state
-│   └── ContentContext.tsx            # Content CRUD + IC canister sync
+│   ├── AuthContext.tsx                   # Internet Identity auth state
+│   ├── ContentContext.tsx               # Content CRUD + IC sync
+│   ├── PreferenceContext.tsx            # Preference learning lifecycle
+│   └── AgentContext.tsx                 # D2A agent lifecycle
 ├── lib/
+│   ├── preferences/
+│   │   ├── types.ts                     # UserPreferenceProfile
+│   │   ├── engine.ts                    # learn(), getContext(), hasEnoughData()
+│   │   └── storage.ts                   # localStorage R/W
+│   ├── briefing/
+│   │   ├── ranker.ts                    # briefingScore, generateBriefing, serendipity
+│   │   └── types.ts                     # BriefingResult, BriefingItem
+│   ├── ingestion/
+│   │   ├── scheduler.ts                 # Background fetch cycle
+│   │   └── quickFilter.ts              # Heuristic pre-filter
+│   ├── nostr/
+│   │   ├── identity.ts                  # IC Principal -> Nostr keypair
+│   │   ├── publish.ts                   # Kind 1 event signing + relay publish
+│   │   ├── encrypt.ts                   # NIP-44 encrypt/decrypt
+│   │   └── types.ts                     # AegisNostrEvent
+│   ├── agent/
+│   │   ├── protocol.ts                  # D2A constants (kinds, tags, thresholds)
+│   │   ├── discovery.ts                 # Presence broadcast + peer discovery
+│   │   ├── handshake.ts                # Offer/accept/reject/deliver messaging
+│   │   ├── manager.ts                   # AgentManager orchestrator
+│   │   └── types.ts                     # AgentProfile, HandshakeState, D2AMessage
 │   ├── ic/
-│   │   ├── agent.ts                 # HttpAgent creation
-│   │   ├── actor.ts                 # Canister actor factory
-│   │   └── declarations/            # Candid types + IDL factory
-│   ├── types/                       # TypeScript type definitions
-│   └── utils/                       # Score computation, constants
+│   │   ├── agent.ts                     # HttpAgent creation
+│   │   ├── actor.ts                     # Canister actor factory
+│   │   └── declarations/               # Candid types + IDL factory
+│   ├── types/                           # ContentItem, API response types
+│   └── utils/                           # Score computation, constants
+├── __tests__/                           # 164 tests across 12 suites
 ├── canisters/
 │   └── aegis_backend/
-│       ├── main.mo                  # Motoko canister (persistent actor)
-│       ├── types.mo                 # Type definitions
-│       └── aegis_backend.did        # Candid interface
-├── dfx.json                         # IC project config
-└── next.config.js                   # Webpack polyfills for @dfinity
+│       ├── main.mo                      # Motoko canister (persistent actor)
+│       ├── types.mo                     # Type definitions
+│       └── aegis_backend.did            # Candid interface
+├── dfx.json                             # IC project config
+└── next.config.js                       # Webpack polyfills for @dfinity
 ```
 
 ## Getting Started
@@ -102,6 +149,13 @@ aegis/
 npm install
 cp .env.example .env.local  # Add your ANTHROPIC_API_KEY
 npm run dev
+```
+
+### Tests
+
+```bash
+npm test              # Run all 164 tests
+npm run test:watch    # Watch mode
 ```
 
 ### Environment Variables
@@ -124,13 +178,10 @@ NEXT_PUBLIC_INTERNET_IDENTITY_URL=https://identity.ic0.app
 ### Canister Development
 
 ```bash
-# Start local replica
 dfx start --background
-
-# Deploy canister locally
 dfx deploy aegis_backend
 
-# Deploy to IC mainnet
+# Mainnet
 DFX_WARNING=-mainnet_plaintext_identity dfx deploy aegis_backend --network ic --identity default
 ```
 
@@ -138,14 +189,14 @@ DFX_WARNING=-mainnet_plaintext_identity dfx deploy aegis_backend --network ic --
 
 ```candid
 service : {
-  // Queries (free, ~200-500ms)
+  // Queries
   getProfile : (principal) -> (opt UserProfile) query;
   getEvaluation : (text) -> (opt ContentEvaluation) query;
   getUserEvaluations : (principal, nat, nat) -> (vec ContentEvaluation) query;
   getUserAnalytics : (principal) -> (AnalyticsResult) query;
   getUserSourceConfigs : (principal) -> (vec SourceConfigEntry) query;
 
-  // Updates (cycles cost, ~2s)
+  // Updates
   saveEvaluation : (ContentEvaluation) -> (text);
   updateEvaluation : (text, bool, bool) -> (bool);
   batchSaveEvaluations : (vec ContentEvaluation) -> (nat);

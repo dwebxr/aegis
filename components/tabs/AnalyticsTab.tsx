@@ -16,6 +16,14 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, mobile }) =
   const slop = content.filter(c => c.verdict === "slop");
   const accuracy = content.length > 0 ? ((qual.length / content.length) * 100).toFixed(1) : "0.0";
 
+  // Compute real validated/flagged counts for false positive estimate
+  const validated = content.filter(c => c.validated);
+  const flagged = content.filter(c => c.flagged);
+  const userReviewed = validated.length + flagged.length;
+  // False positive: items scored "quality" but user flagged them
+  const falsePositives = content.filter(c => c.verdict === "quality" && c.flagged).length;
+  const falsePositiveRate = userReviewed > 0 ? ((falsePositives / userReviewed) * 100).toFixed(1) : "--";
+
   const sourceDistribution: Record<string, number> = {};
   for (const c of content) {
     sourceDistribution[c.source] = (sourceDistribution[c.source] || 0) + 1;
@@ -35,16 +43,16 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, mobile }) =
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(3,1fr)", gap: mobile ? 10 : 14, marginBottom: mobile ? 18 : 22 }}>
-        <StatCard icon={<ShieldIcon s={16} />} label="Accuracy" value={`${accuracy}%`} sub="+2.1% vs last week" color="#34d399" mobile={mobile} />
-        <StatCard icon={<FireIcon s={16} />} label="False Positive" value="3.8%" sub="-0.5%" color="#fbbf24" mobile={mobile} />
-        <StatCard icon={<ZapIcon s={16} />} label="Avg Latency" value="1.8s" sub="per item" color="#818cf8" mobile={mobile} />
+        <StatCard icon={<ShieldIcon s={16} />} label="Accuracy" value={`${accuracy}%`} sub={`${qual.length} quality / ${content.length} total`} color="#34d399" mobile={mobile} />
+        <StatCard icon={<FireIcon s={16} />} label="False Positive" value={falsePositiveRate === "--" ? "--" : `${falsePositiveRate}%`} sub={userReviewed > 0 ? `${userReviewed} user-reviewed` : "no reviews yet"} color="#fbbf24" mobile={mobile} />
+        <StatCard icon={<ZapIcon s={16} />} label="User Reviews" value={userReviewed} sub={`${validated.length} validated, ${flagged.length} flagged`} color="#818cf8" mobile={mobile} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: mobile ? 12 : 16, marginBottom: mobile ? 18 : 22 }}>
         <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: mobile ? 16 : 20 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", marginBottom: 14 }}>Score Distribution</div>
           <BarChart
-            data={scoreBuckets.length > 0 && scoreBuckets.some(v => v > 0) ? scoreBuckets : [3, 8, 15, 22, 35, 28, 18, 12, 8, 5]}
+            data={scoreBuckets}
             labels={["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
             color="#38bdf8"
           />
@@ -52,15 +60,15 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, mobile }) =
         <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: mobile ? 16 : 20 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", marginBottom: 14 }}>Content Sources</div>
           <BarChart
-            data={Object.keys(sourceDistribution).length > 0 ? Object.values(sourceDistribution) : [65, 20, 10, 5]}
-            labels={Object.keys(sourceDistribution).length > 0 ? Object.keys(sourceDistribution) : ["Twitter", "Nostr", "RSS", "Manual"]}
+            data={Object.values(sourceDistribution)}
+            labels={Object.keys(sourceDistribution)}
             color="#a78bfa"
           />
         </div>
       </div>
 
       <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: mobile ? 16 : 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", marginBottom: 14 }}>Evaluation Volume (7d)</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", marginBottom: 14 }}>Evaluation Summary</div>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: mobile ? 8 : 12 }}>
           {[
             ["Total Evaluated", String(content.length), "#38bdf8"],

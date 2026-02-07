@@ -12,21 +12,17 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
-const navItems: NavItem[] = [
-  { id: "dashboard", icon: <ShieldIcon s={18} />, label: "Home" },
-  { id: "briefing", icon: <SearchIcon s={18} />, label: "Briefing" },
-  { id: "incinerator", icon: <FireIcon s={18} />, label: "Burn" },
-  { id: "sources", icon: <RSSIcon s={18} />, label: "Sources" },
-  { id: "analytics", icon: <ChartIcon s={18} />, label: "Stats" },
-];
+const NAV_CONFIG = [
+  { id: "dashboard", Icon: ShieldIcon, label: "Home" },
+  { id: "briefing", Icon: SearchIcon, label: "Briefing" },
+  { id: "incinerator", Icon: FireIcon, label: "Burn" },
+  { id: "sources", Icon: RSSIcon, label: "Sources" },
+  { id: "analytics", Icon: ChartIcon, label: "Stats" },
+] as const;
 
-const mobileNavItems: NavItem[] = [
-  { id: "dashboard", icon: <ShieldIcon s={22} />, label: "Home" },
-  { id: "briefing", icon: <SearchIcon s={22} />, label: "Briefing" },
-  { id: "incinerator", icon: <FireIcon s={22} />, label: "Burn" },
-  { id: "sources", icon: <RSSIcon s={22} />, label: "Sources" },
-  { id: "analytics", icon: <ChartIcon s={22} />, label: "Stats" },
-];
+function buildNavItems(size: number): NavItem[] {
+  return NAV_CONFIG.map(n => ({ id: n.id, icon: <n.Icon s={size} />, label: n.label }));
+}
 
 export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, children }) => {
   const { mobile, tablet } = useWindowSize();
@@ -34,7 +30,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
   return (
     <div style={{ display: "flex", flexDirection: mobile ? "column" : "row", height: "100vh", background: "#0a0f1e", fontFamily: "'Outfit','Noto Sans JP',-apple-system,sans-serif", color: "#e2e8f0", overflow: "hidden", position: "relative" }}>
       {!mobile && (
-        <Sidebar navItems={navItems} activeTab={activeTab} onTabChange={onTabChange} collapsed={tablet} />
+        <Sidebar navItems={buildNavItems(18)} activeTab={activeTab} onTabChange={onTabChange} collapsed={tablet} />
       )}
 
       <main style={{ flex: 1, overflow: "auto", padding: mobile ? "16px 14px 90px" : tablet ? "24px 24px" : "28px 32px" }}>
@@ -42,7 +38,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
       </main>
 
       {mobile && (
-        <MobileNav navItems={mobileNavItems} activeTab={activeTab} onTabChange={onTabChange} />
+        <MobileNav navItems={buildNavItems(22)} activeTab={activeTab} onTabChange={onTabChange} />
       )}
     </div>
   );

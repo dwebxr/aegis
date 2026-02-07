@@ -17,25 +17,30 @@ export function loadProfile(principalId: string): UserPreferenceProfile {
       return createEmptyProfile(principalId);
     }
     return parsed;
-  } catch {
+  } catch (err) {
+    console.warn("Failed to load preference profile:", err);
     return createEmptyProfile(principalId);
   }
 }
 
-export function saveProfile(profile: UserPreferenceProfile): void {
-  if (typeof window === "undefined") return;
+export function saveProfile(profile: UserPreferenceProfile): boolean {
+  if (typeof window === "undefined") return false;
   try {
     localStorage.setItem(storageKey(profile.principalId), JSON.stringify(profile));
-  } catch {
-    // localStorage full or unavailable — silently fail
+    return true;
+  } catch (err) {
+    console.warn("Failed to save preference profile (localStorage may be full):", err);
+    return false;
   }
 }
 
-export function clearProfile(principalId: string): void {
-  if (typeof window === "undefined") return;
+export function clearProfile(principalId: string): boolean {
+  if (typeof window === "undefined") return false;
   try {
     localStorage.removeItem(storageKey(principalId));
-  } catch {
-    // ignore
+    return true;
+  } catch (err) {
+    console.warn("Failed to clear preference profile:", err);
+    return false;
   }
 }

@@ -36,7 +36,6 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         </p>
       </div>
 
-      {/* Priority cards */}
       {briefing.priority.length > 0 ? (
         <div>
           {briefing.priority.map((b, i) => (
@@ -70,7 +69,6 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         </div>
       )}
 
-      {/* Serendipity card */}
       {briefing.serendipity && (
         <div style={{ marginTop: 8, animation: `slideUp .3s ease ${briefing.priority.length * 0.06 + 0.1}s both` }}>
           <ContentCard
@@ -85,7 +83,6 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         </div>
       )}
 
-      {/* Filtered out section */}
       {briefing.filteredOut.length > 0 && (
         <div style={{ marginTop: 20 }}>
           <button

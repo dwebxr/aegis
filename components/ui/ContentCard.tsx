@@ -122,7 +122,6 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
       borderLeft, position: variant !== "default" ? "relative" : undefined,
       overflow: variant === "serendipity" ? "hidden" : undefined,
     }}>
-      {/* Rank badge (priority) */}
       {variant === "priority" && rank !== undefined && (
         <div style={{
           position: "absolute", top: mobile ? 10 : 14, right: mobile ? 10 : 16,
@@ -135,7 +134,6 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
         </div>
       )}
 
-      {/* Serendipity label */}
       {variant === "serendipity" && (
         <div style={{
           position: "absolute", top: 0, right: 0,

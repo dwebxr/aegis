@@ -13,10 +13,7 @@ import {
   PEER_EXPIRY_MS,
 } from "./protocol";
 
-/**
- * Calculate resonance between our preferences and a peer's agent profile.
- * Returns 0-1. Higher = more compatible topic overlap.
- */
+/** Returns 0-1 Jaccard similarity of high-affinity topics vs peer interests. */
 export function calculateResonance(
   myPrefs: UserPreferenceProfile,
   theirProfile: AgentProfile,
@@ -38,10 +35,7 @@ export function calculateResonance(
   return union > 0 ? overlap / union : 0;
 }
 
-/**
- * Broadcast our agent presence to Nostr relays.
- * Uses NIP-78 replaceable event (Kind 30078).
- */
+/** NIP-78 replaceable event (Kind 30078). */
 export async function broadcastPresence(
   sk: Uint8Array,
   interests: string[],
@@ -71,9 +65,6 @@ export async function broadcastPresence(
   pool.destroy();
 }
 
-/**
- * Discover peer agent profiles from Nostr relays.
- */
 export async function discoverPeers(
   myPubkey: string,
   myPrefs: UserPreferenceProfile,
@@ -94,7 +85,6 @@ export async function discoverPeers(
   const peers: AgentProfile[] = [];
 
   for (const ev of events) {
-    // Skip our own profile
     if (ev.pubkey === myPubkey) continue;
 
     const interests: string[] = [];
@@ -129,7 +119,6 @@ export async function discoverPeers(
     }
   }
 
-  // Filter by resonance threshold and sort
   return Array.from(byPubkey.values())
     .filter(p => (p.resonance ?? 0) >= RESONANCE_THRESHOLD)
     .sort((a, b) => (b.resonance ?? 0) - (a.resonance ?? 0));

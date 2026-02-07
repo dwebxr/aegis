@@ -15,10 +15,7 @@ export interface PublishResult {
   relaysFailed: string[];
 }
 
-/**
- * Sign and publish a Nostr event to configured relays.
- * Done entirely client-side — the private key never leaves the browser.
- */
+/** Client-side only — private key never leaves the browser. */
 export async function publishSignalToNostr(
   text: string,
   sk: Uint8Array,
@@ -57,9 +54,6 @@ export async function publishSignalToNostr(
   };
 }
 
-/**
- * Build Aegis-standard tags for a signal event.
- */
 export function buildAegisTags(
   composite: number,
   vSignal: number | undefined,

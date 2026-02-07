@@ -26,8 +26,6 @@ export default function AegisApp() {
   const { userContext, profile } = usePreferences();
 
   const [tab, setTab] = useState("dashboard");
-  const [isProc, setIsProc] = useState(false);
-  const [procCnt, setProcCnt] = useState(0);
 
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
@@ -41,7 +39,7 @@ export default function AegisApp() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadFromIC().catch(() => {});
+      loadFromIC().catch((err: unknown) => console.warn("Failed to load from IC:", err));
     }
   }, [isAuthenticated, loadFromIC]);
 
@@ -66,17 +64,6 @@ export default function AegisApp() {
     return () => scheduler.stop();
   }, [addContent, getSourceConfigs]);
 
-  useEffect(() => {
-    const iv = setInterval(() => setProcCnt(p => p + Math.floor(Math.random() * 3)), 3000);
-    return () => clearInterval(iv);
-  }, []);
-
-  useEffect(() => {
-    const run = () => { setIsProc(true); setTimeout(() => setIsProc(false), 3500); };
-    run();
-    const iv = setInterval(run, 7000);
-    return () => clearInterval(iv);
-  }, []);
 
   const handleValidate = (id: string) => {
     validateItem(id);
@@ -89,12 +76,18 @@ export default function AegisApp() {
   };
 
   const handleAnalyze = async (text: string) => {
-    const result = await analyze(text, userContext);
-    addNotification(
-      result.verdict === "quality" ? "Quality confirmed \u2713" : "Slop identified \uD83D\uDD25",
-      result.verdict === "quality" ? "success" : "error"
-    );
-    return result;
+    try {
+      const result = await analyze(text, userContext);
+      addNotification(
+        result.verdict === "quality" ? "Quality confirmed \u2713" : "Slop identified \uD83D\uDD25",
+        result.verdict === "quality" ? "success" : "error"
+      );
+      return result;
+    } catch (err) {
+      console.error("Analysis failed:", err);
+      addNotification("Analysis failed — check connection", "error");
+      throw err;
+    }
   };
 
   const handlePublishSignal = useCallback(async (
@@ -151,14 +144,13 @@ export default function AegisApp() {
 
   return (
     <AppShell activeTab={tab} onTabChange={setTab}>
-      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} procCnt={procCnt} />}
+      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} />}
       {tab === "briefing" && <BriefingTab content={content} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} />}
       {tab === "incinerator" && (
         <IncineratorTab
-          isProc={isProc}
+          isAnalyzing={isAnalyzing}
           onAnalyze={handleAnalyze}
           onPublishSignal={isAuthenticated ? handlePublishSignal : undefined}
-          isAnalyzing={isAnalyzing}
           nostrPubkey={nostrKeys?.pk || null}
           mobile={mobile}
         />

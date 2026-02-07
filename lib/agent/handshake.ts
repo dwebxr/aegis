@@ -12,10 +12,61 @@ import {
   HANDSHAKE_TIMEOUT_MS,
 } from "./protocol";
 
-/**
- * Send a content offer to a peer.
- * "I have content about {topic} scoring {score}. Want it?"
- */
+interface RelayResult {
+  published: string[];
+  failed: string[];
+}
+
+async function publishToRelays(
+  sk: Uint8Array,
+  template: EventTemplate,
+  relayUrls: string[],
+): Promise<RelayResult> {
+  const signed = finalizeEvent(template, sk);
+  const pool = new SimplePool();
+  const results = await Promise.allSettled(pool.publish(relayUrls, signed));
+  pool.destroy();
+
+  const published: string[] = [];
+  const failed: string[] = [];
+  results.forEach((result, i) => {
+    if (result.status === "fulfilled") {
+      published.push(relayUrls[i]);
+    } else {
+      console.warn(`Relay ${relayUrls[i]} publish failed:`, result.reason);
+      failed.push(relayUrls[i]);
+    }
+  });
+
+  return { published, failed };
+}
+
+async function sendD2AMessage(
+  sk: Uint8Array,
+  myPubkey: string,
+  peerPubkey: string,
+  type: D2AMessage["type"],
+  tag: string,
+  payload: D2AMessage["payload"],
+  relayUrls: string[],
+): Promise<RelayResult> {
+  const message: D2AMessage = { type, fromPubkey: myPubkey, toPubkey: peerPubkey, payload };
+  const encrypted = encryptMessage(JSON.stringify(message), sk, peerPubkey);
+
+  const template: EventTemplate = {
+    kind: KIND_EPHEMERAL,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [["p", peerPubkey], ["d2a", tag]],
+    content: encrypted,
+  };
+
+  const result = await publishToRelays(sk, template, relayUrls);
+  if (result.published.length === 0) {
+    console.warn(`D2A ${type} to ${peerPubkey} failed on all relays`);
+  }
+  return result;
+}
+
 export async function sendOffer(
   sk: Uint8Array,
   myPubkey: string,
@@ -23,31 +74,7 @@ export async function sendOffer(
   offer: D2AOfferPayload,
   relayUrls: string[],
 ): Promise<HandshakeState> {
-  const message: D2AMessage = {
-    type: "offer",
-    fromPubkey: myPubkey,
-    toPubkey: peerPubkey,
-    payload: offer,
-  };
-
-  const encrypted = encryptMessage(JSON.stringify(message), sk, peerPubkey);
-
-  const template: EventTemplate = {
-    kind: KIND_EPHEMERAL,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["p", peerPubkey],
-      ["d2a", TAG_D2A_OFFER],
-    ],
-    content: encrypted,
-  };
-
-  const signed = finalizeEvent(template, sk);
-
-  const pool = new SimplePool();
-  await Promise.allSettled(pool.publish(relayUrls, signed));
-  pool.destroy();
-
+  await sendD2AMessage(sk, myPubkey, peerPubkey, "offer", TAG_D2A_OFFER, offer, relayUrls);
   return {
     peerId: peerPubkey,
     phase: "offered",
@@ -57,115 +84,24 @@ export async function sendOffer(
   };
 }
 
-/**
- * Send acceptance of a content offer.
- */
 export async function sendAccept(
-  sk: Uint8Array,
-  myPubkey: string,
-  peerPubkey: string,
-  relayUrls: string[],
-): Promise<void> {
-  const message: D2AMessage = {
-    type: "accept",
-    fromPubkey: myPubkey,
-    toPubkey: peerPubkey,
-    payload: {},
-  };
-
-  const encrypted = encryptMessage(JSON.stringify(message), sk, peerPubkey);
-
-  const template: EventTemplate = {
-    kind: KIND_EPHEMERAL,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["p", peerPubkey],
-      ["d2a", TAG_D2A_ACCEPT],
-    ],
-    content: encrypted,
-  };
-
-  const signed = finalizeEvent(template, sk);
-
-  const pool = new SimplePool();
-  await Promise.allSettled(pool.publish(relayUrls, signed));
-  pool.destroy();
+  sk: Uint8Array, myPubkey: string, peerPubkey: string, relayUrls: string[],
+): Promise<RelayResult> {
+  return sendD2AMessage(sk, myPubkey, peerPubkey, "accept", TAG_D2A_ACCEPT, {}, relayUrls);
 }
 
-/**
- * Send rejection of a content offer.
- */
 export async function sendReject(
-  sk: Uint8Array,
-  myPubkey: string,
-  peerPubkey: string,
-  relayUrls: string[],
-): Promise<void> {
-  const message: D2AMessage = {
-    type: "reject",
-    fromPubkey: myPubkey,
-    toPubkey: peerPubkey,
-    payload: {},
-  };
-
-  const encrypted = encryptMessage(JSON.stringify(message), sk, peerPubkey);
-
-  const template: EventTemplate = {
-    kind: KIND_EPHEMERAL,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["p", peerPubkey],
-      ["d2a", TAG_D2A_REJECT],
-    ],
-    content: encrypted,
-  };
-
-  const signed = finalizeEvent(template, sk);
-
-  const pool = new SimplePool();
-  await Promise.allSettled(pool.publish(relayUrls, signed));
-  pool.destroy();
+  sk: Uint8Array, myPubkey: string, peerPubkey: string, relayUrls: string[],
+): Promise<RelayResult> {
+  return sendD2AMessage(sk, myPubkey, peerPubkey, "reject", TAG_D2A_REJECT, {}, relayUrls);
 }
 
-/**
- * Deliver full content to a peer (NIP-44 encrypted).
- */
 export async function deliverContent(
-  sk: Uint8Array,
-  myPubkey: string,
-  peerPubkey: string,
-  content: D2ADeliverPayload,
-  relayUrls: string[],
-): Promise<void> {
-  const message: D2AMessage = {
-    type: "deliver",
-    fromPubkey: myPubkey,
-    toPubkey: peerPubkey,
-    payload: content,
-  };
-
-  const encrypted = encryptMessage(JSON.stringify(message), sk, peerPubkey);
-
-  const template: EventTemplate = {
-    kind: KIND_EPHEMERAL,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["p", peerPubkey],
-      ["d2a", TAG_D2A_DELIVER],
-    ],
-    content: encrypted,
-  };
-
-  const signed = finalizeEvent(template, sk);
-
-  const pool = new SimplePool();
-  await Promise.allSettled(pool.publish(relayUrls, signed));
-  pool.destroy();
+  sk: Uint8Array, myPubkey: string, peerPubkey: string, content: D2ADeliverPayload, relayUrls: string[],
+): Promise<RelayResult> {
+  return sendD2AMessage(sk, myPubkey, peerPubkey, "deliver", TAG_D2A_DELIVER, content, relayUrls);
 }
 
-/**
- * Parse an incoming D2A message (decrypt + decode).
- */
 export function parseD2AMessage(
   encryptedContent: string,
   recipientSk: Uint8Array,
@@ -175,9 +111,6 @@ export function parseD2AMessage(
   return JSON.parse(decrypted) as D2AMessage;
 }
 
-/**
- * Check if a handshake has timed out.
- */
 export function isHandshakeExpired(handshake: HandshakeState): boolean {
   return Date.now() - handshake.startedAt > HANDSHAKE_TIMEOUT_MS;
 }
