@@ -27,4 +27,8 @@ export interface ContentEvaluation {
 
 export interface ContentItem extends ContentEvaluation {
   timestamp: string;
+  topics?: string[];
+  vSignal?: number;
+  cContext?: number;
+  lSlop?: number;
 }

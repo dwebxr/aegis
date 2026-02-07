@@ -51,4 +51,16 @@ module {
     enabled : Bool;
     createdAt : Int;
   };
+
+  public type PublishedSignal = {
+    id : Text;
+    owner : Principal;
+    text : Text;
+    nostrEventId : ?Text;
+    nostrPubkey : ?Text;
+    scores : ScoreBreakdown;
+    verdict : Verdict;
+    topics : [Text];
+    createdAt : Int;
+  };
 };

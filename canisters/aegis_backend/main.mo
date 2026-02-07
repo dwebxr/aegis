@@ -18,6 +18,7 @@ persistent actor AegisBackend {
   var stableEvaluations : [(Text, Types.ContentEvaluation)] = [];
   var stableProfiles : [(Principal, Types.UserProfile)] = [];
   var stableSourceConfigs : [(Text, Types.SourceConfigEntry)] = [];
+  var stableSignals : [(Text, Types.PublishedSignal)] = [];
 
   // ──────────────────────────────────────
   // Runtime state (rebuilt from stable on upgrade)
@@ -26,6 +27,10 @@ persistent actor AegisBackend {
   transient var evaluations = HashMap.HashMap<Text, Types.ContentEvaluation>(64, Text.equal, Text.hash);
   transient var profiles = HashMap.HashMap<Principal, Types.UserProfile>(16, Principal.equal, Principal.hash);
   transient var sourceConfigs = HashMap.HashMap<Text, Types.SourceConfigEntry>(16, Text.equal, Text.hash);
+
+  // Signal storage + owner index
+  transient var signals = HashMap.HashMap<Text, Types.PublishedSignal>(16, Text.equal, Text.hash);
+  transient var signalOwnerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
 
   // Owner -> evaluation IDs index for fast user queries
   transient var ownerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
@@ -38,6 +43,7 @@ persistent actor AegisBackend {
     stableEvaluations := Iter.toArray(evaluations.entries());
     stableProfiles := Iter.toArray(profiles.entries());
     stableSourceConfigs := Iter.toArray(sourceConfigs.entries());
+    stableSignals := Iter.toArray(signals.entries());
   };
 
   system func postupgrade() {
@@ -58,9 +64,21 @@ persistent actor AegisBackend {
     for ((id, config) in stableSourceConfigs.vals()) {
       sourceConfigs.put(id, config);
     };
+    for ((id, signal) in stableSignals.vals()) {
+      signals.put(id, signal);
+      switch (signalOwnerIndex.get(signal.owner)) {
+        case (?buf) { buf.add(id) };
+        case null {
+          let buf = Buffer.Buffer<Text>(8);
+          buf.add(id);
+          signalOwnerIndex.put(signal.owner, buf);
+        };
+      };
+    };
     stableEvaluations := [];
     stableProfiles := [];
     stableSourceConfigs := [];
+    stableSignals := [];
   };
 
   // ──────────────────────────────────────
@@ -186,6 +204,8 @@ persistent actor AegisBackend {
     let caller = msg.caller;
     assert(requireAuth(caller));
 
+    let isNew = evaluations.get(eval.id) == null;
+
     let tagged : Types.ContentEvaluation = {
       id = eval.id;
       owner = caller;
@@ -204,12 +224,14 @@ persistent actor AegisBackend {
 
     evaluations.put(tagged.id, tagged);
 
-    switch (ownerIndex.get(caller)) {
-      case (?buf) { buf.add(tagged.id) };
-      case null {
-        let buf = Buffer.Buffer<Text>(8);
-        buf.add(tagged.id);
-        ownerIndex.put(caller, buf);
+    if (isNew) {
+      switch (ownerIndex.get(caller)) {
+        case (?buf) { buf.add(tagged.id) };
+        case null {
+          let buf = Buffer.Buffer<Text>(8);
+          buf.add(tagged.id);
+          ownerIndex.put(caller, buf);
+        };
       };
     };
 
@@ -273,6 +295,8 @@ persistent actor AegisBackend {
 
     var saved : Nat = 0;
     for (eval in evals.vals()) {
+      let isNew = evaluations.get(eval.id) == null;
+
       let tagged : Types.ContentEvaluation = {
         id = eval.id;
         owner = caller;
@@ -291,12 +315,15 @@ persistent actor AegisBackend {
 
       evaluations.put(tagged.id, tagged);
 
-      switch (ownerIndex.get(caller)) {
-        case (?buf) { buf.add(tagged.id) };
-        case null {
-          let buf = Buffer.Buffer<Text>(8);
-          buf.add(tagged.id);
-          ownerIndex.put(caller, buf);
+      // Only add to ownerIndex if this is a new evaluation (not an update)
+      if (isNew) {
+        switch (ownerIndex.get(caller)) {
+          case (?buf) { buf.add(tagged.id) };
+          case null {
+            let buf = Buffer.Buffer<Text>(8);
+            buf.add(tagged.id);
+            ownerIndex.put(caller, buf);
+          };
         };
       };
 
@@ -383,6 +410,68 @@ persistent actor AegisBackend {
         if (not Principal.equal(config.owner, caller)) { return false };
         sourceConfigs.delete(id);
         true;
+      };
+    };
+  };
+
+  // ──────────────────────────────────────
+  // Signal Publishing methods
+  // ──────────────────────────────────────
+
+  public shared(msg) func saveSignal(signal : Types.PublishedSignal) : async Text {
+    let caller = msg.caller;
+    assert(requireAuth(caller));
+
+    let tagged : Types.PublishedSignal = {
+      id = signal.id;
+      owner = caller;
+      text = signal.text;
+      nostrEventId = signal.nostrEventId;
+      nostrPubkey = signal.nostrPubkey;
+      scores = signal.scores;
+      verdict = signal.verdict;
+      topics = signal.topics;
+      createdAt = if (signal.createdAt == 0) { Time.now() } else { signal.createdAt };
+    };
+
+    signals.put(tagged.id, tagged);
+
+    switch (signalOwnerIndex.get(caller)) {
+      case (?buf) { buf.add(tagged.id) };
+      case null {
+        let buf = Buffer.Buffer<Text>(8);
+        buf.add(tagged.id);
+        signalOwnerIndex.put(caller, buf);
+      };
+    };
+
+    tagged.id;
+  };
+
+  public query func getUserSignals(p : Principal, offset : Nat, limit : Nat) : async [Types.PublishedSignal] {
+    switch (signalOwnerIndex.get(p)) {
+      case null { [] };
+      case (?buf) {
+        let all = Buffer.toArray(buf);
+        let total = all.size();
+        if (offset >= total) { return [] };
+
+        let end = Nat.min(offset + limit, total);
+        let count = end - offset;
+
+        let result = Buffer.Buffer<Types.PublishedSignal>(count);
+        var i = total - 1 - offset;
+        var added : Nat = 0;
+        label fetchLoop while (added < count) {
+          switch (signals.get(all[i])) {
+            case (?s) { result.add(s) };
+            case null {};
+          };
+          added += 1;
+          if (i == 0) { break fetchLoop };
+          i -= 1;
+        };
+        Buffer.toArray(result);
       };
     };
   };

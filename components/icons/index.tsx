@@ -16,15 +16,6 @@ export const FireIcon: React.FC<IconProps> = ({ s = 20 }) => (
   </svg>
 );
 
-export const CoinsIcon: React.FC<IconProps> = ({ s = 20 }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="8" cy="8" r="6" />
-    <path d="M18.09 10.37A6 6 0 1110.34 18" />
-    <path d="M7 6h1v4" />
-    <path d="M16.71 13.88l.7.71-2.82 2.82" />
-  </svg>
-);
-
 export const ChartIcon: React.FC<IconProps> = ({ s = 20 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="20" x2="12" y2="10" />

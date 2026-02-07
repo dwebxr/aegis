@@ -14,7 +14,7 @@ interface AppShellProps {
 
 const navItems: NavItem[] = [
   { id: "dashboard", icon: <ShieldIcon s={18} />, label: "Home" },
-  { id: "feed", icon: <SearchIcon s={18} />, label: "Feed" },
+  { id: "briefing", icon: <SearchIcon s={18} />, label: "Briefing" },
   { id: "incinerator", icon: <FireIcon s={18} />, label: "Burn" },
   { id: "sources", icon: <RSSIcon s={18} />, label: "Sources" },
   { id: "analytics", icon: <ChartIcon s={18} />, label: "Stats" },
@@ -22,7 +22,7 @@ const navItems: NavItem[] = [
 
 const mobileNavItems: NavItem[] = [
   { id: "dashboard", icon: <ShieldIcon s={22} />, label: "Home" },
-  { id: "feed", icon: <SearchIcon s={22} />, label: "Feed" },
+  { id: "briefing", icon: <SearchIcon s={22} />, label: "Briefing" },
   { id: "incinerator", icon: <FireIcon s={22} />, label: "Burn" },
   { id: "sources", icon: <RSSIcon s={22} />, label: "Sources" },
   { id: "analytics", icon: <ChartIcon s={22} />, label: "Stats" },

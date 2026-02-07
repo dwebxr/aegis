@@ -52,17 +52,30 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     enabled: IDL.Bool,
     createdAt: IDL.Int,
   });
+  const PublishedSignal = IDL.Record({
+    id: IDL.Text,
+    owner: IDL.Principal,
+    text: IDL.Text,
+    nostrEventId: IDL.Opt(IDL.Text),
+    nostrPubkey: IDL.Opt(IDL.Text),
+    scores: ScoreBreakdown,
+    verdict: Verdict,
+    topics: IDL.Vec(IDL.Text),
+    createdAt: IDL.Int,
+  });
   return IDL.Service({
     getProfile: IDL.Func([IDL.Principal], [IDL.Opt(UserProfile)], ["query"]),
     getEvaluation: IDL.Func([IDL.Text], [IDL.Opt(ContentEvaluation)], ["query"]),
     getUserEvaluations: IDL.Func([IDL.Principal, IDL.Nat, IDL.Nat], [IDL.Vec(ContentEvaluation)], ["query"]),
     getUserAnalytics: IDL.Func([IDL.Principal], [AnalyticsResult], ["query"]),
     getUserSourceConfigs: IDL.Func([IDL.Principal], [IDL.Vec(SourceConfigEntry)], ["query"]),
+    getUserSignals: IDL.Func([IDL.Principal, IDL.Nat, IDL.Nat], [IDL.Vec(PublishedSignal)], ["query"]),
     saveEvaluation: IDL.Func([ContentEvaluation], [IDL.Text], []),
     updateEvaluation: IDL.Func([IDL.Text, IDL.Bool, IDL.Bool], [IDL.Bool], []),
     batchSaveEvaluations: IDL.Func([IDL.Vec(ContentEvaluation)], [IDL.Nat], []),
     updateDisplayName: IDL.Func([IDL.Text], [IDL.Bool], []),
     saveSourceConfig: IDL.Func([SourceConfigEntry], [IDL.Text], []),
     deleteSourceConfig: IDL.Func([IDL.Text], [IDL.Bool], []),
+    saveSignal: IDL.Func([PublishedSignal], [IDL.Text], []),
   });
 };

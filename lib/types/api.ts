@@ -1,4 +1,11 @@
 import type { Verdict } from "./content";
+import type { UserContext } from "@/lib/preferences/types";
+
+export interface AnalyzeRequest {
+  text: string;
+  source?: string;
+  userContext?: UserContext;
+}
 
 export interface AnalyzeResponse {
   originality: number;
@@ -7,6 +14,11 @@ export interface AnalyzeResponse {
   composite: number;
   verdict: Verdict;
   reason: string;
+  // V/C/L scoring (present when personalized)
+  vSignal?: number;
+  cContext?: number;
+  lSlop?: number;
+  topics?: string[];
 }
 
 export interface FetchURLResponse {

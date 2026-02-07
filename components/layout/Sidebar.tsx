@@ -4,6 +4,7 @@ import { fonts } from "@/styles/theme";
 import { ShieldIcon } from "@/components/icons";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserBadge } from "@/components/auth/UserBadge";
+import { AgentStatusBadge } from "@/components/ui/AgentStatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface NavItem {
@@ -40,7 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
       {!collapsed && (
         <div>
           <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: 3 }}>AEGIS</div>
-          <div style={{ fontSize: 8, color: "#64748b", letterSpacing: 2 }}>v2.0 MVP</div>
+          <div style={{ fontSize: 8, color: "#64748b", letterSpacing: 2 }}>v3.0</div>
         </div>
       )}
     </div>
@@ -66,6 +67,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
     {!collapsed && (
       <div style={{ marginBottom: 10 }}>
         {isAuthenticated ? <UserBadge /> : <LoginButton />}
+      </div>
+    )}
+
+    {!collapsed && isAuthenticated && (
+      <div style={{ marginBottom: 10 }}>
+        <AgentStatusBadge compact />
       </div>
     )}
 

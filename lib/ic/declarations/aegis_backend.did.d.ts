@@ -58,16 +58,30 @@ export interface SourceConfigEntry {
   createdAt: bigint;
 }
 
+export interface PublishedSignal {
+  id: string;
+  owner: Principal;
+  text: string;
+  nostrEventId: [] | [string];
+  nostrPubkey: [] | [string];
+  scores: ScoreBreakdown;
+  verdict: Verdict;
+  topics: string[];
+  createdAt: bigint;
+}
+
 export interface _SERVICE {
   getProfile: ActorMethod<[Principal], [] | [UserProfile]>;
   getEvaluation: ActorMethod<[string], [] | [ContentEvaluation]>;
   getUserEvaluations: ActorMethod<[Principal, bigint, bigint], ContentEvaluation[]>;
   getUserAnalytics: ActorMethod<[Principal], AnalyticsResult>;
   getUserSourceConfigs: ActorMethod<[Principal], SourceConfigEntry[]>;
+  getUserSignals: ActorMethod<[Principal, bigint, bigint], PublishedSignal[]>;
   saveEvaluation: ActorMethod<[ContentEvaluation], string>;
   updateEvaluation: ActorMethod<[string, boolean, boolean], boolean>;
   batchSaveEvaluations: ActorMethod<[ContentEvaluation[]], bigint>;
   updateDisplayName: ActorMethod<[string], boolean>;
   saveSourceConfig: ActorMethod<[SourceConfigEntry], string>;
   deleteSourceConfig: ActorMethod<[string], boolean>;
+  saveSignal: ActorMethod<[PublishedSignal], string>;
 }

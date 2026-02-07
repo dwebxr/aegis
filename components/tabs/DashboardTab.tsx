@@ -3,7 +3,7 @@ import React from "react";
 import { ShieldIcon, FireIcon, ZapIcon, RSSIcon } from "@/components/icons";
 import { StatCard } from "@/components/ui/StatCard";
 import { MiniChart } from "@/components/ui/MiniChart";
-import { QualityCard } from "@/components/ui/QualityCard";
+import { ContentCard } from "@/components/ui/ContentCard";
 import type { ContentItem } from "@/lib/types/content";
 
 interface DashboardTabProps {
@@ -47,7 +47,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, pro
 
       <div style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", marginBottom: 10 }}>Latest Quality</div>
       {qual.slice(0, 3).map(it => (
-        <QualityCard key={it.id} item={it} expanded={false} onToggle={() => {}} onValidate={() => {}} onFlag={() => {}} mobile={mobile} />
+        <ContentCard key={it.id} item={it} expanded={false} onToggle={() => {}} onValidate={() => {}} onFlag={() => {}} mobile={mobile} />
       ))}
     </div>
   );
