@@ -30,49 +30,56 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const [sources, setSources] = useState<SavedSource[]>([]);
   const actorRef = useRef<_SERVICE | null>(null);
 
-  // Create IC actor when authenticated
+  // Create IC actor + load sources in a single effect to avoid race conditions
   useEffect(() => {
-    if (isAuthenticated && identity) {
-      try {
-        actorRef.current = createBackendActor(identity);
-      } catch {
-        actorRef.current = null;
-      }
-    } else {
+    if (!isAuthenticated || !identity || !principalText) {
       actorRef.current = null;
-    }
-  }, [isAuthenticated, identity]);
-
-  // Load sources from localStorage + IC on auth change
-  useEffect(() => {
-    if (!isAuthenticated || !principalText) {
       setSources([]);
       return;
+    }
+
+    // Create actor synchronously
+    let actor: _SERVICE | null = null;
+    try {
+      actor = createBackendActor(identity);
+      actorRef.current = actor;
+    } catch {
+      actorRef.current = null;
     }
 
     // Load from localStorage immediately
     const local = loadSources(principalText);
     setSources(local);
 
-    // Then merge from IC
-    if (actorRef.current) {
-      const principal = identity?.getPrincipal();
-      if (principal) {
-        actorRef.current.getUserSourceConfigs(principal)
-          .then((icConfigs: SourceConfigEntry[]) => {
-            if (icConfigs.length === 0) return;
-            const icSources = icConfigs.map(icToSaved);
-            setSources(prev => {
-              const existingIds = new Set(prev.map(s => s.id));
-              const newFromIC = icSources.filter(s => !existingIds.has(s.id));
-              if (newFromIC.length === 0) return prev;
-              const merged = [...prev, ...newFromIC];
-              saveSources(principalText, merged);
-              return merged;
+    // Merge with IC (IC is the authoritative source for cross-device sync)
+    if (actor) {
+      const principal = identity.getPrincipal();
+      actor.getUserSourceConfigs(principal)
+        .then((icConfigs: SourceConfigEntry[]) => {
+          const icSources = icConfigs.map(icToSaved);
+          setSources(prev => {
+            // Build lookup for merging
+            const localMap = new Map<string, SavedSource>();
+            prev.forEach(s => localMap.set(s.id, s));
+
+            // IC wins for items that exist in IC (cross-device sync)
+            const merged: SavedSource[] = [];
+            icSources.forEach(icSource => {
+              merged.push(icSource);
+              localMap.delete(icSource.id);
             });
-          })
-          .catch((err: unknown) => console.warn("[sources] IC load failed:", err));
-      }
+            // Add local-only items and push them to IC
+            localMap.forEach(localSource => {
+              merged.push(localSource);
+              actor!.saveSourceConfig(savedToIC(localSource, principal))
+                .catch((err: unknown) => console.warn("[sources] IC push local→IC failed:", err));
+            });
+
+            saveSources(principalText, merged);
+            return merged;
+          });
+        })
+        .catch((err: unknown) => console.warn("[sources] IC load failed:", err));
     }
   }, [isAuthenticated, identity, principalText]);
 
