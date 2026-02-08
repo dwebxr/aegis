@@ -4,7 +4,7 @@ import { fonts, colors, space, type as t, radii, transitions, kpiLabelStyle } fr
 import { RSSIcon, GlobeIcon, LinkIcon } from "@/components/icons";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { FetchURLResponse, FetchRSSResponse, FetchTwitterResponse, FetchNostrResponse } from "@/lib/types/api";
-import { ManualInput } from "@/components/sources/ManualInput";
+
 import { useSources } from "@/contexts/SourceContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -24,7 +24,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const [editPubkeys, setEditPubkeys] = useState<string[]>([]);
   const [editNewRelay, setEditNewRelay] = useState("");
   const [editNewPubkey, setEditNewPubkey] = useState("");
-  const [activeSource, setActiveSource] = useState<"manual" | "url" | "rss" | "twitter" | "nostr">("manual");
+  const [activeSource, setActiveSource] = useState<"url" | "rss" | "twitter" | "nostr">("url");
   const [urlInput, setUrlInput] = useState("");
   const [urlResult, setUrlResult] = useState<FetchURLResponse | null>(null);
   const [urlLoading, setUrlLoading] = useState(false);
@@ -133,8 +133,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     setEditingId(null);
   };
 
-  const sourceTabs: Array<{ id: "manual" | "url" | "rss" | "twitter" | "nostr"; label: string; icon: React.ReactNode; color: string }> = [
-    { id: "manual", label: "Manual", icon: <span style={{ fontSize: 14 }}>&#x270D;&#xFE0F;</span>, color: colors.purple[400] },
+  const sourceTabs: Array<{ id: "url" | "rss" | "twitter" | "nostr"; label: string; icon: React.ReactNode; color: string }> = [
     { id: "url", label: "URL", icon: <LinkIcon s={14} />, color: colors.sky[400] },
     { id: "rss", label: "RSS", icon: <RSSIcon s={14} />, color: colors.amber[400] },
     { id: "twitter", label: "X (Twitter)", icon: <span style={{ fontSize: 14 }}>{"\u{1D54F}"}</span>, color: colors.text.secondary },
@@ -407,10 +406,6 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         borderRadius: radii.xl,
         padding: mobile ? space[5] : space[8],
       }}>
-        {activeSource === "manual" && (
-          <ManualInput onAnalyze={onAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />
-        )}
-
         {activeSource === "url" && (
           <div>
             <label style={labelStyle}>Article URL</label>
