@@ -27,3 +27,15 @@ export type SourceConfig =
   | { type: "rss"; config: RSSSourceConfig }
   | { type: "twitter"; config: TwitterSourceConfig }
   | { type: "nostr"; config: NostrSourceConfig };
+
+/** Persisted source configuration (localStorage + IC) */
+export interface SavedSource {
+  id: string;
+  type: "rss" | "nostr";
+  label: string;
+  enabled: boolean;
+  feedUrl?: string;
+  relays?: string[];
+  pubkeys?: string[];
+  createdAt: number;
+}

@@ -5,6 +5,8 @@ import { RSSIcon, GlobeIcon, LinkIcon } from "@/components/icons";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { FetchURLResponse, FetchRSSResponse, FetchTwitterResponse, FetchNostrResponse } from "@/lib/types/api";
 import { ManualInput } from "@/components/sources/ManualInput";
+import { useSources } from "@/contexts/SourceContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SourcesTabProps {
   onAnalyze: (text: string) => Promise<AnalyzeResponse>;
@@ -13,6 +15,8 @@ interface SourcesTabProps {
 }
 
 export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, mobile }) => {
+  const { sources, addSource, removeSource, toggleSource } = useSources();
+  const { isAuthenticated } = useAuth();
   const [activeSource, setActiveSource] = useState<"manual" | "url" | "rss" | "twitter" | "nostr">("manual");
   const [urlInput, setUrlInput] = useState("");
   const [urlResult, setUrlResult] = useState<FetchURLResponse | null>(null);
@@ -78,7 +82,21 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     } catch { setNostrError("Network error — check connection"); } finally { setNostrLoading(false); }
   };
 
-  const sources: Array<{ id: "manual" | "url" | "rss" | "twitter" | "nostr"; label: string; icon: React.ReactNode; color: string }> = [
+  const handleSaveRss = () => {
+    if (!rssResult) return;
+    addSource({ type: "rss", label: rssResult.feedTitle || rssInput, feedUrl: rssInput, enabled: true });
+    setRssInput(""); setRssResult(null);
+  };
+
+  const handleSaveNostr = () => {
+    const relays = nostrRelays.split("\n").map(r => r.trim()).filter(Boolean);
+    const pubkeys = nostrPubkeys.split("\n").map(p => p.trim()).filter(Boolean);
+    if (relays.length === 0) return;
+    const label = pubkeys.length > 0 ? `Nostr (${pubkeys.length} keys)` : `Nostr (${relays.length} relays)`;
+    addSource({ type: "nostr", label, relays, pubkeys, enabled: true });
+  };
+
+  const sourceTabs: Array<{ id: "manual" | "url" | "rss" | "twitter" | "nostr"; label: string; icon: React.ReactNode; color: string }> = [
     { id: "manual", label: "Manual", icon: <span style={{ fontSize: 14 }}>&#x270D;&#xFE0F;</span>, color: colors.purple[400] },
     { id: "url", label: "URL", icon: <LinkIcon s={14} />, color: colors.sky[400] },
     { id: "rss", label: "RSS", icon: <RSSIcon s={14} />, color: colors.amber[400] },
@@ -99,6 +117,13 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.5 : 1, whiteSpace: "nowrap",
     transition: transitions.fast,
   });
+
+  const saveBtnStyle: React.CSSProperties = {
+    padding: `${space[2]}px ${space[4]}px`,
+    background: `linear-gradient(135deg,${colors.green[500]},${colors.green[400]})`,
+    border: "none", borderRadius: radii.md, color: "#fff", fontSize: t.bodySm.size, fontWeight: 700,
+    cursor: "pointer", transition: transitions.fast, fontFamily: "inherit",
+  };
 
   const errorStyle: React.CSSProperties = { fontSize: t.bodySm.size, color: colors.red[400], marginTop: space[2] };
   const labelStyle: React.CSSProperties = { ...kpiLabelStyle, display: "block", marginBottom: space[1] };
@@ -121,8 +146,80 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         </p>
       </div>
 
+      {/* Saved Sources List */}
+      {sources.length > 0 && (
+        <div style={{
+          background: colors.bg.surface,
+          border: `1px solid ${colors.border.default}`,
+          borderRadius: radii.lg,
+          padding: mobile ? space[4] : space[5],
+          marginBottom: space[5],
+        }}>
+          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[3] }}>
+            Saved Sources ({sources.length})
+          </div>
+          {sources.map(s => (
+            <div key={s.id} style={{
+              display: "flex", alignItems: "center", gap: space[3],
+              padding: `${space[2]}px ${space[3]}px`, marginBottom: space[1],
+              background: s.enabled ? `${s.type === "rss" ? colors.amber[400] : colors.purple[400]}08` : "transparent",
+              borderRadius: radii.sm,
+            }}>
+              <button
+                onClick={() => toggleSource(s.id)}
+                style={{
+                  width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "pointer",
+                  background: s.enabled ? (s.type === "rss" ? colors.amber[400] : colors.purple[400]) : colors.border.default,
+                  flexShrink: 0, padding: 0,
+                }}
+                title={s.enabled ? "Disable" : "Enable"}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: t.body.mobileSz, fontWeight: 600,
+                  color: s.enabled ? colors.text.secondary : colors.text.disabled,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {s.label}
+                </div>
+                <div style={{ fontSize: t.tiny.size, color: colors.text.muted }}>
+                  {s.type === "rss" ? s.feedUrl : `${(s.relays || []).length} relays`}
+                </div>
+              </div>
+              <span style={{
+                fontSize: t.tiny.size, fontWeight: 700, color: s.type === "rss" ? colors.amber[400] : colors.purple[400],
+                textTransform: "uppercase", letterSpacing: 1,
+              }}>
+                {s.type}
+              </span>
+              <button
+                onClick={() => removeSource(s.id)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
+                  fontSize: t.caption.size, color: colors.text.disabled, fontFamily: "inherit",
+                  transition: transitions.fast,
+                }}
+                title="Remove source"
+              >
+                &#x2715;
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!isAuthenticated && sources.length === 0 && (
+        <div style={{
+          background: colors.bg.surface, border: `1px solid ${colors.border.default}`,
+          borderRadius: radii.lg, padding: space[5], marginBottom: space[5],
+          textAlign: "center", color: colors.text.muted, fontSize: t.bodySm.size,
+        }}>
+          Log in to save sources for automatic fetching
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: space[1], marginBottom: space[5], flexWrap: "wrap" }}>
-        {sources.map(s => (
+        {sourceTabs.map(s => (
           <button key={s.id} onClick={() => setActiveSource(s.id)} style={{
             display: "flex", alignItems: "center", gap: 6,
             padding: `${space[2]}px ${space[4]}px`, borderRadius: radii.sm, fontSize: t.bodySm.size, fontWeight: 600,
@@ -182,7 +279,14 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             {rssError && <div style={errorStyle}>{rssError}</div>}
             {rssResult && (
               <div style={{ marginTop: space[4] }}>
-                <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[3] }}>{rssResult.feedTitle} ({rssResult.items.length} items)</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: space[3] }}>
+                  <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>{rssResult.feedTitle} ({rssResult.items.length} items)</div>
+                  {isAuthenticated && (
+                    <button onClick={handleSaveRss} style={saveBtnStyle}>
+                      Save as Source
+                    </button>
+                  )}
+                </div>
                 {rssResult.items.map((item, i) => (
                   <div key={i} style={{ background: colors.bg.raised, borderRadius: radii.md, padding: space[3], marginBottom: space[1], display: "flex", justifyContent: "space-between", alignItems: "center", gap: space[3] }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -240,9 +344,16 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             <textarea value={nostrRelays} onChange={e => setNostrRelays(e.target.value)} placeholder={"wss://relay.damus.io\nwss://nos.lol"} style={{ ...inputStyle, height: 70, resize: "vertical", marginBottom: space[3] }} />
             <label style={labelStyle}>Public Keys to follow (optional, one per line)</label>
             <textarea value={nostrPubkeys} onChange={e => setNostrPubkeys(e.target.value)} placeholder="npub or hex pubkey..." style={{ ...inputStyle, height: 50, resize: "vertical", marginBottom: space[3] }} />
-            <button onClick={fetchNostr} disabled={nostrLoading} style={btnStyle(nostrLoading, nostrLoading)}>
-              {nostrLoading ? "Fetching..." : "Fetch Latest"}
-            </button>
+            <div style={{ display: "flex", gap: space[2] }}>
+              <button onClick={fetchNostr} disabled={nostrLoading} style={btnStyle(nostrLoading, nostrLoading)}>
+                {nostrLoading ? "Fetching..." : "Fetch Latest"}
+              </button>
+              {isAuthenticated && (
+                <button onClick={handleSaveNostr} style={saveBtnStyle}>
+                  Save Relay Config
+                </button>
+              )}
+            </div>
             {nostrError && <div style={errorStyle}>{nostrError}</div>}
             {nostrResult && (
               <div style={{ marginTop: space[4] }}>

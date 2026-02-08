@@ -13,6 +13,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useContent } from "@/contexts/ContentContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
+import { useSources } from "@/contexts/SourceContext";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { publishSignalToNostr, buildAegisTags } from "@/lib/nostr/publish";
@@ -24,6 +25,7 @@ export default function AegisApp() {
   const { content, isAnalyzing, analyze, validateItem, flagItem, addContent, loadFromIC } = useContent();
   const { isAuthenticated, principalText } = useAuth();
   const { userContext, profile } = usePreferences();
+  const { getSchedulerSources } = useSources();
 
   const [tab, setTab] = useState("dashboard");
 
@@ -44,25 +46,21 @@ export default function AegisApp() {
   }, [isAuthenticated, loadFromIC]);
 
   // Background ingestion scheduler
-  const getSourceConfigs = useCallback(() => {
-    if (typeof window === "undefined") return [];
-    const raw = localStorage.getItem("aegis_source_configs");
-    if (!raw) return [];
-    return JSON.parse(raw) as Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }>;
-  }, []);
+  const getSchedulerSourcesRef = useRef(getSchedulerSources);
+  getSchedulerSourcesRef.current = getSchedulerSources;
 
   useEffect(() => {
     const scheduler = new IngestionScheduler({
       onNewContent: (item) => {
         addContent(item);
       },
-      getSources: getSourceConfigs,
+      getSources: () => getSchedulerSourcesRef.current(),
       getUserContext: () => userContextRef.current,
     });
     schedulerRef.current = scheduler;
     scheduler.start();
     return () => scheduler.stop();
-  }, [addContent, getSourceConfigs]);
+  }, [addContent]);
 
 
   const handleValidate = (id: string) => {
