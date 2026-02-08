@@ -162,8 +162,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       if (item && preferenceCallbacks?.onFlag) {
         preferenceCallbacks.onFlag(item.topics || [], item.author, item.scores.composite, item.verdict);
       }
-      if (actorRef.current && isAuthenticated) {
-        actorRef.current.updateEvaluation(id, false, true)
+      if (item && actorRef.current && isAuthenticated) {
+        actorRef.current.updateEvaluation(id, item.validated, true)
           .catch((err: unknown) => console.warn("IC updateEvaluation (flag) failed:", err));
       }
       return prev.map(c => c.id === id ? { ...c, flagged: true } : c);

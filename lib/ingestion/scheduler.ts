@@ -51,27 +51,31 @@ export class IngestionScheduler {
     if (this.running) return;
     this.running = true;
 
-    const sources = this.callbacks.getSources();
-    const userContext = this.callbacks.getUserContext();
+    try {
+      const sources = this.callbacks.getSources();
+      const userContext = this.callbacks.getUserContext();
 
-    for (const source of sources) {
-      if (!source.enabled) continue;
-      const items = await this.fetchSource(source);
+      for (const source of sources) {
+        if (!source.enabled) continue;
+        const items = await this.fetchSource(source);
 
-      // Quick filter to reduce API calls
-      const passed = items.filter(raw => quickSlopFilter(raw.text));
+        // Quick filter to reduce API calls
+        const passed = items.filter(raw => quickSlopFilter(raw.text));
 
-      // Send top N to Claude for full scoring
-      const toScore = passed.slice(0, MAX_ITEMS_PER_SOURCE);
-      for (const raw of toScore) {
-        const scored = await this.scoreItem(raw, userContext);
-        if (scored) {
-          this.callbacks.onNewContent(scored);
+        // Send top N to Claude for full scoring
+        const toScore = passed.slice(0, MAX_ITEMS_PER_SOURCE);
+        for (const raw of toScore) {
+          const scored = await this.scoreItem(raw, userContext);
+          if (scored) {
+            this.callbacks.onNewContent(scored);
+          }
         }
       }
+    } catch (err) {
+      console.error("[scheduler] Ingestion cycle failed:", err instanceof Error ? err.message : "unknown");
+    } finally {
+      this.running = false;
     }
-
-    this.running = false;
   }
 
   private async fetchSource(source: SourceConfig): Promise<Array<{ text: string; author: string; sourceUrl?: string }>> {
@@ -91,90 +95,112 @@ export class IngestionScheduler {
   }
 
   private async fetchRSS(feedUrl: string): Promise<Array<{ text: string; author: string; sourceUrl?: string }>> {
-    const res = await fetch("/api/fetch/rss", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ feedUrl, limit: 10 }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.items || []).map((item: { title: string; content: string; author?: string; link?: string }) => ({
-      text: `${item.title}\n\n${item.content}`.slice(0, 2000),
-      author: item.author || data.feedTitle || "RSS",
-      sourceUrl: item.link,
-    }));
+    try {
+      const res = await fetch("/api/fetch/rss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedUrl, limit: 10 }),
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.items || []).map((item: { title: string; content: string; author?: string; link?: string }) => ({
+        text: `${item.title}\n\n${item.content}`.slice(0, 2000),
+        author: item.author || data.feedTitle || "RSS",
+        sourceUrl: item.link,
+      }));
+    } catch (err) {
+      console.error("[scheduler] RSS fetch failed:", err instanceof Error ? err.message : "unknown");
+      return [];
+    }
   }
 
   private async fetchNostr(relays: string[], pubkeys?: string[]): Promise<Array<{ text: string; author: string; sourceUrl?: string }>> {
-    const res = await fetch("/api/fetch/nostr", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ relays, pubkeys: pubkeys?.length ? pubkeys : undefined, limit: 20 }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.events || []).map((ev: { content: string; pubkey: string; id: string }) => ({
-      text: ev.content.slice(0, 2000),
-      author: ev.pubkey.slice(0, 12) + "...",
-      sourceUrl: `nostr:${ev.id}`,
-    }));
+    try {
+      const res = await fetch("/api/fetch/nostr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ relays, pubkeys: pubkeys?.length ? pubkeys : undefined, limit: 20 }),
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.events || []).map((ev: { content: string; pubkey: string; id: string }) => ({
+        text: ev.content.slice(0, 2000),
+        author: ev.pubkey.slice(0, 12) + "...",
+        sourceUrl: `nostr:${ev.id}`,
+      }));
+    } catch (err) {
+      console.error("[scheduler] Nostr fetch failed:", err instanceof Error ? err.message : "unknown");
+      return [];
+    }
   }
 
   private async fetchURL(url: string): Promise<Array<{ text: string; author: string; sourceUrl?: string }>> {
-    const res = await fetch("/api/fetch/url", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return [{
-      text: `${data.title || ""}\n\n${data.content || ""}`.slice(0, 2000),
-      author: data.author || new URL(url).hostname,
-      sourceUrl: url,
-    }];
+    try {
+      const res = await fetch("/api/fetch/url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      let hostname = "unknown";
+      try { hostname = new URL(url).hostname; } catch { /* invalid URL */ }
+      return [{
+        text: `${data.title || ""}\n\n${data.content || ""}`.slice(0, 2000),
+        author: data.author || hostname,
+        sourceUrl: url,
+      }];
+    } catch (err) {
+      console.error("[scheduler] URL fetch failed:", err instanceof Error ? err.message : "unknown");
+      return [];
+    }
   }
 
   private async scoreItem(
     raw: { text: string; author: string; sourceUrl?: string },
     userContext: UserContext | null,
   ): Promise<ContentItem | null> {
-    const body: Record<string, unknown> = { text: raw.text, source: "auto" };
-    if (userContext) body.userContext = userContext;
+    try {
+      const body: Record<string, unknown> = { text: raw.text, source: "auto" };
+      if (userContext) body.userContext = userContext;
 
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const result: AnalyzeResponse = data.fallback || data;
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const result: AnalyzeResponse = data.fallback || data;
 
-    return {
-      id: uuidv4(),
-      owner: "",
-      author: raw.author,
-      avatar: raw.sourceUrl?.startsWith("nostr:") ? "\uD83D\uDD2E" : "\uD83D\uDCE1",
-      text: raw.text.slice(0, 300),
-      source: raw.sourceUrl?.startsWith("nostr:") ? "nostr" : "rss",
-      sourceUrl: raw.sourceUrl,
-      scores: {
-        originality: result.originality,
-        insight: result.insight,
-        credibility: result.credibility,
-        composite: result.composite,
-      },
-      verdict: result.verdict,
-      reason: result.reason,
-      createdAt: Date.now(),
-      validated: false,
-      flagged: false,
-      timestamp: "just now",
-      topics: result.topics,
-      vSignal: result.vSignal,
-      cContext: result.cContext,
-      lSlop: result.lSlop,
-    };
+      return {
+        id: uuidv4(),
+        owner: "",
+        author: raw.author,
+        avatar: raw.sourceUrl?.startsWith("nostr:") ? "\uD83D\uDD2E" : "\uD83D\uDCE1",
+        text: raw.text.slice(0, 300),
+        source: raw.sourceUrl?.startsWith("nostr:") ? "nostr" : "rss",
+        sourceUrl: raw.sourceUrl,
+        scores: {
+          originality: result.originality,
+          insight: result.insight,
+          credibility: result.credibility,
+          composite: result.composite,
+        },
+        verdict: result.verdict,
+        reason: result.reason,
+        createdAt: Date.now(),
+        validated: false,
+        flagged: false,
+        timestamp: "just now",
+        topics: result.topics,
+        vSignal: result.vSignal,
+        cContext: result.cContext,
+        lSlop: result.lSlop,
+      };
+    } catch (err) {
+      console.error("[scheduler] Score item failed:", err instanceof Error ? err.message : "unknown");
+      return null;
+    }
   }
 }

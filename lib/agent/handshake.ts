@@ -107,8 +107,12 @@ export function parseD2AMessage(
   recipientSk: Uint8Array,
   senderPk: string,
 ): D2AMessage | null {
-  const decrypted = decryptMessage(encryptedContent, recipientSk, senderPk);
-  return JSON.parse(decrypted) as D2AMessage;
+  try {
+    const decrypted = decryptMessage(encryptedContent, recipientSk, senderPk);
+    return JSON.parse(decrypted) as D2AMessage;
+  } catch {
+    return null;
+  }
 }
 
 export function isHandshakeExpired(handshake: HandshakeState): boolean {

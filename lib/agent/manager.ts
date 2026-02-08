@@ -61,19 +61,27 @@ export class AgentManager {
     this.emitState();
 
     // Initial presence broadcast
-    await this.broadcastMyPresence();
+    try {
+      await this.broadcastMyPresence();
+    } catch (err) {
+      console.warn("[agent] Initial presence broadcast failed:", err instanceof Error ? err.message : "unknown");
+    }
 
     // Periodic presence
     this.presenceInterval = setInterval(() => {
-      this.broadcastMyPresence().catch(err => console.warn("Presence broadcast failed:", err));
+      this.broadcastMyPresence().catch(err => console.warn("[agent] Presence broadcast failed:", err instanceof Error ? err.message : "unknown"));
     }, PRESENCE_BROADCAST_INTERVAL_MS);
 
     // Initial peer discovery
-    await this.discoverAndNegotiate();
+    try {
+      await this.discoverAndNegotiate();
+    } catch (err) {
+      console.warn("[agent] Initial discovery failed:", err instanceof Error ? err.message : "unknown");
+    }
 
     // Periodic discovery
     this.discoveryInterval = setInterval(() => {
-      this.discoverAndNegotiate().catch(err => console.warn("Discovery/negotiate failed:", err));
+      this.discoverAndNegotiate().catch(err => console.warn("[agent] Discovery/negotiate failed:", err instanceof Error ? err.message : "unknown"));
     }, DISCOVERY_POLL_INTERVAL_MS);
 
     // Subscribe to incoming D2A messages

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { TwitterApi } from "twitter-api-v2";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 });
+  }
   const { bearerToken, query, maxResults = 10 } = body;
 
   if (!bearerToken || typeof bearerToken !== "string" || bearerToken.trim().length === 0) {

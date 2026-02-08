@@ -139,7 +139,7 @@ describe("parseD2AMessage — integration with encrypt/decrypt", () => {
     };
 
     const encrypted = encryptMessage(JSON.stringify(msg), alice.sk, bob.pk);
-    // Charlie cannot decrypt Alice→Bob message
-    expect(() => parseD2AMessage(encrypted, charlie.sk, alice.pk)).toThrow();
+    // Charlie cannot decrypt Alice→Bob message — returns null instead of throwing
+    expect(parseD2AMessage(encrypted, charlie.sk, alice.pk)).toBeNull();
   });
 });

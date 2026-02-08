@@ -43,8 +43,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPrincipal(id.getPrincipal());
       }
       setIsLoading(false);
-    }).catch((err) => {
-      console.error("AuthClient.create() failed:", err);
+    }).catch((err: unknown) => {
+      console.error("[auth] Initialization failed:", err instanceof Error ? err.message : "unknown");
       setIsLoading(false);
     });
   }, []);
