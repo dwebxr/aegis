@@ -78,7 +78,7 @@ export class IngestionScheduler {
     }
   }
 
-  private async fetchSource(source: SourceConfig): Promise<Array<{ text: string; author: string; sourceUrl?: string }>> {
+  private async fetchSource(source: SourceConfig): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
     switch (source.type) {
       case "rss":
         return this.fetchRSS(source.config.feedUrl);
@@ -94,7 +94,7 @@ export class IngestionScheduler {
     }
   }
 
-  private async fetchRSS(feedUrl: string): Promise<Array<{ text: string; author: string; sourceUrl?: string }>> {
+  private async fetchRSS(feedUrl: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
     try {
       const res = await fetch("/api/fetch/rss", {
         method: "POST",
@@ -103,10 +103,11 @@ export class IngestionScheduler {
       });
       if (!res.ok) return [];
       const data = await res.json();
-      return (data.items || []).map((item: { title: string; content: string; author?: string; link?: string }) => ({
+      return (data.items || []).map((item: { title: string; content: string; author?: string; link?: string; imageUrl?: string }) => ({
         text: `${item.title}\n\n${item.content}`.slice(0, 2000),
         author: item.author || data.feedTitle || "RSS",
         sourceUrl: item.link,
+        imageUrl: item.imageUrl,
       }));
     } catch (err) {
       console.error("[scheduler] RSS fetch failed:", err instanceof Error ? err.message : "unknown");
@@ -114,7 +115,7 @@ export class IngestionScheduler {
     }
   }
 
-  private async fetchNostr(relays: string[], pubkeys?: string[]): Promise<Array<{ text: string; author: string; sourceUrl?: string }>> {
+  private async fetchNostr(relays: string[], pubkeys?: string[]): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
     try {
       const res = await fetch("/api/fetch/nostr", {
         method: "POST",
@@ -134,7 +135,7 @@ export class IngestionScheduler {
     }
   }
 
-  private async fetchURL(url: string): Promise<Array<{ text: string; author: string; sourceUrl?: string }>> {
+  private async fetchURL(url: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
     try {
       const res = await fetch("/api/fetch/url", {
         method: "POST",
@@ -149,6 +150,7 @@ export class IngestionScheduler {
         text: `${data.title || ""}\n\n${data.content || ""}`.slice(0, 2000),
         author: data.author || hostname,
         sourceUrl: url,
+        imageUrl: data.imageUrl,
       }];
     } catch (err) {
       console.error("[scheduler] URL fetch failed:", err instanceof Error ? err.message : "unknown");
@@ -157,7 +159,7 @@ export class IngestionScheduler {
   }
 
   private async scoreItem(
-    raw: { text: string; author: string; sourceUrl?: string },
+    raw: { text: string; author: string; sourceUrl?: string; imageUrl?: string },
     userContext: UserContext | null,
   ): Promise<ContentItem | null> {
     try {
@@ -181,6 +183,7 @@ export class IngestionScheduler {
         text: raw.text.slice(0, 300),
         source: raw.sourceUrl?.startsWith("nostr:") ? "nostr" : "rss",
         sourceUrl: raw.sourceUrl,
+        imageUrl: raw.imageUrl,
         scores: {
           originality: result.originality,
           insight: result.insight,

@@ -49,5 +49,6 @@ export async function POST(request: NextRequest) {
     description: article.description || "",
     publishedDate: article.published || "",
     source: parsed.hostname,
+    imageUrl: article.image || undefined,
   });
 }

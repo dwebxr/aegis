@@ -256,8 +256,23 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             {urlError && <div style={errorStyle}>{urlError}</div>}
             {urlResult && (
               <div style={{ marginTop: space[4], background: colors.bg.raised, borderRadius: radii.md, padding: space[4] }}>
-                <div style={{ fontSize: t.body.size, fontWeight: 700, color: colors.text.secondary, marginBottom: space[1] }}>{urlResult.title}</div>
-                <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginBottom: space[3] }}>by {urlResult.author} &middot; {urlResult.source}</div>
+                <div style={{ display: "flex", gap: space[3], marginBottom: space[3] }}>
+                  {urlResult.imageUrl && (
+                    <img
+                      src={urlResult.imageUrl}
+                      alt=""
+                      style={{ width: 100, height: 100, objectFit: "cover", borderRadius: radii.sm, border: `1px solid ${colors.border.default}`, flexShrink: 0 }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: t.body.size, fontWeight: 700, color: colors.text.secondary, marginBottom: space[1] }}>{urlResult.title}</div>
+                    <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginBottom: space[2] }}>by {urlResult.author} &middot; {urlResult.source}</div>
+                    <a href={urlInput} target="_blank" rel="noopener noreferrer" style={{ fontSize: t.caption.size, color: colors.blue[400], textDecoration: "none", fontWeight: 600 }}>
+                      Open original &rarr;
+                    </a>
+                  </div>
+                </div>
                 <div style={{ fontSize: t.body.mobileSz, color: colors.text.tertiary, lineHeight: 1.6, maxHeight: 200, overflow: "auto", marginBottom: space[3] }}>{urlResult.content.slice(0, 1000)}{urlResult.content.length > 1000 ? "..." : ""}</div>
                 <button onClick={() => onAnalyze(urlResult.content)} disabled={isAnalyzing} style={btnStyle(isAnalyzing, isAnalyzing)}>
                   {isAnalyzing ? "Analyzing..." : "Analyze This Content"}
@@ -288,12 +303,24 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   )}
                 </div>
                 {rssResult.items.map((item, i) => (
-                  <div key={i} style={{ background: colors.bg.raised, borderRadius: radii.md, padding: space[3], marginBottom: space[1], display: "flex", justifyContent: "space-between", alignItems: "center", gap: space[3] }}>
+                  <div key={i} style={{ background: colors.bg.raised, borderRadius: radii.md, padding: space[3], marginBottom: space[1], display: "flex", alignItems: "center", gap: space[3] }}>
+                    {item.imageUrl && (
+                      <img
+                        src={item.imageUrl}
+                        alt=""
+                        style={{ width: 48, height: 48, objectFit: "cover", borderRadius: radii.sm, border: `1px solid ${colors.border.default}`, flexShrink: 0 }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                    )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: t.body.mobileSz, color: colors.text.secondary, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</div>
+                      {item.link ? (
+                        <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: t.body.mobileSz, color: colors.text.secondary, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", textDecoration: "none" }}>{item.title}</a>
+                      ) : (
+                        <div style={{ fontSize: t.body.mobileSz, color: colors.text.secondary, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</div>
+                      )}
                       <div style={{ fontSize: t.caption.size, color: colors.text.muted }}>{item.author} &middot; {item.publishedDate}</div>
                     </div>
-                    <button onClick={() => onAnalyze(item.content || item.title)} disabled={isAnalyzing} style={{ ...btnStyle(isAnalyzing, false), padding: `6px ${space[3]}px`, fontSize: t.caption.size }}>
+                    <button onClick={() => onAnalyze(item.content || item.title)} disabled={isAnalyzing} style={{ ...btnStyle(isAnalyzing, false), padding: `6px ${space[3]}px`, fontSize: t.caption.size, flexShrink: 0 }}>
                       Analyze
                     </button>
                   </div>

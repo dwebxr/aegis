@@ -43,12 +43,15 @@ export async function POST(request: NextRequest) {
   const items = (feed.items || []).slice(0, Math.min(limit, 50)).map(item => {
     const rawContent = item["content:encoded"] || item.content || item.contentSnippet || item.summary || "";
     const textContent = rawContent.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const enc = item.enclosure as { url?: string; type?: string } | undefined;
+    const imageUrl = enc?.url && /image/i.test(enc.type || "") ? enc.url : undefined;
     return {
       title: item.title || "",
       content: textContent.slice(0, 5000),
       link: item.link || "",
       author: item.creator || item.author || "",
       publishedDate: item.pubDate || item.isoDate || "",
+      imageUrl,
     };
   });
 

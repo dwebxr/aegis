@@ -28,6 +28,7 @@ export interface FetchURLResponse {
   description?: string;
   publishedDate?: string;
   source: string;
+  imageUrl?: string;
 }
 
 export interface FetchRSSResponse {
@@ -38,6 +39,7 @@ export interface FetchRSSResponse {
     link: string;
     author?: string;
     publishedDate?: string;
+    imageUrl?: string;
   }>;
 }
 

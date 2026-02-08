@@ -233,6 +233,21 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
 
       {/* Zone 2: Body Content */}
       <div style={{ display: "flex", gap: mobile ? space[3] : space[4], alignItems: "flex-start" }}>
+        {item.imageUrl && (
+          <img
+            src={item.imageUrl}
+            alt=""
+            style={{
+              width: isLarge ? 80 : 60,
+              height: isLarge ? 80 : 60,
+              objectFit: "cover",
+              borderRadius: radii.sm,
+              flexShrink: 0,
+              border: `1px solid ${colors.border.default}`,
+            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
         <div style={{ flex: 1, minWidth: 0, paddingRight: variant === "serendipity" ? 90 : (variant === "priority" ? 36 : 0) }}>
           <p style={{
             color: isSlop ? colors.text.tertiary : (variant === "serendipity" ? "#d8b4fe" : colors.text.tertiary),
@@ -245,6 +260,27 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
           }}>
             {item.text}
           </p>
+          {item.sourceUrl && item.text.length >= 295 && !item.sourceUrl.startsWith("nostr:") && (
+            <a
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                display: "inline-block",
+                marginTop: space[1],
+                fontSize: t.bodySm.size,
+                color: colors.blue[400],
+                textDecoration: "none",
+                fontWeight: 600,
+                transition: transitions.fast,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+            >
+              Read more &rarr;
+            </a>
+          )}
           {variant === "serendipity" && (
             <div style={{ marginTop: space[2], fontSize: t.caption.size, color: colors.purple[400], fontStyle: "italic" }}>
               Outside your usual topics — expanding your perspective
