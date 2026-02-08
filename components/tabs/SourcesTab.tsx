@@ -15,7 +15,7 @@ interface SourcesTabProps {
 }
 
 export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, mobile }) => {
-  const { sources, syncStatus, addSource, removeSource, toggleSource, updateSource } = useSources();
+  const { sources, syncStatus, syncError, addSource, removeSource, toggleSource, updateSource } = useSources();
   const { isAuthenticated } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -196,7 +196,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             <span>Saved Sources ({sources.length})</span>
             {syncStatus === "syncing" && <span style={{ fontSize: t.caption.size, color: colors.sky[400], fontWeight: 600 }}>syncing...</span>}
             {syncStatus === "synced" && <span style={{ fontSize: t.caption.size, color: colors.green[400], fontWeight: 600 }}>synced</span>}
-            {syncStatus === "error" && <span style={{ fontSize: t.caption.size, color: colors.red[400], fontWeight: 600 }}>sync error</span>}
+            {syncStatus === "error" && <span style={{ fontSize: t.caption.size, color: colors.red[400], fontWeight: 600 }}>sync error{syncError ? `: ${syncError}` : ""}</span>}
           </div>
           {sources.map(s => (
             <div key={s.id} style={{ marginBottom: space[1] }}>
