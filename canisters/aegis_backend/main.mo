@@ -400,6 +400,18 @@ persistent actor AegisBackend {
     Buffer.toArray(result);
   };
 
+  public query func getSourceConfigStats() : async { total: Nat; owners: [Principal] } {
+    let ownerSet = HashMap.HashMap<Principal, Bool>(4, Principal.equal, Principal.hash);
+    for ((_, config) in sourceConfigs.entries()) {
+      ownerSet.put(config.owner, true);
+    };
+    let ownerBuf = Buffer.Buffer<Principal>(ownerSet.size());
+    for ((p, _) in ownerSet.entries()) {
+      ownerBuf.add(p);
+    };
+    { total = sourceConfigs.size(); owners = Buffer.toArray(ownerBuf) };
+  };
+
   public shared(msg) func deleteSourceConfig(id : Text) : async Bool {
     let caller = msg.caller;
     assert(requireAuth(caller));
