@@ -22,12 +22,13 @@ function GradeBadge({ composite }: { composite: number }) {
   const { grade, color, bg } = scoreGrade(composite);
   return (
     <div style={{
-      width: 40, height: 40, borderRadius: radii.sm,
-      background: bg, border: `1px solid ${color}30`,
+      width: 44, height: 44, borderRadius: radii.sm,
+      background: bg, border: `2px solid ${color}40`,
       display: "flex", alignItems: "center", justifyContent: "center",
       flexShrink: 0,
+      boxShadow: `0 0 12px ${color}30`,
     }}>
-      <span style={{ fontSize: 18, fontWeight: 800, color, fontFamily: fonts.mono }}>{grade}</span>
+      <span style={{ fontSize: 20, fontWeight: 800, color, fontFamily: fonts.mono }}>{grade}</span>
     </div>
   );
 }

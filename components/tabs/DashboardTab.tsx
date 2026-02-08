@@ -4,7 +4,7 @@ import { ShieldIcon, FireIcon, ZapIcon, RSSIcon } from "@/components/icons";
 import { StatCard } from "@/components/ui/StatCard";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard } from "@/components/ui/ContentCard";
-import { colors, space, type as t, radii, transitions } from "@/styles/theme";
+import { fonts, colors, space, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 
 interface DashboardTabProps {
@@ -69,10 +69,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             Aegis Dashboard
           </h1>
           <p style={{
-            fontSize: mobile ? t.body.mobileSz : t.body.size,
+            fontSize: t.bodySm.size,
             lineHeight: t.body.lineHeight,
             color: colors.text.muted,
-            marginTop: space[2],
+            marginTop: space[4],
           }}>
             Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol.
           </p>
@@ -94,7 +94,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         marginBottom: mobile ? space[12] : space[16],
       }}>
         {[
-          { title: "Filter Accuracy", d: dailyQuality, c: colors.green[400], unit: "%" },
+          { title: "Filter Accuracy", d: dailyQuality, c: colors.cyan[400], unit: "%" },
           { title: "Slop Volume", d: dailySlop, c: colors.orange[500], unit: "items" },
         ].map(ch => (
           <div key={ch.title} style={{
@@ -107,9 +107,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               display: "flex", justifyContent: "space-between", alignItems: "baseline",
               marginBottom: space[3],
             }}>
-              <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
-                {ch.title}
-              </span>
+              <div style={{ display: "flex", alignItems: "baseline", gap: space[2] }}>
+                <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
+                  {ch.title}
+                </span>
+                <span style={{ fontSize: t.h2.size, fontWeight: 700, color: ch.c, fontFamily: fonts.mono }}>
+                  {ch.d[ch.d.length - 1]}{ch.unit === "%" ? "%" : ""}
+                </span>
+              </div>
               <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>
                 7-day {ch.unit === "%" ? "(%)" : "(count)"}
               </span>

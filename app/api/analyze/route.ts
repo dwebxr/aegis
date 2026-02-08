@@ -87,8 +87,9 @@ export async function POST(request: NextRequest) {
       }),
       signal: controller.signal,
     });
-  } catch {
+  } catch (err) {
     clearTimeout(timeout);
+    console.error("[analyze] Anthropic fetch failed:", err);
     const fallback = heuristicScores(text);
     return NextResponse.json({ error: "Request failed", ...fallback }, { status: 502 });
   }
@@ -101,7 +102,8 @@ export async function POST(request: NextRequest) {
   }
 
   let data;
-  try { data = await res.json(); } catch {
+  try { data = await res.json(); } catch (err) {
+    console.error("[analyze] Failed to parse Anthropic JSON:", err);
     const fallback = heuristicScores(text);
     return NextResponse.json({ error: "Failed to parse Anthropic response", ...fallback }, { status: 502 });
   }
@@ -120,6 +122,7 @@ export async function POST(request: NextRequest) {
       const composite = parseFloat((o * 0.4 + ins * 0.35 + c * 0.25).toFixed(1));
       parsed = { originality: o, insight: ins, credibility: c, composite, verdict: composite >= 4 ? "quality" : "slop", reason: "Parsed from partial response" };
     } else {
+      console.error("[analyze] Unparseable AI response:", clean.slice(0, 200));
       const fallback = heuristicScores(text);
       return NextResponse.json({ error: "Failed to parse AI response", ...fallback }, { status: 502 });
     }

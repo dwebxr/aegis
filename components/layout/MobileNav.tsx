@@ -1,7 +1,8 @@
 "use client";
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { colors, space, type as t, radii, transitions, fonts } from "@/styles/theme";
+import { AgentStatusBadge } from "@/components/ui/AgentStatusBadge";
+import { colors, space, type as t, radii, transitions, fonts, shadows } from "@/styles/theme";
 import type { NavItem } from "./Sidebar";
 
 interface MobileNavProps {
@@ -41,26 +42,30 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
           );
         })}
       </div>
-      <div style={{ display: "flex", justifyContent: "center", paddingBottom: space[1] }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: space[2], paddingBottom: space[1] }}>
         {isAuthenticated ? (
-          <button onClick={logout} style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: `${space[1]}px ${space[4]}px`, background: colors.red.bg,
-            border: `1px solid ${colors.red.border}`, borderRadius: radii.sm,
-            color: colors.red[400], fontSize: t.caption.size, fontWeight: 600,
-            cursor: "pointer", fontFamily: "inherit",
-          }}>
-            <span style={{ fontSize: t.caption.size, color: colors.green[400], fontFamily: fonts.mono }}>{short}</span>
-            <span>Logout</span>
-          </button>
+          <>
+            <button onClick={logout} style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: `${space[1]}px ${space[4]}px`, background: colors.red.bg,
+              border: `1px solid ${colors.red.border}`, borderRadius: radii.sm,
+              color: colors.red[400], fontSize: t.caption.size, fontWeight: 600,
+              cursor: "pointer", fontFamily: "inherit",
+            }}>
+              <span style={{ fontSize: t.caption.size, color: colors.green[400], fontFamily: fonts.mono }}>{short}</span>
+              <span>Logout</span>
+            </button>
+            <AgentStatusBadge compact />
+          </>
         ) : (
           <button onClick={login} style={{
-            padding: `${space[1]}px ${space[4]}px`,
+            padding: `${space[2]}px ${space[6]}px`,
             background: `linear-gradient(135deg, ${colors.blue[600]}, ${colors.cyan[500]})`,
-            border: "none", borderRadius: radii.sm, color: "#fff", fontSize: t.caption.size,
+            border: "none", borderRadius: radii.sm, color: "#fff", fontSize: t.body.mobileSz,
             fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+            boxShadow: shadows.glow.cyan,
           }}>
-            Login
+            Login with Internet Identity
           </button>
         )}
       </div>

@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
     const poolModule = await import("nostr-tools/pool");
     SimplePool = poolModule.SimplePool;
     setWsImpl = poolModule.useWebSocketImplementation;
-  } catch {
+  } catch (err) {
+    console.error("[fetch/nostr] Failed to load nostr-tools:", err);
     return NextResponse.json({ error: "Failed to load Nostr tools" }, { status: 500 });
   }
 
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
       tags: e.tags,
     }));
   } catch (err: unknown) {
+    console.error("[fetch/nostr] Relay query failed:", err);
     const msg = err instanceof Error ? err.message : "";
     if (msg === "timeout") {
       return NextResponse.json({

@@ -102,15 +102,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
 
     <div style={{
       background: colors.green.bg, border: `1px solid ${colors.green.border}`,
-      borderRadius: radii.md, padding: collapsed ? `${space[3]}px ${space[1]}px` : `${space[3]}px ${space[4]}px`,
+      borderRadius: radii.md, padding: collapsed ? `${space[2]}px ${space[1]}px` : `${space[2]}px ${space[3]}px`,
       textAlign: collapsed ? "center" : "left",
+      boxShadow: shadows.glow.green,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: space[1], justifyContent: collapsed ? "center" : "flex-start" }}>
-        <div style={{ width: 7, height: 7, borderRadius: "50%", background: colors.green[400], animation: "pulse 2s infinite" }} />
-        {!collapsed && <span style={{ fontSize: t.caption.size, color: colors.green[400], fontWeight: 600 }}>Online</span>}
-      </div>
-      <div style={{ fontSize: collapsed ? t.caption.size : t.body.mobileSz, fontWeight: 700, color: colors.text.secondary, fontFamily: fonts.mono }}>Aegis AI</div>
-      {!collapsed && <div style={{ fontSize: t.tiny.size, color: colors.text.muted }}>Content Filter</div>}
+      {collapsed ? (
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: colors.green[400], animation: "pulse 2s infinite" }} />
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: colors.green[400], animation: "pulse 2s infinite", flexShrink: 0 }} />
+          <span style={{ fontSize: t.caption.size, fontWeight: 600, color: colors.green[400], textTransform: "uppercase", letterSpacing: 1.5 }}>Online</span>
+          <span style={{ fontSize: t.tiny.size, color: colors.text.disabled }}>·</span>
+          <span style={{ fontSize: t.caption.size, fontWeight: 700, color: colors.text.secondary, fontFamily: fonts.mono }}>Aegis AI</span>
+        </div>
+      )}
     </div>
   </nav>
   );

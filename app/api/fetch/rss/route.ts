@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
   try {
     feed = await parser.parseURL(feedUrl);
   } catch (err: unknown) {
+    console.error("[fetch/rss] Parse failed:", feedUrl, err);
     const msg = err instanceof Error ? err.message : "Unknown error";
     if (msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
       return NextResponse.json({ error: "Could not reach this feed. Check the URL and try again." }, { status: 502 });

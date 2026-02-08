@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
   let article;
   try {
     article = await extract(url);
-  } catch {
+  } catch (err) {
+    console.error("[fetch/url] Extract failed:", url, err);
     return NextResponse.json({ error: "Could not reach this URL. Please verify it is accessible." }, { status: 502 });
   }
 

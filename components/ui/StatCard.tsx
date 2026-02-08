@@ -59,7 +59,7 @@ export const StatCard: React.FC<StatCardProps> = ({ icon, label, value, sub, col
       </div>
 
       {sub && (
-        <div style={{ fontSize: t.kpiSub.size, fontWeight: t.kpiSub.weight, color, marginTop: space[1], opacity: 0.8 }}>
+        <div style={{ fontSize: t.caption.size, fontWeight: t.kpiSub.weight, color: colors.text.disabled, marginTop: space[1] }}>
           {sub}
         </div>
       )}
