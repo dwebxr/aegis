@@ -1,4 +1,4 @@
-# Aegis — D2A Social Agent Platform
+# Aegis — D2A Social Agent Network
 
 Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol.
 
