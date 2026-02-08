@@ -256,7 +256,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
           }}>
             {item.text}
           </p>
-          {item.sourceUrl && item.text.length >= 295 && !item.sourceUrl.startsWith("nostr:") && (
+          {item.sourceUrl && !item.sourceUrl.startsWith("nostr:") && (
             <a
               href={item.sourceUrl}
               target="_blank"
