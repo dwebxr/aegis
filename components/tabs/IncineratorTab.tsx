@@ -15,11 +15,11 @@ interface IncineratorTabProps {
 }
 
 export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, nostrPubkey, mobile }) => {
-  const stages: Array<[string, string, boolean, string]> = [
-    ["S1", "Heuristic Filter", isAnalyzing, colors.purple[400]],
-    ["S2", "Structural", isAnalyzing, colors.sky[400]],
-    ["S3", "LLM Score", isAnalyzing, colors.amber[400]],
-    ["S4", "Cross-Valid", false, colors.text.tertiary],
+  const stages = [
+    { id: "S1", name: "Heuristic Filter", active: isAnalyzing, color: colors.purple[400] },
+    { id: "S2", name: "Structural", active: isAnalyzing, color: colors.sky[400] },
+    { id: "S3", name: "LLM Score", active: isAnalyzing, color: colors.amber[400] },
+    { id: "S4", name: "Cross-Valid", active: false, color: colors.text.tertiary },
   ];
 
   return (
@@ -50,12 +50,12 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onA
       }}>
         <IncineratorViz active={isAnalyzing} mobile={mobile} />
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: space[2], marginTop: space[4] }}>
-          {stages.map(([s, n, a, c]) => (
-            <div key={s} style={{ textAlign: "center", padding: `${space[3]}px ${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
-              <div style={{ ...kpiLabelStyle, letterSpacing: 1 }}>{s}</div>
-              <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, fontWeight: 600, marginTop: space[1] }}>{n}</div>
-              <div style={{ fontSize: t.tiny.size, fontWeight: 700, color: c, marginTop: space[1], textTransform: "uppercase", animation: a ? "pulse 1.5s infinite" : "none" }}>
-                &#x25CF; {a ? "ACTIVE" : "IDLE"}
+          {stages.map(({ id, name, active, color }) => (
+            <div key={id} style={{ textAlign: "center", padding: `${space[3]}px ${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
+              <div style={{ ...kpiLabelStyle, letterSpacing: 1 }}>{id}</div>
+              <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, fontWeight: 600, marginTop: space[1] }}>{name}</div>
+              <div style={{ fontSize: t.tiny.size, fontWeight: 700, color, marginTop: space[1], textTransform: "uppercase", animation: active ? "pulse 1.5s infinite" : "none" }}>
+                &#x25CF; {active ? "ACTIVE" : "IDLE"}
               </div>
             </div>
           ))}

@@ -79,7 +79,14 @@ export async function discoverPeers(
   };
 
   const pool = new SimplePool();
-  const events = await pool.querySync(relayUrls, filter);
+  let events;
+  try {
+    events = await pool.querySync(relayUrls, filter);
+  } catch (err) {
+    console.error("[discovery] Relay query failed:", err instanceof Error ? err.message : "unknown");
+    pool.destroy();
+    return [];
+  }
   pool.destroy();
 
   const peers: AgentProfile[] = [];

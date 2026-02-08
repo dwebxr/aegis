@@ -25,23 +25,27 @@ export function heuristicScores(text: string): HeuristicScores {
   let insight = 5;
   let credibility = 5;
 
-  if (exclamationDensity > 0.1) { originality -= 3; credibility -= 3; }
-  if (emojiDensity > 0.05) { originality -= 2; }
-  if (capsRatio > 0.3) { credibility -= 3; originality -= 2; }
+  const signals: string[] = [];
+  if (exclamationDensity > 0.1) { originality -= 3; credibility -= 3; signals.push("excessive exclamation marks"); }
+  if (emojiDensity > 0.05) { originality -= 2; signals.push("high emoji density"); }
+  if (capsRatio > 0.3) { credibility -= 3; originality -= 2; signals.push("excessive caps"); }
   if (words > 50) { insight += 1; }
-  if (words > 100) { insight += 1; originality += 1; }
-  if (hasLinks) { credibility += 2; }
-  if (hasData) { insight += 2; credibility += 1; }
+  if (words > 100) { insight += 1; originality += 1; signals.push("long-form content"); }
+  if (hasLinks) { credibility += 2; signals.push("contains links"); }
+  if (hasData) { insight += 2; credibility += 1; signals.push("contains data/numbers"); }
 
   originality = Math.max(0, Math.min(10, originality));
   insight = Math.max(0, Math.min(10, insight));
   credibility = Math.max(0, Math.min(10, credibility));
 
   const composite = parseFloat((originality * 0.4 + insight * 0.35 + credibility * 0.25).toFixed(1));
+  const reason = signals.length > 0
+    ? `Heuristic (AI unavailable): ${signals.join(", ")}.`
+    : "Heuristic (AI unavailable): no strong signals detected.";
   return {
     originality, insight, credibility, composite,
     verdict: composite >= 4 ? "quality" : "slop",
-    reason: "Estimated scores (AI unavailable). Based on text analysis heuristics.",
+    reason,
   };
 }
 

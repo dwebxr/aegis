@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "./AuthContext";
 import { usePreferences } from "./PreferenceContext";
 import { useContent } from "./ContentContext";
@@ -75,8 +75,12 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated, principalText, isEnabled, addContent]);
 
+  const value = useMemo(() => ({
+    agentState, isEnabled, toggleAgent,
+  }), [agentState, isEnabled, toggleAgent]);
+
   return (
-    <AgentContext.Provider value={{ agentState, isEnabled, toggleAgent }}>
+    <AgentContext.Provider value={value}>
       {children}
     </AgentContext.Provider>
   );

@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
 import { createBackendActor, createBackendActorAsync } from "@/lib/ic/actor";
@@ -35,6 +35,8 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "error">("idle");
   const [syncError, setSyncError] = useState("");
   const actorRef = useRef<_SERVICE | null>(null);
+  const sourcesRef = useRef(sources);
+  sourcesRef.current = sources;
 
   // Keep refs in sync with latest values to avoid stale closures
   const identityRef = useRef(identity);
@@ -44,11 +46,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const principalTextRef = useRef(principalText);
   principalTextRef.current = principalText;
 
-  // Version marker for cache debugging
-  useEffect(() => {
-    console.log("[sources] v6 loaded");
-  }, []);
-
   // Ensure actor uses current identity (invalidate on identity change)
   useEffect(() => {
     actorRef.current = null;
@@ -57,17 +54,16 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   // Get or create actor using latest identity from ref
   function getActor(): _SERVICE | null {
     if (!isAuthRef.current || !identityRef.current) {
-      console.warn("[sources v6] getActor: auth=", isAuthRef.current, "identity=", !!identityRef.current);
+      console.warn("[sources] getActor: auth=", isAuthRef.current, "identity=", !!identityRef.current);
       return null;
     }
     if (actorRef.current) return actorRef.current;
     try {
       const actor = createBackendActor(identityRef.current);
       actorRef.current = actor;
-      console.log("[sources v6] getActor: created new actor");
       return actor;
     } catch (err) {
-      console.error("[sources v6] getActor failed:", err);
+      console.error("[sources] getActor failed:", err);
       return null;
     }
   }
@@ -77,14 +73,16 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     const actor = getActor();
     const id = identityRef.current;
     if (!actor || !id) {
-      console.warn("[sources v6] saveToIC skip: actor=", !!actor, "identity=", !!id);
+      console.warn("[sources] saveToIC skip: actor=", !!actor, "identity=", !!id);
       return;
     }
     const principal = id.getPrincipal();
-    console.log("[sources v6] saveToIC:", source.id, "principal:", principal.toText().slice(0, 10));
     actor.saveSourceConfig(savedToIC(source, principal))
-      .then((resultId) => console.log("[sources v6] IC save OK:", resultId))
-      .catch((err: unknown) => console.error("[sources v6] IC save FAILED:", err));
+      .catch((err: unknown) => {
+        console.error("[sources] IC save FAILED:", err);
+        setSyncStatus("error");
+        setSyncError("Failed to save source to IC");
+      });
   }
 
   // Load sources from localStorage + IC on auth change
@@ -97,12 +95,9 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    console.log("[sources v6] sync effect: principal=", principalText.slice(0, 10));
-
     // Load from localStorage immediately
     const local = loadSources(principalText);
     setSources(local);
-    console.log("[sources v6] local sources:", local.length);
 
     // Async: create actor and query IC
     const doSync = async () => {
@@ -110,10 +105,9 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       try {
         actor = await createBackendActorAsync(identity);
         actorRef.current = actor;
-        console.log("[sources v7] actor created with syncTime");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error("[sources v7] actor creation failed:", msg);
+        console.error("[sources] actor creation failed:", msg);
         setSyncStatus("error");
         setSyncError("Actor: " + msg);
         return;
@@ -122,11 +116,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       setSyncStatus("syncing");
       try {
         const principal = identity.getPrincipal();
-        console.log("[sources v6] querying getUserSourceConfigs...");
         const icConfigs = await actor.getUserSourceConfigs(principal);
-        console.log("[sources v6] IC returned", icConfigs.length, "configs");
 
         const icSources = icConfigs.map(icToSaved);
+        let localOnly: SavedSource[] = [];
         setSources(prev => {
           const localMap = new Map<string, SavedSource>();
           prev.forEach(s => localMap.set(s.id, s));
@@ -136,23 +129,22 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
             merged.push(icSource);
             localMap.delete(icSource.id);
           });
-          // Keep local-only items and push them to IC
-          localMap.forEach(localSource => {
-            merged.push(localSource);
-            actor.saveSourceConfig(savedToIC(localSource, principal))
-              .then(() => console.log("[sources v6] pushed local→IC:", localSource.label))
-              .catch((e: unknown) => console.error("[sources v6] push local→IC failed:", e));
-          });
+          localOnly = Array.from(localMap.values());
+          localOnly.forEach(s => merged.push(s));
 
           saveSources(principalText, merged);
           return merged;
         });
+        // Push local-only items to IC (outside state updater)
+        for (const localSource of localOnly) {
+          actor.saveSourceConfig(savedToIC(localSource, principal))
+            .catch((e: unknown) => console.error("[sources] push local→IC failed:", e));
+        }
         setSyncStatus("synced");
         setSyncError("");
-        console.log("[sources v6] sync complete");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error("[sources v6] IC query failed:", msg, err);
+        console.error("[sources] IC query failed:", msg, err);
         setSyncStatus("error");
         setSyncError(msg);
       }
@@ -184,7 +176,11 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     const actor = getActor();
     if (actor) {
       actor.deleteSourceConfig(id)
-        .catch((err: unknown) => console.error("[sources] IC delete failed:", err));
+        .catch((err: unknown) => {
+          console.error("[sources] IC delete failed:", err);
+          setSyncStatus("error");
+          setSyncError("Failed to delete source from IC");
+        });
     }
   }, [persist]);
 
@@ -192,20 +188,20 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     setSources(prev => {
       const next = prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s);
       persist(next);
-      const toggled = next.find(s => s.id === id);
-      if (toggled) saveToIC(toggled);
       return next;
     });
+    const source = sourcesRef.current.find(s => s.id === id);
+    if (source) saveToIC({ ...source, enabled: !source.enabled });
   }, [persist]);
 
   const updateSource = useCallback((id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => {
     setSources(prev => {
       const next = prev.map(s => s.id === id ? { ...s, ...partial } : s);
       persist(next);
-      const updated = next.find(s => s.id === id);
-      if (updated) saveToIC(updated);
       return next;
     });
+    const source = sourcesRef.current.find(s => s.id === id);
+    if (source) saveToIC({ ...source, ...partial });
   }, [persist]);
 
   const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }> => {
@@ -228,8 +224,12 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     return result;
   }, [sources]);
 
+  const value = useMemo(() => ({
+    sources, syncStatus, syncError, addSource, removeSource, toggleSource, updateSource, getSchedulerSources,
+  }), [sources, syncStatus, syncError, addSource, removeSource, toggleSource, updateSource, getSchedulerSources]);
+
   return (
-    <SourceContext.Provider value={{ sources, syncStatus, syncError, addSource, removeSource, toggleSource, updateSource, getSchedulerSources }}>
+    <SourceContext.Provider value={value}>
       {children}
     </SourceContext.Provider>
   );
@@ -257,7 +257,7 @@ function savedToIC(s: SavedSource, owner: import("@dfinity/principal").Principal
 
 function icToSaved(ic: SourceConfigEntry): SavedSource {
   let parsed: Record<string, unknown> = {};
-  try { parsed = JSON.parse(ic.configJson); } catch { /* use defaults */ }
+  try { parsed = JSON.parse(ic.configJson); } catch (err) { console.warn("[sources] Failed to parse configJson:", err); }
   return {
     id: ic.id,
     type: ic.sourceType as "rss" | "nostr",

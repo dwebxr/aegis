@@ -178,11 +178,15 @@ export class AgentManager {
           contentPreview: match.text.slice(0, 100),
         };
 
-        const handshake = await sendOffer(
-          this.sk, this.pk, peer.nostrPubkey, offer, this.relayUrls,
-        );
-        this.handshakes.set(peer.nostrPubkey, handshake);
-        this.emitState();
+        try {
+          const handshake = await sendOffer(
+            this.sk, this.pk, peer.nostrPubkey, offer, this.relayUrls,
+          );
+          this.handshakes.set(peer.nostrPubkey, handshake);
+          this.emitState();
+        } catch (err) {
+          console.warn("[agent] sendOffer failed:", err instanceof Error ? err.message : "unknown");
+        }
       }
     }
   }
@@ -198,7 +202,8 @@ export class AgentManager {
 
     this.listenerSub = this.listenerPool.subscribe(this.relayUrls, filter, {
       onevent: (event) => {
-        this.handleIncomingMessage(event.pubkey, event.content);
+        this.handleIncomingMessage(event.pubkey, event.content)
+          .catch(err => console.warn("[agent] Message handler failed:", err instanceof Error ? err.message : "unknown"));
       },
     });
   }
@@ -232,27 +237,29 @@ export class AgentManager {
     const prefs = this.callbacks.getPrefs();
     const topicAffinity = prefs.topicAffinities[offer.topic] ?? 0;
 
-    // Accept if topic has positive affinity (not unknown/neutral) and score is high
-    if (topicAffinity > 0 && offer.score >= 6) {
-      await sendAccept(this.sk, this.pk, senderPk, this.relayUrls);
-      this.handshakes.set(senderPk, {
-        peerId: senderPk,
-        phase: "accepted",
-        offeredTopic: offer.topic,
-        offeredScore: offer.score,
-        startedAt: Date.now(),
-      });
-    } else {
-      // Politely decline — notify the sender
-      await sendReject(this.sk, this.pk, senderPk, this.relayUrls);
-      this.handshakes.set(senderPk, {
-        peerId: senderPk,
-        phase: "rejected",
-        offeredTopic: offer.topic,
-        offeredScore: offer.score,
-        startedAt: Date.now(),
-        completedAt: Date.now(),
-      });
+    try {
+      if (topicAffinity > 0 && offer.score >= 6) {
+        await sendAccept(this.sk, this.pk, senderPk, this.relayUrls);
+        this.handshakes.set(senderPk, {
+          peerId: senderPk,
+          phase: "accepted",
+          offeredTopic: offer.topic,
+          offeredScore: offer.score,
+          startedAt: Date.now(),
+        });
+      } else {
+        await sendReject(this.sk, this.pk, senderPk, this.relayUrls);
+        this.handshakes.set(senderPk, {
+          peerId: senderPk,
+          phase: "rejected",
+          offeredTopic: offer.topic,
+          offeredScore: offer.score,
+          startedAt: Date.now(),
+          completedAt: Date.now(),
+        });
+      }
+    } catch (err) {
+      console.warn("[agent] handleOffer relay send failed:", err instanceof Error ? err.message : "unknown");
     }
     this.emitState();
   }
@@ -263,7 +270,6 @@ export class AgentManager {
 
     handshake.phase = "delivering";
 
-    // Find the content we offered
     const content = this.callbacks.getContent();
     const match = content.find(c =>
       c.topics?.includes(handshake.offeredTopic) &&
@@ -282,10 +288,16 @@ export class AgentManager {
         lSlop: match.lSlop,
       };
 
-      await deliverContent(this.sk, this.pk, senderPk, payload, this.relayUrls);
-      handshake.phase = "completed";
-      handshake.completedAt = Date.now();
-      this.sentItems++;
+      try {
+        await deliverContent(this.sk, this.pk, senderPk, payload, this.relayUrls);
+        handshake.phase = "completed";
+        handshake.completedAt = Date.now();
+        this.sentItems++;
+      } catch (err) {
+        console.warn("[agent] deliverContent failed:", err instanceof Error ? err.message : "unknown");
+        handshake.phase = "rejected";
+        handshake.completedAt = Date.now();
+      }
     }
     this.emitState();
   }

@@ -188,7 +188,6 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
         boxShadow: hovered ? hoverShadow : "none",
       }}
     >
-      {/* Priority rank badge */}
       {variant === "priority" && rank !== undefined && (
         <div style={{
           position: "absolute", top: mobile ? space[3] : space[4], right: mobile ? space[3] : space[4],
@@ -201,7 +200,6 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
         </div>
       )}
 
-      {/* Serendipity ribbon */}
       {variant === "serendipity" && (
         <div style={{
           position: "absolute", top: 0, right: 0,
@@ -213,7 +211,6 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
         </div>
       )}
 
-      {/* Zone 1: Author Info Bar */}
       <div style={{
         display: "flex", alignItems: "center", gap: space[2], flexWrap: "wrap",
         paddingBottom: space[2],
@@ -231,7 +228,6 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
         {variant === "priority" && <div style={{ flex: 1 }} />}
       </div>
 
-      {/* Zone 2: Body Content */}
       <div style={{ display: "flex", gap: mobile ? space[3] : space[4], alignItems: "flex-start" }}>
         {item.imageUrl && (
           <img
@@ -288,7 +284,6 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
           )}
         </div>
 
-        {/* Score badge (non-large cards) */}
         {!isLarge && (
           <div style={{ textAlign: "center", flexShrink: 0 }}>
             <GradeBadge composite={item.scores.composite} />
@@ -302,7 +297,6 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
           </div>
         )}
 
-        {/* Score badge (large cards) */}
         {isLarge && (
           <div style={{ flexShrink: 0, marginTop: space[1] }}>
             <GradeBadge composite={item.scores.composite} />
@@ -310,15 +304,12 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
         )}
       </div>
 
-      {/* Score indicator tags (always visible) */}
       <ScoreTags item={item} />
 
-      {/* Zone 3: Topic tags (always visible) */}
       {item.topics && item.topics.length > 0 && (
         <TopicTags topics={item.topics} />
       )}
 
-      {/* Expanded details */}
       {expanded && (
         <div style={{
           marginTop: space[4],

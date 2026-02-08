@@ -21,6 +21,6 @@ module.exports = {
     }],
   },
   transformIgnorePatterns: [
-    "node_modules/(?!(@noble|nostr-tools|@scure)/)",
+    "node_modules/(?!(@noble|nostr-tools|@scure|uuid|@extractus)/)",
   ],
 };

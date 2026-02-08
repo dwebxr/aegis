@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "./AuthContext";
 import type { UserPreferenceProfile, UserContext } from "@/lib/preferences/types";
 import { createEmptyProfile } from "@/lib/preferences/types";
@@ -65,8 +65,12 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   const isPersonalized = hasEnoughData(profile);
   const userContext = isPersonalized ? getContext(profile) : null;
 
+  const value = useMemo(() => ({
+    profile, userContext, isPersonalized, onValidate, onFlag,
+  }), [profile, userContext, isPersonalized, onValidate, onFlag]);
+
   return (
-    <PreferenceContext.Provider value={{ profile, userContext, isPersonalized, onValidate, onFlag }}>
+    <PreferenceContext.Provider value={value}>
       {children}
     </PreferenceContext.Provider>
   );

@@ -5,7 +5,6 @@ import { generateBriefing } from "@/lib/briefing/ranker";
 import { colors, space, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
-import { createEmptyProfile } from "@/lib/preferences/types";
 
 interface BriefingTabProps {
   content: ContentItem[];
@@ -20,8 +19,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const [showFiltered, setShowFiltered] = useState(false);
 
   const briefing = useMemo(() => {
-    const p = profile.principalId ? profile : createEmptyProfile("anonymous");
-    return generateBriefing(content, p);
+    return generateBriefing(content, profile);
   }, [content, profile]);
 
   const insightCount = briefing.priority.length + (briefing.serendipity ? 1 : 0);

@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { AuthClient } from "@dfinity/auth-client";
 import type { Identity } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
@@ -79,8 +79,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const principalText = principal ? principal.toText() : "";
 
+  const value = useMemo(() => ({
+    isAuthenticated, identity, principal, principalText, isLoading, login, logout,
+  }), [isAuthenticated, identity, principal, principalText, isLoading, login, logout]);
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, identity, principal, principalText, isLoading, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

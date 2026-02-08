@@ -33,14 +33,3 @@ export function saveProfile(profile: UserPreferenceProfile): boolean {
     return false;
   }
 }
-
-export function clearProfile(principalId: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    localStorage.removeItem(storageKey(principalId));
-    return true;
-  } catch (err) {
-    console.warn("Failed to clear preference profile:", err);
-    return false;
-  }
-}

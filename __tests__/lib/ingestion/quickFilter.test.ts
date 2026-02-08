@@ -8,7 +8,7 @@ describe("heuristicScores", () => {
     expect(result.credibility).toBe(5);
     expect(result.composite).toBeCloseTo(5.0);
     expect(result.verdict).toBe("quality");
-    expect(result.reason).toContain("heuristics");
+    expect(result.reason).toContain("Heuristic");
   });
 
   describe("exclamation density", () => {
@@ -123,6 +123,25 @@ describe("heuristicScores", () => {
       const text = "OMG!!! BREAKING!!! YOU WON'T BELIEVE THIS!!! CLICK NOW!!!";
       const result = heuristicScores(text);
       expect(result.verdict).toBe("slop");
+    });
+  });
+
+  describe("reason string", () => {
+    it("includes specific signals detected", () => {
+      const text = "Check out https://example.com for the data: 42% improvement!";
+      const result = heuristicScores(text);
+      expect(result.reason).toContain("contains links");
+      expect(result.reason).toContain("contains data/numbers");
+    });
+
+    it("reports no signals for plain text", () => {
+      const result = heuristicScores("Simple normal text here");
+      expect(result.reason).toContain("no strong signals");
+    });
+
+    it("reports exclamation marks when excessive", () => {
+      const result = heuristicScores("Wow! Amazing! Great! Super!");
+      expect(result.reason).toContain("exclamation marks");
     });
   });
 

@@ -10,8 +10,8 @@ import type { ContentItem } from "@/lib/types/content";
 interface DashboardTabProps {
   content: ContentItem[];
   mobile?: boolean;
-  onValidate?: (id: string) => void;
-  onFlag?: (id: string) => void;
+  onValidate: (id: string) => void;
+  onFlag: (id: string) => void;
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag }) => {
@@ -155,8 +155,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           item={it}
           expanded={expanded === it.id}
           onToggle={() => setExpanded(expanded === it.id ? null : it.id)}
-          onValidate={onValidate || (() => {})}
-          onFlag={onFlag || (() => {})}
+          onValidate={onValidate}
+          onFlag={onFlag}
           mobile={mobile}
         />
       ))}
@@ -202,8 +202,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     item={it}
                     expanded={expanded === it.id}
                     onToggle={() => setExpanded(expanded === it.id ? null : it.id)}
-                    onValidate={onValidate || (() => {})}
-                    onFlag={onFlag || (() => {})}
+                    onValidate={onValidate}
+                    onFlag={onFlag}
                     mobile={mobile}
                   />
                 </div>

@@ -1,13 +1,13 @@
 "use client";
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
-import { createBackendActor, createBackendActorAsync } from "@/lib/ic/actor";
+import { createBackendActorAsync } from "@/lib/ic/actor";
 import { relativeTime } from "@/lib/utils/scores";
 import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
-import type { _SERVICE } from "@/lib/ic/declarations";
+import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
 
 interface ContentState {
   content: ContentItem[];
@@ -40,6 +40,24 @@ const ContentContext = createContext<ContentState>({
   loadFromIC: async () => {},
 });
 
+function mapSource(s: string): ContentSource {
+  switch (s) {
+    case "rss": return { rss: null };
+    case "url": return { url: null };
+    case "twitter": return { twitter: null };
+    case "nostr": return { nostr: null };
+    default: return { manual: null };
+  }
+}
+
+function mapSourceBack(s: ContentSource): string {
+  if ("rss" in s) return "rss";
+  if ("url" in s) return "url";
+  if ("twitter" in s) return "twitter";
+  if ("nostr" in s) return "nostr";
+  return "manual";
+}
+
 export function ContentProvider({ children, preferenceCallbacks }: { children: React.ReactNode; preferenceCallbacks?: PreferenceCallbacks }) {
   const { isAuthenticated, identity, principal } = useAuth();
   const [content, setContent] = useState<ContentItem[]>([]);
@@ -47,6 +65,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "offline">("idle");
   const actorRef = useRef<_SERVICE | null>(null);
+  const contentRef = useRef(content);
+  contentRef.current = content;
 
   useEffect(() => {
     if (isAuthenticated && identity) {
@@ -67,10 +87,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated, identity]);
 
   useEffect(() => {
-    const iv = setInterval(() => {
+    const timestampTimer = setInterval(() => {
       setContent(prev => prev.map(c => ({ ...c, timestamp: relativeTime(c.createdAt) })));
     }, 30000);
-    return () => clearInterval(iv);
+    return () => clearInterval(timestampTimer);
   }, []);
 
   const analyze = useCallback(async (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }): Promise<AnalyzeResponse> => {
@@ -118,10 +138,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     };
     setContent(prev => [evaluation, ...prev]);
 
-    if (actorRef.current && isAuthenticated) {
+    if (actorRef.current && isAuthenticated && principal) {
       actorRef.current.saveEvaluation({
         id: evaluation.id,
-        owner: principal!,
+        owner: principal,
         author: evaluation.author,
         avatar: evaluation.avatar,
         text: evaluation.text,
@@ -138,7 +158,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         createdAt: BigInt(evaluation.createdAt * 1_000_000),
         validated: evaluation.validated,
         flagged: evaluation.flagged,
-      }).catch((err: unknown) => console.warn("IC saveEvaluation failed:", err));
+      }).catch((err: unknown) => {
+        console.warn("IC saveEvaluation failed:", err);
+        setSyncStatus("offline");
+      });
     }
 
     return result;
@@ -146,31 +169,33 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated, principal]);
 
   const validateItem = useCallback((id: string) => {
-    setContent(prev => {
-      const item = prev.find(c => c.id === id);
-      if (item && preferenceCallbacks?.onValidate) {
-        preferenceCallbacks.onValidate(item.topics || [], item.author, item.scores.composite, item.verdict);
-      }
-      if (item && actorRef.current && isAuthenticated) {
-        actorRef.current.updateEvaluation(id, true, item.flagged)
-          .catch((err: unknown) => console.warn("IC updateEvaluation (validate) failed:", err));
-      }
-      return prev.map(c => c.id === id ? { ...c, validated: true } : c);
-    });
+    const item = contentRef.current.find(c => c.id === id);
+    setContent(prev => prev.map(c => c.id === id ? { ...c, validated: true } : c));
+    if (item && preferenceCallbacks?.onValidate) {
+      preferenceCallbacks.onValidate(item.topics || [], item.author, item.scores.composite, item.verdict);
+    }
+    if (item && actorRef.current && isAuthenticated) {
+      actorRef.current.updateEvaluation(id, true, item.flagged)
+        .catch((err: unknown) => {
+          console.warn("IC updateEvaluation (validate) failed:", err);
+          setSyncStatus("offline");
+        });
+    }
   }, [isAuthenticated, preferenceCallbacks]);
 
   const flagItem = useCallback((id: string) => {
-    setContent(prev => {
-      const item = prev.find(c => c.id === id);
-      if (item && preferenceCallbacks?.onFlag) {
-        preferenceCallbacks.onFlag(item.topics || [], item.author, item.scores.composite, item.verdict);
-      }
-      if (item && actorRef.current && isAuthenticated) {
-        actorRef.current.updateEvaluation(id, item.validated, true)
-          .catch((err: unknown) => console.warn("IC updateEvaluation (flag) failed:", err));
-      }
-      return prev.map(c => c.id === id ? { ...c, flagged: true } : c);
-    });
+    const item = contentRef.current.find(c => c.id === id);
+    setContent(prev => prev.map(c => c.id === id ? { ...c, flagged: true } : c));
+    if (item && preferenceCallbacks?.onFlag) {
+      preferenceCallbacks.onFlag(item.topics || [], item.author, item.scores.composite, item.verdict);
+    }
+    if (item && actorRef.current && isAuthenticated) {
+      actorRef.current.updateEvaluation(id, item.validated, true)
+        .catch((err: unknown) => {
+          console.warn("IC updateEvaluation (flag) failed:", err);
+          setSyncStatus("offline");
+        });
+    }
   }, [isAuthenticated, preferenceCallbacks]);
 
   const addContent = useCallback((item: ContentItem) => {
@@ -188,16 +213,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       setSyncStatus("synced");
       return;
     }
-
-    const mapSource = (s: string) => {
-      switch (s) {
-        case "rss": return { rss: null };
-        case "url": return { url: null };
-        case "twitter": return { twitter: null };
-        case "nostr": return { nostr: null };
-        default: return { manual: null };
-      }
-    };
 
     const evals = userContent.map(c => ({
       id: c.id,
@@ -239,15 +254,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     try {
       const icEvals = await actorRef.current.getUserEvaluations(principal, BigInt(0), BigInt(100));
 
-      const mapSourceBack = (s: { manual: null } | { rss: null } | { url: null } | { twitter: null } | { nostr: null }): string => {
-        if ("manual" in s) return "manual";
-        if ("rss" in s) return "rss";
-        if ("url" in s) return "url";
-        if ("twitter" in s) return "twitter";
-        if ("nostr" in s) return "nostr";
-        return "manual";
-      };
-
       const loaded: ContentItem[] = icEvals.map(e => ({
         id: e.id,
         owner: e.owner.toText(),
@@ -287,11 +293,13 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     }
   }, [isAuthenticated, principal]);
 
+  const value = useMemo(() => ({
+    content, isAnalyzing, isSyncing, syncStatus,
+    analyze, validateItem, flagItem, addContent, syncToIC, loadFromIC,
+  }), [content, isAnalyzing, isSyncing, syncStatus, analyze, validateItem, flagItem, addContent, syncToIC, loadFromIC]);
+
   return (
-    <ContentContext.Provider value={{
-      content, isAnalyzing, isSyncing, syncStatus,
-      analyze, validateItem, flagItem, addContent, syncToIC, loadFromIC,
-    }}>
+    <ContentContext.Provider value={value}>
       {children}
     </ContentContext.Provider>
   );

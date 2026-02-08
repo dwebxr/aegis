@@ -15,7 +15,11 @@ export function createBackendActor(identity?: Identity): _SERVICE {
  *  Prevents signed-query failures from client clock drift. */
 export async function createBackendActorAsync(identity?: Identity): Promise<_SERVICE> {
   const agent = createAgent(identity);
-  await agent.syncTime();
+  try {
+    await agent.syncTime();
+  } catch (err) {
+    console.warn("[ic] syncTime failed (clock drift possible):", err instanceof Error ? err.message : "unknown");
+  }
   return Actor.createActor<_SERVICE>(idlFactory, {
     agent,
     canisterId: getCanisterId(),
