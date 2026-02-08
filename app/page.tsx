@@ -73,9 +73,9 @@ export default function AegisApp() {
     addNotification("Flagged as slop", "error");
   };
 
-  const handleAnalyze = async (text: string) => {
+  const handleAnalyze = async (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => {
     try {
-      const result = await analyze(text, userContext);
+      const result = await analyze(text, userContext, meta);
       addNotification(
         result.verdict === "quality" ? "Quality confirmed \u2713" : "Slop identified \uD83D\uDD25",
         result.verdict === "quality" ? "success" : "error"

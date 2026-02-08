@@ -15,7 +15,7 @@ interface ContentState {
   isAnalyzing: boolean;
   isSyncing: boolean;
   syncStatus: "idle" | "syncing" | "synced" | "offline";
-  analyze: (text: string, userContext?: UserContext | null) => Promise<AnalyzeResponse>;
+  analyze: (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
   validateItem: (id: string) => void;
   flagItem: (id: string) => void;
   addContent: (item: ContentItem) => void;
@@ -72,7 +72,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     return () => clearInterval(iv);
   }, []);
 
-  const analyze = useCallback(async (text: string, userContext?: UserContext | null): Promise<AnalyzeResponse> => {
+  const analyze = useCallback(async (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }): Promise<AnalyzeResponse> => {
     setIsAnalyzing(true);
     try {
     const body: Record<string, unknown> = { text, source: "manual" };
@@ -95,7 +95,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       author: "You",
       avatar: "\u{1F50D}",
       text: text.slice(0, 300),
-      source: "manual",
+      source: meta?.sourceUrl ? "url" : "manual",
+      sourceUrl: meta?.sourceUrl,
+      imageUrl: meta?.imageUrl,
       scores: {
         originality: result.originality,
         insight: result.insight,
@@ -122,8 +124,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         author: evaluation.author,
         avatar: evaluation.avatar,
         text: evaluation.text,
-        source: { manual: null },
-        sourceUrl: [],
+        source: meta?.sourceUrl ? { url: null } : { manual: null },
+        sourceUrl: evaluation.sourceUrl ? [evaluation.sourceUrl] as [string] : [] as [],
         scores: {
           originality: Math.round(evaluation.scores.originality),
           insight: Math.round(evaluation.scores.insight),

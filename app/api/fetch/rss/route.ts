@@ -44,7 +44,13 @@ export async function POST(request: NextRequest) {
     const rawContent = item["content:encoded"] || item.content || item.contentSnippet || item.summary || "";
     const textContent = rawContent.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
     const enc = item.enclosure as { url?: string; type?: string } | undefined;
-    const imageUrl = enc?.url && /image/i.test(enc.type || "") ? enc.url : undefined;
+    let imageUrl: string | undefined;
+    if (enc?.url && /image/i.test(enc.type || "")) {
+      imageUrl = enc.url;
+    } else {
+      const imgMatch = rawContent.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (imgMatch?.[1]) imageUrl = imgMatch[1];
+    }
     return {
       title: item.title || "",
       content: textContent.slice(0, 5000),

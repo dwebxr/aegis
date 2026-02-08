@@ -9,7 +9,7 @@ import { useSources } from "@/contexts/SourceContext";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface SourcesTabProps {
-  onAnalyze: (text: string) => Promise<AnalyzeResponse>;
+  onAnalyze: (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
   isAnalyzing: boolean;
   mobile?: boolean;
 }
@@ -438,7 +438,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   </div>
                 </div>
                 <div style={{ fontSize: t.body.mobileSz, color: colors.text.tertiary, lineHeight: 1.6, maxHeight: 200, overflow: "auto", marginBottom: space[3] }}>{urlResult.content.slice(0, 1000)}{urlResult.content.length > 1000 ? "..." : ""}</div>
-                <button onClick={() => onAnalyze(urlResult.content)} disabled={isAnalyzing} style={btnStyle(isAnalyzing, isAnalyzing)}>
+                <button onClick={() => onAnalyze(urlResult.content, { sourceUrl: urlInput, imageUrl: urlResult.imageUrl })} disabled={isAnalyzing} style={btnStyle(isAnalyzing, isAnalyzing)}>
                   {isAnalyzing ? "Analyzing..." : "Analyze This Content"}
                 </button>
               </div>
@@ -484,7 +484,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                       )}
                       <div style={{ fontSize: t.caption.size, color: colors.text.muted }}>{item.author} &middot; {item.publishedDate}</div>
                     </div>
-                    <button onClick={() => onAnalyze(item.content || item.title)} disabled={isAnalyzing} style={{ ...btnStyle(isAnalyzing, false), padding: `6px ${space[3]}px`, fontSize: t.caption.size, flexShrink: 0 }}>
+                    <button onClick={() => onAnalyze(item.content || item.title, { sourceUrl: item.link || undefined, imageUrl: item.imageUrl })} disabled={isAnalyzing} style={{ ...btnStyle(isAnalyzing, false), padding: `6px ${space[3]}px`, fontSize: t.caption.size, flexShrink: 0 }}>
                       Analyze
                     </button>
                   </div>
