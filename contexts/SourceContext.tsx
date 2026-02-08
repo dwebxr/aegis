@@ -33,19 +33,46 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "error">("idle");
   const actorRef = useRef<_SERVICE | null>(null);
 
-  // On-demand actor getter: creates or returns cached actor
-  const getActor = useCallback((): _SERVICE | null => {
-    if (!isAuthenticated || !identity) return null;
+  // Keep refs in sync with latest values to avoid stale closures
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
+  const isAuthRef = useRef(isAuthenticated);
+  isAuthRef.current = isAuthenticated;
+  const principalTextRef = useRef(principalText);
+  principalTextRef.current = principalText;
+
+  // Ensure actor uses current identity (invalidate on identity change)
+  useEffect(() => {
+    actorRef.current = null;
+  }, [identity]);
+
+  // Get or create actor using latest identity from ref
+  function getActor(): _SERVICE | null {
+    if (!isAuthRef.current || !identityRef.current) return null;
     if (actorRef.current) return actorRef.current;
     try {
-      const actor = createBackendActor(identity);
+      const actor = createBackendActor(identityRef.current);
       actorRef.current = actor;
       return actor;
     } catch (err) {
       console.error("[sources] Failed to create IC actor:", err);
       return null;
     }
-  }, [isAuthenticated, identity]);
+  }
+
+  // Save a source to IC using refs (never stale)
+  function saveToIC(source: SavedSource): void {
+    const actor = getActor();
+    const id = identityRef.current;
+    if (!actor || !id) {
+      console.warn("[sources] IC save skipped: actor=", !!actor, "identity=", !!id);
+      return;
+    }
+    const principal = id.getPrincipal();
+    actor.saveSourceConfig(savedToIC(source, principal))
+      .then((resultId) => console.log("[sources] IC save OK:", resultId))
+      .catch((err: unknown) => console.error("[sources] IC save FAILED:", err));
+  }
 
   // Load sources from localStorage + IC on auth change
   useEffect(() => {
@@ -60,9 +87,13 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     const local = loadSources(principalText);
     setSources(local);
 
-    // Create actor and merge with IC
-    const actor = getActor();
-    if (!actor) {
+    // Create actor directly (not via ref, since we have identity here)
+    let actor: _SERVICE | null = null;
+    try {
+      actor = createBackendActor(identity);
+      actorRef.current = actor;
+    } catch (err) {
+      console.error("[sources] Actor creation failed in effect:", err);
       setSyncStatus("error");
       return;
     }
@@ -76,7 +107,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           const localMap = new Map<string, SavedSource>();
           prev.forEach(s => localMap.set(s.id, s));
 
-          // IC wins for items that exist in IC
           const merged: SavedSource[] = [];
           icSources.forEach(icSource => {
             merged.push(icSource);
@@ -84,7 +114,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           });
           // Push local-only items to IC
           localMap.forEach(localSource => {
-            actor.saveSourceConfig(savedToIC(localSource, principal))
+            actor!.saveSourceConfig(savedToIC(localSource, principal))
               .then(() => console.log("[sources] Pushed local→IC:", localSource.label))
               .catch((err: unknown) => console.error("[sources] Push local→IC failed:", err));
           });
@@ -98,24 +128,12 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         console.error("[sources] IC load failed:", err);
         setSyncStatus("error");
       });
-  }, [isAuthenticated, identity, principalText, getActor]);
+  }, [isAuthenticated, identity, principalText]);
 
   const persist = useCallback((next: SavedSource[]) => {
-    if (principalText) saveSources(principalText, next);
-  }, [principalText]);
-
-  // Helper: save source to IC with on-demand actor
-  const saveToIC = useCallback((source: SavedSource) => {
-    const actor = getActor();
-    if (!actor || !identity) {
-      console.warn("[sources] IC save skipped: no actor or identity");
-      return;
-    }
-    const principal = identity.getPrincipal();
-    actor.saveSourceConfig(savedToIC(source, principal))
-      .then((id) => console.log("[sources] IC save OK:", id))
-      .catch((err: unknown) => console.error("[sources] IC save FAILED:", err));
-  }, [getActor, identity]);
+    const pt = principalTextRef.current;
+    if (pt) saveSources(pt, next);
+  }, []);
 
   const addSource = useCallback((partial: Omit<SavedSource, "id" | "createdAt">) => {
     const source: SavedSource = { ...partial, id: uuidv4(), createdAt: Date.now() };
@@ -125,7 +143,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     saveToIC(source);
-  }, [persist, saveToIC]);
+  }, [persist]);
 
   const removeSource = useCallback((id: string) => {
     setSources(prev => {
@@ -138,7 +156,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       actor.deleteSourceConfig(id)
         .catch((err: unknown) => console.error("[sources] IC delete failed:", err));
     }
-  }, [persist, getActor]);
+  }, [persist]);
 
   const toggleSource = useCallback((id: string) => {
     setSources(prev => {
@@ -148,7 +166,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       if (toggled) saveToIC(toggled);
       return next;
     });
-  }, [persist, saveToIC]);
+  }, [persist]);
 
   const updateSource = useCallback((id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => {
     setSources(prev => {
@@ -158,7 +176,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       if (updated) saveToIC(updated);
       return next;
     });
-  }, [persist, saveToIC]);
+  }, [persist]);
 
   const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }> => {
     const result: Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }> = [];
