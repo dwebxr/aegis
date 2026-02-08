@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
-import { createBackendActor } from "@/lib/ic/actor";
+import { createBackendActor, createBackendActorAsync } from "@/lib/ic/actor";
 import { relativeTime } from "@/lib/utils/scores";
 import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
@@ -50,14 +50,16 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   useEffect(() => {
     if (isAuthenticated && identity) {
-      try {
-        actorRef.current = createBackendActor(identity);
-        setSyncStatus("idle");
-      } catch (err) {
-        console.error("Failed to create IC actor:", err);
-        actorRef.current = null;
-        setSyncStatus("offline");
-      }
+      createBackendActorAsync(identity)
+        .then(actor => {
+          actorRef.current = actor;
+          setSyncStatus("idle");
+        })
+        .catch(err => {
+          console.error("Failed to create IC actor:", err);
+          actorRef.current = null;
+          setSyncStatus("offline");
+        });
     } else {
       actorRef.current = null;
       setSyncStatus("offline");

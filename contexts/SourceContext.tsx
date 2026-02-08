@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
-import { createBackendActor } from "@/lib/ic/actor";
+import { createBackendActor, createBackendActorAsync } from "@/lib/ic/actor";
 import { loadSources, saveSources } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
@@ -108,12 +108,12 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     const doSync = async () => {
       let actor: _SERVICE;
       try {
-        actor = createBackendActor(identity);
+        actor = await createBackendActorAsync(identity);
         actorRef.current = actor;
-        console.log("[sources v6] actor created in effect");
+        console.log("[sources v7] actor created with syncTime");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error("[sources v6] actor creation failed:", msg);
+        console.error("[sources v7] actor creation failed:", msg);
         setSyncStatus("error");
         setSyncError("Actor: " + msg);
         return;

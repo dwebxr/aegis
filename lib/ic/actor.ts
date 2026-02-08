@@ -10,3 +10,14 @@ export function createBackendActor(identity?: Identity): _SERVICE {
     canisterId: getCanisterId(),
   });
 }
+
+/** Async version: syncs agent time with IC before returning actor.
+ *  Prevents signed-query failures from client clock drift. */
+export async function createBackendActorAsync(identity?: Identity): Promise<_SERVICE> {
+  const agent = createAgent(identity);
+  await agent.syncTime();
+  return Actor.createActor<_SERVICE>(idlFactory, {
+    agent,
+    canisterId: getCanisterId(),
+  });
+}
