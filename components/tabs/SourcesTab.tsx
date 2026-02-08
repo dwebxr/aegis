@@ -15,8 +15,15 @@ interface SourcesTabProps {
 }
 
 export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, mobile }) => {
-  const { sources, addSource, removeSource, toggleSource } = useSources();
+  const { sources, addSource, removeSource, toggleSource, updateSource } = useSources();
   const { isAuthenticated } = useAuth();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editFeedUrl, setEditFeedUrl] = useState("");
+  const [editRelays, setEditRelays] = useState<string[]>([]);
+  const [editPubkeys, setEditPubkeys] = useState<string[]>([]);
+  const [editNewRelay, setEditNewRelay] = useState("");
+  const [editNewPubkey, setEditNewPubkey] = useState("");
   const [activeSource, setActiveSource] = useState<"manual" | "url" | "rss" | "twitter" | "nostr">("manual");
   const [urlInput, setUrlInput] = useState("");
   const [urlResult, setUrlResult] = useState<FetchURLResponse | null>(null);
@@ -96,6 +103,36 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     addSource({ type: "nostr", label, relays, pubkeys, enabled: true });
   };
 
+  const startEdit = (s: typeof sources[number]) => {
+    setEditingId(s.id);
+    setEditLabel(s.label);
+    setEditFeedUrl(s.feedUrl || "");
+    setEditRelays([...(s.relays || [])]);
+    setEditPubkeys([...(s.pubkeys || [])]);
+    setEditNewRelay("");
+    setEditNewPubkey("");
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEdit = () => {
+    if (!editingId) return;
+    const s = sources.find(x => x.id === editingId);
+    if (!s) return;
+    if (s.type === "rss") {
+      updateSource(editingId, { label: editLabel.trim() || s.label, feedUrl: editFeedUrl.trim() || s.feedUrl });
+    } else {
+      const filtered = editRelays.filter(Boolean);
+      if (filtered.length === 0) return;
+      updateSource(editingId, {
+        label: editLabel.trim() || s.label,
+        relays: filtered,
+        pubkeys: editPubkeys.filter(Boolean),
+      });
+    }
+    setEditingId(null);
+  };
+
   const sourceTabs: Array<{ id: "manual" | "url" | "rss" | "twitter" | "nostr"; label: string; icon: React.ReactNode; color: string }> = [
     { id: "manual", label: "Manual", icon: <span style={{ fontSize: 14 }}>&#x270D;&#xFE0F;</span>, color: colors.purple[400] },
     { id: "url", label: "URL", icon: <LinkIcon s={14} />, color: colors.sky[400] },
@@ -159,50 +196,177 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             Saved Sources ({sources.length})
           </div>
           {sources.map(s => (
-            <div key={s.id} style={{
-              display: "flex", alignItems: "center", gap: space[3],
-              padding: `${space[2]}px ${space[3]}px`, marginBottom: space[1],
-              background: s.enabled ? `${s.type === "rss" ? colors.amber[400] : colors.purple[400]}08` : "transparent",
-              borderRadius: radii.sm,
-            }}>
-              <button
-                onClick={() => toggleSource(s.id)}
-                style={{
-                  width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "pointer",
-                  background: s.enabled ? (s.type === "rss" ? colors.amber[400] : colors.purple[400]) : colors.border.default,
-                  flexShrink: 0, padding: 0,
-                }}
-                title={s.enabled ? "Disable" : "Enable"}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: t.body.mobileSz, fontWeight: 600,
-                  color: s.enabled ? colors.text.secondary : colors.text.disabled,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>
-                  {s.label}
-                </div>
-                <div style={{ fontSize: t.tiny.size, color: colors.text.muted }}>
-                  {s.type === "rss" ? s.feedUrl : `${(s.relays || []).length} relays`}
-                </div>
-              </div>
-              <span style={{
-                fontSize: t.tiny.size, fontWeight: 700, color: s.type === "rss" ? colors.amber[400] : colors.purple[400],
-                textTransform: "uppercase", letterSpacing: 1,
+            <div key={s.id} style={{ marginBottom: space[1] }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: space[3],
+                padding: `${space[2]}px ${space[3]}px`,
+                background: s.enabled ? `${s.type === "rss" ? colors.amber[400] : colors.purple[400]}08` : "transparent",
+                borderRadius: editingId === s.id ? `${radii.sm} ${radii.sm} 0 0` : radii.sm,
               }}>
-                {s.type}
-              </span>
-              <button
-                onClick={() => removeSource(s.id)}
-                style={{
-                  background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
-                  fontSize: t.caption.size, color: colors.text.disabled, fontFamily: "inherit",
-                  transition: transitions.fast,
-                }}
-                title="Remove source"
-              >
-                &#x2715;
-              </button>
+                <button
+                  onClick={() => toggleSource(s.id)}
+                  style={{
+                    width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "pointer",
+                    background: s.enabled ? (s.type === "rss" ? colors.amber[400] : colors.purple[400]) : colors.border.default,
+                    flexShrink: 0, padding: 0,
+                  }}
+                  title={s.enabled ? "Disable" : "Enable"}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: t.body.mobileSz, fontWeight: 600,
+                    color: s.enabled ? colors.text.secondary : colors.text.disabled,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {s.label}
+                  </div>
+                  <div style={{ fontSize: t.tiny.size, color: colors.text.muted }}>
+                    {s.type === "rss" ? s.feedUrl : `${(s.relays || []).length} relays · ${(s.pubkeys || []).length} keys`}
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: t.tiny.size, fontWeight: 700, color: s.type === "rss" ? colors.amber[400] : colors.purple[400],
+                  textTransform: "uppercase", letterSpacing: 1,
+                }}>
+                  {s.type}
+                </span>
+                <button
+                  onClick={() => editingId === s.id ? cancelEdit() : startEdit(s)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
+                    fontSize: t.caption.size, color: editingId === s.id ? colors.blue[400] : colors.text.disabled,
+                    fontFamily: "inherit", transition: transitions.fast,
+                  }}
+                  title="Edit source"
+                >
+                  &#x270E;
+                </button>
+                <button
+                  onClick={() => removeSource(s.id)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
+                    fontSize: t.caption.size, color: colors.text.disabled, fontFamily: "inherit",
+                    transition: transitions.fast,
+                  }}
+                  title="Remove source"
+                >
+                  &#x2715;
+                </button>
+              </div>
+
+              {/* Inline Editor */}
+              {editingId === s.id && (
+                <div style={{
+                  background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
+                  borderTop: "none", borderRadius: `0 0 ${radii.sm} ${radii.sm}`,
+                  padding: `${space[3]}px ${space[4]}px`,
+                }}>
+                  <div style={{ marginBottom: space[3] }}>
+                    <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Label</label>
+                    <input value={editLabel} onChange={e => setEditLabel(e.target.value)} style={{ ...inputStyle, padding: `${space[2]}px ${space[3]}px` }} />
+                  </div>
+
+                  {s.type === "rss" && (
+                    <div style={{ marginBottom: space[3] }}>
+                      <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Feed URL</label>
+                      <input value={editFeedUrl} onChange={e => setEditFeedUrl(e.target.value)} style={{ ...inputStyle, padding: `${space[2]}px ${space[3]}px` }} />
+                    </div>
+                  )}
+
+                  {s.type === "nostr" && (
+                    <>
+                      <div style={{ marginBottom: space[3] }}>
+                        <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Relays ({editRelays.length})</label>
+                        {editRelays.map((relay, i) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
+                            <span style={{ flex: 1, fontSize: t.bodySm.size, color: colors.text.tertiary, fontFamily: fonts.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{relay}</span>
+                            <button
+                              onClick={() => setEditRelays(prev => prev.filter((_, idx) => idx !== i))}
+                              style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", fontSize: t.caption.size, color: colors.red[400], fontFamily: "inherit" }}
+                            >&#x2715;</button>
+                          </div>
+                        ))}
+                        <div style={{ display: "flex", gap: space[2], marginTop: space[1] }}>
+                          <input
+                            value={editNewRelay}
+                            onChange={e => setEditNewRelay(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" && editNewRelay.trim()) {
+                                setEditRelays(prev => [...prev, editNewRelay.trim()]);
+                                setEditNewRelay("");
+                              }
+                            }}
+                            placeholder="wss://relay.example.com"
+                            style={{ ...inputStyle, flex: 1, padding: `${space[1]}px ${space[3]}px`, fontSize: t.bodySm.size }}
+                          />
+                          <button
+                            onClick={() => {
+                              if (editNewRelay.trim()) {
+                                setEditRelays(prev => [...prev, editNewRelay.trim()]);
+                                setEditNewRelay("");
+                              }
+                            }}
+                            style={{
+                              background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
+                              cursor: "pointer", padding: `${space[1]}px ${space[3]}px`,
+                              fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
+                            }}
+                          >+ Add</button>
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: space[3] }}>
+                        <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Public Keys ({editPubkeys.length})</label>
+                        {editPubkeys.map((pk, i) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
+                            <span style={{ flex: 1, fontSize: t.bodySm.size, color: colors.text.tertiary, fontFamily: fonts.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pk}</span>
+                            <button
+                              onClick={() => setEditPubkeys(prev => prev.filter((_, idx) => idx !== i))}
+                              style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", fontSize: t.caption.size, color: colors.red[400], fontFamily: "inherit" }}
+                            >&#x2715;</button>
+                          </div>
+                        ))}
+                        <div style={{ display: "flex", gap: space[2], marginTop: space[1] }}>
+                          <input
+                            value={editNewPubkey}
+                            onChange={e => setEditNewPubkey(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" && editNewPubkey.trim()) {
+                                setEditPubkeys(prev => [...prev, editNewPubkey.trim()]);
+                                setEditNewPubkey("");
+                              }
+                            }}
+                            placeholder="npub or hex pubkey"
+                            style={{ ...inputStyle, flex: 1, padding: `${space[1]}px ${space[3]}px`, fontSize: t.bodySm.size }}
+                          />
+                          <button
+                            onClick={() => {
+                              if (editNewPubkey.trim()) {
+                                setEditPubkeys(prev => [...prev, editNewPubkey.trim()]);
+                                setEditNewPubkey("");
+                              }
+                            }}
+                            style={{
+                              background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
+                              cursor: "pointer", padding: `${space[1]}px ${space[3]}px`,
+                              fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
+                            }}
+                          >+ Add</button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div style={{ display: "flex", gap: space[2], justifyContent: "flex-end" }}>
+                    <button onClick={cancelEdit} style={{
+                      background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
+                      cursor: "pointer", padding: `${space[2]}px ${space[4]}px`,
+                      fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
+                    }}>Cancel</button>
+                    <button onClick={saveEdit} style={saveBtnStyle}>Save</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

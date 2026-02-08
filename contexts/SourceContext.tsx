@@ -12,6 +12,7 @@ interface SourceState {
   addSource: (source: Omit<SavedSource, "id" | "createdAt">) => void;
   removeSource: (id: string) => void;
   toggleSource: (id: string) => void;
+  updateSource: (id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => void;
   getSchedulerSources: () => Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }>;
 }
 
@@ -20,6 +21,7 @@ const SourceContext = createContext<SourceState>({
   addSource: () => {},
   removeSource: () => {},
   toggleSource: () => {},
+  updateSource: () => {},
   getSchedulerSources: () => [],
 });
 
@@ -120,6 +122,20 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     });
   }, [persist, isAuthenticated, identity]);
 
+  const updateSource = useCallback((id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => {
+    setSources(prev => {
+      const next = prev.map(s => s.id === id ? { ...s, ...partial } : s);
+      persist(next);
+      const updated = next.find(s => s.id === id);
+      if (updated && actorRef.current && isAuthenticated && identity) {
+        const principal = identity.getPrincipal();
+        actorRef.current.saveSourceConfig(savedToIC(updated, principal))
+          .catch((err: unknown) => console.warn("[sources] IC update failed:", err));
+      }
+      return next;
+    });
+  }, [persist, isAuthenticated, identity]);
+
   const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }> => {
     const result: Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }> = [];
     for (const s of sources) {
@@ -141,7 +157,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   }, [sources]);
 
   return (
-    <SourceContext.Provider value={{ sources, addSource, removeSource, toggleSource, getSchedulerSources }}>
+    <SourceContext.Provider value={{ sources, addSource, removeSource, toggleSource, updateSource, getSchedulerSources }}>
       {children}
     </SourceContext.Provider>
   );
