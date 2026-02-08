@@ -42,7 +42,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
           );
         })}
       </div>
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: space[2], paddingBottom: space[1] }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: space[2], paddingBottom: space[1], flexWrap: "wrap", padding: `0 ${space[3]}px ${space[1]}px` }}>
         {isAuthenticated ? (
           <>
             <button onClick={logout} style={{

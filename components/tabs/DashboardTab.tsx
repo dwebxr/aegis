@@ -112,7 +112,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   {ch.title}
                 </span>
                 <span style={{ fontSize: t.h2.size, fontWeight: 700, color: ch.c, fontFamily: fonts.mono }}>
-                  {ch.d[ch.d.length - 1]}{ch.unit === "%" ? "%" : ""}
+                  {ch.d.length > 0 ? ch.d[ch.d.length - 1] : 0}{ch.unit === "%" ? "%" : ""}
                 </span>
               </div>
               <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>

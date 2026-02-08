@@ -17,6 +17,44 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
   const peerCount = agentState.peers.length;
   const activeHS = agentState.activeHandshakes.length;
 
+  if (compact) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", gap: 6,
+        background: isEnabled ? `${colors.purple[600]}0F` : colors.border.subtle,
+        border: `1px solid ${isEnabled ? `${colors.purple[600]}33` : colors.border.subtle}`,
+        borderRadius: radii.sm,
+        padding: `${space[1]}px ${space[2]}px`,
+      }}>
+        <div style={{
+          width: 6, height: 6, borderRadius: "50%",
+          background: isEnabled ? colors.purple[400] : colors.text.disabled,
+          boxShadow: isEnabled ? `0 0 6px ${colors.purple[400]}80` : "none",
+          animation: isEnabled ? "pulse 2s infinite" : "none",
+          flexShrink: 0,
+        }} />
+        <span style={{ fontSize: t.tiny.size, fontWeight: 600, color: isEnabled ? colors.purple[400] : colors.text.muted }}>
+          D2A
+        </span>
+        <button
+          onClick={toggleAgent}
+          style={{
+            padding: `1px 6px`,
+            background: isEnabled ? colors.red.bg : `${colors.purple[600]}1A`,
+            border: `1px solid ${isEnabled ? colors.red.border : `${colors.purple[600]}33`}`,
+            borderRadius: radii.sm,
+            color: isEnabled ? colors.red[400] : colors.purple[400],
+            fontSize: t.tiny.size, fontWeight: 600, cursor: "pointer",
+            transition: transitions.fast, fontFamily: "inherit",
+            lineHeight: 1.2,
+          }}
+        >
+          {isEnabled ? "Stop" : "Start"}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       background: isEnabled
@@ -24,7 +62,7 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
         : colors.border.subtle,
       border: `1px solid ${isEnabled ? `${colors.purple[600]}33` : colors.border.subtle}`,
       borderRadius: radii.md,
-      padding: compact ? `${space[2]}px ${space[3]}px` : `${space[3]}px ${space[4]}px`,
+      padding: `${space[3]}px ${space[4]}px`,
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[1] }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -54,7 +92,7 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
         </button>
       </div>
       {isEnabled && (
-        <div style={{ display: "flex", gap: compact ? space[2] : space[3], fontSize: t.caption.size, color: colors.text.tertiary }}>
+        <div style={{ display: "flex", gap: space[3], fontSize: t.caption.size, color: colors.text.tertiary }}>
           <span><strong style={{ color: colors.purple[400], fontFamily: fonts.mono }}>{peerCount}</strong> peers</span>
           <span><strong style={{ color: colors.sky[400], fontFamily: fonts.mono }}>{activeHS}</strong> active</span>
           <span>
