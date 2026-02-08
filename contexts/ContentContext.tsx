@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
 import { createBackendActor } from "@/lib/ic/actor";
-import { SAMPLE_CONTENT } from "@/lib/utils/constants";
 import { relativeTime } from "@/lib/utils/scores";
 import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
@@ -43,7 +42,7 @@ const ContentContext = createContext<ContentState>({
 
 export function ContentProvider({ children, preferenceCallbacks }: { children: React.ReactNode; preferenceCallbacks?: PreferenceCallbacks }) {
   const { isAuthenticated, identity, principal } = useAuth();
-  const [content, setContent] = useState<ContentItem[]>(SAMPLE_CONTENT);
+  const [content, setContent] = useState<ContentItem[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "offline">("idle");
@@ -254,6 +253,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         avatar: e.avatar,
         text: e.text,
         source: mapSourceBack(e.source) as ContentItem["source"],
+        sourceUrl: e.sourceUrl.length > 0 ? e.sourceUrl[0] : undefined,
         scores: {
           originality: e.scores.originality,
           insight: e.scores.insight,

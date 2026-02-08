@@ -138,7 +138,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[3] }}>
         Latest Quality
       </div>
-      {qual.slice(0, 3).map(it => (
+      {qual.length === 0 ? (
+        <div style={{
+          textAlign: "center", padding: space[10],
+          color: colors.text.muted, background: colors.bg.surface,
+          borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
+          marginBottom: space[4],
+        }}>
+          <div style={{ fontSize: 32, marginBottom: space[3] }}>&#x1F50D;</div>
+          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>No content yet</div>
+          <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Add sources or analyze content to get started</div>
+        </div>
+      ) : qual.slice(0, 3).map(it => (
         <ContentCard
           key={it.id}
           item={it}
