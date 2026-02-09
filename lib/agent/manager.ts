@@ -276,28 +276,33 @@ export class AgentManager {
       c.scores.composite >= handshake.offeredScore - 0.5
     );
 
-    if (match) {
-      const payload: D2ADeliverPayload = {
-        text: match.text,
-        author: match.author,
-        scores: match.scores,
-        verdict: match.verdict,
-        topics: match.topics || [],
-        vSignal: match.vSignal,
-        cContext: match.cContext,
-        lSlop: match.lSlop,
-      };
+    if (!match) {
+      handshake.phase = "rejected";
+      handshake.completedAt = Date.now();
+      this.emitState();
+      return;
+    }
 
-      try {
-        await deliverContent(this.sk, this.pk, senderPk, payload, this.relayUrls);
-        handshake.phase = "completed";
-        handshake.completedAt = Date.now();
-        this.sentItems++;
-      } catch (err) {
-        console.warn("[agent] deliverContent failed:", err instanceof Error ? err.message : "unknown");
-        handshake.phase = "rejected";
-        handshake.completedAt = Date.now();
-      }
+    const payload: D2ADeliverPayload = {
+      text: match.text,
+      author: match.author,
+      scores: match.scores,
+      verdict: match.verdict,
+      topics: match.topics || [],
+      vSignal: match.vSignal,
+      cContext: match.cContext,
+      lSlop: match.lSlop,
+    };
+
+    try {
+      await deliverContent(this.sk, this.pk, senderPk, payload, this.relayUrls);
+      handshake.phase = "completed";
+      handshake.completedAt = Date.now();
+      this.sentItems++;
+    } catch (err) {
+      console.warn("[agent] deliverContent failed:", err instanceof Error ? err.message : "unknown");
+      handshake.phase = "rejected";
+      handshake.completedAt = Date.now();
     }
     this.emitState();
   }
