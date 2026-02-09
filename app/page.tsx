@@ -2,14 +2,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { AppShell } from "@/components/layout/AppShell";
-import { NotificationToast } from "@/components/ui/NotificationToast";
 import { DashboardTab } from "@/components/tabs/DashboardTab";
 import { BriefingTab } from "@/components/tabs/BriefingTab";
 import { IncineratorTab } from "@/components/tabs/IncineratorTab";
 import { SourcesTab } from "@/components/tabs/SourcesTab";
 import { AnalyticsTab } from "@/components/tabs/AnalyticsTab";
 import { useWindowSize } from "@/hooks/useWindowSize";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotify } from "@/contexts/NotificationContext";
 import { useContent } from "@/contexts/ContentContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
@@ -27,7 +26,7 @@ import type { AnalyzeResponse } from "@/lib/types/api";
 
 export default function AegisApp() {
   const { mobile } = useWindowSize();
-  const { notifications, addNotification } = useNotifications();
+  const { addNotification } = useNotify();
   const { content, isAnalyzing, analyze, validateItem, flagItem, addContent, loadFromIC } = useContent();
   const { isAuthenticated, identity, principalText } = useAuth();
   const { userContext, profile } = usePreferences();
@@ -52,9 +51,12 @@ export default function AegisApp() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadFromIC().catch((err: unknown) => console.warn("Failed to load from IC:", err));
+      loadFromIC().catch((err: unknown) => {
+        console.warn("Failed to load from IC:", err);
+        addNotification("Could not load saved content from IC", "error");
+      });
     }
-  }, [isAuthenticated, loadFromIC]);
+  }, [isAuthenticated, loadFromIC, addNotification]);
 
   // Initialize ICP ledger actor + fetch balance and reputation
   useEffect(() => {
@@ -87,11 +89,12 @@ export default function AegisApp() {
         setEngagementIndex(eIndex);
       } catch (err) {
         console.warn("[staking] Failed to init ledger/reputation:", err instanceof Error ? err.message : "unknown");
+        addNotification("Could not load ICP balance — staking may be unavailable", "error");
       }
     })();
 
     return () => { cancelled = true; };
-  }, [isAuthenticated, identity, principalText]);
+  }, [isAuthenticated, identity, principalText, addNotification]);
 
   // Background ingestion scheduler
   const getSchedulerSourcesRef = useRef(getSchedulerSources);
@@ -207,7 +210,9 @@ export default function AegisApp() {
             try {
               const bal = await ledgerRef.current.icrc1_balance_of({ owner: Principal.fromText(principalText), subaccount: [] });
               setIcpBalance(bal);
-            } catch { /* ignore */ }
+            } catch (err) {
+              console.warn("[staking] Balance refresh failed:", err instanceof Error ? err.message : "unknown");
+            }
           } else {
             addNotification(`Stake failed: ${stakeResult.err}`, "error");
           }
@@ -276,7 +281,6 @@ export default function AegisApp() {
       )}
       {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />}
       {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} />}
-      <NotificationToast notifications={notifications} mobile={mobile} />
     </AppShell>
   );
 }

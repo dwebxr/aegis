@@ -31,7 +31,6 @@ export class IngestionScheduler {
 
   start(): void {
     if (this.intervalId) return;
-    // Run first cycle after short delay
     this.initialTimeoutId = setTimeout(() => this.runCycle(), 5000);
     this.intervalId = setInterval(() => this.runCycle(), CYCLE_INTERVAL_MS);
   }

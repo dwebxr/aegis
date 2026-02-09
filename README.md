@@ -44,6 +44,7 @@ Browser                                  Internet Computer (Mainnet)
    1. IC LLM (Llama 3.1 8B, free, on-chain)
    2. Anthropic Claude (premium, V/C/L)
    3. Heuristic fallback (client-side)
+   + Per-IP API rate limiting (20-30 req/min)
 ```
 
 ---
@@ -354,7 +355,7 @@ The receiving agent applies a final resonance check (≥ 0.1) before injecting t
 | Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
 | Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
-| Test | Jest + ts-jest (261 tests, 23 suites) |
+| Test | Jest + ts-jest (366 tests, 30 suites) |
 
 ## Project Structure
 
@@ -378,13 +379,14 @@ aegis/
 │   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, AgentStatusBadge
 │   ├── sources/                         # ManualInput
 │   ├── auth/                            # LoginButton, UserBadge
-│   └── Providers.tsx                    # Auth + Content + Preference + Source + Agent providers
+│   └── Providers.tsx                    # Notification + Auth + Content + Preference + Source + Agent
 ├── contexts/
+│   ├── NotificationContext.tsx          # Global notification system (toast) for all providers
 │   ├── AuthContext.tsx                   # Internet Identity auth state
-│   ├── ContentContext.tsx               # Content CRUD + IC sync
+│   ├── ContentContext.tsx               # Content CRUD + IC sync + error notifications
 │   ├── PreferenceContext.tsx            # Preference learning lifecycle
 │   ├── SourceContext.tsx                # RSS/Nostr source management + IC sync
-│   └── AgentContext.tsx                 # D2A agent lifecycle
+│   └── AgentContext.tsx                 # D2A agent lifecycle + error notifications
 ├── lib/
 │   ├── preferences/
 │   │   ├── types.ts                     # UserPreferenceProfile, constants
@@ -400,7 +402,7 @@ aegis/
 │   │   ├── identity.ts                  # IC Principal -> Nostr keypair (SHA-256 derivation)
 │   │   ├── publish.ts                   # Kind 1 event signing + relay publish
 │   │   ├── encrypt.ts                   # NIP-44 encrypt/decrypt (XChaCha20-Poly1305)
-│   │   └── types.ts                     # AegisNostrEvent, Nostr kind constants
+│   │   └── types.ts                     # Nostr kind constants
 │   ├── agent/
 │   │   ├── protocol.ts                  # D2A constants (kinds, tags, thresholds, timings)
 │   │   ├── discovery.ts                 # Presence broadcast + peer discovery + Jaccard resonance
@@ -412,9 +414,11 @@ aegis/
 │   │   ├── actor.ts                     # Canister actor factory (sync + async with syncTime)
 │   │   ├── icpLedger.ts                # ICP Ledger actor (ICRC-1/2 balance, approve, allowance)
 │   │   └── declarations/               # Candid types + IDL factory
+│   ├── api/
+│   │   └── rateLimit.ts                 # Per-IP rate limiter for API routes (30 req/min)
 │   ├── types/                           # ContentItem, API response types, source types
 │   └── utils/                           # Score computation helpers
-├── __tests__/                           # 261 tests across 23 suites
+├── __tests__/                           # 366 tests across 30 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -445,7 +449,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 261 tests
+npm test              # Run all 366 tests
 npm run test:watch    # Watch mode
 ```
 

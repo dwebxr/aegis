@@ -4,10 +4,11 @@ import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { relativeTime } from "@/lib/utils/scores";
+import { useNotify } from "./NotificationContext";
 import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
-import type { _SERVICE, ContentSource, OnChainAnalysis } from "@/lib/ic/declarations";
+import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
 
 interface ContentState {
   content: ContentItem[];
@@ -59,6 +60,7 @@ function mapSourceBack(s: ContentSource): string {
 }
 
 export function ContentProvider({ children, preferenceCallbacks }: { children: React.ReactNode; preferenceCallbacks?: PreferenceCallbacks }) {
+  const { addNotification } = useNotify();
   const { isAuthenticated, identity, principal } = useAuth();
   const [content, setContent] = useState<ContentItem[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -79,12 +81,13 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           console.error("Failed to create IC actor:", err);
           actorRef.current = null;
           setSyncStatus("offline");
+          addNotification("Could not connect to IC — content won't sync", "error");
         });
     } else {
       actorRef.current = null;
       setSyncStatus("offline");
     }
-  }, [isAuthenticated, identity]);
+  }, [isAuthenticated, identity, addNotification]);
 
   useEffect(() => {
     const timestampTimer = setInterval(() => {
@@ -104,7 +107,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         const topics = userContext
           ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
           : [];
-        const icResult = await actorRef.current.analyzeOnChain(text.slice(0, 3000), topics);
+        const icResult = await Promise.race([
+          actorRef.current.analyzeOnChain(text.slice(0, 3000), topics),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("IC LLM timeout (30s)")), 30_000)),
+        ]);
         if ("ok" in icResult) {
           const a = icResult.ok;
           result = {
@@ -134,11 +140,18 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) {
-        throw new Error(`Analyze API returned ${res.status}: ${res.statusText}`);
-      }
       const data = await res.json();
-      result = data.fallback || data;
+      if (!res.ok) {
+        // API failed but may include heuristic fallback
+        if (data.fallback) {
+          console.warn(`[analyze] API returned ${res.status}, using fallback (tier: ${data.fallback.tier})`);
+          result = data.fallback;
+        } else {
+          throw new Error(`Analyze API returned ${res.status}: ${data.error || res.statusText}`);
+        }
+      } else {
+        result = data;
+      }
     }
 
     if (!result) {
@@ -196,12 +209,13 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       }).catch((err: unknown) => {
         console.warn("IC saveEvaluation failed:", err);
         setSyncStatus("offline");
+        addNotification("Evaluation saved locally but IC sync failed", "error");
       });
     }
 
     return result;
     } finally { setIsAnalyzing(false); }
-  }, [isAuthenticated, principal]);
+  }, [isAuthenticated, principal, addNotification]);
 
   const validateItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
@@ -214,9 +228,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         .catch((err: unknown) => {
           console.warn("IC updateEvaluation (validate) failed:", err);
           setSyncStatus("offline");
+          addNotification("Validation saved locally but IC sync failed", "error");
         });
     }
-  }, [isAuthenticated, preferenceCallbacks]);
+  }, [isAuthenticated, preferenceCallbacks, addNotification]);
 
   const flagItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
@@ -229,9 +244,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         .catch((err: unknown) => {
           console.warn("IC updateEvaluation (flag) failed:", err);
           setSyncStatus("offline");
+          addNotification("Flag saved locally but IC sync failed", "error");
         });
     }
-  }, [isAuthenticated, preferenceCallbacks]);
+  }, [isAuthenticated, preferenceCallbacks, addNotification]);
 
   const addContent = useCallback((item: ContentItem) => {
     setContent(prev => {
@@ -247,7 +263,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     setIsSyncing(true);
     setSyncStatus("syncing");
 
-    const userContent = content.filter(c => c.owner === principal.toText());
+    const userContent = contentRef.current.filter(c => c.owner === principal.toText());
     if (userContent.length === 0) {
       setIsSyncing(false);
       setSyncStatus("synced");
@@ -281,10 +297,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     } catch (err) {
       console.error("Failed to sync to IC:", err);
       setSyncStatus("offline");
+      addNotification("Batch sync to IC failed", "error");
     } finally {
       setIsSyncing(false);
     }
-  }, [content, isAuthenticated, principal]);
+  }, [isAuthenticated, principal, addNotification]);
 
   const loadFromIC = useCallback(async () => {
     if (!actorRef.current || !isAuthenticated || !principal) return;
@@ -328,10 +345,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     } catch (err) {
       console.error("Failed to load from IC:", err);
       setSyncStatus("offline");
+      addNotification("Could not load content history from IC", "error");
     } finally {
       setIsSyncing(false);
     }
-  }, [isAuthenticated, principal]);
+  }, [isAuthenticated, principal, addNotification]);
 
   const value = useMemo(() => ({
     content, isAnalyzing, isSyncing, syncStatus,

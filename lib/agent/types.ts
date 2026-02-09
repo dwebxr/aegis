@@ -55,4 +55,6 @@ export interface AgentState {
   receivedItems: number;
   sentItems: number;
   d2aMatchCount: number;
+  consecutiveErrors: number; // relay/discovery failures since last success
+  lastError?: string;        // most recent error message
 }

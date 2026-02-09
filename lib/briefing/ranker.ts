@@ -43,14 +43,12 @@ export function generateBriefing(
 ): BriefingState {
   const qualityItems = content.filter(c => c.verdict === "quality" && !c.flagged);
 
-  // Score and sort all quality items
   const scored: Array<{ item: ContentItem; score: number }> = qualityItems.map(item => ({
     item,
     score: briefingScore(item, prefs),
   }));
   scored.sort((a, b) => b.score - a.score);
 
-  // Take top N as priority
   const priorityItems = scored.slice(0, PRIORITY_COUNT);
   const priorityIds = new Set(priorityItems.map(s => s.item.id));
 

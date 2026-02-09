@@ -93,14 +93,6 @@ export interface ICPLedgerActor {
   }) => Promise<{ allowance: bigint; expires_at: [] | [bigint] }>;
 }
 
-export function createICPLedgerActor(identity: Identity): ICPLedgerActor {
-  const agent = createAgent(identity);
-  return Actor.createActor<ICPLedgerActor>(icpLedgerIdlFactory, {
-    agent,
-    canisterId: ICP_LEDGER_CANISTER_ID,
-  });
-}
-
 export async function createICPLedgerActorAsync(identity: Identity): Promise<ICPLedgerActor> {
   const agent = createAgent(identity);
   try {
@@ -114,7 +106,6 @@ export async function createICPLedgerActorAsync(identity: Identity): Promise<ICP
   });
 }
 
-// Constants
 export const ICP_FEE = BigInt(10_000); // 0.0001 ICP
 export const MIN_STAKE = BigInt(100_000); // 0.001 ICP
 export const MAX_STAKE = BigInt(100_000_000); // 1.0 ICP

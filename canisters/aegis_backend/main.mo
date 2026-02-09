@@ -90,39 +90,19 @@ persistent actor AegisBackend {
   system func postupgrade() {
     for ((id, eval) in stableEvaluations.vals()) {
       evaluations.put(id, eval);
-      switch (ownerIndex.get(eval.owner)) {
-        case (?buf) { buf.add(id) };
-        case null {
-          let buf = Buffer.Buffer<Text>(8);
-          buf.add(id);
-          ownerIndex.put(eval.owner, buf);
-        };
-      };
+      addToPrincipalIndex(ownerIndex, eval.owner, id);
     };
-    for ((p, profile) in stableProfiles.vals()) {
-      profiles.put(p, profile);
-    };
-    for ((id, config) in stableSourceConfigs.vals()) {
-      sourceConfigs.put(id, config);
-    };
+    for ((p, profile) in stableProfiles.vals()) { profiles.put(p, profile) };
+    for ((id, config) in stableSourceConfigs.vals()) { sourceConfigs.put(id, config) };
     for ((id, signal) in stableSignals.vals()) {
       signals.put(id, signal);
-      switch (signalOwnerIndex.get(signal.owner)) {
-        case (?buf) { buf.add(id) };
-        case null {
-          let buf = Buffer.Buffer<Text>(8);
-          buf.add(id);
-          signalOwnerIndex.put(signal.owner, buf);
-        };
-      };
+      addToPrincipalIndex(signalOwnerIndex, signal.owner, id);
     };
     for ((id, stake) in stableStakes.vals()) {
       stakes.put(id, stake);
       signalStakeIndex.put(stake.signalId, id);
     };
-    for ((p, rep) in stableReputations.vals()) {
-      reputations.put(p, rep);
-    };
+    for ((p, rep) in stableReputations.vals()) { reputations.put(p, rep) };
     stableEvaluations := [];
     stableProfiles := [];
     stableSourceConfigs := [];
@@ -131,24 +111,14 @@ persistent actor AegisBackend {
     stableReputations := [];
     for ((id, m) in stableD2AMatches.vals()) {
       d2aMatches.put(id, m);
-      // Index by both sender and receiver
       for (p in [m.senderPrincipal, m.receiverPrincipal].vals()) {
-        switch (d2aOwnerIndex.get(p)) {
-          case (?buf) { buf.add(id) };
-          case null {
-            let buf = Buffer.Buffer<Text>(4);
-            buf.add(id);
-            d2aOwnerIndex.put(p, buf);
-          };
-        };
+        addToPrincipalIndex(d2aOwnerIndex, p, id);
       };
     };
     stableD2AMatches := [];
     for ((signalId, voters) in stableSignalVoters.vals()) {
       let buf = Buffer.Buffer<Principal>(voters.size());
-      for (v in voters.vals()) {
-        buf.add(v);
-      };
+      for (v in voters.vals()) { buf.add(v) };
       signalVoters.put(signalId, buf);
     };
     stableSignalVoters := [];
@@ -160,6 +130,52 @@ persistent actor AegisBackend {
 
   func requireAuth(caller : Principal) : Bool {
     not Principal.isAnonymous(caller);
+  };
+
+  // Helper: add an ID to a Principal-keyed Buffer index
+  func addToPrincipalIndex(index : HashMap.HashMap<Principal, Buffer.Buffer<Text>>, owner : Principal, id : Text) {
+    switch (index.get(owner)) {
+      case (?buf) { buf.add(id) };
+      case null {
+        let buf = Buffer.Buffer<Text>(8);
+        buf.add(id);
+        index.put(owner, buf);
+      };
+    };
+  };
+
+  // Helper: paginate an index buffer in reverse chronological order
+  func paginateReverseIds(indexBuf : Buffer.Buffer<Text>, offset : Nat, limit : Nat) : [Text] {
+    let all = Buffer.toArray(indexBuf);
+    let total = all.size();
+    if (offset >= total) { return [] };
+    let end = Nat.min(offset + limit, total);
+    let count = end - offset;
+    let result = Buffer.Buffer<Text>(count);
+    var i = total - 1 - offset;
+    var added : Nat = 0;
+    label fetchLoop while (added < count) {
+      result.add(all[i]);
+      added += 1;
+      if (i == 0) { break fetchLoop };
+      i -= 1;
+    };
+    Buffer.toArray(result);
+  };
+
+  // Helper: update a StakeRecord with new status/counts
+  func putStakeUpdate(stakeId : Text, stake : Types.StakeRecord, status : Types.StakeStatus, validCount : Nat, flagCnt : Nat, resolved : ?Int) {
+    stakes.put(stakeId, {
+      id = stake.id;
+      owner = stake.owner;
+      signalId = stake.signalId;
+      amount = stake.amount;
+      status = status;
+      validationCount = validCount;
+      flagCount = flagCnt;
+      createdAt = stake.createdAt;
+      resolvedAt = resolved;
+    });
   };
 
   func ensureProfile(caller : Principal) : Types.UserProfile {
@@ -196,25 +212,10 @@ persistent actor AegisBackend {
     switch (ownerIndex.get(p)) {
       case null { [] };
       case (?buf) {
-        let all = Buffer.toArray(buf);
-        let total = all.size();
-        if (offset >= total) { return [] };
-
-        let end = Nat.min(offset + limit, total);
-        let count = end - offset;
-
-        // Return in reverse chronological order (newest first)
-        let result = Buffer.Buffer<Types.ContentEvaluation>(count);
-        var i = total - 1 - offset;
-        var added : Nat = 0;
-        label fetchLoop while (added < count) {
-          switch (evaluations.get(all[i])) {
-            case (?eval) { result.add(eval) };
-            case null {};
-          };
-          added += 1;
-          if (i == 0) { break fetchLoop };
-          i -= 1;
+        let ids = paginateReverseIds(buf, offset, limit);
+        let result = Buffer.Buffer<Types.ContentEvaluation>(ids.size());
+        for (id in ids.vals()) {
+          switch (evaluations.get(id)) { case (?e) { result.add(e) }; case null {} };
         };
         Buffer.toArray(result);
       };
@@ -298,14 +299,7 @@ persistent actor AegisBackend {
     evaluations.put(tagged.id, tagged);
 
     if (isNew) {
-      switch (ownerIndex.get(caller)) {
-        case (?buf) { buf.add(tagged.id) };
-        case null {
-          let buf = Buffer.Buffer<Text>(8);
-          buf.add(tagged.id);
-          ownerIndex.put(caller, buf);
-        };
-      };
+      addToPrincipalIndex(ownerIndex, caller, tagged.id);
     };
 
     if (isNew) {
@@ -393,16 +387,8 @@ persistent actor AegisBackend {
 
       evaluations.put(tagged.id, tagged);
 
-      // Only add to ownerIndex and count stats if this is a new evaluation (not an update)
       if (isNew) {
-        switch (ownerIndex.get(caller)) {
-          case (?buf) { buf.add(tagged.id) };
-          case null {
-            let buf = Buffer.Buffer<Text>(8);
-            buf.add(tagged.id);
-            ownerIndex.put(caller, buf);
-          };
-        };
+        addToPrincipalIndex(ownerIndex, caller, tagged.id);
         newCount += 1;
         switch (eval.verdict) {
           case (#quality) { newQuality += 1 };
@@ -523,16 +509,7 @@ persistent actor AegisBackend {
     };
 
     signals.put(tagged.id, tagged);
-
-    switch (signalOwnerIndex.get(caller)) {
-      case (?buf) { buf.add(tagged.id) };
-      case null {
-        let buf = Buffer.Buffer<Text>(8);
-        buf.add(tagged.id);
-        signalOwnerIndex.put(caller, buf);
-      };
-    };
-
+    addToPrincipalIndex(signalOwnerIndex, caller, tagged.id);
     tagged.id;
   };
 
@@ -540,24 +517,10 @@ persistent actor AegisBackend {
     switch (signalOwnerIndex.get(p)) {
       case null { [] };
       case (?buf) {
-        let all = Buffer.toArray(buf);
-        let total = all.size();
-        if (offset >= total) { return [] };
-
-        let end = Nat.min(offset + limit, total);
-        let count = end - offset;
-
-        let result = Buffer.Buffer<Types.PublishedSignal>(count);
-        var i = total - 1 - offset;
-        var added : Nat = 0;
-        label fetchLoop while (added < count) {
-          switch (signals.get(all[i])) {
-            case (?s) { result.add(s) };
-            case null {};
-          };
-          added += 1;
-          if (i == 0) { break fetchLoop };
-          i -= 1;
+        let ids = paginateReverseIds(buf, offset, limit);
+        let result = Buffer.Buffer<Types.PublishedSignal>(ids.size());
+        for (id in ids.vals()) {
+          switch (signals.get(id)) { case (?s) { result.add(s) }; case null {} };
         };
         Buffer.toArray(result);
       };
@@ -587,14 +550,28 @@ persistent actor AegisBackend {
     };
   };
 
-  func computeTrustScore(rep : Types.UserReputation) : Float {
-    let total = rep.qualitySignals + rep.slopSignals;
+  func computeTrustScore(quality : Nat, slop : Nat) : Float {
+    let total = quality + slop;
     if (total == 0) { return 5.0 };
-    let qualityRatio = Float.fromInt(rep.qualitySignals) / Float.fromInt(total);
-    // Trust = base (5.0) + quality ratio bonus (up to 5.0)
+    let qualityRatio = Float.fromInt(quality) / Float.fromInt(total);
     let raw = 5.0 + qualityRatio * 5.0;
-    // Clamp to [0.0, 10.0]
     if (raw > 10.0) { 10.0 } else if (raw < 0.0) { 0.0 } else { raw };
+  };
+
+  // Helper: update reputation after stake resolution
+  func resolveReputation(owner : Principal, qualityDelta : Nat, slopDelta : Nat, returnedDelta : Nat, slashedDelta : Nat) {
+    let rep = ensureReputation(owner);
+    let q = rep.qualitySignals + qualityDelta;
+    let s = rep.slopSignals + slopDelta;
+    reputations.put(owner, {
+      principal = rep.principal;
+      trustScore = computeTrustScore(q, s);
+      totalStaked = rep.totalStaked;
+      totalReturned = rep.totalReturned + returnedDelta;
+      totalSlashed = rep.totalSlashed + slashedDelta;
+      qualitySignals = q;
+      slopSignals = s;
+    });
   };
 
   /// Publish a signal with ICP stake attached.
@@ -689,16 +666,7 @@ persistent actor AegisBackend {
       createdAt = if (signal.createdAt == 0) { Time.now() } else { signal.createdAt };
     };
     signals.put(tagged.id, tagged);
-
-    switch (signalOwnerIndex.get(caller)) {
-      case (?buf) { buf.add(tagged.id) };
-      case null {
-        let buf = Buffer.Buffer<Text>(8);
-        buf.add(tagged.id);
-        signalOwnerIndex.put(caller, buf);
-      };
-    };
-
+    addToPrincipalIndex(signalOwnerIndex, caller, tagged.id);
     #ok(tagged.id);
   };
 
@@ -748,116 +716,47 @@ persistent actor AegisBackend {
 
     let newCount = stake.validationCount + 1;
 
-    if (newCount >= VALIDATE_THRESHOLD) {
-      // Threshold reached: return stake to owner
-      // Pre-debit: mark as returned before async call
-      let updatedStake : Types.StakeRecord = {
-        id = stake.id;
-        owner = stake.owner;
-        signalId = stake.signalId;
-        amount = stake.amount;
-        status = #returned;
-        validationCount = newCount;
-        flagCount = stake.flagCount;
-        createdAt = stake.createdAt;
-        resolvedAt = ?Time.now();
-      };
-      stakes.put(stakeId, updatedStake);
-
-      let rep = ensureReputation(stake.owner);
-
-      // Return ICP to owner (minus fee)
-      let returnAmount = if (stake.amount > ICP_FEE) { stake.amount - ICP_FEE } else { 0 };
-      var transferOk = true;
-      if (returnAmount > 0) {
-        let transferResult = try {
-          await ICP_LEDGER.icrc1_transfer({
-            from_subaccount = null;
-            to = { owner = stake.owner; subaccount = null };
-            amount = returnAmount;
-            fee = ?ICP_FEE;
-            memo = null;
-            created_at_time = null;
-          });
-        } catch (_e) {
-          transferOk := false;
-          // Rollback: revert to active so it can be retried
-          let rolledBack : Types.StakeRecord = {
-            id = stake.id;
-            owner = stake.owner;
-            signalId = stake.signalId;
-            amount = stake.amount;
-            status = #active;
-            validationCount = newCount;
-            flagCount = stake.flagCount;
-            createdAt = stake.createdAt;
-            resolvedAt = null;
-          };
-          stakes.put(stakeId, rolledBack);
-          #Err(#TemporarilyUnavailable);
-        };
-        switch (transferResult) {
-          case (#Err(_)) {
-            if (transferOk) {
-              transferOk := false;
-              let rolledBack : Types.StakeRecord = {
-                id = stake.id;
-                owner = stake.owner;
-                signalId = stake.signalId;
-                amount = stake.amount;
-                status = #active;
-                validationCount = newCount;
-                flagCount = stake.flagCount;
-                createdAt = stake.createdAt;
-                resolvedAt = null;
-              };
-              stakes.put(stakeId, rolledBack);
-            };
-          };
-          case (#Ok(_)) {};
-        };
-      };
-
-      // Only update reputation if transfer succeeded
-      if (transferOk) {
-        let newTrust = computeTrustScore({
-          principal = rep.principal;
-          trustScore = rep.trustScore;
-          totalStaked = rep.totalStaked;
-          totalReturned = rep.totalReturned + stake.amount;
-          totalSlashed = rep.totalSlashed;
-          qualitySignals = rep.qualitySignals + 1;
-          slopSignals = rep.slopSignals;
-        });
-        let updatedRep : Types.UserReputation = {
-          principal = rep.principal;
-          trustScore = newTrust;
-          totalStaked = rep.totalStaked;
-          totalReturned = rep.totalReturned + stake.amount;
-          totalSlashed = rep.totalSlashed;
-          qualitySignals = rep.qualitySignals + 1;
-          slopSignals = rep.slopSignals;
-        };
-        reputations.put(stake.owner, updatedRep);
-      };
-
-      #ok(true);
-    } else {
-      // Just increment count
-      let updatedStake : Types.StakeRecord = {
-        id = stake.id;
-        owner = stake.owner;
-        signalId = stake.signalId;
-        amount = stake.amount;
-        status = #active;
-        validationCount = newCount;
-        flagCount = stake.flagCount;
-        createdAt = stake.createdAt;
-        resolvedAt = null;
-      };
-      stakes.put(stakeId, updatedStake);
-      #ok(false); // Not yet resolved
+    if (newCount < VALIDATE_THRESHOLD) {
+      putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
+      return #ok(false);
     };
+
+    // Threshold reached: return stake to owner (pre-debit pattern)
+    putStakeUpdate(stakeId, stake, #returned, newCount, stake.flagCount, ?Time.now());
+
+    let returnAmount = if (stake.amount > ICP_FEE) { stake.amount - ICP_FEE } else { 0 };
+    var transferOk = true;
+    if (returnAmount > 0) {
+      let transferResult = try {
+        await ICP_LEDGER.icrc1_transfer({
+          from_subaccount = null;
+          to = { owner = stake.owner; subaccount = null };
+          amount = returnAmount;
+          fee = ?ICP_FEE;
+          memo = null;
+          created_at_time = null;
+        });
+      } catch (_e) {
+        transferOk := false;
+        putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
+        #Err(#TemporarilyUnavailable);
+      };
+      switch (transferResult) {
+        case (#Err(_)) {
+          if (transferOk) {
+            transferOk := false;
+            putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
+          };
+        };
+        case (#Ok(_)) {};
+      };
+    };
+
+    if (transferOk) {
+      resolveReputation(stake.owner, 1, 0, stake.amount, 0);
+    };
+
+    #ok(true);
   };
 
   /// Community flag: vote that a staked signal is slop.
@@ -903,59 +802,15 @@ persistent actor AegisBackend {
 
     let newCount = stake.flagCount + 1;
 
-    if (newCount >= FLAG_THRESHOLD) {
-      // Threshold reached: slash stake (stays in canister as treasury)
-      let updatedStake : Types.StakeRecord = {
-        id = stake.id;
-        owner = stake.owner;
-        signalId = stake.signalId;
-        amount = stake.amount;
-        status = #slashed;
-        validationCount = stake.validationCount;
-        flagCount = newCount;
-        createdAt = stake.createdAt;
-        resolvedAt = ?Time.now();
-      };
-      stakes.put(stakeId, updatedStake);
-
-      // Update owner's reputation (penalize)
-      let rep = ensureReputation(stake.owner);
-      let newTrust = computeTrustScore({
-        principal = rep.principal;
-        trustScore = rep.trustScore;
-        totalStaked = rep.totalStaked;
-        totalReturned = rep.totalReturned;
-        totalSlashed = rep.totalSlashed + stake.amount;
-        qualitySignals = rep.qualitySignals;
-        slopSignals = rep.slopSignals + 1;
-      });
-      let updatedRep : Types.UserReputation = {
-        principal = rep.principal;
-        trustScore = newTrust;
-        totalStaked = rep.totalStaked;
-        totalReturned = rep.totalReturned;
-        totalSlashed = rep.totalSlashed + stake.amount;
-        qualitySignals = rep.qualitySignals;
-        slopSignals = rep.slopSignals + 1;
-      };
-      reputations.put(stake.owner, updatedRep);
-
-      #ok(true); // Slashed
-    } else {
-      let updatedStake : Types.StakeRecord = {
-        id = stake.id;
-        owner = stake.owner;
-        signalId = stake.signalId;
-        amount = stake.amount;
-        status = #active;
-        validationCount = stake.validationCount;
-        flagCount = newCount;
-        createdAt = stake.createdAt;
-        resolvedAt = null;
-      };
-      stakes.put(stakeId, updatedStake);
-      #ok(false); // Not yet resolved
+    if (newCount < FLAG_THRESHOLD) {
+      putStakeUpdate(stakeId, stake, #active, stake.validationCount, newCount, null);
+      return #ok(false);
     };
+
+    // Threshold reached: slash stake (stays in canister as treasury)
+    putStakeUpdate(stakeId, stake, #slashed, stake.validationCount, newCount, ?Time.now());
+    resolveReputation(stake.owner, 0, 1, 0, stake.amount);
+    #ok(true);
   };
 
   /// Get a user's reputation profile
@@ -1030,16 +885,8 @@ persistent actor AegisBackend {
     };
     d2aMatches.put(matchId, record);
 
-    // Index by both parties
     for (p in [senderPrincipal, caller].vals()) {
-      switch (d2aOwnerIndex.get(p)) {
-        case (?buf) { buf.add(matchId) };
-        case null {
-          let buf = Buffer.Buffer<Text>(4);
-          buf.add(matchId);
-          d2aOwnerIndex.put(p, buf);
-        };
-      };
+      addToPrincipalIndex(d2aOwnerIndex, p, matchId);
     };
 
     // Pay sender their 80% share (minus transfer fee)
@@ -1067,26 +914,12 @@ persistent actor AegisBackend {
     switch (d2aOwnerIndex.get(p)) {
       case null { [] };
       case (?buf) {
-        let all = Buffer.toArray(buf);
-        let total = all.size();
-        if (offset >= total) { return [] };
-
-        let end = Nat.min(offset + limit, total);
-        let count = end - offset;
-
-        let resultBuf = Buffer.Buffer<Types.D2AMatchRecord>(count);
-        var i = total - 1 - offset;
-        var added : Nat = 0;
-        label fetchLoop while (added < count) {
-          switch (d2aMatches.get(all[i])) {
-            case (?m) { resultBuf.add(m) };
-            case null {};
-          };
-          added += 1;
-          if (i == 0) { break fetchLoop };
-          i -= 1;
+        let ids = paginateReverseIds(buf, offset, limit);
+        let result = Buffer.Buffer<Types.D2AMatchRecord>(ids.size());
+        for (id in ids.vals()) {
+          switch (d2aMatches.get(id)) { case (?m) { result.add(m) }; case null {} };
         };
-        Buffer.toArray(resultBuf);
+        Buffer.toArray(result);
       };
     };
   };

@@ -4,6 +4,7 @@
  */
 import { POST } from "@/app/api/fetch/nostr/route";
 import { NextRequest } from "next/server";
+import { _resetRateLimits } from "@/lib/api/rateLimit";
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost:3000/api/fetch/nostr", {
@@ -14,6 +15,10 @@ function makeRequest(body: unknown): NextRequest {
 }
 
 describe("POST /api/fetch/nostr", () => {
+  beforeEach(() => {
+    _resetRateLimits();
+  });
+
   describe("input validation", () => {
     it("returns 400 for missing relays", async () => {
       const res = await POST(makeRequest({}));

@@ -14,6 +14,10 @@ import {
   PEER_EXPIRY_MS,
 } from "./protocol";
 
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : "unknown";
+}
+
 /** Returns 0-1 Jaccard similarity of high-affinity topics vs peer interests. */
 export function calculateResonance(
   myPrefs: UserPreferenceProfile,
@@ -88,7 +92,7 @@ export async function discoverPeers(
   try {
     events = await pool.querySync(relayUrls, filter);
   } catch (err) {
-    console.error("[discovery] Relay query failed:", err instanceof Error ? err.message : "unknown");
+    console.error("[discovery] Relay query failed:", errMsg(err));
     pool.destroy();
     return [];
   }

@@ -5,6 +5,7 @@
  */
 import { POST } from "@/app/api/analyze/route";
 import { NextRequest } from "next/server";
+import { _resetRateLimits } from "@/lib/api/rateLimit";
 
 function makeRequest(body: Record<string, unknown>): NextRequest {
   return new NextRequest("http://localhost:3000/api/analyze", {
@@ -15,6 +16,9 @@ function makeRequest(body: Record<string, unknown>): NextRequest {
 }
 
 describe("POST /api/analyze", () => {
+  beforeEach(() => {
+    _resetRateLimits();
+  });
   describe("input validation", () => {
     it("returns 400 for missing text", async () => {
       const res = await POST(makeRequest({}));
@@ -55,7 +59,7 @@ describe("POST /api/analyze", () => {
   describe("fallback scoring (no API key)", () => {
     // In test env, ANTHROPIC_API_KEY is not set, so fallback is always used
 
-    it("returns fallback scores for normal text", async () => {
+    it("returns fallback scores for normal text with tier indicator", async () => {
       const res = await POST(makeRequest({
         text: "A thoughtful analysis of artificial intelligence and its impact on society.",
       }));
@@ -70,6 +74,8 @@ describe("POST /api/analyze", () => {
       expect(data.composite).toBeGreaterThanOrEqual(0);
       expect(["quality", "slop"]).toContain(data.verdict);
       expect(data.reason).toBeDefined();
+      // LARP fix: tier is now explicit
+      expect(data.tier).toBe("heuristic");
     });
 
     it("returns quality verdict for clean content", async () => {

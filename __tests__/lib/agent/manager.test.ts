@@ -138,7 +138,7 @@ describe("AgentManager — handleOffer error handling", () => {
     });
   });
 
-  it("does not throw when sendAccept fails on relay error", async () => {
+  it("stays active and tracks error when sendAccept fails on relay error", async () => {
     mockParseD2AMessage.mockReturnValue({
       type: "offer",
       fromPubkey: "peer-abc",
@@ -156,6 +156,11 @@ describe("AgentManager — handleOffer error handling", () => {
 
     // Wait for async handler to settle
     await new Promise(r => setTimeout(r, 50));
+
+    // Agent must remain active despite relay error
+    expect(mgr.getState().isActive).toBe(true);
+    // No content should have been received (this was an offer, not delivery)
+    expect(mgr.getState().receivedItems).toBe(0);
 
     mgr.stop();
   });
@@ -256,16 +261,10 @@ describe("AgentManager — handleAccept delivery failure", () => {
     onEventHandler({ pubkey: "peer-deliver-fail", content: "encrypted-accept" });
     await new Promise(r => setTimeout(r, 50));
 
-    // Verify handshake phase is "rejected", NOT "offered"
-    const state = mgr.getState();
-    // activeHandshakes filters out expired ones, so check directly
-    const handshake = state.activeHandshakes.find(h => h.peerId === "peer-deliver-fail");
-    // handshake might be cleaned up since it's completed/rejected
-    // The key assertion: it should NOT be "offered"
-    if (handshake) {
-      expect(handshake.phase).toBe("rejected");
-      expect(handshake.phase).not.toBe("offered");
-    }
+    // deliverContent failed → sentItems must NOT have incremented
+    expect(mgr.getState().sentItems).toBe(0);
+    // onNewContent must NOT have been called (we are the sender, not receiver)
+    expect(callbacks.onNewContent).not.toHaveBeenCalled();
 
     mgr.stop();
   });

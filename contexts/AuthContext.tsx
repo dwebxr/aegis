@@ -4,6 +4,7 @@ import { AuthClient } from "@dfinity/auth-client";
 import type { Identity } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { getInternetIdentityUrl } from "@/lib/ic/agent";
+import { useNotify } from "./NotificationContext";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -26,6 +27,7 @@ const AuthContext = createContext<AuthState>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { addNotification } = useNotify();
   const [authClient, setAuthClient] = useState<AuthClient | null>(null);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [principal, setPrincipal] = useState<Principal | null>(null);
@@ -45,9 +47,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     }).catch((err: unknown) => {
       console.error("[auth] Initialization failed:", err instanceof Error ? err.message : "unknown");
+      addNotification("Authentication system failed to initialize", "error");
       setIsLoading(false);
     });
-  }, []);
+  }, [addNotification]);
 
   const login = useCallback(async () => {
     if (!authClient) return;

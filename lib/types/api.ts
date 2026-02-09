@@ -1,11 +1,4 @@
 import type { Verdict } from "./content";
-import type { UserContext } from "@/lib/preferences/types";
-
-export interface AnalyzeRequest {
-  text: string;
-  source?: string;
-  userContext?: UserContext;
-}
 
 export interface AnalyzeResponse {
   originality: number;

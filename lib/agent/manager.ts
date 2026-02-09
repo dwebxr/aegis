@@ -14,6 +14,10 @@ import {
 } from "./protocol";
 import type { SubCloser } from "nostr-tools/pool";
 
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : "unknown";
+}
+
 const DEFAULT_RELAYS = [
   "wss://relay.damus.io",
   "wss://nos.lol",
@@ -39,6 +43,8 @@ export class AgentManager {
   private receivedItems = 0;
   private sentItems = 0;
   private d2aMatchCount = 0;
+  private consecutiveErrors = 0;
+  private lastError?: string;
 
   private presenceInterval: ReturnType<typeof setInterval> | null = null;
   private discoveryInterval: ReturnType<typeof setInterval> | null = null;
@@ -66,31 +72,40 @@ export class AgentManager {
     this.active = true;
     this.emitState();
 
-    // Initial presence broadcast
     try {
       await this.broadcastMyPresence();
+      this.clearErrors();
     } catch (err) {
-      console.warn("[agent] Initial presence broadcast failed:", err instanceof Error ? err.message : "unknown");
+      this.recordError(errMsg(err));
+      console.warn("[agent] Initial presence broadcast failed:", errMsg(err));
     }
 
-    // Periodic presence
     this.presenceInterval = setInterval(() => {
-      this.broadcastMyPresence().catch(err => console.warn("[agent] Presence broadcast failed:", err instanceof Error ? err.message : "unknown"));
+      this.broadcastMyPresence()
+        .then(() => this.clearErrors())
+        .catch(err => {
+          this.recordError(errMsg(err));
+          console.warn("[agent] Presence broadcast failed:", errMsg(err));
+        });
     }, PRESENCE_BROADCAST_INTERVAL_MS);
 
-    // Initial peer discovery
     try {
       await this.discoverAndNegotiate();
+      this.clearErrors();
     } catch (err) {
-      console.warn("[agent] Initial discovery failed:", err instanceof Error ? err.message : "unknown");
+      this.recordError(errMsg(err));
+      console.warn("[agent] Initial discovery failed:", errMsg(err));
     }
 
-    // Periodic discovery
     this.discoveryInterval = setInterval(() => {
-      this.discoverAndNegotiate().catch(err => console.warn("[agent] Discovery/negotiate failed:", err instanceof Error ? err.message : "unknown"));
+      this.discoverAndNegotiate()
+        .then(() => this.clearErrors())
+        .catch(err => {
+          this.recordError(errMsg(err));
+          console.warn("[agent] Discovery/negotiate failed:", errMsg(err));
+        });
     }, DISCOVERY_POLL_INTERVAL_MS);
 
-    // Subscribe to incoming D2A messages
     this.subscribeToMessages();
   }
 
@@ -116,11 +131,27 @@ export class AgentManager {
       receivedItems: this.receivedItems,
       sentItems: this.sentItems,
       d2aMatchCount: this.d2aMatchCount,
+      consecutiveErrors: this.consecutiveErrors,
+      lastError: this.lastError,
     };
   }
 
   private emitState(): void {
     this.callbacks.onStateChange(this.getState());
+  }
+
+  private recordError(msg: string): void {
+    this.consecutiveErrors++;
+    this.lastError = msg;
+    this.emitState();
+  }
+
+  private clearErrors(): void {
+    if (this.consecutiveErrors > 0) {
+      this.consecutiveErrors = 0;
+      this.lastError = undefined;
+      this.emitState();
+    }
   }
 
   private async broadcastMyPresence(): Promise<void> {
@@ -153,7 +184,6 @@ export class AgentManager {
     const prefs = this.callbacks.getPrefs();
     const discovered = await discoverPeers(this.pk, prefs, this.relayUrls);
 
-    // Update peer map
     for (const peer of discovered) {
       this.peers.set(peer.nostrPubkey, peer);
     }
@@ -173,7 +203,6 @@ export class AgentManager {
       const existing = this.handshakes.get(peer.nostrPubkey);
       if (existing && (existing.phase === "offered" || existing.phase === "accepted" || existing.phase === "delivering")) continue;
 
-      // Find best content to offer this peer
       const match = offerCandidates.find(c =>
         c.topics?.some(t => peer.interests.includes(t))
       );
@@ -192,7 +221,7 @@ export class AgentManager {
           this.handshakes.set(peer.nostrPubkey, handshake);
           this.emitState();
         } catch (err) {
-          console.warn("[agent] sendOffer failed:", err instanceof Error ? err.message : "unknown");
+          console.warn("[agent] sendOffer failed:", errMsg(err));
         }
       }
     }
@@ -210,7 +239,7 @@ export class AgentManager {
     this.listenerSub = this.listenerPool.subscribe(this.relayUrls, filter, {
       onevent: (event) => {
         this.handleIncomingMessage(event.pubkey, event.content)
-          .catch(err => console.warn("[agent] Message handler failed:", err instanceof Error ? err.message : "unknown"));
+          .catch(err => console.warn("[agent] Message handler failed:", errMsg(err)));
       },
     });
   }
@@ -266,7 +295,7 @@ export class AgentManager {
         });
       }
     } catch (err) {
-      console.warn("[agent] handleOffer relay send failed:", err instanceof Error ? err.message : "unknown");
+      console.warn("[agent] handleOffer relay send failed:", errMsg(err));
     }
     this.emitState();
   }
@@ -275,8 +304,7 @@ export class AgentManager {
     const handshake = this.handshakes.get(senderPk);
     if (!handshake || handshake.phase !== "offered") return;
 
-    handshake.phase = "delivering";
-
+    // Find matching content BEFORE transitioning state to avoid inconsistent "delivering" with no content
     const content = this.callbacks.getContent();
     const match = content.find(c =>
       c.topics?.includes(handshake.offeredTopic) &&
@@ -284,11 +312,14 @@ export class AgentManager {
     );
 
     if (!match) {
+      console.warn(`[agent] handleAccept: content no longer available for topic="${handshake.offeredTopic}", rejecting`);
       handshake.phase = "rejected";
       handshake.completedAt = Date.now();
       this.emitState();
       return;
     }
+
+    handshake.phase = "delivering";
 
     const payload: D2ADeliverPayload = {
       text: match.text,
@@ -307,7 +338,7 @@ export class AgentManager {
       handshake.completedAt = Date.now();
       this.sentItems++;
     } catch (err) {
-      console.warn("[agent] deliverContent failed:", err instanceof Error ? err.message : "unknown");
+      console.warn("[agent] deliverContent failed:", errMsg(err));
       handshake.phase = "rejected";
       handshake.completedAt = Date.now();
     }
@@ -332,7 +363,6 @@ export class AgentManager {
       if (resonance < 0.1) return; // Very low resonance, ignore
     }
 
-    // Convert to ContentItem and inject into feed
     const item: ContentItem = {
       id: uuidv4(),
       owner: "",
@@ -356,7 +386,6 @@ export class AgentManager {
     this.callbacks.onNewContent(item);
     this.receivedItems++;
 
-    // Complete handshake
     const handshake = this.handshakes.get(senderPk);
     if (handshake) {
       handshake.phase = "completed";

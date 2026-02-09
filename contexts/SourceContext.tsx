@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
+import { useNotify } from "./NotificationContext";
 import { createBackendActor, createBackendActorAsync } from "@/lib/ic/actor";
 import { loadSources, saveSources } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
@@ -30,6 +31,7 @@ const SourceContext = createContext<SourceState>({
 });
 
 export function SourceProvider({ children }: { children: React.ReactNode }) {
+  const { addNotification } = useNotify();
   const { isAuthenticated, identity, principalText } = useAuth();
   const [sources, setSources] = useState<SavedSource[]>([]);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "error">("idle");
@@ -82,6 +84,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         console.error("[sources] IC save FAILED:", err);
         setSyncStatus("error");
         setSyncError("Failed to save source to IC");
+        addNotification("Source saved locally but IC sync failed", "error");
       });
   }
 
@@ -110,6 +113,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         console.error("[sources] actor creation failed:", msg);
         setSyncStatus("error");
         setSyncError("Actor: " + msg);
+        addNotification("Could not connect to IC for source sync", "error");
         return;
       }
 
@@ -138,7 +142,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         // Push local-only items to IC (outside state updater)
         for (const localSource of localOnly) {
           actor.saveSourceConfig(savedToIC(localSource, principal))
-            .catch((e: unknown) => console.error("[sources] push local→IC failed:", e));
+            .catch((e: unknown) => {
+              console.error("[sources] push local→IC failed:", e);
+              addNotification("Some sources failed to sync to IC", "error");
+            });
         }
         setSyncStatus("synced");
         setSyncError("");
@@ -147,6 +154,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         console.error("[sources] IC query failed:", msg, err);
         setSyncStatus("error");
         setSyncError(msg);
+        addNotification("Failed to load sources from IC", "error");
       }
     };
     doSync();
@@ -266,7 +274,7 @@ function savedToIC(s: SavedSource, owner: import("@dfinity/principal").Principal
 
 function icToSaved(ic: SourceConfigEntry): SavedSource {
   let parsed: Record<string, unknown> = {};
-  try { parsed = JSON.parse(ic.configJson); } catch (err) { console.warn("[sources] Failed to parse configJson:", err); }
+  try { parsed = JSON.parse(ic.configJson); } catch (err) { console.warn(`[sources] Corrupted configJson for source ${ic.id}:`, err); }
   return {
     id: ic.id,
     type: ic.sourceType as "rss" | "nostr",

@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ContentProvider } from "@/contexts/ContentContext";
 import { PreferenceProvider, usePreferences } from "@/contexts/PreferenceContext";
@@ -17,16 +18,18 @@ function ContentWithPreferences({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <PreferenceProvider>
-        <ContentWithPreferences>
-          <SourceProvider>
-            <AgentProvider>
-              {children}
-            </AgentProvider>
-          </SourceProvider>
-        </ContentWithPreferences>
-      </PreferenceProvider>
-    </AuthProvider>
+    <NotificationProvider>
+      <AuthProvider>
+        <PreferenceProvider>
+          <ContentWithPreferences>
+            <SourceProvider>
+              <AgentProvider>
+                {children}
+              </AgentProvider>
+            </SourceProvider>
+          </ContentWithPreferences>
+        </PreferenceProvider>
+      </AuthProvider>
+    </NotificationProvider>
   );
 }

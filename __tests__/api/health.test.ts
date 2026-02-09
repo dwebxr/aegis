@@ -4,11 +4,18 @@
 import { GET } from "@/app/api/health/route";
 
 describe("GET /api/health", () => {
-  it("returns 200 with status ok", async () => {
+  const origEnv = process.env;
+
+  afterEach(() => {
+    process.env = origEnv;
+  });
+
+  it("returns 200 with status and checks", async () => {
     const res = await GET();
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.status).toBe("ok");
+    expect(data.status).toBeDefined();
+    expect(data.checks).toBeDefined();
   });
 
   it("returns valid ISO timestamp", async () => {
@@ -29,7 +36,23 @@ describe("GET /api/health", () => {
   it("returns 'local' version when no VERCEL_GIT_COMMIT_SHA", async () => {
     const res = await GET();
     const data = await res.json();
-    // In test env, VERCEL_GIT_COMMIT_SHA is not set
     expect(data.version).toBe("local");
+  });
+
+  it("reports 'degraded' when ANTHROPIC_API_KEY is missing", async () => {
+    process.env = { ...origEnv };
+    delete process.env.ANTHROPIC_API_KEY;
+    const res = await GET();
+    const data = await res.json();
+    expect(data.status).toBe("degraded");
+    expect(data.checks.anthropicKey).toBe("missing");
+  });
+
+  it("reports 'ok' when ANTHROPIC_API_KEY is configured", async () => {
+    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key" };
+    const res = await GET();
+    const data = await res.json();
+    expect(data.status).toBe("ok");
+    expect(data.checks.anthropicKey).toBe("configured");
   });
 });

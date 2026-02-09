@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { UserContext } from "@/lib/preferences/types";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
+import { rateLimit } from "@/lib/api/rateLimit";
 
 function buildPrompt(text: string, userContext?: UserContext): string {
   const contentSlice = text.slice(0, 5000);
@@ -46,6 +47,9 @@ Respond ONLY in this exact JSON format:
 }
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request, 20, 60_000);
+  if (limited) return limited;
+
   let body;
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -63,7 +67,7 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     const fallback = heuristicScores(text);
-    return NextResponse.json({ ...fallback });
+    return NextResponse.json({ ...fallback, tier: "heuristic" });
   }
 
   const prompt = buildPrompt(text, userContext);
@@ -91,41 +95,34 @@ export async function POST(request: NextRequest) {
     clearTimeout(timeout);
     console.error("[analyze] Anthropic fetch failed:", err instanceof Error ? err.message : "unknown");
     const fallback = heuristicScores(text);
-    return NextResponse.json({ error: "Request failed", ...fallback }, { status: 502 });
+    return NextResponse.json({ error: "Request failed", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
   }
 
   clearTimeout(timeout);
 
   if (!res.ok) {
     const fallback = heuristicScores(text);
-    return NextResponse.json({ error: `Anthropic API error: ${res.status}`, ...fallback }, { status: 502 });
+    return NextResponse.json({ error: `Anthropic API error: ${res.status}`, fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
   }
 
   let data;
   try { data = await res.json(); } catch (err) {
     console.error("[analyze] Failed to parse Anthropic JSON:", err instanceof Error ? err.message : "unknown");
     const fallback = heuristicScores(text);
-    return NextResponse.json({ error: "Failed to parse Anthropic response", ...fallback }, { status: 502 });
+    return NextResponse.json({ error: "Failed to parse Anthropic response", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
   }
   const rawText = data.content?.[0]?.text || "";
   const clean = rawText.replace(/```json|```/g, "").trim();
 
   let parsed;
+  const tier: "claude" | "heuristic" = "claude";
   try {
     parsed = JSON.parse(clean);
   } catch {
-    const numMatch = clean.match(/(\d+)/g);
-    if (numMatch && numMatch.length >= 3) {
-      const o = Math.min(10, parseInt(numMatch[0]));
-      const ins = Math.min(10, parseInt(numMatch[1]));
-      const c = Math.min(10, parseInt(numMatch[2]));
-      const composite = parseFloat((o * 0.4 + ins * 0.35 + c * 0.25).toFixed(1));
-      parsed = { originality: o, insight: ins, credibility: c, composite, verdict: composite >= 4 ? "quality" : "slop", reason: "Parsed from partial response" };
-    } else {
-      console.error("[analyze] Unparseable AI response, length:", clean.length);
-      const fallback = heuristicScores(text);
-      return NextResponse.json({ error: "Failed to parse AI response", ...fallback }, { status: 502 });
-    }
+    // AI returned non-JSON — use heuristic instead of unreliable regex extraction
+    console.warn("[analyze] AI returned non-JSON (length:", clean.length, "), falling back to heuristic");
+    const fallback = heuristicScores(text);
+    return NextResponse.json({ error: "Failed to parse AI response", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
   }
 
   const response: Record<string, unknown> = {
@@ -142,6 +139,7 @@ export async function POST(request: NextRequest) {
   if (parsed.cContext !== undefined) response.cContext = parsed.cContext;
   if (parsed.lSlop !== undefined) response.lSlop = parsed.lSlop;
   if (Array.isArray(parsed.topics)) response.topics = parsed.topics;
+  response.tier = tier;
 
   return NextResponse.json(response);
 }
