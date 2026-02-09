@@ -93,8 +93,13 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const handleAnalyzeOnce = async (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => {
     const key = meta?.sourceUrl || text.slice(0, 200);
     if (analyzedUrls.has(key)) return;
-    setAnalyzedUrls(prev => new Set(prev).add(key));
-    return onAnalyze(text, meta);
+    try {
+      const result = await onAnalyze(text, meta);
+      setAnalyzedUrls(prev => new Set(prev).add(key));
+      return result;
+    } catch {
+      // Don't mark as analyzed on failure — allow retry
+    }
   };
 
   const handleSaveRss = () => {

@@ -72,7 +72,7 @@ export function generateBriefing(
     };
   }
 
-  const selectedIds = new Set(Array.from(priorityIds));
+  const selectedIds = new Set(priorityIds);
   if (serendipity) selectedIds.add(serendipity.item.id);
 
   const filteredOut = content.filter(c => !selectedIds.has(c.id));

@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     if (msg.includes("403") || msg.includes("Forbidden")) {
       return NextResponse.json({ error: "Your X API access level doesn't include search. You need Basic tier ($200/mo) or higher." }, { status: 403 });
     }
-    return NextResponse.json({ error: `X API error: ${msg}` }, { status: 500 });
+    return NextResponse.json({ error: "X API request failed. Please try again later." }, { status: 500 });
   }
 
   const users = new Map<string, { name: string; username: string }>();

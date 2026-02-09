@@ -46,20 +46,19 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
   }, []);
 
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
+
   const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop") => {
-    setProfile(prev => {
-      const next = learn(prev, { action: "validate", topics, author, composite, verdict });
-      debouncedSave(next);
-      return next;
-    });
+    const next = learn(profileRef.current, { action: "validate", topics, author, composite, verdict });
+    setProfile(next);
+    debouncedSave(next);
   }, [debouncedSave]);
 
   const onFlag = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop") => {
-    setProfile(prev => {
-      const next = learn(prev, { action: "flag", topics, author, composite, verdict });
-      debouncedSave(next);
-      return next;
-    });
+    const next = learn(profileRef.current, { action: "flag", topics, author, composite, verdict });
+    setProfile(next);
+    debouncedSave(next);
   }, [debouncedSave]);
 
   const isPersonalized = hasEnoughData(profile);
