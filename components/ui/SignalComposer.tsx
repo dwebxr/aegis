@@ -43,9 +43,11 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
     }
   };
 
-  const maxStakeE8s = icpBalance != null
+  const rawMax = icpBalance != null
     ? Number(icpBalance < MAX_STAKE ? icpBalance : MAX_STAKE)
     : Number(MAX_STAKE);
+  // Ensure slider max >= min so the HTML range input doesn't break
+  const maxStakeE8s = Math.max(rawMax, Number(MIN_STAKE));
   const hasBalance = icpBalance != null && icpBalance >= MIN_STAKE;
 
   // Clamp stakeE8s when max changes (e.g. balance drops)
