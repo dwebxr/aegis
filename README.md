@@ -536,6 +536,8 @@ Aegis follows a non-custodial architecture for all on-chain fund management:
 
 **Note**: The canister controller can still upgrade the code, which is a residual trust assumption. Full trustlessness would require controller renunciation or DAO governance.
 
+> **Disclaimer**: This protocol's source code is publicly available. The operator does not exercise the authority to modify or manipulate the automatic distribution logic defined by the smart contract without individual user consent under normal operations. (本プロトコルのソースコードは公開されており、運営者はスマートコントラクトによって定義された自動分配ロジックを、ユーザーの個別の同意なく変更・操作する権限を（通常運用において）行使しません。)
+
 ## License
 
 MIT
