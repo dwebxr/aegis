@@ -32,6 +32,12 @@ export function _resetRateLimits(): void {
 
 /**
  * Check rate limit for a request. Returns null if allowed, or a 429 NextResponse if exceeded.
+ *
+ * LIMITATION: On Vercel serverless, state is per-instance (warm start).
+ * Cold starts get a fresh Map. This provides burst protection within a
+ * single instance but does not limit across distributed instances.
+ * For stronger guarantees, migrate to Vercel KV or Redis.
+ *
  * @param request - The incoming request
  * @param limit - Max requests per window (default: 30)
  * @param windowMs - Window duration in ms (default: 60_000 = 1 minute)

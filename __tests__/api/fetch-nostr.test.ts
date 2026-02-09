@@ -41,7 +41,7 @@ describe("POST /api/fetch/nostr", () => {
       const res = await POST(makeRequest({ relays: ["relay.damus.io"] }));
       expect(res.status).toBe(400);
       const data = await res.json();
-      expect(data.error).toContain("wss://");
+      expect(data.error).toMatch(/wss:\/\/|Invalid relay/);
     });
 
     it("returns 400 for relay with ws:// prefix", async () => {
@@ -62,6 +62,32 @@ describe("POST /api/fetch/nostr", () => {
     it("returns 400 for mixed valid and invalid relays", async () => {
       const res = await POST(makeRequest({
         relays: ["wss://relay.damus.io", "http://bad.relay"],
+      }));
+      expect(res.status).toBe(400);
+    });
+
+    it("blocks localhost relay (SSRF)", async () => {
+      const res = await POST(makeRequest({ relays: ["wss://127.0.0.1"] }));
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Localhost");
+    });
+
+    it("blocks private IP relay (SSRF)", async () => {
+      const res = await POST(makeRequest({ relays: ["wss://192.168.1.1"] }));
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Private network");
+    });
+
+    it("blocks cloud metadata relay (SSRF)", async () => {
+      const res = await POST(makeRequest({ relays: ["wss://169.254.169.254"] }));
+      expect(res.status).toBe(400);
+    });
+
+    it("blocks private IP in mixed relay list (SSRF)", async () => {
+      const res = await POST(makeRequest({
+        relays: ["wss://relay.damus.io", "wss://10.0.0.1"],
       }));
       expect(res.status).toBe(400);
     });

@@ -8,6 +8,7 @@ export interface Notification {
 }
 
 const DEDUPE_WINDOW_MS = 5_000;
+let nextId = 1;
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -27,7 +28,7 @@ export function useNotifications() {
       recentRef.current.set(text, now);
     }
 
-    const id = now;
+    const id = nextId++;
     setNotifications(prev => [...prev, { id, text, type }]);
     const timer = setTimeout(() => {
       timersRef.current.delete(timer);

@@ -208,7 +208,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         validated: evaluation.validated,
         flagged: evaluation.flagged,
       }).catch((err: unknown) => {
-        console.warn("IC saveEvaluation failed:", err);
+        console.warn("[content] IC saveEvaluation failed:", errMsg(err));
         setSyncStatus("offline");
         addNotification("Evaluation saved locally but IC sync failed", "error");
       });
@@ -227,7 +227,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (item && actorRef.current && isAuthenticated) {
       actorRef.current.updateEvaluation(id, true, item.flagged)
         .catch((err: unknown) => {
-          console.warn("IC updateEvaluation (validate) failed:", err);
+          console.warn("[content] IC updateEvaluation (validate) failed:", errMsg(err));
           setSyncStatus("offline");
           addNotification("Validation saved locally but IC sync failed", "error");
         });
@@ -243,7 +243,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (item && actorRef.current && isAuthenticated) {
       actorRef.current.updateEvaluation(id, item.validated, true)
         .catch((err: unknown) => {
-          console.warn("IC updateEvaluation (flag) failed:", err);
+          console.warn("[content] IC updateEvaluation (flag) failed:", errMsg(err));
           setSyncStatus("offline");
           addNotification("Flag saved locally but IC sync failed", "error");
         });
@@ -296,7 +296,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       await actorRef.current.batchSaveEvaluations(evals);
       setSyncStatus("synced");
     } catch (err) {
-      console.error("Failed to sync to IC:", err);
+      console.error("[content] Failed to sync to IC:", errMsg(err));
       setSyncStatus("offline");
       addNotification("Batch sync to IC failed", "error");
     } finally {
@@ -344,7 +344,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
       setSyncStatus("synced");
     } catch (err) {
-      console.error("Failed to load from IC:", err);
+      console.error("[content] Failed to load from IC:", errMsg(err));
       setSyncStatus("offline");
       addNotification("Could not load content history from IC", "error");
     } finally {

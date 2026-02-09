@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
+import { blockPrivateRelay } from "@/lib/utils/url";
 
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 30, 60_000);
@@ -19,8 +20,12 @@ export async function POST(request: NextRequest) {
   }
 
   for (const relay of relays) {
-    if (typeof relay !== "string" || !relay.startsWith("wss://")) {
-      return NextResponse.json({ error: `Invalid relay URL: ${relay}. Must start with wss://` }, { status: 400 });
+    if (typeof relay !== "string") {
+      return NextResponse.json({ error: `Invalid relay URL: must be a string` }, { status: 400 });
+    }
+    const blocked = blockPrivateRelay(relay);
+    if (blocked) {
+      return NextResponse.json({ error: blocked }, { status: 400 });
     }
   }
 

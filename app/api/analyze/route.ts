@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { UserContext } from "@/lib/preferences/types";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
 
 function buildPrompt(text: string, userContext?: UserContext): string {
@@ -66,10 +67,11 @@ export async function POST(request: NextRequest) {
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  if (!apiKey || !withinDailyBudget()) {
     const fallback = heuristicScores(text);
     return NextResponse.json({ ...fallback, tier: "heuristic" });
   }
+  recordApiCall();
 
   const prompt = buildPrompt(text, userContext);
 

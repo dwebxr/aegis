@@ -214,7 +214,7 @@ export default function AegisApp() {
           }
         }
       } catch (err) {
-        console.error("[staking] publishWithStake failed:", err);
+        console.error("[staking] publishWithStake failed:", errMsg(err));
         addNotification("Deposit failed — signal published without quality bond", "error");
       }
     }
