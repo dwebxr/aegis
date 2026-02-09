@@ -9,6 +9,7 @@ import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
+import { errMsg } from "@/lib/utils/errors";
 
 interface ContentState {
   content: ContentItem[];
@@ -127,7 +128,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           };
         }
       } catch (err) {
-        console.warn("[analyze] IC LLM failed, falling back to API:", err instanceof Error ? err.message : "unknown");
+        console.warn("[analyze] IC LLM failed, falling back to API:", errMsg(err));
       }
     }
 

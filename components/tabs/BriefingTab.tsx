@@ -18,9 +18,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showFiltered, setShowFiltered] = useState(false);
 
-  const briefing = useMemo(() => {
-    return generateBriefing(content, profile);
-  }, [content, profile]);
+  const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
 
   const insightCount = briefing.priority.length + (briefing.serendipity ? 1 : 0);
 

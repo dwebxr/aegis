@@ -13,10 +13,7 @@ import {
   MIN_OFFER_SCORE,
 } from "./protocol";
 import type { SubCloser } from "nostr-tools/pool";
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : "unknown";
-}
+import { errMsg } from "@/lib/utils/errors";
 
 const DEFAULT_RELAYS = [
   "wss://relay.damus.io",

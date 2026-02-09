@@ -3,6 +3,7 @@ import { quickSlopFilter } from "./quickFilter";
 import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
+import { errMsg } from "@/lib/utils/errors";
 
 const CYCLE_INTERVAL_MS = 20 * 60 * 1000; // 20 minutes
 const MAX_ITEMS_PER_SOURCE = 5;
@@ -71,7 +72,7 @@ export class IngestionScheduler {
         }
       }
     } catch (err) {
-      console.error("[scheduler] Ingestion cycle failed:", err instanceof Error ? err.message : "unknown");
+      console.error("[scheduler] Ingestion cycle failed:", errMsg(err));
     } finally {
       this.running = false;
     }
@@ -109,7 +110,7 @@ export class IngestionScheduler {
         imageUrl: item.imageUrl,
       }));
     } catch (err) {
-      console.error("[scheduler] RSS fetch failed:", err instanceof Error ? err.message : "unknown");
+      console.error("[scheduler] RSS fetch failed:", errMsg(err));
       return [];
     }
   }
@@ -129,7 +130,7 @@ export class IngestionScheduler {
         sourceUrl: `nostr:${ev.id}`,
       }));
     } catch (err) {
-      console.error("[scheduler] Nostr fetch failed:", err instanceof Error ? err.message : "unknown");
+      console.error("[scheduler] Nostr fetch failed:", errMsg(err));
       return [];
     }
   }
@@ -152,7 +153,7 @@ export class IngestionScheduler {
         imageUrl: data.imageUrl,
       }];
     } catch (err) {
-      console.error("[scheduler] URL fetch failed:", err instanceof Error ? err.message : "unknown");
+      console.error("[scheduler] URL fetch failed:", errMsg(err));
       return [];
     }
   }
@@ -201,7 +202,7 @@ export class IngestionScheduler {
         lSlop: result.lSlop,
       };
     } catch (err) {
-      console.error("[scheduler] Score item failed:", err instanceof Error ? err.message : "unknown");
+      console.error("[scheduler] Score item failed:", errMsg(err));
       return null;
     }
   }

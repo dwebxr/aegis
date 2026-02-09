@@ -1,5 +1,6 @@
 import { Actor, Identity } from "@dfinity/agent";
 import { createAgent } from "./agent";
+import { errMsg } from "@/lib/utils/errors";
 
 const ICP_LEDGER_CANISTER_ID = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 
@@ -98,7 +99,7 @@ export async function createICPLedgerActorAsync(identity: Identity): Promise<ICP
   try {
     await agent.syncTime();
   } catch (err) {
-    console.warn("[ic] ledger syncTime failed:", err instanceof Error ? err.message : "unknown");
+    console.warn("[ic] ledger syncTime failed:", errMsg(err));
   }
   return Actor.createActor<ICPLedgerActor>(icpLedgerIdlFactory, {
     agent,

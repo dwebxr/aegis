@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { UserContext } from "@/lib/preferences/types";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { errMsg } from "@/lib/utils/errors";
 
 function buildPrompt(text: string, userContext?: UserContext): string {
   const contentSlice = text.slice(0, 5000);
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     clearTimeout(timeout);
-    console.error("[analyze] Anthropic fetch failed:", err instanceof Error ? err.message : "unknown");
+    console.error("[analyze] Anthropic fetch failed:", errMsg(err));
     const fallback = heuristicScores(text);
     return NextResponse.json({ error: "Request failed", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
   }
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
 
   let data;
   try { data = await res.json(); } catch (err) {
-    console.error("[analyze] Failed to parse Anthropic JSON:", err instanceof Error ? err.message : "unknown");
+    console.error("[analyze] Failed to parse Anthropic JSON:", errMsg(err));
     const fallback = heuristicScores(text);
     return NextResponse.json({ error: "Failed to parse Anthropic response", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { errMsg } from "@/lib/utils/errors";
 
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 30, 60_000);
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
     }));
   } catch (err: unknown) {
     console.error("[fetch/nostr] Relay query failed:", err);
-    const msg = err instanceof Error ? err.message : "";
+    const msg = errMsg(err);
     if (msg === "timeout") {
       return NextResponse.json({
         events: [],

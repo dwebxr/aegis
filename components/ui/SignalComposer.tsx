@@ -215,6 +215,9 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                   <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>
                     Deposit ICP as a quality assurance bond. Validated by community = deposit returned. Flagged = deposit forfeited as quality assurance cost. No verdict within 30 days = deposit auto-returned.
                   </div>
+                  <div style={{ fontSize: 10, color: "#fbbf24", marginTop: 6, padding: "6px 8px", background: "rgba(251,191,36,0.08)", borderRadius: 6, lineHeight: 1.5 }}>
+                    &#x26A0;&#xFE0F; Alpha &mdash; Currently in test operation. Bugs or data resets may occur. Please deposit only amounts you are comfortable treating as a tip. Refunds cannot be guaranteed if issues arise.
+                  </div>
                   {!hasBalance && (
                     <div style={{ fontSize: 10, color: "#f87171", marginTop: 4, fontWeight: 600 }}>
                       Insufficient ICP balance. Min: {formatICP(MIN_STAKE)} ICP

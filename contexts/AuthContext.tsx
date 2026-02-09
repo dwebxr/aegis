@@ -5,6 +5,7 @@ import type { Identity } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { getInternetIdentityUrl, getDerivationOrigin } from "@/lib/ic/agent";
 import { useNotify } from "./NotificationContext";
+import { errMsg } from "@/lib/utils/errors";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -46,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setIsLoading(false);
     }).catch((err: unknown) => {
-      console.error("[auth] Initialization failed:", err instanceof Error ? err.message : "unknown");
+      console.error("[auth] Initialization failed:", errMsg(err));
       addNotification("Authentication system failed to initialize", "error");
       setIsLoading(false);
     });

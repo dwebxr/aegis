@@ -23,6 +23,7 @@ import { Principal } from "@dfinity/principal";
 import { getCanisterId } from "@/lib/ic/agent";
 import type { UserReputation } from "@/lib/ic/declarations";
 import type { AnalyzeResponse } from "@/lib/types/api";
+import { errMsg } from "@/lib/utils/errors";
 
 export default function AegisApp() {
   const { mobile } = useWindowSize();
@@ -88,7 +89,7 @@ export default function AegisApp() {
         setReputation(rep);
         setEngagementIndex(eIndex);
       } catch (err) {
-        console.warn("[staking] Failed to init ledger/reputation:", err instanceof Error ? err.message : "unknown");
+        console.warn("[staking] Failed to init ledger/reputation:", errMsg(err));
         addNotification("Could not load ICP balance — staking may be unavailable", "error");
       }
     })();
@@ -102,9 +103,7 @@ export default function AegisApp() {
 
   useEffect(() => {
     const scheduler = new IngestionScheduler({
-      onNewContent: (item) => {
-        addContent(item);
-      },
+      onNewContent: addContent,
       getSources: () => getSchedulerSourcesRef.current(),
       getUserContext: () => userContextRef.current,
     });
@@ -112,7 +111,6 @@ export default function AegisApp() {
     scheduler.start();
     return () => scheduler.stop();
   }, [addContent]);
-
 
   const handleValidate = (id: string) => {
     validateItem(id);
@@ -211,7 +209,7 @@ export default function AegisApp() {
               const bal = await ledgerRef.current.icrc1_balance_of({ owner: Principal.fromText(principalText), subaccount: [] });
               setIcpBalance(bal);
             } catch (err) {
-              console.warn("[staking] Balance refresh failed:", err instanceof Error ? err.message : "unknown");
+              console.warn("[staking] Balance refresh failed:", errMsg(err));
             }
           } else {
             addNotification(`Stake failed: ${stakeResult.err}`, "error");

@@ -7,6 +7,7 @@ import { createBackendActor, createBackendActorAsync } from "@/lib/ic/actor";
 import { loadSources, saveSources } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
+import { errMsg } from "@/lib/utils/errors";
 
 interface SourceState {
   sources: SavedSource[];
@@ -53,31 +54,22 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     actorRef.current = null;
   }, [identity]);
 
-  // Get or create actor using latest identity from ref
   function getActor(): _SERVICE | null {
-    if (!isAuthRef.current || !identityRef.current) {
-      console.warn("[sources] getActor: auth=", isAuthRef.current, "identity=", !!identityRef.current);
-      return null;
-    }
+    if (!isAuthRef.current || !identityRef.current) return null;
     if (actorRef.current) return actorRef.current;
     try {
       const actor = createBackendActor(identityRef.current);
       actorRef.current = actor;
       return actor;
-    } catch (err) {
-      console.error("[sources] getActor failed:", err);
+    } catch {
       return null;
     }
   }
 
-  // Save a source to IC using refs (never stale)
   function saveToIC(source: SavedSource): void {
     const actor = getActor();
     const id = identityRef.current;
-    if (!actor || !id) {
-      console.warn("[sources] saveToIC skip: actor=", !!actor, "identity=", !!id);
-      return;
-    }
+    if (!actor || !id) return;
     const principal = id.getPrincipal();
     actor.saveSourceConfig(savedToIC(source, principal))
       .catch((err: unknown) => {
@@ -109,7 +101,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         actor = await createBackendActorAsync(identity);
         actorRef.current = actor;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = errMsg(err);
         console.error("[sources] actor creation failed:", msg);
         setSyncStatus("error");
         setSyncError("Actor: " + msg);
@@ -150,7 +142,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         setSyncStatus("synced");
         setSyncError("");
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = errMsg(err);
         console.error("[sources] IC query failed:", msg, err);
         setSyncStatus("error");
         setSyncError(msg);

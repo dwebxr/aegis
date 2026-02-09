@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TwitterApi } from "twitter-api-v2";
+import { errMsg } from "@/lib/utils/errors";
 
 export async function POST(request: NextRequest) {
   let body;
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     console.error("[fetch/twitter] X API error:", err);
-    const msg = err instanceof Error ? err.message : "";
+    const msg = errMsg(err);
     if (msg.includes("401") || msg.includes("Unauthorized")) {
       return NextResponse.json({ error: "Invalid or expired X API bearer token. Please check your token." }, { status: 401 });
     }

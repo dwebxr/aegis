@@ -13,10 +13,7 @@ import {
   RESONANCE_THRESHOLD,
   PEER_EXPIRY_MS,
 } from "./protocol";
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : "unknown";
-}
+import { errMsg } from "@/lib/utils/errors";
 
 /** Returns 0-1 Jaccard similarity of high-affinity topics vs peer interests. */
 export function calculateResonance(

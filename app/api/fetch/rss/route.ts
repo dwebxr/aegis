@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Parser from "rss-parser";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { errMsg } from "@/lib/utils/errors";
 
 const parser = new Parser({
   timeout: 10000,
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
     feed = await parser.parseURL(feedUrl);
   } catch (err: unknown) {
     console.error("[fetch/rss] Parse failed:", feedUrl, err);
-    const msg = err instanceof Error ? err.message : "Unknown error";
+    const msg = errMsg(err);
     if (msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
       return NextResponse.json({ error: "Could not reach this feed. Check the URL and try again." }, { status: 502 });
     }

@@ -13,10 +13,7 @@ import { createICPLedgerActorAsync, ICP_FEE } from "@/lib/ic/icpLedger";
 import { getCanisterId } from "@/lib/ic/agent";
 import { Principal } from "@dfinity/principal";
 import type { AgentState } from "@/lib/agent/types";
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : "unknown";
-}
+import { errMsg } from "@/lib/utils/errors";
 
 interface AgentContextValue {
   agentState: AgentState;
@@ -123,7 +120,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                 BigInt(D2A_MATCH_FEE),
               );
               if ("ok" in result) {
-                console.info("[agent] D2A match recorded:", result.ok);
+                // Match recorded successfully
               } else {
                 console.warn("[agent] D2A match recording failed:", result.err);
                 addNotification("D2A match recording failed on IC", "error");
