@@ -53,7 +53,7 @@ export default function AegisApp() {
   useEffect(() => {
     if (isAuthenticated) {
       loadFromIC().catch((err: unknown) => {
-        console.warn("Failed to load from IC:", err);
+        console.warn("[page] Failed to load from IC:", errMsg(err));
         addNotification("Could not load saved content from IC", "error");
       });
     }
@@ -131,7 +131,7 @@ export default function AegisApp() {
       );
       return result;
     } catch (err) {
-      console.error("Analysis failed:", err);
+      console.error("[page] Analysis failed:", errMsg(err));
       addNotification("Analysis failed — check connection", "error");
       throw err;
     }
@@ -183,7 +183,6 @@ export default function AegisApp() {
         if ("Err" in approveResult) {
           addNotification("ICP approve failed — check balance", "error");
         } else {
-          // Call publishWithStake on aegis_backend
           const backend = await createBackendActorAsync(identity);
           const stakeResult = await backend.publishWithStake({
             id: signalId,
@@ -204,7 +203,6 @@ export default function AegisApp() {
 
           if ("ok" in stakeResult) {
             addNotification(`Deposited & published! Signal quality bond secured`, "success");
-            // Refresh balance
             try {
               const bal = await ledgerRef.current.icrc1_balance_of({ owner: Principal.fromText(principalText), subaccount: [] });
               setIcpBalance(bal);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Parser from "rss-parser";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
+import { blockPrivateUrl } from "@/lib/utils/url";
 
 const parser = new Parser({
   timeout: 10000,
@@ -52,10 +53,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Feed URL is required" }, { status: 400 });
   }
 
-  try {
-    new URL(feedUrl);
-  } catch {
-    return NextResponse.json({ error: "Invalid feed URL format" }, { status: 400 });
+  const blocked = blockPrivateUrl(feedUrl);
+  if (blocked) {
+    return NextResponse.json({ error: blocked }, { status: 400 });
   }
 
   let feed;

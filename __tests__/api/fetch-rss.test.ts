@@ -41,7 +41,24 @@ describe("POST /api/fetch/rss", () => {
       const res = await POST(makeRequest({ feedUrl: "not a url" }));
       expect(res.status).toBe(400);
       const data = await res.json();
-      expect(data.error).toContain("Invalid feed URL");
+      expect(data.error).toContain("Invalid URL");
+    });
+
+    it("blocks localhost (SSRF)", async () => {
+      const res = await POST(makeRequest({ feedUrl: "http://127.0.0.1/feed.xml" }));
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Localhost");
+    });
+
+    it("blocks private IPs (SSRF)", async () => {
+      const res = await POST(makeRequest({ feedUrl: "http://192.168.1.1/feed" }));
+      expect(res.status).toBe(400);
+    });
+
+    it("blocks cloud metadata endpoint (SSRF)", async () => {
+      const res = await POST(makeRequest({ feedUrl: "http://169.254.169.254/latest/" }));
+      expect(res.status).toBe(400);
     });
 
     it("returns 400 for invalid JSON body", async () => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extract } from "@extractus/article-extractor";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { blockPrivateUrl } from "@/lib/utils/url";
 
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 30, 60_000);
@@ -18,15 +19,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "URL is required" }, { status: 400 });
   }
 
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      return NextResponse.json({ error: "Invalid URL: must be HTTP or HTTPS" }, { status: 400 });
-    }
-  } catch {
-    return NextResponse.json({ error: "Invalid URL format" }, { status: 400 });
+  const blocked = blockPrivateUrl(url);
+  if (blocked) {
+    return NextResponse.json({ error: blocked }, { status: 400 });
   }
+  const parsed = new URL(url);
 
   let article;
   try {

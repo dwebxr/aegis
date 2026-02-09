@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TwitterApi } from "twitter-api-v2";
+import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request, 30, 60_000);
+  if (limited) return limited;
+
   let body;
   try {
     body = await request.json();

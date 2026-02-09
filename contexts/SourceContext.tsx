@@ -90,11 +90,9 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Load from localStorage immediately
     const local = loadSources(principalText);
     setSources(local);
 
-    // Async: create actor and query IC
     const doSync = async () => {
       let actor: _SERVICE;
       try {
@@ -114,7 +112,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         const principal = identity.getPrincipal();
         const icConfigs = await actor.getUserSourceConfigs(principal);
 
-        const icSources = icConfigs.map(icToSaved);
+        const icSources = icConfigs.map(icToSaved).filter((s): s is SavedSource => s !== null);
         let localOnly: SavedSource[] = [];
         setSources(prev => {
           const localMap = new Map<string, SavedSource>();
@@ -131,16 +129,25 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           saveSources(principalText, merged);
           return merged;
         });
-        // Push local-only items to IC (outside state updater)
-        for (const localSource of localOnly) {
-          actor.saveSourceConfig(savedToIC(localSource, principal))
-            .catch((e: unknown) => {
-              console.error("[sources] push local→IC failed:", e);
-              addNotification("Some sources failed to sync to IC", "error");
-            });
+        // Push local-only items to IC and await completion
+        let pushFailed = false;
+        await Promise.all(
+          localOnly.map(localSource =>
+            actor.saveSourceConfig(savedToIC(localSource, principal))
+              .catch((e: unknown) => {
+                console.error("[sources] push local→IC failed:", e);
+                pushFailed = true;
+              })
+          )
+        );
+        if (pushFailed) {
+          setSyncStatus("error");
+          setSyncError("Some sources failed to sync to IC");
+          addNotification("Some sources failed to sync to IC", "error");
+        } else {
+          setSyncStatus("synced");
+          setSyncError("");
         }
-        setSyncStatus("synced");
-        setSyncError("");
       } catch (err) {
         const msg = errMsg(err);
         console.error("[sources] IC query failed:", msg, err);
@@ -264,9 +271,12 @@ function savedToIC(s: SavedSource, owner: import("@dfinity/principal").Principal
   };
 }
 
-function icToSaved(ic: SourceConfigEntry): SavedSource {
-  let parsed: Record<string, unknown> = {};
-  try { parsed = JSON.parse(ic.configJson); } catch (err) { console.warn(`[sources] Corrupted configJson for source ${ic.id}:`, err); }
+function icToSaved(ic: SourceConfigEntry): SavedSource | null {
+  let parsed: Record<string, unknown>;
+  try { parsed = JSON.parse(ic.configJson); } catch (err) {
+    console.warn(`[sources] Corrupted configJson for source ${ic.id}, skipping:`, err);
+    return null;
+  }
   return {
     id: ic.id,
     type: ic.sourceType as "rss" | "nostr",

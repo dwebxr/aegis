@@ -26,13 +26,28 @@ export function heuristicScores(text: string): HeuristicScores {
   let credibility = 5;
 
   const signals: string[] = [];
+  // Negative signals
   if (exclamationDensity > 0.1) { originality -= 3; credibility -= 3; signals.push("excessive exclamation marks"); }
   if (emojiDensity > 0.05) { originality -= 2; signals.push("high emoji density"); }
   if (capsRatio > 0.3) { credibility -= 3; originality -= 2; signals.push("excessive caps"); }
+  if (words < 8) { insight -= 1; originality -= 1; signals.push("very short content"); }
+  // Positive signals
   if (words > 50) { insight += 1; }
   if (words > 100) { insight += 1; originality += 1; signals.push("long-form content"); }
+  if (words > 200) { insight += 1; signals.push("detailed content"); }
   if (hasLinks) { credibility += 2; signals.push("contains links"); }
   if (hasData) { insight += 2; credibility += 1; signals.push("contains data/numbers"); }
+  // Structure signals
+  const paragraphs = text.split(/\n\s*\n/).length;
+  if (paragraphs >= 3) { originality += 1; insight += 1; signals.push("structured paragraphs"); }
+  // Analytical language
+  if (/\b(analysis|evidence|hypothesis|correlation|framework|methodology|dataset|benchmark|implementation|algorithm)\b/i.test(text)) {
+    insight += 1; credibility += 1; signals.push("analytical language");
+  }
+  // Attribution
+  if (/\b(according to|cited|source:)\b/i.test(text)) {
+    credibility += 2; signals.push("attribution present");
+  }
 
   originality = Math.max(0, Math.min(10, originality));
   insight = Math.max(0, Math.min(10, insight));

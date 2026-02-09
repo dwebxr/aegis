@@ -27,7 +27,7 @@ export function createAgent(identity?: Identity): HttpAgent {
   });
 
   if (isLocal) {
-    agent.fetchRootKey().catch(console.error);
+    agent.fetchRootKey().catch(err => console.error("[ic] fetchRootKey failed:", err));
   }
 
   return agent;

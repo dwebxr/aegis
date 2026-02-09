@@ -65,12 +65,16 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    let cancelled = false;
     const keys = deriveNostrKeypairFromText(principalText);
+    const capturedIdentity = identity;
 
-    // Pre-approve canister for D2A match fees (blanket ICRC-2 approval)
-    const canisterId = getCanisterId();
-    createICPLedgerActorAsync(identity).then(async (ledger) => {
+    const startAgent = async () => {
+      // Step 1: Pre-approve canister for D2A match fees (ICRC-2)
+      const canisterId = getCanisterId();
       try {
+        const ledger = await createICPLedgerActorAsync(capturedIdentity);
+        if (cancelled) return;
         const spender = Principal.fromText(canisterId);
         await ledger.icrc2_approve({
           from_subaccount: [],
@@ -86,61 +90,65 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         console.warn("[agent] D2A fee pre-approve failed:", errMsg(err));
         addNotification("D2A fee pre-approval failed — matches may not settle", "error");
       }
-    }).catch(err => {
-      console.warn("[agent] Ledger actor creation failed:", errMsg(err));
-      addNotification("Could not connect to ICP ledger for D2A agent", "error");
-    });
+      if (cancelled) return;
 
-    // Capture identity for async callback closure
-    const capturedIdentity = identity;
-
-    const manager = new AgentManager(
-      keys.sk,
-      keys.pk,
-      {
-        onNewContent: (item) => addContent(item),
-        getContent: () => contentRef.current,
-        getPrefs: () => profileRef.current,
-        onStateChange: (state) => setAgentState(state),
-        onD2AMatchComplete: (_senderPk, senderPrincipalId, contentHash) => {
-          if (!senderPrincipalId) {
-            console.warn("[agent] D2A match: sender has no IC principal, skipping fee");
-            return;
-          }
-          // Fire-and-forget: record the D2A match on-chain
-          (async () => {
-            try {
-              const backend = await createBackendActorAsync(capturedIdentity);
-              const senderPrincipal = Principal.fromText(senderPrincipalId);
-              const matchId = uuidv4();
-              const result = await backend.recordD2AMatch(
-                matchId,
-                senderPrincipal,
-                contentHash,
-                BigInt(D2A_MATCH_FEE),
-              );
-              if ("ok" in result) {
-                // Match recorded successfully
-              } else {
-                console.warn("[agent] D2A match recording failed:", result.err);
+      // Step 2: Create and start agent manager (after approval completes)
+      const manager = new AgentManager(
+        keys.sk,
+        keys.pk,
+        {
+          onNewContent: (item) => addContent(item),
+          getContent: () => contentRef.current,
+          getPrefs: () => profileRef.current,
+          onStateChange: (state) => setAgentState(state),
+          onD2AMatchComplete: (_senderPk, senderPrincipalId, contentHash) => {
+            if (!senderPrincipalId) {
+              console.warn("[agent] D2A match: sender has no IC principal, skipping fee");
+              return;
+            }
+            (async () => {
+              try {
+                const backend = await createBackendActorAsync(capturedIdentity);
+                const senderPrincipal = Principal.fromText(senderPrincipalId);
+                const matchId = uuidv4();
+                const result = await backend.recordD2AMatch(
+                  matchId,
+                  senderPrincipal,
+                  contentHash,
+                  BigInt(D2A_MATCH_FEE),
+                );
+                if (!("ok" in result)) {
+                  console.warn("[agent] D2A match recording failed:", result.err);
+                  addNotification("D2A match recording failed on IC", "error");
+                }
+              } catch (err) {
+                console.warn("[agent] recordD2AMatch call failed:", errMsg(err));
                 addNotification("D2A match recording failed on IC", "error");
               }
-            } catch (err) {
-              console.warn("[agent] recordD2AMatch call failed:", errMsg(err));
-              addNotification("D2A match recording failed on IC", "error");
-            }
-          })();
+            })();
+          },
         },
-      },
-      undefined, // relayUrls (use default)
-      principalText, // IC principal for presence broadcast
-    );
+        undefined, // relayUrls (use default)
+        principalText, // IC principal for presence broadcast
+      );
 
-    managerRef.current = manager;
-    manager.start();
+      if (cancelled) {
+        manager.stop();
+        return;
+      }
+
+      managerRef.current = manager;
+      manager.start();
+    };
+
+    startAgent();
 
     return () => {
-      manager.stop();
+      cancelled = true;
+      if (managerRef.current) {
+        managerRef.current.stop();
+        managerRef.current = null;
+      }
     };
   }, [isAuthenticated, principalText, identity, isEnabled, addContent, addNotification]);
 

@@ -78,8 +78,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           actorRef.current = actor;
           setSyncStatus("idle");
         })
-        .catch(err => {
-          console.error("Failed to create IC actor:", err);
+        .catch((err: unknown) => {
+          console.error("[content] Failed to create IC actor:", errMsg(err));
           actorRef.current = null;
           setSyncStatus("offline");
           addNotification("Could not connect to IC — content won't sync", "error");

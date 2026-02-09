@@ -116,7 +116,6 @@ export async function POST(request: NextRequest) {
   const clean = rawText.replace(/```json|```/g, "").trim();
 
   let parsed;
-  const tier: "claude" | "heuristic" = "claude";
   try {
     parsed = JSON.parse(clean);
   } catch {
@@ -140,7 +139,7 @@ export async function POST(request: NextRequest) {
   if (parsed.cContext !== undefined) response.cContext = parsed.cContext;
   if (parsed.lSlop !== undefined) response.lSlop = parsed.lSlop;
   if (Array.isArray(parsed.topics)) response.topics = parsed.topics;
-  response.tier = tier;
+  response.tier = "claude";
 
   return NextResponse.json(response);
 }

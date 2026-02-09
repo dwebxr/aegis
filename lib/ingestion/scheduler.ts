@@ -18,6 +18,7 @@ interface SchedulerCallbacks {
   onNewContent: (item: ContentItem) => void;
   getSources: () => SourceConfig[];
   getUserContext: () => UserContext | null;
+  onSourceError?: (sourceKey: string, error: string) => void;
 }
 
 export class IngestionScheduler {
@@ -25,6 +26,7 @@ export class IngestionScheduler {
   private initialTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private callbacks: SchedulerCallbacks;
   private running = false;
+  private sourceErrors = new Map<string, { count: number; lastError: string; lastAt: number }>();
 
   constructor(callbacks: SchedulerCallbacks) {
     this.callbacks = callbacks;
@@ -45,6 +47,20 @@ export class IngestionScheduler {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+  }
+
+  getSourceErrors(): ReadonlyMap<string, { count: number; lastError: string; lastAt: number }> {
+    return this.sourceErrors;
+  }
+
+  private recordSourceError(key: string, error: string): void {
+    const existing = this.sourceErrors.get(key);
+    this.sourceErrors.set(key, {
+      count: (existing?.count ?? 0) + 1,
+      lastError: error,
+      lastAt: Date.now(),
+    });
+    this.callbacks.onSourceError?.(key, error);
   }
 
   private async runCycle(): Promise<void> {
@@ -101,7 +117,10 @@ export class IngestionScheduler {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ feedUrl, limit: 10 }),
       });
-      if (!res.ok) return [];
+      if (!res.ok) {
+        this.recordSourceError(`rss:${feedUrl}`, `HTTP ${res.status}`);
+        return [];
+      }
       const data = await res.json();
       return (data.items || []).map((item: { title: string; content: string; author?: string; link?: string; imageUrl?: string }) => ({
         text: `${item.title}\n\n${item.content}`.slice(0, 2000),
@@ -110,7 +129,9 @@ export class IngestionScheduler {
         imageUrl: item.imageUrl,
       }));
     } catch (err) {
-      console.error("[scheduler] RSS fetch failed:", errMsg(err));
+      const msg = errMsg(err);
+      console.error("[scheduler] RSS fetch failed:", msg);
+      this.recordSourceError(`rss:${feedUrl}`, msg);
       return [];
     }
   }
@@ -122,7 +143,10 @@ export class IngestionScheduler {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ relays, pubkeys: pubkeys?.length ? pubkeys : undefined, limit: 20 }),
       });
-      if (!res.ok) return [];
+      if (!res.ok) {
+        this.recordSourceError(`nostr:${relays[0] || "unknown"}`, `HTTP ${res.status}`);
+        return [];
+      }
       const data = await res.json();
       return (data.events || []).map((ev: { content: string; pubkey: string; id: string }) => ({
         text: ev.content.slice(0, 2000),
@@ -130,7 +154,9 @@ export class IngestionScheduler {
         sourceUrl: `nostr:${ev.id}`,
       }));
     } catch (err) {
-      console.error("[scheduler] Nostr fetch failed:", errMsg(err));
+      const msg = errMsg(err);
+      console.error("[scheduler] Nostr fetch failed:", msg);
+      this.recordSourceError(`nostr:${relays[0] || "unknown"}`, msg);
       return [];
     }
   }
@@ -142,7 +168,10 @@ export class IngestionScheduler {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      if (!res.ok) return [];
+      if (!res.ok) {
+        this.recordSourceError(`url:${url}`, `HTTP ${res.status}`);
+        return [];
+      }
       const data = await res.json();
       let hostname = "unknown";
       try { hostname = new URL(url).hostname; } catch { /* invalid URL */ }
@@ -153,7 +182,9 @@ export class IngestionScheduler {
         imageUrl: data.imageUrl,
       }];
     } catch (err) {
-      console.error("[scheduler] URL fetch failed:", errMsg(err));
+      const msg = errMsg(err);
+      console.error("[scheduler] URL fetch failed:", msg);
+      this.recordSourceError(`url:${url}`, msg);
       return [];
     }
   }

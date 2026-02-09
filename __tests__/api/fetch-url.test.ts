@@ -48,12 +48,29 @@ describe("POST /api/fetch/url", () => {
     it("returns 400 for ftp:// protocol", async () => {
       const res = await POST(makeRequest({ url: "ftp://files.example.com/doc.txt" }));
       expect(res.status).toBe(400);
-      const data = await res.json();
-      expect(data.error).toContain("HTTP or HTTPS");
     });
 
     it("returns 400 for file:// protocol", async () => {
       const res = await POST(makeRequest({ url: "file:///etc/passwd" }));
+      expect(res.status).toBe(400);
+    });
+
+    it("blocks localhost (SSRF)", async () => {
+      const res = await POST(makeRequest({ url: "http://127.0.0.1/admin" }));
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Localhost");
+    });
+
+    it("blocks private IPs (SSRF)", async () => {
+      const res = await POST(makeRequest({ url: "http://10.0.0.1/internal" }));
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Private network");
+    });
+
+    it("blocks cloud metadata endpoint (SSRF)", async () => {
+      const res = await POST(makeRequest({ url: "http://169.254.169.254/latest/meta-data/" }));
       expect(res.status).toBe(400);
     });
 

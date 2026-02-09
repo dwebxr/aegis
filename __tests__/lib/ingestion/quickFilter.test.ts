@@ -67,7 +67,7 @@ describe("heuristicScores", () => {
 
   describe("link presence", () => {
     it("gives credibility bonus for text with links", () => {
-      const text = "According to https://nature.com/study the findings show X.";
+      const text = "See results at https://nature.com/study for the full findings here.";
       const result = heuristicScores(text);
       expect(result.credibility).toBe(7); // base 5 + 2
     });
@@ -82,7 +82,7 @@ describe("heuristicScores", () => {
     });
 
     it("recognizes decimal numbers as data", () => {
-      const text = "The accuracy improved to 0.95 after fine-tuning.";
+      const text = "The model accuracy improved to 0.95 after careful fine-tuning.";
       const result = heuristicScores(text);
       expect(result.insight).toBe(7);
     });
@@ -107,7 +107,7 @@ describe("heuristicScores", () => {
   describe("composite formula", () => {
     it("uses weighted average: 0.4*O + 0.35*I + 0.25*C", () => {
       // Baseline: all 5's → composite = 5*0.4 + 5*0.35 + 5*0.25 = 5.0
-      const result = heuristicScores("Simple normal text here");
+      const result = heuristicScores("This is a simple and normal text about general topics");
       expect(result.composite).toBeCloseTo(5.0, 1);
     });
   });
@@ -135,7 +135,7 @@ describe("heuristicScores", () => {
     });
 
     it("reports no signals for plain text", () => {
-      const result = heuristicScores("Simple normal text here");
+      const result = heuristicScores("This is a simple and normal text about general topics");
       expect(result.reason).toContain("no strong signals");
     });
 
@@ -162,6 +162,78 @@ describe("heuristicScores", () => {
       const str = result.composite.toString();
       const decimals = str.includes(".") ? str.split(".")[1].length : 0;
       expect(decimals).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe("short content penalty", () => {
+    it("penalizes very short text (< 8 words)", () => {
+      const result = heuristicScores("Short text");
+      expect(result.insight).toBe(4); // base 5 - 1
+      expect(result.originality).toBe(4); // base 5 - 1
+      expect(result.reason).toContain("very short content");
+    });
+
+    it("does not penalize text with 8+ words", () => {
+      const result = heuristicScores("This is a reasonable piece of content about technology.");
+      expect(result.insight).toBe(5);
+      expect(result.originality).toBe(5);
+    });
+  });
+
+  describe("detailed content bonus", () => {
+    it("gives extra insight bonus for very long text (>200 words)", () => {
+      const words = Array(220).fill("word").join(" ");
+      const result = heuristicScores(words);
+      expect(result.insight).toBe(8); // base 5 + 1 (>50) + 1 (>100) + 1 (>200)
+      expect(result.reason).toContain("detailed content");
+    });
+  });
+
+  describe("structured paragraphs bonus", () => {
+    it("gives bonus for text with 3+ paragraphs", () => {
+      const text = "First paragraph about the topic.\n\nSecond paragraph with more detail.\n\nThird paragraph with conclusions.";
+      const result = heuristicScores(text);
+      expect(result.reason).toContain("structured paragraphs");
+      // originality and insight each get +1
+      expect(result.originality).toBeGreaterThanOrEqual(6);
+      expect(result.insight).toBeGreaterThanOrEqual(6);
+    });
+
+    it("does not trigger for fewer than 3 paragraphs", () => {
+      const text = "First paragraph.\n\nSecond paragraph.";
+      const result = heuristicScores(text);
+      expect(result.reason).not.toContain("structured paragraphs");
+    });
+  });
+
+  describe("analytical language bonus", () => {
+    it("gives insight+credibility bonus for analytical terms", () => {
+      const text = "The analysis of the dataset shows a strong correlation between the variables.";
+      const result = heuristicScores(text);
+      expect(result.reason).toContain("analytical language");
+      expect(result.insight).toBeGreaterThanOrEqual(6); // base 5 + 1
+      expect(result.credibility).toBeGreaterThanOrEqual(6); // base 5 + 1
+    });
+
+    it("does not trigger for casual language", () => {
+      const text = "I think this is a pretty good idea for a new project.";
+      const result = heuristicScores(text);
+      expect(result.reason).not.toContain("analytical language");
+    });
+  });
+
+  describe("attribution bonus", () => {
+    it("gives credibility bonus for attribution", () => {
+      const text = "According to the latest report the results are significant here.";
+      const result = heuristicScores(text);
+      expect(result.reason).toContain("attribution present");
+      expect(result.credibility).toBe(7); // base 5 + 2
+    });
+
+    it("recognizes 'cited' as attribution", () => {
+      const text = "The study cited in the paper provides strong evidence for the claim.";
+      const result = heuristicScores(text);
+      expect(result.reason).toContain("attribution present");
     });
   });
 });
