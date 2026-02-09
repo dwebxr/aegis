@@ -148,6 +148,7 @@ When publishing a signal, users deposit ICP (0.001–1.0 ICP) as a quality assur
 Publisher deposits 0.01 ICP as quality bond
   → 3 validates (community consensus) → Deposit returned + Trust Score updated
   → 3 flags (community consensus)     → Deposit forfeited as quality assurance cost
+  → 30 days with no verdict           → Deposit auto-returned (no issue found)
 ```
 
 **Quality determination process**: Content is first scored by AI (IC LLM or Claude) using objective metrics (originality, insight, credibility). Community peer review then requires a minimum of 3 independent votes to reach consensus. This two-layer process (AI scoring + community consensus) ensures objectivity.
@@ -159,6 +160,8 @@ Publisher deposits 0.01 ICP as quality bond
 **Trust Score**: `T = 5.0 + (qualitySignals / totalSignals) × 5.0` — ranges 0–10. Starts at 5.0 (neutral).
 
 **Engagement Index**: `E = validationRatio × avgComposite` — measures how effectively a user's signals engage the community (0–10 scale).
+
+**Auto-return**: Deposits that receive no community verdict within 30 days are automatically returned to the depositor. "No verdict = no issue found." This is processed by a recurring on-chain timer, ensuring no funds are permanently locked.
 
 Double-voting is prevented by tracking voters per signal. Self-voting is blocked. Deposit records and voter lists persist across canister upgrades.
 
@@ -315,6 +318,7 @@ The receiving agent applies a final resonance check (≥ 0.1) before injecting t
 - Deposit 0.001–1.0 ICP when publishing signals as a quality assurance bond
 - Community validation: 3 validates (consensus) → deposit returned + trust score updated
 - Community flagging: 3 flags (consensus) → deposit forfeited as quality assurance cost
+- Auto-return: 30 days with no verdict → deposit returned automatically
 - Trust Score gauge (0–10) and Engagement Index in Analytics dashboard
 - Non-custodial: forfeited deposits auto-distributed, no operator withdrawal
 - ICRC-2 approve/transfer_from pattern with pre-debit rollback safety
@@ -534,7 +538,18 @@ Aegis follows a non-custodial architecture for all on-chain fund management:
 - **Public sweep functions**: `sweepProtocolFees()` and `topUpCycles()` can be called by anyone — not restricted to the controller.
 - **Open source**: All canister code is publicly auditable on [GitHub](https://github.com/dwebxr/aegis).
 
-**Note**: The canister controller can still upgrade the code, which is a residual trust assumption. Full trustlessness would require controller renunciation or DAO governance.
+**Auto-return**: Deposits pending for 30+ days without community verdict are automatically returned. "No verdict = no issue found." A recurring on-chain timer processes expired deposits monthly.
+
+### Progressive Decentralization
+
+Aegis follows a staged decentralization roadmap to balance security with trustlessness:
+
+| Phase | Status | Controller | Description |
+|-------|--------|------------|-------------|
+| **Phase 1** | Current | Developer-held | Code is open source on GitHub. On-chain logic enforces non-custodial fund management. Controller retained for critical bug fixes. |
+| **Phase 2** | Planned | Blackhole canister or SNS DAO | Once the protocol is stable, controller will be transferred to a blackhole canister (immutable) or an SNS (Service Nervous System) DAO for community governance. |
+
+**Why not renounce immediately?** Premature controller renunciation risks permanent fund lockup if a critical bug is discovered. The current phase prioritizes code transparency and on-chain enforcement while retaining the ability to patch vulnerabilities.
 
 > **Disclaimer**: This protocol's source code is publicly available. The operator does not exercise the authority to modify or manipulate the automatic distribution logic defined by the smart contract without individual user consent under normal operations. (本プロトコルのソースコードは公開されており、運営者はスマートコントラクトによって定義された自動分配ロジックを、ユーザーの個別の同意なく変更・操作する権限を（通常運用において）行使しません。)
 

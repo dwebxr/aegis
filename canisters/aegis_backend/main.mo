@@ -35,6 +35,7 @@ persistent actor AegisBackend {
   let MAX_STAKE : Nat = 100_000_000; // 1.0 ICP maximum
   let VALIDATE_THRESHOLD : Nat = 3; // Validations needed to return stake
   let FLAG_THRESHOLD : Nat = 3; // Flags needed to slash stake
+  let DEPOSIT_EXPIRY_NS : Int = 30 * 24 * 60 * 60 * 1_000_000_000; // 30 days in nanoseconds
 
   // ──────────────────────────────────────
   // Non-custodial: protocol wallet + cycles top-up
@@ -1129,8 +1130,56 @@ persistent actor AegisBackend {
     #ok("Processed " # Nat.toText(surplus) # " e8s surplus");
   };
 
-  // Monthly maintenance timer: sweep surplus & top-up cycles every 30 days
+  /// Return deposits that have been active for longer than DEPOSIT_EXPIRY_NS (30 days).
+  /// "No community verdict = no issue found" — deposit returned automatically.
+  func resolveExpiredDeposits() : async () {
+    let now = Time.now();
+    let expired = Buffer.Buffer<(Text, Types.StakeRecord)>(8);
+    for ((stakeId, stake) in stakes.entries()) {
+      switch (stake.status) {
+        case (#active) {
+          if (now - stake.createdAt > DEPOSIT_EXPIRY_NS) {
+            expired.add((stakeId, stake));
+          };
+        };
+        case (_) {};
+      };
+    };
+    for ((stakeId, stake) in expired.vals()) {
+      putStakeUpdate(stakeId, stake, #returned, stake.validationCount, stake.flagCount, ?now);
+      let returnAmount = if (stake.amount > ICP_FEE) { stake.amount - ICP_FEE } else { 0 };
+      if (returnAmount > 0) {
+        try {
+          let result = await ICP_LEDGER.icrc1_transfer({
+            from_subaccount = null;
+            to = { owner = stake.owner; subaccount = null };
+            amount = returnAmount;
+            fee = ?ICP_FEE;
+            memo = null;
+            created_at_time = null;
+          });
+          switch (result) {
+            case (#Ok(_)) {
+              resolveReputation(stake.owner, 1, 0, stake.amount, 0);
+            };
+            case (#Err(_)) {
+              // Revert to active so next maintenance cycle retries
+              putStakeUpdate(stakeId, stake, #active, stake.validationCount, stake.flagCount, null);
+            };
+          };
+        } catch (_e) {
+          putStakeUpdate(stakeId, stake, #active, stake.validationCount, stake.flagCount, null);
+        };
+      };
+    };
+  };
+
+  // Monthly maintenance timer: sweep surplus, return expired deposits & top-up cycles every 30 days
   func monthlyMaintenance() : async () {
+    // 1. Return expired deposits (30+ days without community verdict)
+    await resolveExpiredDeposits();
+
+    // 2. Sweep surplus to protocol wallet or cycles
     let totalBalance = await ICP_LEDGER.icrc1_balance_of({
       owner = Principal.fromActor(AegisBackend); subaccount = null;
     });

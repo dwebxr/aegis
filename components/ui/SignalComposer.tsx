@@ -213,7 +213,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                     </span>
                   </div>
                   <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>
-                    Deposit ICP as a quality assurance bond. Validated by community = deposit returned. Flagged = deposit forfeited as quality assurance cost.
+                    Deposit ICP as a quality assurance bond. Validated by community = deposit returned. Flagged = deposit forfeited as quality assurance cost. No verdict within 30 days = deposit auto-returned.
                   </div>
                   {!hasBalance && (
                     <div style={{ fontSize: 10, color: "#f87171", marginTop: 4, fontWeight: 600 }}>
