@@ -121,7 +121,7 @@ export default function AegisApp() {
 
   const handleFlag = (id: string) => {
     flagItem(id);
-    addNotification("Flagged as slop", "error");
+    addNotification("Flagged", "error");
   };
 
   const handleAnalyze = async (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => {
@@ -152,7 +152,7 @@ export default function AegisApp() {
 
     // Staking is mandatory for authenticated users
     if (identity && principalText && !stakeAmount) {
-      addNotification("ICP staking is required to publish a signal", "error");
+      addNotification("ICP deposit is required to publish a signal", "error");
       return { eventId: null, relaysPublished: [] };
     }
 
@@ -205,7 +205,7 @@ export default function AegisApp() {
           }, stakeAmount);
 
           if ("ok" in stakeResult) {
-            addNotification(`Staked & published! Signal backed with ICP`, "success");
+            addNotification(`Deposited & published! Signal quality bond secured`, "success");
             // Refresh balance
             try {
               const bal = await ledgerRef.current.icrc1_balance_of({ owner: Principal.fromText(principalText), subaccount: [] });
@@ -219,7 +219,7 @@ export default function AegisApp() {
         }
       } catch (err) {
         console.error("[staking] publishWithStake failed:", err);
-        addNotification("Staking failed — signal published without stake", "error");
+        addNotification("Deposit failed — signal published without quality bond", "error");
       }
     }
 

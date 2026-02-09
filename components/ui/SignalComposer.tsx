@@ -175,7 +175,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                   marginLeft: "auto",
                 }}
               >
-                {isPublishing ? "Publishing..." : stakingEnabled ? `Stake & Publish` : "Publish Signal"}
+                {isPublishing ? "Publishing..." : stakingEnabled ? `Deposit & Publish` : "Publish Signal"}
               </button>
             </div>
 
@@ -188,7 +188,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                   <span style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600 }}>
-                    Proof of Quality Stake (Required)
+                    Quality Assurance Deposit
                   </span>
                   {icpBalance != null && (
                     <span style={{ fontSize: 10, color: "#64748b", fontFamily: fonts.mono }}>
@@ -213,7 +213,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                     </span>
                   </div>
                   <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>
-                    Stake ICP to back your signal. Validated = returned + trust. Flagged as slop = slashed.
+                    Deposit ICP as a quality assurance bond. Validated by community = deposit returned. Flagged = deposit forfeited as quality assurance cost.
                   </div>
                   {!hasBalance && (
                     <div style={{ fontSize: 10, color: "#f87171", marginTop: 4, fontWeight: 600 }}>

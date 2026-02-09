@@ -50,11 +50,11 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
           </div>
           <div style={{ marginBottom: 6 }}>
             <strong style={{ color: colors.amber[400] }}>Precision Match Fee:</strong>{" "}
-            When you receive content through a successful match, a fee of <strong style={{ fontFamily: fonts.mono }}>0.001 ICP</strong> is charged to you (the receiver).
+            When you receive content through a successful match, a content delivery fee of <strong style={{ fontFamily: fonts.mono }}>0.001 ICP</strong> is charged to the receiver.
           </div>
           <div style={{ marginBottom: 6 }}>
             <strong style={{ color: colors.text.primary }}>Fee Distribution:</strong>{" "}
-            80% goes to the content sender as a reward. 20% goes to the Aegis protocol as an operating fee.
+            80% is distributed to the content provider as a content provision fee. 20% covers protocol operating costs.
           </div>
           <div style={{ marginBottom: 6 }}>
             <strong style={{ color: colors.text.primary }}>Pre-Approval:</strong>{" "}

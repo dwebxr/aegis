@@ -149,7 +149,7 @@ export interface _SERVICE {
   getUserD2AMatches: ActorMethod<[Principal, bigint, bigint], D2AMatchRecord[]>;
   getEngagementIndex: ActorMethod<[Principal], number>;
   getTreasuryBalance: ActorMethod<[], bigint>;
-  getWithdrawableBalance: ActorMethod<[], bigint>;
-  withdrawTreasury: ActorMethod<[Principal, bigint], Result<bigint, string>>;
+  sweepProtocolFees: ActorMethod<[], Result<string, string>>;
+  topUpCycles: ActorMethod<[], Result<string, string>>;
   analyzeOnChain: ActorMethod<[string, string[]], Result<OnChainAnalysis, string>>;
 }

@@ -94,7 +94,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
 
       {reputation && (
         <div style={{ background: colors.bg.surface, border: `1px solid ${colors.border.default}`, borderRadius: radii.lg, padding: mobile ? space[4] : space[5], marginTop: mobile ? space[3] : space[4] }}>
-          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.amber[400], marginBottom: space[4] }}>Trust Score (PoQ)</div>
+          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.amber[400], marginBottom: space[4] }}>Trust Score</div>
 
           <div style={{ display: "flex", alignItems: "center", gap: mobile ? 16 : 24, marginBottom: space[4], flexWrap: "wrap" }}>
             <div style={{ textAlign: "center" }}>
@@ -129,9 +129,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
 
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: mobile ? space[2] : space[3] }}>
             {[
-              ["Total Staked", formatICP(reputation.totalStaked) + " ICP", colors.amber[400]],
+              ["Total Deposited", formatICP(reputation.totalStaked) + " ICP", colors.amber[400]],
               ["Returned", formatICP(reputation.totalReturned) + " ICP", colors.green[400]],
-              ["Slashed", formatICP(reputation.totalSlashed) + " ICP", colors.orange[400]],
+              ["Forfeited", formatICP(reputation.totalSlashed) + " ICP", colors.orange[400]],
               ["Return Rate", returnRate(reputation), colors.sky[400]],
             ].map(([l, v, c]) => (
               <div key={l} style={{ textAlign: "center", padding: `${space[3]}px ${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
@@ -148,7 +148,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
             </div>
             <div style={{ flex: 1, textAlign: "center", padding: `${space[2]}px`, background: "rgba(248,113,113,0.06)", borderRadius: radii.sm }}>
               <div style={{ fontSize: mobile ? t.h2.mobileSz : t.h2.size, fontWeight: 700, color: colors.orange[400], fontFamily: fonts.mono }}>{reputation.slopSignals.toString()}</div>
-              <div style={{ ...kpiLabelStyle }}>Slop Signals</div>
+              <div style={{ ...kpiLabelStyle }}>Flagged Signals</div>
             </div>
           </div>
         </div>

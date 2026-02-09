@@ -1,15 +1,19 @@
+import Array "mo:base/Array";
 import Blob "mo:base/Blob";
 import Buffer "mo:base/Buffer";
+import ExperimentalCycles "mo:base/ExperimentalCycles";
 import Float "mo:base/Float";
 import HashMap "mo:base/HashMap";
 import Int "mo:base/Int";
 import Iter "mo:base/Iter";
 import Nat "mo:base/Nat";
 import Nat8 "mo:base/Nat8";
+import Nat64 "mo:base/Nat64";
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
+import Timer "mo:base/Timer";
 
 import CertifiedCache "mo:certified-cache";
 import HTTP "mo:certified-cache/Http";
@@ -31,6 +35,15 @@ persistent actor AegisBackend {
   let MAX_STAKE : Nat = 100_000_000; // 1.0 ICP maximum
   let VALIDATE_THRESHOLD : Nat = 3; // Validations needed to return stake
   let FLAG_THRESHOLD : Nat = 3; // Flags needed to slash stake
+
+  // ──────────────────────────────────────
+  // Non-custodial: protocol wallet + cycles top-up
+  // ──────────────────────────────────────
+
+  let PROTOCOL_WALLET : Principal = Principal.fromText("lg3sn-xvuag-vrcgb-xkhyo-4tlui-dw23v-sgtz3-573c7-obhuo-apcx6-uqe");
+  let CMC : Ledger.CMCActor = actor "rkp4c-7iaaa-aaaaa-aaaca-cai";
+  let CYCLES_THRESHOLD : Nat = 2_000_000_000_000; // 2T cycles — below this, top up from revenue
+  let TPUP_MEMO : Blob = "\54\50\55\50\00\00\00\00"; // "TPUP" as little-endian u64
 
   // ──────────────────────────────────────
   // Stable storage for upgrades
@@ -600,6 +613,63 @@ persistent actor AegisBackend {
     });
   };
 
+  // ──────────────────────────────────────
+  // Non-custodial revenue distribution
+  // ──────────────────────────────────────
+
+  /// Convert a Principal to a 32-byte subaccount (for CMC top-up addressing).
+  func principalToSubaccount(p : Principal) : Blob {
+    let pb = Blob.toArray(Principal.toBlob(p));
+    let sub = Array.init<Nat8>(32, 0 : Nat8);
+    sub[0] := Nat8.fromNat(pb.size());
+    var i = 0;
+    while (i < pb.size()) { sub[i + 1] := pb[i]; i += 1 };
+    Blob.fromArray(Array.freeze(sub));
+  };
+
+  /// Distribute protocol revenue: if cycles are low, convert ICP to cycles via CMC;
+  /// otherwise send ICP to the hardcoded PROTOCOL_WALLET.
+  func distributeProtocolRevenue(amount : Nat) : async () {
+    let net = if (amount > ICP_FEE) { amount - ICP_FEE } else { 0 };
+    if (net == 0) return;
+
+    if (ExperimentalCycles.balance() < CYCLES_THRESHOLD) {
+      // Cycles low → convert this revenue to cycles via CMC
+      try {
+        let xferResult = await ICP_LEDGER.icrc1_transfer({
+          from_subaccount = null;
+          to = { owner = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
+                 subaccount = ?principalToSubaccount(Principal.fromActor(AegisBackend)) };
+          amount = net;
+          fee = ?ICP_FEE;
+          memo = ?TPUP_MEMO;
+          created_at_time = null;
+        });
+        switch (xferResult) {
+          case (#Ok(blockIdx)) {
+            ignore await CMC.notify_top_up({
+              block_index = Nat64.fromNat(blockIdx);
+              canister_id = Principal.fromActor(AegisBackend);
+            });
+          };
+          case (#Err(_)) {}; // Transfer failed; funds stay for sweepProtocolFees
+        };
+      } catch (_e) {};
+    } else {
+      // Cycles sufficient → send to protocol wallet
+      try {
+        ignore await ICP_LEDGER.icrc1_transfer({
+          from_subaccount = null;
+          to = { owner = PROTOCOL_WALLET; subaccount = null };
+          amount = net;
+          fee = ?ICP_FEE;
+          memo = null;
+          created_at_time = null;
+        });
+      } catch (_e) {}; // Failed; remains for sweepProtocolFees
+    };
+  };
+
   /// Publish a signal with ICP stake attached.
   /// The caller must have previously approved this canister to transfer `stakeAmount` via icrc2_approve.
   public shared(msg) func publishWithStake(signal : Types.PublishedSignal, stakeAmount : Nat) : async Result.Result<Text, Text> {
@@ -785,8 +855,8 @@ persistent actor AegisBackend {
     #ok(true);
   };
 
-  /// Community flag: vote that a staked signal is slop.
-  /// When flagCount reaches threshold, stake is slashed (kept by protocol treasury).
+  /// Community flag: vote that a staked signal is low quality.
+  /// When flagCount reaches threshold, deposit is forfeited (auto-distributed).
   public shared(msg) func flagSignal(signalId : Text) : async Result.Result<Bool, Text> {
     let caller = msg.caller;
     assert(requireAuth(caller));
@@ -833,9 +903,13 @@ persistent actor AegisBackend {
       return #ok(false);
     };
 
-    // Threshold reached: slash stake (stays in canister as treasury)
+    // Threshold reached: forfeit stake (auto-distribute to protocol wallet or cycles)
     putStakeUpdate(stakeId, stake, #slashed, stake.validationCount, newCount, ?Time.now());
     resolveReputation(stake.owner, 0, 1, 0, stake.amount);
+
+    // Auto-distribute forfeited deposit
+    await distributeProtocolRevenue(stake.amount);
+
     #ok(true);
   };
 
@@ -857,7 +931,7 @@ persistent actor AegisBackend {
   // ──────────────────────────────────────
 
   /// Record a D2A match and collect fee from receiver.
-  /// Fee split: 80% to sender, 20% to protocol treasury.
+  /// Fee split: 80% to content provider, 20% auto-distributed (cycles top-up or protocol wallet).
   /// The receiver must have icrc2_approved this canister before calling.
   public shared(msg) func recordD2AMatch(
     matchId : Text,
@@ -928,9 +1002,12 @@ persistent actor AegisBackend {
           created_at_time = null;
         });
       } catch (_e) {
-        // Sender payout failed; funds remain in canister for manual recovery
+        // Sender payout failed; funds remain in canister for sweepProtocolFees
       };
     };
+
+    // Distribute protocol's 20% share (cycles top-up or protocol wallet)
+    await distributeProtocolRevenue(protocolPayout);
 
     #ok(matchId);
   };
@@ -1003,11 +1080,11 @@ persistent actor AegisBackend {
   };
 
   // ──────────────────────────────────────
-  // Treasury Management (controller-only)
+  // Treasury (non-custodial — no operator withdrawal)
   // ──────────────────────────────────────
 
-  /// Sum of all active (pending) stakes — these funds must be reserved
-  /// for potential returns and must NOT be withdrawn.
+  /// Sum of all active (pending) deposits — these funds must be reserved
+  /// for potential returns and must NOT be distributed.
   func calcActiveStakeTotal() : Nat {
     var total : Nat = 0;
     for ((_, stake) in stakes.entries()) {
@@ -1019,8 +1096,7 @@ persistent actor AegisBackend {
     total;
   };
 
-  /// Get the canister's total ICP balance.
-  /// Anyone can call this for transparency.
+  /// Get the canister's total ICP balance (transparency).
   public shared func getTreasuryBalance() : async Nat {
     await ICP_LEDGER.icrc1_balance_of({
       owner = Principal.fromActor(AegisBackend);
@@ -1028,67 +1104,44 @@ persistent actor AegisBackend {
     });
   };
 
-  /// Get the confirmed revenue that can be safely withdrawn.
-  /// = Total ICP balance − active stakes (reserved for returns).
-  /// Anyone can call this for transparency.
-  public shared func getWithdrawableBalance() : async Nat {
+  /// Sweep any accumulated surplus to protocol wallet or cycles.
+  /// Anyone can call this — no controller restriction.
+  public shared func sweepProtocolFees() : async Result.Result<Text, Text> {
     let totalBalance = await ICP_LEDGER.icrc1_balance_of({
-      owner = Principal.fromActor(AegisBackend);
-      subaccount = null;
+      owner = Principal.fromActor(AegisBackend); subaccount = null;
     });
     let reserved = calcActiveStakeTotal();
-    if (totalBalance > reserved) { totalBalance - reserved } else { 0 };
+    let surplus = if (totalBalance > reserved + ICP_FEE) { totalBalance - reserved - ICP_FEE } else { 0 };
+    if (surplus == 0) { return #err("No surplus to sweep") };
+    await distributeProtocolRevenue(surplus + ICP_FEE);
+    #ok("Processed " # Nat.toText(surplus) # " e8s surplus");
   };
 
-  /// Withdraw ICP from the canister treasury.
-  /// Only the canister controller can call this.
-  /// Amount is capped at withdrawable balance (total − active stakes).
-  public shared(msg) func withdrawTreasury(to : Principal, amount : Nat) : async Result.Result<Nat, Text> {
-    let caller = msg.caller;
-    if (not Principal.isController(caller)) {
-      return #err("Only controller can withdraw");
-    };
-    if (amount == 0) {
-      return #err("Amount must be greater than zero");
-    };
-
-    // Safety: check amount does not exceed withdrawable balance
+  /// Manually trigger cycles top-up from surplus ICP. Anyone can call.
+  public shared func topUpCycles() : async Result.Result<Text, Text> {
     let totalBalance = await ICP_LEDGER.icrc1_balance_of({
-      owner = Principal.fromActor(AegisBackend);
-      subaccount = null;
+      owner = Principal.fromActor(AegisBackend); subaccount = null;
     });
     let reserved = calcActiveStakeTotal();
-    let withdrawable = if (totalBalance > reserved) { totalBalance - reserved } else { 0 };
-    if (amount > withdrawable) {
-      return #err("Amount exceeds withdrawable balance (" # Nat.toText(withdrawable) # " e8s). " #
-                   Nat.toText(reserved) # " e8s reserved for active stakes.");
-    };
+    let surplus = if (totalBalance > reserved + ICP_FEE) { totalBalance - reserved - ICP_FEE } else { 0 };
+    if (surplus == 0) { return #err("No surplus ICP available") };
+    await distributeProtocolRevenue(surplus + ICP_FEE);
+    #ok("Processed " # Nat.toText(surplus) # " e8s surplus");
+  };
 
-    let transferResult = try {
-      await ICP_LEDGER.icrc1_transfer({
-        from_subaccount = null;
-        to = { owner = to; subaccount = null };
-        amount = amount;
-        fee = ?ICP_FEE;
-        memo = null;
-        created_at_time = null;
-      });
-    } catch (_e) {
-      return #err("Ledger transfer failed");
-    };
-
-    switch (transferResult) {
-      case (#Ok(blockIndex)) { #ok(blockIndex) };
-      case (#Err(err)) {
-        let errMsg = switch (err) {
-          case (#InsufficientFunds(_)) { "Insufficient treasury balance" };
-          case (#BadFee(_)) { "Bad fee" };
-          case (_) { "Transfer rejected" };
-        };
-        #err(errMsg);
-      };
+  // Monthly maintenance timer: sweep surplus & top-up cycles every 30 days
+  func monthlyMaintenance() : async () {
+    let totalBalance = await ICP_LEDGER.icrc1_balance_of({
+      owner = Principal.fromActor(AegisBackend); subaccount = null;
+    });
+    let reserved = calcActiveStakeTotal();
+    let surplus = if (totalBalance > reserved + ICP_FEE) { totalBalance - reserved - ICP_FEE } else { 0 };
+    if (surplus > 0) {
+      await distributeProtocolRevenue(surplus + ICP_FEE);
     };
   };
+
+  ignore Timer.recurringTimer<system>(#seconds(30 * 24 * 60 * 60), monthlyMaintenance);
 
   // ──────────────────────────────────────
   // IC LLM Analysis (on-chain scoring)

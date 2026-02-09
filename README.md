@@ -1,6 +1,6 @@
 # Aegis — D2A Social Agent Network
 
-Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol — with on-chain monetization via ICP staking and D2A match fees.
+Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol — with on-chain quality assurance deposits and D2A content provision fees.
 
 ## Live
 
@@ -18,7 +18,7 @@ Browser                                  Internet Computer (Mainnet)
 │    Dashboard / Briefing / Burn    │◄──►│  - Evaluation storage    │
 │    Sources / Analytics            │    │  - User profiles         │
 │                                   │    │  - Source configs         │
-│  API Routes:                      │    │  - PoQ staking/reputation│
+│  API Routes:                      │    │  - Quality deposits/rep  │
 │    POST /api/analyze              │    │  - D2A match records     │
 │    POST /api/fetch/{url,rss,      │    │  - IC LLM scoring       │
 │         twitter,nostr}            │    │  - Engagement index      │
@@ -28,8 +28,8 @@ Browser                                  Internet Computer (Mainnet)
 │    Briefing ranker                │    ┌─────────▼────────────────┐
 │    Nostr identity (IC-derived)    │    │  ICP Ledger (ICRC-1/2)   │
 │    D2A agent manager              │    │  ryjl3-tyaaa-aaaaa-aaaba │
-│    ICP Ledger (stake/approve)     │    │  Stake hold / return /   │
-│                                   │    │  slash / D2A fee split   │
+│    ICP Ledger (deposit/approve)   │    │  Deposit hold / return / │
+│                                   │    │  forfeit / D2A fee split │
 │                                   │    └──────────────────────────┘
 │                                   │
 │                                   │    Nostr Relays
@@ -140,34 +140,40 @@ Aegis implements a sustainable economic model using ICP tokens (ICRC-1/2) with t
 
 Free-tier scoring runs entirely on the Internet Computer. Premium Claude API scoring provides higher accuracy for users who supply their own API key.
 
-### Pillar 2: Proof of Quality (PoQ) Staking
+### Pillar 2: Quality Assurance Deposits (Non-Custodial)
 
-When publishing a signal, users can **stake ICP** (0.001–1.0 ICP) to back their content quality claim. Community members vote to validate or flag staked signals:
+When publishing a signal, users deposit ICP (0.001–1.0 ICP) as a quality assurance bond. Community members vote to validate or flag signals through objective peer review:
 
 ```
-Publisher stakes 0.01 ICP
-  → 3 validates → Stake returned + Trust Score ↑ + Quality Signal count ↑
-  → 3 flags     → Stake slashed (kept by protocol) + Trust Score ↓ + Slop Signal count ↑
+Publisher deposits 0.01 ICP as quality bond
+  → 3 validates (community consensus) → Deposit returned + Trust Score updated
+  → 3 flags (community consensus)     → Deposit forfeited as quality assurance cost
 ```
 
-**ICRC-2 flow**: Client `icrc2_approve` → Canister `icrc2_transfer_from` (stake hold) → On resolution: `icrc1_transfer` (return) or retained (slash).
+**Quality determination process**: Content is first scored by AI (IC LLM or Claude) using objective metrics (originality, insight, credibility). Community peer review then requires a minimum of 3 independent votes to reach consensus. This two-layer process (AI scoring + community consensus) ensures objectivity.
 
-**Trust Score**: `T = 5.0 + (qualitySignals / totalSignals) × 5.0` — ranges 0–10. Starts at 5.0 (neutral). A user with 100% quality signals reaches 10.0.
+**Non-custodial design**: The canister operator has no withdrawal capability. Protocol revenue (forfeited deposits) is automatically distributed to a hardcoded protocol wallet or converted to cycles for canister operation. The canister only holds active deposits pending resolution. All code is [open source on GitHub](https://github.com/dwebxr/aegis).
+
+**ICRC-2 flow**: Client `icrc2_approve` → Canister `icrc2_transfer_from` (deposit hold) → On resolution: `icrc1_transfer` (return to depositor or auto-distribute).
+
+**Trust Score**: `T = 5.0 + (qualitySignals / totalSignals) × 5.0` — ranges 0–10. Starts at 5.0 (neutral).
 
 **Engagement Index**: `E = validationRatio × avgComposite` — measures how effectively a user's signals engage the community (0–10 scale).
 
-Double-voting is prevented by tracking voters per signal. Self-voting is blocked. Stake records and voter lists persist across canister upgrades.
+Double-voting is prevented by tracking voters per signal. Self-voting is blocked. Deposit records and voter lists persist across canister upgrades.
 
-### Pillar 3: D2A Precision Match Fee
+### Pillar 3: D2A Content Provision Fee
 
-When content is successfully delivered via the D2A protocol, a micro-fee is collected from the receiver:
+When content is successfully delivered via the D2A protocol, a content delivery fee is collected from the receiver:
 
 ```
 Content delivered via D2A
-  → Receiver pays 0.001 ICP match fee
-  → 80% (0.0008 ICP) → Content sender
-  → 20% (0.0002 ICP) → Protocol treasury (canister)
+  → Receiver pays 0.001 ICP content delivery fee
+  → 80% (0.0008 ICP) → Content provider (content provision fee)
+  → 20% (0.0002 ICP) → Auto-distributed (cycles top-up or protocol wallet)
 ```
+
+**Non-custodial**: The 20% protocol share is immediately distributed — either converted to cycles (if canister cycles are below threshold) or sent to the hardcoded protocol wallet. No funds accumulate in the canister beyond active deposits.
 
 The receiver pre-approves the canister for a blanket allowance (0.1 ICP ≈ 100 matches) when the agent starts. Fees are collected automatically via `icrc2_transfer_from` and distributed via `icrc1_transfer`.
 
@@ -305,16 +311,17 @@ The receiving agent applies a final resonance check (≥ 0.1) before injecting t
 - **Tier 3**: Heuristic fallback — local, instant, no network call
 - Automatic fallback: each tier falls through to the next on failure
 
-### Proof of Quality (PoQ) Staking
-- Stake 0.001–1.0 ICP when publishing signals to back your quality claim
-- Community validation: 3 validates → stake returned + trust boost
-- Community flagging: 3 flags → stake slashed + trust penalty
+### Quality Assurance Deposits
+- Deposit 0.001–1.0 ICP when publishing signals as a quality assurance bond
+- Community validation: 3 validates (consensus) → deposit returned + trust score updated
+- Community flagging: 3 flags (consensus) → deposit forfeited as quality assurance cost
 - Trust Score gauge (0–10) and Engagement Index in Analytics dashboard
+- Non-custodial: forfeited deposits auto-distributed, no operator withdrawal
 - ICRC-2 approve/transfer_from pattern with pre-debit rollback safety
 
-### D2A Match Fee
-- Automatic micro-fee (0.001 ICP) on successful D2A content delivery
-- 80/20 split: 80% to content sender, 20% to protocol treasury
+### D2A Content Provision Fee
+- Automatic content delivery fee (0.001 ICP) on successful D2A delivery
+- 80/20 split: 80% to content provider, 20% auto-distributed (cycles or protocol wallet)
 - Blanket ICRC-2 pre-approval on agent start (0.1 ICP ≈ 100 matches)
 - IC principal included in presence broadcast for on-chain fee settlement
 
@@ -423,7 +430,7 @@ aegis/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
 │       ├── types.mo                     # Type definitions (incl. StakeRecord, UserReputation, D2AMatchRecord)
-│       ├── ledger.mo                    # ICRC-1/2 ICP Ledger interface module
+│       ├── ledger.mo                    # ICRC-1/2 ICP Ledger + CMC interface module
 │       └── aegis_backend.did            # Candid interface
 ├── public/                              # Icons (apple-touch-icon, favicons, PWA)
 ├── mops.toml                            # Motoko package manager (mo:llm, mo:json)
@@ -508,8 +515,26 @@ service : {
   flagSignal : (text) -> (Result);
   recordD2AMatch : (text, principal, text, nat) -> (Result);
   analyzeOnChain : (text, vec text) -> (Result);
+
+  // Treasury (non-custodial — no operator withdrawal)
+  getTreasuryBalance : () -> (nat);                  // Transparency: anyone can check
+  sweepProtocolFees : () -> (Result);                // Anyone can trigger surplus distribution
+  topUpCycles : () -> (Result);                      // Anyone can trigger cycles top-up
 }
 ```
+
+## Non-Custodial Design
+
+Aegis follows a non-custodial architecture for all on-chain fund management:
+
+- **No operator withdrawal**: The `withdrawTreasury` function has been removed. The canister controller cannot withdraw user funds.
+- **Hardcoded distribution**: Protocol revenue is automatically sent to a hardcoded wallet address or converted to cycles. No configurable destinations.
+- **Active deposits only**: The canister only holds ICP for deposits pending community review. Once resolved (validated or flagged), funds are immediately distributed.
+- **Self-sustaining cycles**: When the canister's cycles balance drops below threshold, protocol revenue is automatically converted to cycles via the Cycles Minting Canister (CMC), with a 30-day recurring timer as fallback.
+- **Public sweep functions**: `sweepProtocolFees()` and `topUpCycles()` can be called by anyone — not restricted to the controller.
+- **Open source**: All canister code is publicly auditable on [GitHub](https://github.com/dwebxr/aegis).
+
+**Note**: The canister controller can still upgrade the code, which is a residual trust assumption. Full trustlessness would require controller renunciation or DAO governance.
 
 ## License
 

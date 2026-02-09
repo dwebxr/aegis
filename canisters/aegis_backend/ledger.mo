@@ -101,4 +101,25 @@ module {
     icrc2_transfer_from : shared (TransferFromArgs) -> async TransferFromResult;
     icrc2_allowance : shared query (AllowanceArgs) -> async Allowance;
   };
+
+  // ── Cycles Minting Canister (CMC) Types ──
+
+  public type NotifyTopUpArg = {
+    block_index : Nat64;
+    canister_id : Principal;
+  };
+
+  public type NotifyError = {
+    #Refunded : { reason : Text; block_index : ?Nat64 };
+    #Processing;
+    #TransactionTooOld : Nat64;
+    #InvalidTransaction : Text;
+    #Other : { error_code : Nat64; error_message : Text };
+  };
+
+  public type NotifyTopUpResult = { #Ok : Nat; #Err : NotifyError };
+
+  public type CMCActor = actor {
+    notify_top_up : shared (NotifyTopUpArg) -> async NotifyTopUpResult;
+  };
 };
