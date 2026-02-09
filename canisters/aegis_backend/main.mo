@@ -1147,7 +1147,20 @@ persistent actor AegisBackend {
   // Treasury Management (controller-only)
   // ──────────────────────────────────────
 
-  /// Get the canister's ICP balance (treasury).
+  /// Sum of all active (pending) stakes — these funds must be reserved
+  /// for potential returns and must NOT be withdrawn.
+  func calcActiveStakeTotal() : Nat {
+    var total : Nat = 0;
+    for ((_, stake) in stakes.entries()) {
+      switch (stake.status) {
+        case (#active) { total += stake.amount };
+        case (_) {};
+      };
+    };
+    total;
+  };
+
+  /// Get the canister's total ICP balance.
   /// Anyone can call this for transparency.
   public shared func getTreasuryBalance() : async Nat {
     await ICP_LEDGER.icrc1_balance_of({
@@ -1156,8 +1169,21 @@ persistent actor AegisBackend {
     });
   };
 
+  /// Get the confirmed revenue that can be safely withdrawn.
+  /// = Total ICP balance − active stakes (reserved for returns).
+  /// Anyone can call this for transparency.
+  public shared func getWithdrawableBalance() : async Nat {
+    let totalBalance = await ICP_LEDGER.icrc1_balance_of({
+      owner = Principal.fromActor(AegisBackend);
+      subaccount = null;
+    });
+    let reserved = calcActiveStakeTotal();
+    if (totalBalance > reserved) { totalBalance - reserved } else { 0 };
+  };
+
   /// Withdraw ICP from the canister treasury.
   /// Only the canister controller can call this.
+  /// Amount is capped at withdrawable balance (total − active stakes).
   public shared(msg) func withdrawTreasury(to : Principal, amount : Nat) : async Result.Result<Nat, Text> {
     let caller = msg.caller;
     if (not Principal.isController(caller)) {
@@ -1165,6 +1191,18 @@ persistent actor AegisBackend {
     };
     if (amount == 0) {
       return #err("Amount must be greater than zero");
+    };
+
+    // Safety: check amount does not exceed withdrawable balance
+    let totalBalance = await ICP_LEDGER.icrc1_balance_of({
+      owner = Principal.fromActor(AegisBackend);
+      subaccount = null;
+    });
+    let reserved = calcActiveStakeTotal();
+    let withdrawable = if (totalBalance > reserved) { totalBalance - reserved } else { 0 };
+    if (amount > withdrawable) {
+      return #err("Amount exceeds withdrawable balance (" # Nat.toText(withdrawable) # " e8s). " #
+                   Nat.toText(reserved) # " e8s reserved for active stakes.");
     };
 
     let transferResult = try {
