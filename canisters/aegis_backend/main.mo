@@ -1144,6 +1144,56 @@ persistent actor AegisBackend {
   };
 
   // ──────────────────────────────────────
+  // Treasury Management (controller-only)
+  // ──────────────────────────────────────
+
+  /// Get the canister's ICP balance (treasury).
+  /// Anyone can call this for transparency.
+  public shared func getTreasuryBalance() : async Nat {
+    await ICP_LEDGER.icrc1_balance_of({
+      owner = Principal.fromActor(AegisBackend);
+      subaccount = null;
+    });
+  };
+
+  /// Withdraw ICP from the canister treasury.
+  /// Only the canister controller can call this.
+  public shared(msg) func withdrawTreasury(to : Principal, amount : Nat) : async Result.Result<Nat, Text> {
+    let caller = msg.caller;
+    if (not Principal.isController(caller)) {
+      return #err("Only controller can withdraw");
+    };
+    if (amount == 0) {
+      return #err("Amount must be greater than zero");
+    };
+
+    let transferResult = try {
+      await ICP_LEDGER.icrc1_transfer({
+        from_subaccount = null;
+        to = { owner = to; subaccount = null };
+        amount = amount;
+        fee = ?ICP_FEE;
+        memo = null;
+        created_at_time = null;
+      });
+    } catch (_e) {
+      return #err("Ledger transfer failed");
+    };
+
+    switch (transferResult) {
+      case (#Ok(blockIndex)) { #ok(blockIndex) };
+      case (#Err(err)) {
+        let errMsg = switch (err) {
+          case (#InsufficientFunds(_)) { "Insufficient treasury balance" };
+          case (#BadFee(_)) { "Bad fee" };
+          case (_) { "Transfer rejected" };
+        };
+        #err(errMsg);
+      };
+    };
+  };
+
+  // ──────────────────────────────────────
   // IC LLM Analysis (on-chain scoring)
   // ──────────────────────────────────────
 

@@ -131,6 +131,8 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     recordD2AMatch: IDL.Func([IDL.Text, IDL.Principal, IDL.Text, IDL.Nat], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })], []),
     getUserD2AMatches: IDL.Func([IDL.Principal, IDL.Nat, IDL.Nat], [IDL.Vec(D2AMatchRecord)], ["query"]),
     getEngagementIndex: IDL.Func([IDL.Principal], [IDL.Float64], ["query"]),
+    getTreasuryBalance: IDL.Func([], [IDL.Nat], []),
+    withdrawTreasury: IDL.Func([IDL.Principal, IDL.Nat], [IDL.Variant({ ok: IDL.Nat, err: IDL.Text })], []),
     analyzeOnChain: IDL.Func([IDL.Text, IDL.Vec(IDL.Text)], [AnalyzeResult], []),
   });
 };
