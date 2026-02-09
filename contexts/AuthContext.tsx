@@ -57,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await new Promise<void>((resolve, reject) => {
       authClient.login({
         identityProvider: getInternetIdentityUrl(),
+        derivationOrigin: "https://aegis-kappa-eight.vercel.app",
         maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1_000_000_000),
         onSuccess: () => {
           const id = authClient.getIdentity();
