@@ -5,3 +5,4 @@ version = "0.1.0"
 [dependencies]
 llm = "2.1.0"
 json = "1.4.0"
+certified-cache = "0.3.0"

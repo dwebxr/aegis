@@ -15,6 +15,11 @@ export function getCanisterId(): string {
   return (process.env.NEXT_PUBLIC_CANISTER_ID || "rluf3-eiaaa-aaaam-qgjuq-cai").trim();
 }
 
+export function getDerivationOrigin(): string | undefined {
+  if (isLocal) return undefined;
+  return `https://${getCanisterId()}.icp0.io`;
+}
+
 export function createAgent(identity?: Identity): HttpAgent {
   const agent = HttpAgent.createSync({
     host: getHost(),

@@ -1,3 +1,4 @@
+import Blob "mo:base/Blob";
 import Buffer "mo:base/Buffer";
 import Float "mo:base/Float";
 import HashMap "mo:base/HashMap";
@@ -10,6 +11,8 @@ import Result "mo:base/Result";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 
+import CertifiedCache "mo:certified-cache";
+import HTTP "mo:certified-cache/Http";
 import Json "mo:json";
 import LLM "mo:llm";
 
@@ -69,6 +72,28 @@ persistent actor AegisBackend {
   transient var ownerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
 
   // ──────────────────────────────────────
+  // II Alternative Origins (certified HTTP)
+  // ──────────────────────────────────────
+
+  let II_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
+  let II_ORIGINS_BODY : Blob = Text.encodeUtf8(
+    "{\"alternativeOrigins\":[\"https://aegis.dwebxr.xyz\",\"https://aegis-kappa-eight.vercel.app\"]}"
+  );
+
+  transient var certCache = CertifiedCache.CertifiedCache<Text, Blob>(
+    4, Text.equal, Text.hash,
+    Text.encodeUtf8,
+    func(b : Blob) : Blob { b },
+    365 * 24 * 60 * 60 * 1_000_000_000
+  );
+
+  func initCertCache() {
+    certCache.put(II_ORIGINS_PATH, II_ORIGINS_BODY, null);
+  };
+
+  initCertCache();
+
+  // ──────────────────────────────────────
   // Upgrade hooks
   // ──────────────────────────────────────
 
@@ -122,6 +147,7 @@ persistent actor AegisBackend {
       signalVoters.put(signalId, buf);
     };
     stableSignalVoters := [];
+    initCertCache();
   };
 
   // ──────────────────────────────────────
@@ -1213,5 +1239,46 @@ persistent actor AegisBackend {
     };
 
     parseAnalysisResponse(response);
+  };
+
+  // ──────────────────────────────────────
+  // HTTP Interface (II alternative origins)
+  // ──────────────────────────────────────
+
+  public query func http_request(req : HTTP.HttpRequest) : async HTTP.HttpResponse {
+    if (req.url == II_ORIGINS_PATH or Text.startsWith(req.url, #text(II_ORIGINS_PATH # "?"))) {
+      switch (certCache.get(II_ORIGINS_PATH)) {
+        case (?body) {
+          return {
+            status_code = 200 : Nat16;
+            headers = [
+              ("content-type", "application/json"),
+              ("access-control-allow-origin", "*"),
+              certCache.certificationHeader(II_ORIGINS_PATH),
+            ];
+            body = body;
+            streaming_strategy = null;
+            upgrade = null;
+          };
+        };
+        case null {
+          return {
+            status_code = 500 : Nat16;
+            headers = [];
+            body = Text.encodeUtf8("Cache not initialized");
+            streaming_strategy = null;
+            upgrade = null;
+          };
+        };
+      };
+    };
+
+    {
+      status_code = 404 : Nat16;
+      headers = [];
+      body = Text.encodeUtf8("Not found");
+      streaming_strategy = null;
+      upgrade = null;
+    };
   };
 };

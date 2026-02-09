@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { AuthClient } from "@dfinity/auth-client";
 import type { Identity } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
-import { getInternetIdentityUrl } from "@/lib/ic/agent";
+import { getInternetIdentityUrl, getDerivationOrigin } from "@/lib/ic/agent";
 import { useNotify } from "./NotificationContext";
 
 interface AuthState {
@@ -57,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await new Promise<void>((resolve, reject) => {
       authClient.login({
         identityProvider: getInternetIdentityUrl(),
+        derivationOrigin: getDerivationOrigin(),
         maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1_000_000_000),
         onSuccess: () => {
           const id = authClient.getIdentity();
