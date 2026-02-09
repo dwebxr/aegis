@@ -199,7 +199,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated, preferenceCallbacks]);
 
   const addContent = useCallback((item: ContentItem) => {
-    setContent(prev => [item, ...prev]);
+    setContent(prev => {
+      // Deduplicate by sourceUrl (URL/RSS) or by text (manual/nostr)
+      if (item.sourceUrl && prev.some(c => c.sourceUrl === item.sourceUrl)) return prev;
+      if (!item.sourceUrl && prev.some(c => c.text === item.text)) return prev;
+      return [item, ...prev];
+    });
   }, []);
 
   const syncToIC = useCallback(async () => {

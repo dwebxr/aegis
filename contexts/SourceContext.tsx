@@ -11,7 +11,7 @@ interface SourceState {
   sources: SavedSource[];
   syncStatus: "idle" | "syncing" | "synced" | "error";
   syncError: string;
-  addSource: (source: Omit<SavedSource, "id" | "createdAt">) => void;
+  addSource: (source: Omit<SavedSource, "id" | "createdAt">) => boolean;
   removeSource: (id: string) => void;
   toggleSource: (id: string) => void;
   updateSource: (id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => void;
@@ -22,7 +22,7 @@ const SourceContext = createContext<SourceState>({
   sources: [],
   syncStatus: "idle",
   syncError: "",
-  addSource: () => {},
+  addSource: () => false,
   removeSource: () => {},
   toggleSource: () => {},
   updateSource: () => {},
@@ -157,7 +157,15 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     if (pt) saveSources(pt, next);
   }, []);
 
-  const addSource = useCallback((partial: Omit<SavedSource, "id" | "createdAt">) => {
+  const addSource = useCallback((partial: Omit<SavedSource, "id" | "createdAt">): boolean => {
+    // Duplicate check: same feedUrl (RSS) or same relays (Nostr)
+    const existing = sourcesRef.current;
+    if (partial.type === "rss" && partial.feedUrl) {
+      if (existing.some(s => s.type === "rss" && s.feedUrl === partial.feedUrl)) return false;
+    } else if (partial.type === "nostr" && partial.relays) {
+      const key = [...partial.relays].sort().join(",");
+      if (existing.some(s => s.type === "nostr" && s.relays && [...s.relays].sort().join(",") === key)) return false;
+    }
     const source: SavedSource = { ...partial, id: uuidv4(), createdAt: Date.now() };
     setSources(prev => {
       const next = [...prev, source];
@@ -165,6 +173,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     saveToIC(source);
+    return true;
   }, [persist]);
 
   const removeSource = useCallback((id: string) => {

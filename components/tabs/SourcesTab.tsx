@@ -43,6 +43,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const [nostrResult, setNostrResult] = useState<FetchNostrResponse | null>(null);
   const [nostrLoading, setNostrLoading] = useState(false);
   const [nostrError, setNostrError] = useState("");
+  const [analyzedUrls, setAnalyzedUrls] = useState<Set<string>>(new Set());
 
   const fetchUrl = async () => {
     if (!urlInput.trim()) return;
@@ -89,9 +90,17 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     } catch { setNostrError("Network error — check connection"); } finally { setNostrLoading(false); }
   };
 
+  const handleAnalyzeOnce = async (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => {
+    const key = meta?.sourceUrl || text.slice(0, 200);
+    if (analyzedUrls.has(key)) return;
+    setAnalyzedUrls(prev => new Set(prev).add(key));
+    return onAnalyze(text, meta);
+  };
+
   const handleSaveRss = () => {
     if (!rssResult) return;
-    addSource({ type: "rss", label: rssResult.feedTitle || rssInput, feedUrl: rssInput, enabled: true });
+    const added = addSource({ type: "rss", label: rssResult.feedTitle || rssInput, feedUrl: rssInput, enabled: true });
+    if (!added) { setRssError("This feed is already saved"); return; }
     setRssInput(""); setRssResult(null);
   };
 
@@ -100,7 +109,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     const pubkeys = nostrPubkeys.split("\n").map(p => p.trim()).filter(Boolean);
     if (relays.length === 0) return;
     const label = pubkeys.length > 0 ? `Nostr (${pubkeys.length} keys)` : `Nostr (${relays.length} relays)`;
-    addSource({ type: "nostr", label, relays, pubkeys, enabled: true });
+    const added = addSource({ type: "nostr", label, relays, pubkeys, enabled: true });
+    if (!added) { setNostrError("This relay config is already saved"); return; }
   };
 
   const startEdit = (s: typeof sources[number]) => {
@@ -436,8 +446,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   </div>
                 </div>
                 <div style={{ fontSize: t.body.mobileSz, color: colors.text.tertiary, lineHeight: 1.6, maxHeight: 200, overflow: "auto", marginBottom: space[3] }}>{urlResult.content.slice(0, 1000)}{urlResult.content.length > 1000 ? "..." : ""}</div>
-                <button onClick={() => onAnalyze(urlResult.content, { sourceUrl: urlInput, imageUrl: urlResult.imageUrl })} disabled={isAnalyzing} style={btnStyle(isAnalyzing, isAnalyzing)}>
-                  {isAnalyzing ? "Analyzing..." : "Analyze This Content"}
+                <button onClick={() => handleAnalyzeOnce(urlResult.content, { sourceUrl: urlInput, imageUrl: urlResult.imageUrl })} disabled={isAnalyzing || analyzedUrls.has(urlInput)} style={btnStyle(isAnalyzing || analyzedUrls.has(urlInput), isAnalyzing)}>
+                  {analyzedUrls.has(urlInput) ? "Already Analyzed" : isAnalyzing ? "Analyzing..." : "Analyze This Content"}
                 </button>
               </div>
             )}
@@ -482,8 +492,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                       )}
                       <div style={{ fontSize: t.caption.size, color: colors.text.muted }}>{item.author} &middot; {item.publishedDate}</div>
                     </div>
-                    <button onClick={() => onAnalyze(item.content || item.title, { sourceUrl: item.link || undefined, imageUrl: item.imageUrl })} disabled={isAnalyzing} style={{ ...btnStyle(isAnalyzing, false), padding: `6px ${space[3]}px`, fontSize: t.caption.size, flexShrink: 0 }}>
-                      Analyze
+                    <button onClick={() => handleAnalyzeOnce(item.content || item.title, { sourceUrl: item.link || undefined, imageUrl: item.imageUrl })} disabled={isAnalyzing || !!(item.link && analyzedUrls.has(item.link))} style={{ ...btnStyle(isAnalyzing || !!(item.link && analyzedUrls.has(item.link)), false), padding: `6px ${space[3]}px`, fontSize: t.caption.size, flexShrink: 0 }}>
+                      {item.link && analyzedUrls.has(item.link) ? "Done" : "Analyze"}
                     </button>
                   </div>
                 ))}
@@ -516,8 +526,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                         <div style={{ fontSize: t.body.mobileSz, color: colors.text.tertiary, lineHeight: 1.5, marginTop: space[1] }}>{tweet.text}</div>
                         <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: space[1] }}>{tweet.createdAt}</div>
                       </div>
-                      <button onClick={() => onAnalyze(tweet.text)} disabled={isAnalyzing} style={{ ...btnStyle(isAnalyzing, false), padding: `6px ${space[3]}px`, fontSize: t.caption.size }}>
-                        Analyze
+                      <button onClick={() => handleAnalyzeOnce(tweet.text)} disabled={isAnalyzing || analyzedUrls.has(tweet.text.slice(0, 200))} style={{ ...btnStyle(isAnalyzing || analyzedUrls.has(tweet.text.slice(0, 200)), false), padding: `6px ${space[3]}px`, fontSize: t.caption.size }}>
+                        {analyzedUrls.has(tweet.text.slice(0, 200)) ? "Done" : "Analyze"}
                       </button>
                     </div>
                   </div>
@@ -555,8 +565,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                         <div style={{ fontSize: t.body.mobileSz, color: colors.text.tertiary, lineHeight: 1.5, marginTop: space[1] }}>{event.content}</div>
                         <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: space[1] }}>{new Date(event.createdAt * 1000).toLocaleString()}</div>
                       </div>
-                      <button onClick={() => onAnalyze(event.content)} disabled={isAnalyzing} style={{ ...btnStyle(isAnalyzing, false), padding: `6px ${space[3]}px`, fontSize: t.caption.size }}>
-                        Analyze
+                      <button onClick={() => handleAnalyzeOnce(event.content)} disabled={isAnalyzing || analyzedUrls.has(event.content.slice(0, 200))} style={{ ...btnStyle(isAnalyzing || analyzedUrls.has(event.content.slice(0, 200)), false), padding: `6px ${space[3]}px`, fontSize: t.caption.size }}>
+                        {analyzedUrls.has(event.content.slice(0, 200)) ? "Done" : "Analyze"}
                       </button>
                     </div>
                   </div>
