@@ -4,7 +4,7 @@ Content quality filter that learns your taste, curates a zero-noise briefing, pu
 
 ## Live
 
-- **Frontend**: https://aegis-kappa-eight.vercel.app
+- **Frontend**: https://aegis.dwebxr.xyz
 - **Backend Canister**: [`rluf3-eiaaa-aaaam-qgjuq-cai`](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=rluf3-eiaaa-aaaam-qgjuq-cai)
 
 ## Architecture
