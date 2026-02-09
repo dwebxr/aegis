@@ -1,5 +1,6 @@
 export interface AgentProfile {
   nostrPubkey: string;
+  principalId?: string; // IC principal text, included in presence broadcast
   interests: string[];
   capacity: number; // how many items this agent can accept per cycle
   lastSeen: number;
@@ -53,4 +54,5 @@ export interface AgentState {
   activeHandshakes: HandshakeState[];
   receivedItems: number;
   sentItems: number;
+  d2aMatchCount: number;
 }

@@ -7,7 +7,7 @@ import { relativeTime } from "@/lib/utils/scores";
 import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
-import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
+import type { _SERVICE, ContentSource, OnChainAnalysis } from "@/lib/ic/declarations";
 
 interface ContentState {
   content: ContentItem[];
@@ -96,19 +96,54 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const analyze = useCallback(async (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }): Promise<AnalyzeResponse> => {
     setIsAnalyzing(true);
     try {
-    const body: Record<string, unknown> = { text, source: "manual" };
-    if (userContext) body.userContext = userContext;
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      throw new Error(`Analyze API returned ${res.status}: ${res.statusText}`);
-    }
-    const data = await res.json();
+    let result: AnalyzeResponse | null = null;
 
-    const result: AnalyzeResponse = data.fallback || data;
+    // Tier 1: IC LLM via canister (free, on-chain)
+    if (actorRef.current && isAuthenticated) {
+      try {
+        const topics = userContext
+          ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
+          : [];
+        const icResult = await actorRef.current.analyzeOnChain(text.slice(0, 3000), topics);
+        if ("ok" in icResult) {
+          const a = icResult.ok;
+          result = {
+            originality: a.originality,
+            insight: a.insight,
+            credibility: a.credibility,
+            composite: a.compositeScore,
+            verdict: "quality" in a.verdict ? "quality" : "slop",
+            reason: a.reason,
+            topics: a.topics,
+            vSignal: a.vSignal.length > 0 ? a.vSignal[0] : undefined,
+            cContext: a.cContext.length > 0 ? a.cContext[0] : undefined,
+            lSlop: a.lSlop.length > 0 ? a.lSlop[0] : undefined,
+          };
+        }
+      } catch (err) {
+        console.warn("[analyze] IC LLM failed, falling back to API:", err instanceof Error ? err.message : "unknown");
+      }
+    }
+
+    // Tier 2: Claude API via /api/analyze (premium / fallback)
+    if (!result) {
+      const body: Record<string, unknown> = { text, source: "manual" };
+      if (userContext) body.userContext = userContext;
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        throw new Error(`Analyze API returned ${res.status}: ${res.statusText}`);
+      }
+      const data = await res.json();
+      result = data.fallback || data;
+    }
+
+    if (!result) {
+      throw new Error("Analysis failed: no result from IC LLM or API");
+    }
 
     const evaluation: ContentItem = {
       id: uuidv4(),

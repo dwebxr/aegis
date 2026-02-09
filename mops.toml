@@ -1,0 +1,7 @@
+[package]
+name = "aegis_backend"
+version = "0.1.0"
+
+[dependencies]
+llm = "2.1.0"
+json = "1.4.0"

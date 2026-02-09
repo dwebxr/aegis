@@ -1,23 +1,29 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { fonts } from "@/styles/theme";
 import { ScoreRing } from "./ScoreRing";
 import { scoreColor } from "@/lib/utils/scores";
+import { formatICP, MIN_STAKE, MAX_STAKE } from "@/lib/ic/icpLedger";
 import type { AnalyzeResponse } from "@/lib/types/api";
 
 interface SignalComposerProps {
-  onPublish: (text: string, scores: AnalyzeResponse) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
+  onPublish: (text: string, scores: AnalyzeResponse, stakeAmount?: bigint) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
   onAnalyze: (text: string) => Promise<AnalyzeResponse>;
   isAnalyzing: boolean;
   nostrPubkey: string | null;
+  icpBalance?: bigint | null;
+  stakingEnabled?: boolean;
   mobile?: boolean;
 }
 
-export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAnalyze, isAnalyzing, nostrPubkey, mobile }) => {
+export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAnalyze, isAnalyzing, nostrPubkey, icpBalance, stakingEnabled, mobile }) => {
   const [text, setText] = useState("");
   const [selfScore, setSelfScore] = useState<AnalyzeResponse | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<{ eventId: string | null; relaysPublished: string[] } | null>(null);
+  const [stakeEnabled, setStakeEnabled] = useState(false);
+  // Slider value in e8s steps: 100_000 (0.001) to 100_000_000 (1.0)
+  const [stakeE8s, setStakeE8s] = useState(1_000_000); // Default: 0.01 ICP
 
   const handleSelfEvaluate = async () => {
     if (!text.trim()) return;
@@ -25,13 +31,30 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
     setSelfScore(result);
   };
 
+  const effectiveStake = stakeEnabled ? BigInt(stakeE8s) : undefined;
+
   const handlePublish = async () => {
     if (!selfScore) return;
     setIsPublishing(true);
-    const result = await onPublish(text, selfScore);
-    setPublishResult(result);
-    setIsPublishing(false);
+    try {
+      const result = await onPublish(text, selfScore, effectiveStake);
+      setPublishResult(result);
+    } finally {
+      setIsPublishing(false);
+    }
   };
+
+  const maxStakeE8s = icpBalance != null
+    ? Number(icpBalance < MAX_STAKE ? icpBalance : MAX_STAKE)
+    : Number(MAX_STAKE);
+  const hasBalance = icpBalance != null && icpBalance >= MIN_STAKE;
+
+  // Clamp stakeE8s when max changes (e.g. balance drops)
+  useEffect(() => {
+    if (stakeE8s > maxStakeE8s) {
+      setStakeE8s(Math.max(Number(MIN_STAKE), maxStakeE8s));
+    }
+  }, [maxStakeE8s, stakeE8s]);
 
   const handleReset = () => {
     setText("");
@@ -117,36 +140,96 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
             {isAnalyzing ? "Evaluating..." : "Self-Evaluate"}
           </button>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <ScoreRing value={selfScore.composite} size={40} color={scoreColor(selfScore.composite)} />
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: selfScore.verdict === "quality" ? "#34d399" : "#f87171", textTransform: "uppercase" }}>
-                {selfScore.verdict}
-              </div>
-              {selfScore.topics && selfScore.topics.length > 0 && (
-                <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
-                  {selfScore.topics.map(t => (
-                    <span key={t} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(139,92,246,0.12)", color: "#a78bfa", fontWeight: 600 }}>{t}</span>
-                  ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <ScoreRing value={selfScore.composite} size={40} color={scoreColor(selfScore.composite)} />
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: selfScore.verdict === "quality" ? "#34d399" : "#f87171", textTransform: "uppercase" }}>
+                  {selfScore.verdict}
                 </div>
-              )}
+                {selfScore.topics && selfScore.topics.length > 0 && (
+                  <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
+                    {selfScore.topics.map(t => (
+                      <span key={t} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(139,92,246,0.12)", color: "#a78bfa", fontWeight: 600 }}>{t}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handlePublish}
+                disabled={isPublishing || (stakeEnabled && !hasBalance)}
+                style={{
+                  padding: mobile ? "10px 16px" : "10px 24px",
+                  background: isPublishing || (stakeEnabled && !hasBalance)
+                    ? "rgba(255,255,255,0.05)"
+                    : stakeEnabled
+                      ? "linear-gradient(135deg, #f59e0b, #ef4444)"
+                      : "linear-gradient(135deg, #34d399, #2563eb)",
+                  border: "none",
+                  borderRadius: 10,
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: isPublishing || (stakeEnabled && !hasBalance) ? "not-allowed" : "pointer",
+                  marginLeft: "auto",
+                }}
+              >
+                {isPublishing ? "Publishing..." : stakeEnabled ? `Stake & Publish` : "Publish Signal"}
+              </button>
             </div>
-            <button
-              onClick={handlePublish}
-              disabled={isPublishing}
-              style={{
-                padding: mobile ? "10px 16px" : "10px 24px",
-                background: isPublishing ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg, #34d399, #2563eb)",
-                border: "none",
+
+            {stakingEnabled && (
+              <div style={{
+                background: "rgba(245,158,11,0.06)",
+                border: "1px solid rgba(245,158,11,0.15)",
                 borderRadius: 10,
-                color: "#fff",
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: isPublishing ? "wait" : "pointer",
-              }}
-            >
-              {isPublishing ? "Publishing..." : "Publish Signal"}
-            </button>
+                padding: "10px 14px",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: stakeEnabled ? 8 : 0 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: "#f59e0b", fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={stakeEnabled}
+                      onChange={e => setStakeEnabled(e.target.checked)}
+                      style={{ accentColor: "#f59e0b" }}
+                    />
+                    Proof of Quality Stake
+                  </label>
+                  {icpBalance != null && (
+                    <span style={{ fontSize: 10, color: "#64748b", fontFamily: fonts.mono }}>
+                      Balance: {formatICP(icpBalance)} ICP
+                    </span>
+                  )}
+                </div>
+
+                {stakeEnabled && (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <input
+                        type="range"
+                        min={Number(MIN_STAKE)}
+                        max={maxStakeE8s}
+                        step={100_000}
+                        value={stakeE8s}
+                        onChange={e => setStakeE8s(Number(e.target.value))}
+                        style={{ flex: 1, accentColor: "#f59e0b" }}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b", fontFamily: fonts.mono, minWidth: 80, textAlign: "right" }}>
+                        {formatICP(BigInt(stakeE8s))} ICP
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>
+                      Stake ICP to back your signal. Validated = returned + trust. Flagged as slop = slashed.
+                    </div>
+                    {!hasBalance && (
+                      <div style={{ fontSize: 10, color: "#f87171", marginTop: 4, fontWeight: 600 }}>
+                        Insufficient ICP balance. Min: {formatICP(MIN_STAKE)} ICP
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

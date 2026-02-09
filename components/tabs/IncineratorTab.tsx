@@ -9,12 +9,14 @@ import type { AnalyzeResponse } from "@/lib/types/api";
 interface IncineratorTabProps {
   isAnalyzing: boolean;
   onAnalyze: (text: string) => Promise<AnalyzeResponse>;
-  onPublishSignal?: (text: string, scores: AnalyzeResponse) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
+  onPublishSignal?: (text: string, scores: AnalyzeResponse, stakeAmount?: bigint) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
   nostrPubkey?: string | null;
+  icpBalance?: bigint | null;
+  stakingEnabled?: boolean;
   mobile?: boolean;
 }
 
-export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, nostrPubkey, mobile }) => {
+export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, nostrPubkey, icpBalance, stakingEnabled, mobile }) => {
   const stages = [
     { id: "S1", name: "Heuristic Filter", active: isAnalyzing, color: colors.purple[400] },
     { id: "S2", name: "Structural", active: isAnalyzing, color: colors.sky[400] },
@@ -91,6 +93,8 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onA
             onAnalyze={onAnalyze}
             isAnalyzing={isAnalyzing}
             nostrPubkey={nostrPubkey || null}
+            icpBalance={icpBalance}
+            stakingEnabled={stakingEnabled}
             mobile={mobile}
           />
         </div>

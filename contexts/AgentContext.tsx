@@ -1,10 +1,16 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
 import { usePreferences } from "./PreferenceContext";
 import { useContent } from "./ContentContext";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { AgentManager } from "@/lib/agent/manager";
+import { D2A_MATCH_FEE, D2A_APPROVE_AMOUNT } from "@/lib/agent/protocol";
+import { createBackendActorAsync } from "@/lib/ic/actor";
+import { createICPLedgerActorAsync, ICP_FEE } from "@/lib/ic/icpLedger";
+import { getCanisterId } from "@/lib/ic/agent";
+import { Principal } from "@dfinity/principal";
 import type { AgentState } from "@/lib/agent/types";
 
 interface AgentContextValue {
@@ -20,6 +26,7 @@ const defaultState: AgentState = {
   activeHandshakes: [],
   receivedItems: 0,
   sentItems: 0,
+  d2aMatchCount: 0,
 };
 
 const AgentContext = createContext<AgentContextValue>({
@@ -29,7 +36,7 @@ const AgentContext = createContext<AgentContextValue>({
 });
 
 export function AgentProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, principalText } = useAuth();
+  const { isAuthenticated, identity, principalText } = useAuth();
   const { profile } = usePreferences();
   const { content, addContent } = useContent();
   const [agentState, setAgentState] = useState<AgentState>(defaultState);
@@ -45,7 +52,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || !principalText || !isEnabled) {
+    if (!isAuthenticated || !principalText || !identity || !isEnabled) {
       if (managerRef.current) {
         managerRef.current.stop();
         managerRef.current = null;
@@ -56,6 +63,31 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
 
     const keys = deriveNostrKeypairFromText(principalText);
 
+    // Pre-approve canister for D2A match fees (blanket ICRC-2 approval)
+    const canisterId = getCanisterId();
+    createICPLedgerActorAsync(identity).then(async (ledger) => {
+      try {
+        const spender = Principal.fromText(canisterId);
+        await ledger.icrc2_approve({
+          from_subaccount: [],
+          spender: { owner: spender, subaccount: [] },
+          amount: BigInt(D2A_APPROVE_AMOUNT) + ICP_FEE,
+          expected_allowance: [],
+          expires_at: [],
+          fee: [],
+          memo: [],
+          created_at_time: [],
+        });
+      } catch (err) {
+        console.warn("[agent] D2A fee pre-approve failed:", err instanceof Error ? err.message : "unknown");
+      }
+    }).catch(err => {
+      console.warn("[agent] Ledger actor creation failed:", err instanceof Error ? err.message : "unknown");
+    });
+
+    // Capture identity for async callback closure
+    const capturedIdentity = identity;
+
     const manager = new AgentManager(
       keys.sk,
       keys.pk,
@@ -64,7 +96,36 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         getContent: () => contentRef.current,
         getPrefs: () => profileRef.current,
         onStateChange: (state) => setAgentState(state),
+        onD2AMatchComplete: (senderPk, senderPrincipalId, contentHash) => {
+          if (!senderPrincipalId) {
+            console.warn("[agent] D2A match: sender has no IC principal, skipping fee");
+            return;
+          }
+          // Fire-and-forget: record the D2A match on-chain
+          (async () => {
+            try {
+              const backend = await createBackendActorAsync(capturedIdentity);
+              const senderPrincipal = Principal.fromText(senderPrincipalId);
+              const matchId = uuidv4();
+              const result = await backend.recordD2AMatch(
+                matchId,
+                senderPrincipal,
+                contentHash,
+                BigInt(D2A_MATCH_FEE),
+              );
+              if ("ok" in result) {
+                console.log("[agent] D2A match recorded:", result.ok);
+              } else {
+                console.warn("[agent] D2A match recording failed:", result.err);
+              }
+            } catch (err) {
+              console.warn("[agent] recordD2AMatch call failed:", err instanceof Error ? err.message : "unknown");
+            }
+          })();
+        },
       },
+      undefined, // relayUrls (use default)
+      principalText, // IC principal for presence broadcast
     );
 
     managerRef.current = manager;
@@ -73,7 +134,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     return () => {
       manager.stop();
     };
-  }, [isAuthenticated, principalText, isEnabled, addContent]);
+  }, [isAuthenticated, principalText, identity, isEnabled, addContent]);
 
   const value = useMemo(() => ({
     agentState, isEnabled, toggleAgent,

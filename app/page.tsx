@@ -14,24 +14,35 @@ import { useContent } from "@/contexts/ContentContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { useSources } from "@/contexts/SourceContext";
+import { useAgent } from "@/contexts/AgentContext";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { publishSignalToNostr, buildAegisTags } from "@/lib/nostr/publish";
+import { createICPLedgerActorAsync, ICP_FEE, type ICPLedgerActor } from "@/lib/ic/icpLedger";
+import { createBackendActorAsync } from "@/lib/ic/actor";
+import { Principal } from "@dfinity/principal";
+import { getCanisterId } from "@/lib/ic/agent";
+import type { UserReputation } from "@/lib/ic/declarations";
 import type { AnalyzeResponse } from "@/lib/types/api";
 
 export default function AegisApp() {
   const { mobile } = useWindowSize();
   const { notifications, addNotification } = useNotifications();
   const { content, isAnalyzing, analyze, validateItem, flagItem, addContent, loadFromIC } = useContent();
-  const { isAuthenticated, principalText } = useAuth();
+  const { isAuthenticated, identity, principalText } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
+  const { agentState } = useAgent();
 
   const [tab, setTab] = useState("dashboard");
+  const [icpBalance, setIcpBalance] = useState<bigint | null>(null);
+  const [reputation, setReputation] = useState<UserReputation | null>(null);
+  const [engagementIndex, setEngagementIndex] = useState<number | null>(null);
 
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
   userContextRef.current = userContext;
+  const ledgerRef = useRef<ICPLedgerActor | null>(null);
 
   // Derive Nostr keypair from principal (memoized)
   const nostrKeys = useMemo(() => {
@@ -44,6 +55,43 @@ export default function AegisApp() {
       loadFromIC().catch((err: unknown) => console.warn("Failed to load from IC:", err));
     }
   }, [isAuthenticated, loadFromIC]);
+
+  // Initialize ICP ledger actor + fetch balance and reputation
+  useEffect(() => {
+    if (!isAuthenticated || !identity || !principalText) {
+      ledgerRef.current = null;
+      setIcpBalance(null);
+      setReputation(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const [ledger, backend] = await Promise.all([
+          createICPLedgerActorAsync(identity),
+          createBackendActorAsync(identity),
+        ]);
+        if (cancelled) return;
+        ledgerRef.current = ledger;
+
+        const principal = Principal.fromText(principalText);
+        const [balance, rep, eIndex] = await Promise.all([
+          ledger.icrc1_balance_of({ owner: principal, subaccount: [] }),
+          backend.getUserReputation(principal),
+          backend.getEngagementIndex(principal),
+        ]);
+        if (cancelled) return;
+        setIcpBalance(balance);
+        setReputation(rep);
+        setEngagementIndex(eIndex);
+      } catch (err) {
+        console.warn("[staking] Failed to init ledger/reputation:", err instanceof Error ? err.message : "unknown");
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [isAuthenticated, identity, principalText]);
 
   // Background ingestion scheduler
   const getSchedulerSourcesRef = useRef(getSchedulerSources);
@@ -91,6 +139,7 @@ export default function AegisApp() {
   const handlePublishSignal = useCallback(async (
     text: string,
     scores: AnalyzeResponse,
+    stakeAmount?: bigint,
   ): Promise<{ eventId: string | null; relaysPublished: string[] }> => {
     if (!nostrKeys) {
       return { eventId: null, relaysPublished: [] };
@@ -101,9 +150,71 @@ export default function AegisApp() {
     // Publish to Nostr relays
     const result = await publishSignalToNostr(text, nostrKeys.sk, tags);
 
-    // Also save to IC canister if available
+    const signalId = uuidv4();
+
+    // If staking, approve + publishWithStake on IC
+    if (stakeAmount && identity && principalText) {
+      try {
+        const canisterId = getCanisterId();
+        const spender = Principal.fromText(canisterId);
+
+        // ICRC-2 approve: let canister transfer our ICP
+        if (!ledgerRef.current) {
+          ledgerRef.current = await createICPLedgerActorAsync(identity);
+        }
+        const approveResult = await ledgerRef.current.icrc2_approve({
+          from_subaccount: [],
+          spender: { owner: spender, subaccount: [] },
+          amount: stakeAmount + ICP_FEE, // Include fee for the transfer_from
+          expected_allowance: [],
+          expires_at: [],
+          fee: [],
+          memo: [],
+          created_at_time: [],
+        });
+
+        if ("Err" in approveResult) {
+          addNotification("ICP approve failed — check balance", "error");
+        } else {
+          // Call publishWithStake on aegis_backend
+          const backend = await createBackendActorAsync(identity);
+          const stakeResult = await backend.publishWithStake({
+            id: signalId,
+            owner: Principal.fromText(principalText),
+            text: text.slice(0, 300),
+            nostrEventId: result.eventId ? [result.eventId] : [],
+            nostrPubkey: nostrKeys.pk ? [nostrKeys.pk] : [],
+            scores: {
+              originality: Math.round(scores.originality),
+              insight: Math.round(scores.insight),
+              credibility: Math.round(scores.credibility),
+              compositeScore: scores.composite,
+            },
+            verdict: scores.verdict === "quality" ? { quality: null } : { slop: null },
+            topics: scores.topics || [],
+            createdAt: BigInt(Date.now() * 1_000_000),
+          }, stakeAmount);
+
+          if ("ok" in stakeResult) {
+            addNotification(`Staked & published! Signal backed with ICP`, "success");
+            // Refresh balance
+            try {
+              const bal = await ledgerRef.current.icrc1_balance_of({ owner: Principal.fromText(principalText), subaccount: [] });
+              setIcpBalance(bal);
+            } catch { /* ignore */ }
+          } else {
+            addNotification(`Stake failed: ${stakeResult.err}`, "error");
+          }
+        }
+      } catch (err) {
+        console.error("[staking] publishWithStake failed:", err);
+        addNotification("Staking failed — signal published without stake", "error");
+      }
+    }
+
+    // Also save to local content state
     addContent({
-      id: uuidv4(),
+      id: signalId,
       owner: principalText,
       author: "You",
       avatar: "\uD83D\uDCE1",
@@ -127,18 +238,20 @@ export default function AegisApp() {
       lSlop: scores.lSlop,
     });
 
-    addNotification(
-      result.relaysPublished.length > 0
-        ? `Signal published to ${result.relaysPublished.length} relays`
-        : "Signal saved locally (relay publish failed)",
-      result.relaysPublished.length > 0 ? "success" : "error"
-    );
+    if (!stakeAmount) {
+      addNotification(
+        result.relaysPublished.length > 0
+          ? `Signal published to ${result.relaysPublished.length} relays`
+          : "Signal saved locally (relay publish failed)",
+        result.relaysPublished.length > 0 ? "success" : "error"
+      );
+    }
 
     return {
       eventId: result.eventId,
       relaysPublished: result.relaysPublished,
     };
-  }, [nostrKeys, principalText, addContent, addNotification]);
+  }, [nostrKeys, identity, principalText, addContent, addNotification]);
 
   return (
     <AppShell activeTab={tab} onTabChange={setTab}>
@@ -150,11 +263,13 @@ export default function AegisApp() {
           onAnalyze={handleAnalyze}
           onPublishSignal={isAuthenticated ? handlePublishSignal : undefined}
           nostrPubkey={nostrKeys?.pk || null}
+          icpBalance={icpBalance}
+          stakingEnabled={isAuthenticated && icpBalance != null}
           mobile={mobile}
         />
       )}
       {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />}
-      {tab === "analytics" && <AnalyticsTab content={content} mobile={mobile} />}
+      {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} />}
       <NotificationToast notifications={notifications} mobile={mobile} />
     </AppShell>
   );

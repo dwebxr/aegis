@@ -25,6 +25,7 @@ interface AgentManagerCallbacks {
   getContent: () => ContentItem[];
   getPrefs: () => UserPreferenceProfile;
   onStateChange: (state: AgentState) => void;
+  onD2AMatchComplete?: (senderPk: string, senderPrincipalId: string | undefined, contentHash: string) => void;
 }
 
 export class AgentManager {
@@ -37,6 +38,7 @@ export class AgentManager {
   private handshakes: Map<string, HandshakeState> = new Map();
   private receivedItems = 0;
   private sentItems = 0;
+  private d2aMatchCount = 0;
 
   private presenceInterval: ReturnType<typeof setInterval> | null = null;
   private discoveryInterval: ReturnType<typeof setInterval> | null = null;
@@ -44,16 +46,20 @@ export class AgentManager {
   private listenerSub: SubCloser | null = null;
   private active = false;
 
+  private principalId?: string;
+
   constructor(
     sk: Uint8Array,
     pk: string,
     callbacks: AgentManagerCallbacks,
     relayUrls?: string[],
+    principalId?: string,
   ) {
     this.sk = sk;
     this.pk = pk;
     this.callbacks = callbacks;
     this.relayUrls = relayUrls || DEFAULT_RELAYS;
+    this.principalId = principalId;
   }
 
   async start(): Promise<void> {
@@ -109,6 +115,7 @@ export class AgentManager {
       activeHandshakes: Array.from(this.handshakes.values()).filter(h => !isHandshakeExpired(h)),
       receivedItems: this.receivedItems,
       sentItems: this.sentItems,
+      d2aMatchCount: this.d2aMatchCount,
     };
   }
 
@@ -124,7 +131,7 @@ export class AgentManager {
       .slice(0, 20)
       .map(([k]) => k);
 
-    await broadcastPresence(this.sk, interests, 5, this.relayUrls);
+    await broadcastPresence(this.sk, interests, 5, this.relayUrls, this.principalId);
   }
 
   private cleanupStaleHandshakes(): void {
@@ -355,6 +362,15 @@ export class AgentManager {
       handshake.phase = "completed";
       handshake.completedAt = Date.now();
     }
+
+    // Trigger D2A match fee callback (content hash = first 32 chars of text)
+    if (this.callbacks.onD2AMatchComplete) {
+      this.d2aMatchCount++;
+      const contentHash = payload.text.slice(0, 32);
+      const senderPrincipalId = this.peers.get(senderPk)?.principalId;
+      this.callbacks.onD2AMatchComplete(senderPk, senderPrincipalId, contentHash);
+    }
+
     this.emitState();
   }
 }

@@ -9,6 +9,7 @@ import {
   TAG_D2A_PROFILE,
   TAG_D2A_INTEREST,
   TAG_D2A_CAPACITY,
+  TAG_D2A_PRINCIPAL,
   RESONANCE_THRESHOLD,
   PEER_EXPIRY_MS,
 } from "./protocol";
@@ -41,11 +42,15 @@ export async function broadcastPresence(
   interests: string[],
   capacity: number,
   relayUrls: string[],
+  principalId?: string,
 ): Promise<void> {
   const tags: string[][] = [
     ["d", TAG_D2A_PROFILE],
     [TAG_D2A_CAPACITY, capacity.toString()],
   ];
+  if (principalId) {
+    tags.push([TAG_D2A_PRINCIPAL, principalId]);
+  }
   for (const interest of interests.slice(0, 20)) {
     tags.push([TAG_D2A_INTEREST, interest]);
   }
@@ -96,6 +101,7 @@ export async function discoverPeers(
 
     const interests: string[] = [];
     let capacity = 5;
+    let principalId: string | undefined;
 
     for (const tag of ev.tags) {
       if (tag[0] === TAG_D2A_INTEREST && tag[1]) {
@@ -104,10 +110,14 @@ export async function discoverPeers(
       if (tag[0] === TAG_D2A_CAPACITY && tag[1]) {
         capacity = parseInt(tag[1]) || 5;
       }
+      if (tag[0] === TAG_D2A_PRINCIPAL && tag[1]) {
+        principalId = tag[1];
+      }
     }
 
     const profile: AgentProfile = {
       nostrPubkey: ev.pubkey,
+      principalId,
       interests,
       capacity,
       lastSeen: ev.created_at * 1000,

@@ -70,6 +70,62 @@ export interface PublishedSignal {
   createdAt: bigint;
 }
 
+export type StakeStatus =
+  | { active: null }
+  | { returned: null }
+  | { slashed: null };
+
+export interface StakeRecord {
+  id: string;
+  owner: Principal;
+  signalId: string;
+  amount: bigint;
+  status: StakeStatus;
+  validationCount: bigint;
+  flagCount: bigint;
+  createdAt: bigint;
+  resolvedAt: [] | [bigint];
+}
+
+export interface UserReputation {
+  principal: Principal;
+  trustScore: number;
+  totalStaked: bigint;
+  totalReturned: bigint;
+  totalSlashed: bigint;
+  qualitySignals: bigint;
+  slopSignals: bigint;
+}
+
+export interface D2AMatchRecord {
+  id: string;
+  senderPrincipal: Principal;
+  receiverPrincipal: Principal;
+  contentHash: string;
+  feeAmount: bigint;
+  senderPayout: bigint;
+  protocolPayout: bigint;
+  createdAt: bigint;
+}
+
+export type AnalysisTier = { free: null } | { premium: null };
+
+export interface OnChainAnalysis {
+  originality: number;
+  insight: number;
+  credibility: number;
+  compositeScore: number;
+  verdict: Verdict;
+  reason: string;
+  topics: string[];
+  tier: AnalysisTier;
+  vSignal: [] | [number];
+  cContext: [] | [number];
+  lSlop: [] | [number];
+}
+
+export type Result<T, E> = { ok: T } | { err: E };
+
 export interface _SERVICE {
   getProfile: ActorMethod<[Principal], [] | [UserProfile]>;
   getEvaluation: ActorMethod<[string], [] | [ContentEvaluation]>;
@@ -84,4 +140,13 @@ export interface _SERVICE {
   saveSourceConfig: ActorMethod<[SourceConfigEntry], string>;
   deleteSourceConfig: ActorMethod<[string], boolean>;
   saveSignal: ActorMethod<[PublishedSignal], string>;
+  publishWithStake: ActorMethod<[PublishedSignal, bigint], Result<string, string>>;
+  validateSignal: ActorMethod<[string], Result<boolean, string>>;
+  flagSignal: ActorMethod<[string], Result<boolean, string>>;
+  getUserReputation: ActorMethod<[Principal], UserReputation>;
+  getSignalStake: ActorMethod<[string], [] | [StakeRecord]>;
+  recordD2AMatch: ActorMethod<[string, Principal, string, bigint], Result<string, string>>;
+  getUserD2AMatches: ActorMethod<[Principal, bigint, bigint], D2AMatchRecord[]>;
+  getEngagementIndex: ActorMethod<[Principal], number>;
+  analyzeOnChain: ActorMethod<[string, string[]], Result<OnChainAnalysis, string>>;
 }

@@ -1,6 +1,6 @@
 # Aegis — D2A Social Agent Network
 
-Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol.
+Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol — with on-chain monetization via ICP staking and D2A match fees.
 
 ## Live
 
@@ -18,30 +18,53 @@ Browser                                  Internet Computer (Mainnet)
 │    Dashboard / Briefing / Burn    │◄──►│  - Evaluation storage    │
 │    Sources / Analytics            │    │  - User profiles         │
 │                                   │    │  - Source configs         │
-│  API Routes:                      │    │  - Analytics queries     │
-│    POST /api/analyze              │    │                          │
-│    POST /api/fetch/{url,rss,      │    │  Internet Identity auth  │
-│         twitter,nostr}            │    └──────────────────────────┘
+│  API Routes:                      │    │  - PoQ staking/reputation│
+│    POST /api/analyze              │    │  - D2A match records     │
+│    POST /api/fetch/{url,rss,      │    │  - IC LLM scoring       │
+│         twitter,nostr}            │    │  - Engagement index      │
+│                                   │    │  Internet Identity auth  │
+│  Client-side:                     │    └─────────┬────────────────┘
+│    Preference learning engine     │              │
+│    Briefing ranker                │    ┌─────────▼────────────────┐
+│    Nostr identity (IC-derived)    │    │  ICP Ledger (ICRC-1/2)   │
+│    D2A agent manager              │    │  ryjl3-tyaaa-aaaaa-aaaba │
+│    ICP Ledger (stake/approve)     │    │  Stake hold / return /   │
+│                                   │    │  slash / D2A fee split   │
+│                                   │    └──────────────────────────┘
 │                                   │
-│  Client-side:                     │    Nostr Relays
-│    Preference learning engine     │◄──►┌──────────────────────────┐
-│    Briefing ranker                │    │  Signal publishing       │
-│    Nostr identity (IC-derived)    │    │  D2A agent discovery     │
-│    D2A agent manager              │    │  Encrypted handshakes    │
+│                                   │    Nostr Relays
+│                                   │◄──►┌──────────────────────────┐
+│                                   │    │  Signal publishing       │
+│                                   │    │  D2A agent discovery     │
+│                                   │    │  Encrypted handshakes    │
 └───────────┬───────────────────────┘    └──────────────────────────┘
             │
             ▼
-   Anthropic Claude API
-   (V/C/L scoring + fallback heuristics)
+   3-Tier Scoring Pipeline:
+   1. IC LLM (Llama 3.1 8B, free, on-chain)
+   2. Anthropic Claude (premium, V/C/L)
+   3. Heuristic fallback (client-side)
 ```
 
 ---
 
 ## Slop Detection: How Aegis Judges Content Quality
 
-Aegis uses a three-tier scoring pipeline. Every piece of content passes through these layers in order, and the system is designed to be fully transparent — no black-box ranking.
+Aegis uses a three-tier scoring pipeline with automatic fallback. The system tries each tier in order and uses the first successful result — no silent failures.
 
-### Tier 1: Heuristic Pre-Filter (Client-side, No API Call)
+### Tier 1: IC LLM On-Chain Scoring (Free, Decentralized)
+
+When authenticated, Aegis first calls `analyzeOnChain()` on the canister, which runs **Llama 3.1 8B** via the [IC LLM Canister](https://github.com/nickcen/ic_llm) (`w36hm-eqaaa-aaaal-qr76a-cai`). This provides free, fully on-chain scoring with no API key required. The prompt includes the user's topic affinities for personalized evaluation.
+
+If IC LLM is unavailable (e.g. local dev, not authenticated), the system falls through to Tier 2.
+
+### Tier 2: Claude API Scoring (Premium, High Quality)
+
+For cases where IC LLM fails or for premium-tier scoring, Aegis calls the Anthropic Claude API with the full V/C/L framework and the user's preference context. This provides the highest quality analysis but requires an API key.
+
+If the API key is missing or the call fails, the system falls through to Tier 3.
+
+### Tier 3: Heuristic Pre-Filter (Client-side, No API Call)
 
 Before any content reaches Claude, a fast heuristic filter runs locally. This eliminates obvious slop without spending API tokens.
 
@@ -55,11 +78,11 @@ Before any content reaches Claude, a fast heuristic filter runs locally. This el
 | Contains links | credibility +2 | `https://` present |
 | Contains data/numbers | insight +2, credibility +1 | `%`, `$`, decimals |
 
-Base scores start at 5. Composite = `0.4 × Originality + 0.35 × Insight + 0.25 × Credibility`. Items below 3.5 composite are dropped before reaching Tier 2.
+Base scores start at 5. Composite = `0.4 × Originality + 0.35 × Insight + 0.25 × Credibility`.
 
-### Tier 2: V/C/L AI Scoring (Claude API)
+### V/C/L Scoring Axes (Used by Tier 1 and Tier 2)
 
-For content that passes heuristics, Aegis sends the text to Claude with the user's preference context. The AI evaluates three orthogonal axes:
+Both IC LLM and Claude evaluate three orthogonal axes:
 
 - **V (Signal)**: Information density and novelty. Does this contain genuinely new information, data, or analysis? (0–10)
 - **C (Context)**: Relevance to *this specific user's* interests, calibrated from their learned topic affinities. (0–10)
@@ -75,9 +98,7 @@ Normalized to 0–10 scale. Verdict: **quality** if S ≥ 4, else **slop**.
 
 The `+ 0.5` floor prevents division by zero and ensures that even zero-slop content still needs real signal to score well.
 
-When the API key is missing or the API fails, the system falls back to Tier 1 heuristics automatically — no silent failures.
-
-### Tier 3: Personalized Re-ranking (Briefing)
+### Personalized Re-ranking (Briefing)
 
 Quality items are further ranked by a personalized briefing score that combines multiple signals:
 
@@ -101,6 +122,55 @@ Every Validate/Flag action updates the user's preference profile:
 | Flag | −0.05 per topic | −0.3 | +0.1 (if AI said "quality") |
 
 Affinities are clamped to [−1.0, +1.0]. Author trust is clamped to [−1.0, +1.0]. After 3+ feedback events, the learned context is injected into Claude's prompt, making the AI scoring personalized.
+
+---
+
+## Monetization: Three Revenue Pillars
+
+Aegis implements a sustainable economic model using ICP tokens (ICRC-1/2) with three revenue pillars:
+
+### Pillar 1: Compute & Intelligence Subscription
+
+| Tier | Engine | Cost | Where |
+|------|--------|------|-------|
+| **Free** | IC LLM (Llama 3.1 8B) | 0 ICP — cycles paid by canister | On-chain (IC) |
+| **Premium** | Anthropic Claude | API key required | Off-chain (Vercel) |
+| **Fallback** | Heuristic filter | 0 | Client-side |
+
+Free-tier scoring runs entirely on the Internet Computer. Premium Claude API scoring provides higher accuracy for users who supply their own API key.
+
+### Pillar 2: Proof of Quality (PoQ) Staking
+
+When publishing a signal, users can **stake ICP** (0.001–1.0 ICP) to back their content quality claim. Community members vote to validate or flag staked signals:
+
+```
+Publisher stakes 0.01 ICP
+  → 3 validates → Stake returned + Trust Score ↑ + Quality Signal count ↑
+  → 3 flags     → Stake slashed (kept by protocol) + Trust Score ↓ + Slop Signal count ↑
+```
+
+**ICRC-2 flow**: Client `icrc2_approve` → Canister `icrc2_transfer_from` (stake hold) → On resolution: `icrc1_transfer` (return) or retained (slash).
+
+**Trust Score**: `T = 5.0 + (qualitySignals / totalSignals) × 5.0` — ranges 0–10. Starts at 5.0 (neutral). A user with 100% quality signals reaches 10.0.
+
+**Engagement Index**: `E = validationRatio × avgComposite` — measures how effectively a user's signals engage the community (0–10 scale).
+
+Double-voting is prevented by tracking voters per signal. Self-voting is blocked. Stake records and voter lists persist across canister upgrades.
+
+### Pillar 3: D2A Precision Match Fee
+
+When content is successfully delivered via the D2A protocol, a micro-fee is collected from the receiver:
+
+```
+Content delivered via D2A
+  → Receiver pays 0.001 ICP match fee
+  → 80% (0.0008 ICP) → Content sender
+  → 20% (0.0002 ICP) → Protocol treasury (canister)
+```
+
+The receiver pre-approves the canister for a blanket allowance (0.1 ICP ≈ 100 matches) when the agent starts. Fees are collected automatically via `icrc2_transfer_from` and distributed via `icrc1_transfer`.
+
+Fee collection only occurs when both peers include their IC principal in their presence broadcast. Peers without principals can still exchange content — just without the fee mechanism.
 
 ---
 
@@ -128,16 +198,17 @@ Every 5 minutes, each agent publishes a **NIP-78 replaceable event** (Kind 30078
   "kind": 30078,
   "tags": [
     ["d", "aegis-agent-profile"],
+    ["capacity", "5"],
+    ["principal", "rluf3-eiaaa-aaaam-qgjuq-cai"],
     ["interest", "machine-learning"],
     ["interest", "rust"],
-    ["interest", "cryptography"],
-    ["capacity", "5"]
+    ["interest", "cryptography"]
   ],
   "content": ""
 }
 ```
 
-Topics are drawn from the user's top 20 high-affinity topics (affinity ≥ 0.2). `capacity` indicates how many items the agent can accept per cycle. Being a replaceable event, only the latest version persists on relays.
+Topics are drawn from the user's top 20 high-affinity topics (affinity ≥ 0.2). `capacity` indicates how many items the agent can accept per cycle. `principal` is the agent's IC principal (used for D2A fee settlement). Being a replaceable event, only the latest version persists on relays.
 
 ### Phase 2: Peer Discovery
 
@@ -227,6 +298,25 @@ The receiving agent applies a final resonance check (≥ 0.1) before injecting t
 
 ## Features
 
+### 3-Tier AI Scoring Pipeline
+- **Tier 1**: IC LLM (Llama 3.1 8B) — free, fully on-chain, no API key
+- **Tier 2**: Anthropic Claude — premium V/C/L scoring with user context
+- **Tier 3**: Heuristic fallback — local, instant, no network call
+- Automatic fallback: each tier falls through to the next on failure
+
+### Proof of Quality (PoQ) Staking
+- Stake 0.001–1.0 ICP when publishing signals to back your quality claim
+- Community validation: 3 validates → stake returned + trust boost
+- Community flagging: 3 flags → stake slashed + trust penalty
+- Trust Score gauge (0–10) and Engagement Index in Analytics dashboard
+- ICRC-2 approve/transfer_from pattern with pre-debit rollback safety
+
+### D2A Match Fee
+- Automatic micro-fee (0.001 ICP) on successful D2A content delivery
+- 80/20 split: 80% to content sender, 20% to protocol treasury
+- Blanket ICRC-2 pre-approval on agent start (0.1 ICP ≈ 100 matches)
+- IC principal included in presence broadcast for on-chain fee settlement
+
 ### Personalization Engine
 - Learns from Validate/Flag feedback — topic affinities, author trust, quality threshold calibration
 - Profile stored in localStorage (primary) with IC canister sync
@@ -241,6 +331,7 @@ The receiving agent applies a final resonance check (≥ 0.1) before injecting t
 - Deterministic Nostr keypair derived from IC Principal (no extra key management)
 - Self-evaluated posts published as Kind 1 events with `aegis-score` tags
 - Client-side signing — private key never leaves the browser
+- Optional PoQ stake attachment with range slider UI
 
 ### Multi-Source Ingestion
 - RSS/Atom feeds (YouTube, note.com, blogs — with thumbnail extraction)
@@ -255,10 +346,13 @@ The receiving agent applies a final resonance check (≥ 0.1) before injecting t
 | Frontend | Next.js 14 (App Router), React 18, TypeScript |
 | Styling | CSS-in-JS (inline styles), dark theme |
 | Backend API | Next.js API Routes (Vercel Serverless) |
-| AI | Anthropic Claude (claude-sonnet-4-20250514) + fallback heuristics |
-| Blockchain | Internet Computer (Motoko canister) |
+| AI (Free) | IC LLM Canister — Llama 3.1 8B (on-chain, mo:llm 2.1.0) |
+| AI (Premium) | Anthropic Claude (claude-sonnet-4-20250514) + fallback heuristics |
+| Blockchain | Internet Computer (Motoko canister, dfx 0.30.2) |
+| Tokens | ICP Ledger ICRC-1/2 (staking, D2A fees) |
 | Auth | Internet Identity (@dfinity/auth-client 2.1.3) |
 | Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
+| Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | Test | Jest + ts-jest (261 tests, 23 suites) |
 
@@ -316,17 +410,20 @@ aegis/
 │   ├── ic/
 │   │   ├── agent.ts                     # HttpAgent creation + canister ID
 │   │   ├── actor.ts                     # Canister actor factory (sync + async with syncTime)
+│   │   ├── icpLedger.ts                # ICP Ledger actor (ICRC-1/2 balance, approve, allowance)
 │   │   └── declarations/               # Candid types + IDL factory
 │   ├── types/                           # ContentItem, API response types, source types
 │   └── utils/                           # Score computation helpers
 ├── __tests__/                           # 261 tests across 23 suites
 ├── canisters/
 │   └── aegis_backend/
-│       ├── main.mo                      # Motoko canister (persistent actor)
-│       ├── types.mo                     # Type definitions
+│       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
+│       ├── types.mo                     # Type definitions (incl. StakeRecord, UserReputation, D2AMatchRecord)
+│       ├── ledger.mo                    # ICRC-1/2 ICP Ledger interface module
 │       └── aegis_backend.did            # Candid interface
 ├── public/                              # Icons (apple-touch-icon, favicons, PWA)
-├── dfx.json                             # IC project config
+├── mops.toml                            # Motoko package manager (mo:llm, mo:json)
+├── dfx.json                             # IC project config (packtool: mops sources)
 └── next.config.mjs                      # Webpack polyfills for @dfinity
 ```
 
@@ -389,6 +486,10 @@ service : {
   getUserEvaluations : (principal, nat, nat) -> (vec ContentEvaluation) query;
   getUserAnalytics : (principal) -> (AnalyticsResult) query;
   getUserSourceConfigs : (principal) -> (vec SourceConfigEntry) query;
+  getUserReputation : (principal) -> (UserReputation) query;
+  getSignalStake : (text) -> (opt StakeRecord) query;
+  getUserD2AMatches : (principal, nat, nat) -> (vec D2AMatchRecord) query;
+  getEngagementIndex : (principal) -> (float64) query;
 
   // Updates
   saveEvaluation : (ContentEvaluation) -> (text);
@@ -397,6 +498,12 @@ service : {
   updateDisplayName : (text) -> (bool);
   saveSourceConfig : (SourceConfigEntry) -> (text);
   deleteSourceConfig : (text) -> (bool);
+  saveSignal : (PublishedSignal) -> (text);
+  publishWithStake : (PublishedSignal, nat) -> (Result);
+  validateSignal : (text) -> (Result);
+  flagSignal : (text) -> (Result);
+  recordD2AMatch : (text, principal, text, nat) -> (Result);
+  analyzeOnChain : (text, vec text) -> (Result);
 }
 ```
 
