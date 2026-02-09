@@ -21,7 +21,6 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
   const [selfScore, setSelfScore] = useState<AnalyzeResponse | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<{ eventId: string | null; relaysPublished: string[] } | null>(null);
-  const [stakeEnabled, setStakeEnabled] = useState(false);
   // Slider value in e8s steps: 100_000 (0.001) to 100_000_000 (1.0)
   const [stakeE8s, setStakeE8s] = useState(1_000_000); // Default: 0.01 ICP
 
@@ -31,7 +30,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
     setSelfScore(result);
   };
 
-  const effectiveStake = stakeEnabled ? BigInt(stakeE8s) : undefined;
+  const effectiveStake = stakingEnabled ? BigInt(stakeE8s) : undefined;
 
   const handlePublish = async () => {
     if (!selfScore) return;
@@ -157,12 +156,12 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
               </div>
               <button
                 onClick={handlePublish}
-                disabled={isPublishing || (stakeEnabled && !hasBalance)}
+                disabled={isPublishing || (stakingEnabled && !hasBalance)}
                 style={{
                   padding: mobile ? "10px 16px" : "10px 24px",
-                  background: isPublishing || (stakeEnabled && !hasBalance)
+                  background: isPublishing || (stakingEnabled && !hasBalance)
                     ? "rgba(255,255,255,0.05)"
-                    : stakeEnabled
+                    : stakingEnabled
                       ? "linear-gradient(135deg, #f59e0b, #ef4444)"
                       : "linear-gradient(135deg, #34d399, #2563eb)",
                   border: "none",
@@ -170,11 +169,11 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                   color: "#fff",
                   fontSize: 13,
                   fontWeight: 700,
-                  cursor: isPublishing || (stakeEnabled && !hasBalance) ? "not-allowed" : "pointer",
+                  cursor: isPublishing || (stakingEnabled && !hasBalance) ? "not-allowed" : "pointer",
                   marginLeft: "auto",
                 }}
               >
-                {isPublishing ? "Publishing..." : stakeEnabled ? `Stake & Publish` : "Publish Signal"}
+                {isPublishing ? "Publishing..." : stakingEnabled ? `Stake & Publish` : "Publish Signal"}
               </button>
             </div>
 
@@ -185,16 +184,10 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                 borderRadius: 10,
                 padding: "10px 14px",
               }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: stakeEnabled ? 8 : 0 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: "#f59e0b", fontWeight: 600 }}>
-                    <input
-                      type="checkbox"
-                      checked={stakeEnabled}
-                      onChange={e => setStakeEnabled(e.target.checked)}
-                      style={{ accentColor: "#f59e0b" }}
-                    />
-                    Proof of Quality Stake
-                  </label>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600 }}>
+                    Proof of Quality Stake (Required)
+                  </span>
                   {icpBalance != null && (
                     <span style={{ fontSize: 10, color: "#64748b", fontFamily: fonts.mono }}>
                       Balance: {formatICP(icpBalance)} ICP
@@ -202,32 +195,30 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                   )}
                 </div>
 
-                {stakeEnabled && (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <input
-                        type="range"
-                        min={Number(MIN_STAKE)}
-                        max={maxStakeE8s}
-                        step={100_000}
-                        value={stakeE8s}
-                        onChange={e => setStakeE8s(Number(e.target.value))}
-                        style={{ flex: 1, accentColor: "#f59e0b" }}
-                      />
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b", fontFamily: fonts.mono, minWidth: 80, textAlign: "right" }}>
-                        {formatICP(BigInt(stakeE8s))} ICP
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>
-                      Stake ICP to back your signal. Validated = returned + trust. Flagged as slop = slashed.
-                    </div>
-                    {!hasBalance && (
-                      <div style={{ fontSize: 10, color: "#f87171", marginTop: 4, fontWeight: 600 }}>
-                        Insufficient ICP balance. Min: {formatICP(MIN_STAKE)} ICP
-                      </div>
-                    )}
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input
+                      type="range"
+                      min={Number(MIN_STAKE)}
+                      max={maxStakeE8s}
+                      step={100_000}
+                      value={stakeE8s}
+                      onChange={e => setStakeE8s(Number(e.target.value))}
+                      style={{ flex: 1, accentColor: "#f59e0b" }}
+                    />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b", fontFamily: fonts.mono, minWidth: 80, textAlign: "right" }}>
+                      {formatICP(BigInt(stakeE8s))} ICP
+                    </span>
                   </div>
-                )}
+                  <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>
+                    Stake ICP to back your signal. Validated = returned + trust. Flagged as slop = slashed.
+                  </div>
+                  {!hasBalance && (
+                    <div style={{ fontSize: 10, color: "#f87171", marginTop: 4, fontWeight: 600 }}>
+                      Insufficient ICP balance. Min: {formatICP(MIN_STAKE)} ICP
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

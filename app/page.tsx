@@ -147,12 +147,18 @@ export default function AegisApp() {
 
     const tags = buildAegisTags(scores.composite, scores.vSignal, scores.topics || []);
 
+    // Staking is mandatory for authenticated users
+    if (identity && principalText && !stakeAmount) {
+      addNotification("ICP staking is required to publish a signal", "error");
+      return { eventId: null, relaysPublished: [] };
+    }
+
     // Publish to Nostr relays
     const result = await publishSignalToNostr(text, nostrKeys.sk, tags);
 
     const signalId = uuidv4();
 
-    // If staking, approve + publishWithStake on IC
+    // Approve + publishWithStake on IC
     if (stakeAmount && identity && principalText) {
       try {
         const canisterId = getCanisterId();
