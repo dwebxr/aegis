@@ -270,7 +270,7 @@ export default function AegisApp() {
           onPublishSignal={isAuthenticated ? handlePublishSignal : undefined}
           nostrPubkey={nostrKeys?.pk || null}
           icpBalance={icpBalance}
-          stakingEnabled={isAuthenticated && icpBalance != null}
+          stakingEnabled={isAuthenticated}
           mobile={mobile}
         />
       )}
