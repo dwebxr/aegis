@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { decode } from "nostr-tools/nip19";
+import type { AddressPointer } from "nostr-tools/nip19";
 import { parseBriefingMarkdown } from "@/lib/briefing/serialize";
 import type { ParsedBriefing } from "@/lib/briefing/serialize";
 import { SharedBriefingView } from "@/components/shared/SharedBriefingView";
+import { KIND_LONG_FORM, DEFAULT_RELAYS } from "@/lib/nostr/types";
 
 export const maxDuration = 30;
 
@@ -10,34 +13,67 @@ interface PageProps {
   params: Promise<{ naddr: string }>;
 }
 
+/** Extra relays for long-form content */
+const LONG_FORM_RELAYS = [
+  "wss://relay.nostr.band",
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+];
+
 const briefingCache = new Map<string, { data: ParsedBriefing | null; at: number }>();
 
 async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
   const cached = briefingCache.get(naddr);
   if (cached && Date.now() - cached.at < 30_000) return cached.data;
 
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
+  let addr: AddressPointer;
+  try {
+    const decoded = decode(naddr);
+    if (decoded.type !== "naddr") return null;
+    addr = decoded.data as AddressPointer;
+    if (addr.kind !== KIND_LONG_FORM) return null;
+  } catch {
+    return null;
+  }
+
+  const hintRelays = addr.relays && addr.relays.length > 0 ? addr.relays : DEFAULT_RELAYS;
+  const relaySet = new Set([...hintRelays, ...LONG_FORM_RELAYS]);
+  const relays = Array.from(relaySet);
+
+  const { SimplePool, useWebSocketImplementation: setWsImpl } =
+    await import("nostr-tools/pool");
+  const WebSocket = (await import("ws")).default;
+  setWsImpl(WebSocket as unknown as typeof globalThis.WebSocket);
+
+  const pool = new SimplePool();
+  const filter = {
+    kinds: [addr.kind],
+    authors: [addr.pubkey],
+    "#d": [addr.identifier],
+    limit: 1,
+  };
 
   try {
-    const res = await fetch(`${baseUrl}/api/fetch/briefing?naddr=${encodeURIComponent(naddr)}`, {
-      cache: "no-store",
-    });
+    const events = await Promise.race([
+      pool.querySync(relays, filter),
+      new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 15000)),
+    ]);
 
-    if (!res.ok) {
+    if (events.length === 0) {
       briefingCache.set(naddr, { data: null, at: Date.now() });
       return null;
     }
 
-    const data = await res.json();
-    const parsed = parseBriefingMarkdown(data.content, data.tags);
+    const event = events[0];
+    const parsed = parseBriefingMarkdown(event.content, event.tags);
     briefingCache.set(naddr, { data: parsed, at: Date.now() });
     return parsed;
   } catch (err) {
-    console.error("[briefing/page] Fetch failed:", err);
+    console.error("[briefing/page] Relay query failed:", err);
     briefingCache.set(naddr, { data: null, at: Date.now() });
     return null;
+  } finally {
+    pool.close(relays);
   }
 }
 

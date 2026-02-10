@@ -5,6 +5,13 @@ import { KIND_LONG_FORM, DEFAULT_RELAYS } from "@/lib/nostr/types";
 
 export const maxDuration = 30;
 
+/** Extra relays for long-form content that may not be in the naddr hint */
+const LONG_FORM_RELAYS = [
+  "wss://relay.nostr.band",
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+];
+
 export async function GET(request: NextRequest) {
   const naddr = request.nextUrl.searchParams.get("naddr");
   if (!naddr) {
@@ -25,19 +32,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Failed to decode naddr" }, { status: 400 });
   }
 
-  const relays = addr.relays && addr.relays.length > 0 ? addr.relays : DEFAULT_RELAYS;
+  // Merge naddr relays + fallback relays, deduplicate
+  const hintRelays = addr.relays && addr.relays.length > 0 ? addr.relays : DEFAULT_RELAYS;
+  const relaySet = new Set([...hintRelays, ...LONG_FORM_RELAYS]);
+  const relays = Array.from(relaySet);
 
-  let SimplePool: typeof import("nostr-tools/pool").SimplePool;
-  let setWsImpl: typeof import("nostr-tools/pool").useWebSocketImplementation;
-  try {
-    const poolModule = await import("nostr-tools/pool");
-    SimplePool = poolModule.SimplePool;
-    setWsImpl = poolModule.useWebSocketImplementation;
-  } catch (err) {
-    console.error("[fetch/briefing] Failed to load nostr-tools:", err);
-    return NextResponse.json({ error: "Failed to load Nostr tools" }, { status: 500 });
-  }
-
+  const { SimplePool, useWebSocketImplementation: setWsImpl } =
+    await import("nostr-tools/pool");
   const WebSocket = (await import("ws")).default;
   setWsImpl(WebSocket as unknown as typeof globalThis.WebSocket);
 
@@ -52,11 +53,14 @@ export async function GET(request: NextRequest) {
   try {
     const events = await Promise.race([
       pool.querySync(relays, filter),
-      new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 12000)),
+      new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 15000)),
     ]);
 
     if (events.length === 0) {
-      return NextResponse.json({ error: "Event not found on relays" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Event not found on relays", _debug: { relays, filter } },
+        { status: 404 },
+      );
     }
 
     const event = events[0];
