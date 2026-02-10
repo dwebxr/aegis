@@ -34,13 +34,18 @@ export async function fetchEventByAddress(
   };
 
   try {
+    console.log("[nostr/fetch] Querying relays:", relayUrls, "filter:", JSON.stringify(filter));
     const events = await Promise.race([
       pool.querySync(relayUrls, filter),
-      new Promise<never[]>((resolve) =>
-        setTimeout(() => resolve([]), timeoutMs),
-      ),
+      new Promise<never[]>((resolve) => {
+        setTimeout(() => {
+          console.warn("[nostr/fetch] Timeout after", timeoutMs, "ms");
+          resolve([]);
+        }, timeoutMs);
+      }),
     ]);
 
+    console.log("[nostr/fetch] Got", events.length, "events");
     if (events.length === 0) return null;
     return events[0] as unknown as NostrEvent;
   } catch (err) {
