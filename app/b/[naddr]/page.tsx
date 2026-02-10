@@ -1,12 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { decode } from "nostr-tools/nip19";
-import type { AddressPointer } from "nostr-tools/nip19";
-import { fetchEventByAddress } from "@/lib/nostr/fetch";
 import { parseBriefingMarkdown } from "@/lib/briefing/serialize";
 import type { ParsedBriefing } from "@/lib/briefing/serialize";
 import { SharedBriefingView } from "@/components/shared/SharedBriefingView";
-import { DEFAULT_RELAYS, KIND_LONG_FORM } from "@/lib/nostr/types";
 
 export const maxDuration = 30;
 
@@ -14,42 +10,35 @@ interface PageProps {
   params: Promise<{ naddr: string }>;
 }
 
-function decodeNaddr(naddr: string): AddressPointer | null {
-  try {
-    const decoded = decode(naddr);
-    if (decoded.type !== "naddr") return null;
-    const addr = decoded.data as AddressPointer;
-    if (addr.kind !== KIND_LONG_FORM) return null;
-    return addr;
-  } catch {
-    return null;
-  }
-}
-
-// Cache to avoid double relay fetch (generateMetadata + page render share one request)
 const briefingCache = new Map<string, { data: ParsedBriefing | null; at: number }>();
 
 async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
   const cached = briefingCache.get(naddr);
   if (cached && Date.now() - cached.at < 30_000) return cached.data;
 
-  const addr = decodeNaddr(naddr);
-  if (!addr) return null;
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3000";
 
-  const relays =
-    addr.relays && addr.relays.length > 0
-      ? addr.relays
-      : DEFAULT_RELAYS;
+  try {
+    const res = await fetch(`${baseUrl}/api/fetch/briefing?naddr=${encodeURIComponent(naddr)}`, {
+      cache: "no-store",
+    });
 
-  const event = await fetchEventByAddress(addr, relays);
-  if (!event) {
+    if (!res.ok) {
+      briefingCache.set(naddr, { data: null, at: Date.now() });
+      return null;
+    }
+
+    const data = await res.json();
+    const parsed = parseBriefingMarkdown(data.content, data.tags);
+    briefingCache.set(naddr, { data: parsed, at: Date.now() });
+    return parsed;
+  } catch (err) {
+    console.error("[briefing/page] Fetch failed:", err);
     briefingCache.set(naddr, { data: null, at: Date.now() });
     return null;
   }
-
-  const parsed = parseBriefingMarkdown(event.content, event.tags);
-  briefingCache.set(naddr, { data: parsed, at: Date.now() });
-  return parsed;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
