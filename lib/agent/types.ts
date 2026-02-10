@@ -7,7 +7,7 @@ export interface AgentProfile {
   resonance?: number; // computed locally against our profile
 }
 
-export type HandshakePhase = "idle" | "offered" | "accepted" | "delivering" | "completed" | "rejected";
+export type HandshakePhase = "offered" | "accepted" | "delivering" | "completed" | "rejected";
 
 export interface HandshakeState {
   peerId: string; // nostr pubkey of peer

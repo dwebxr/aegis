@@ -8,3 +8,9 @@ export const DEFAULT_RELAYS = [
   "wss://nos.lol",
   "wss://relay.nostr.band",
 ];
+
+/** Merge naddr hint relays with defaults, deduplicated */
+export function mergeRelays(hintRelays?: string[]): string[] {
+  if (!hintRelays?.length) return DEFAULT_RELAYS;
+  return Array.from(new Set([...hintRelays, ...DEFAULT_RELAYS]));
+}

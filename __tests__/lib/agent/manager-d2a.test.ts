@@ -128,7 +128,7 @@ describe("AgentManager — D2A match callback", () => {
     mgr.stop();
   });
 
-  it("fires onD2AMatchComplete with undefined principalId for unknown peer", async () => {
+  it("rejects delivery from unknown peer (not in discovered peers map)", async () => {
     const { callbacks } = makeCallbacks();
     const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
     await mgr.start();
@@ -149,11 +149,9 @@ describe("AgentManager — D2A match callback", () => {
     onEventHandler({ pubkey: "unknown-peer", content: "encrypted-deliver" });
     await new Promise(r => setTimeout(r, 50));
 
-    expect(callbacks.onD2AMatchComplete).toHaveBeenCalledWith(
-      "unknown-peer",
-      undefined, // peer not in map → no principalId
-      expect.any(String),
-    );
+    expect(callbacks.onNewContent).not.toHaveBeenCalled();
+    expect(callbacks.onD2AMatchComplete).not.toHaveBeenCalled();
+    expect(mgr.getState().receivedItems).toBe(0);
 
     mgr.stop();
   });
@@ -161,6 +159,15 @@ describe("AgentManager — D2A match callback", () => {
   it("does not fire onD2AMatchComplete when callback is not provided", async () => {
     const { callbacks } = makeCallbacks();
     delete (callbacks as Record<string, unknown>).onD2AMatchComplete;
+    mockCalculateResonance.mockReturnValue(0.5);
+
+    // Peer must be discovered first
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: "peer",
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+    }]);
 
     const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
     await mgr.start();
@@ -181,10 +188,8 @@ describe("AgentManager — D2A match callback", () => {
     onEventHandler({ pubkey: "peer", content: "deliver" });
     await new Promise(r => setTimeout(r, 50));
 
-    // Should not throw, content should still be delivered
     expect(callbacks.onNewContent).toHaveBeenCalledTimes(1);
     expect(mgr.getState().receivedItems).toBe(1);
-    // d2aMatchCount should still be 0 since callback was not provided
     expect(mgr.getState().d2aMatchCount).toBe(0);
 
     mgr.stop();
@@ -229,6 +234,15 @@ describe("AgentManager — D2A match callback", () => {
 
   it("increments d2aMatchCount on each successful delivery", async () => {
     const { callbacks } = makeCallbacks();
+    mockCalculateResonance.mockReturnValue(0.5);
+
+    // Register all 3 peers before start
+    mockDiscoverPeers.mockResolvedValueOnce([
+      { nostrPubkey: "peer-0", interests: ["ai"], capacity: 5, lastSeen: Date.now() },
+      { nostrPubkey: "peer-1", interests: ["ai"], capacity: 5, lastSeen: Date.now() },
+      { nostrPubkey: "peer-2", interests: ["ai"], capacity: 5, lastSeen: Date.now() },
+    ]);
+
     const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
     await mgr.start();
 
@@ -256,15 +270,24 @@ describe("AgentManager — D2A match callback", () => {
     mgr.stop();
   });
 
-  it("uses content hash from first 32 chars of text", async () => {
+  it("uses content preview (first 32 chars of text) for match callback", async () => {
     const { callbacks } = makeCallbacks();
+    mockCalculateResonance.mockReturnValue(0.5);
+
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: "peer-preview",
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+    }]);
+
     const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
     await mgr.start();
 
     const longText = "A".repeat(100);
     mockParseD2AMessage.mockReturnValue({
       type: "deliver",
-      fromPubkey: "peer-hash",
+      fromPubkey: "peer-preview",
       toPubkey: pk,
       payload: {
         text: longText,
@@ -275,12 +298,12 @@ describe("AgentManager — D2A match callback", () => {
       } as D2ADeliverPayload,
     });
 
-    onEventHandler({ pubkey: "peer-hash", content: "deliver" });
+    onEventHandler({ pubkey: "peer-preview", content: "deliver" });
     await new Promise(r => setTimeout(r, 50));
 
-    const contentHash = callbacks.onD2AMatchComplete.mock.calls[0][2];
-    expect(contentHash).toBe("A".repeat(32));
-    expect(contentHash.length).toBe(32);
+    const contentPreview = callbacks.onD2AMatchComplete.mock.calls[0][2];
+    expect(contentPreview).toBe("A".repeat(32));
+    expect(contentPreview.length).toBe(32);
 
     mgr.stop();
   });

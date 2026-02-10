@@ -1,7 +1,6 @@
 import { finalizeEvent } from "nostr-tools/pure";
-import type { EventTemplate } from "nostr-tools/pure";
-import { SimplePool } from "nostr-tools/pool";
 import { encryptMessage, decryptMessage } from "@/lib/nostr/encrypt";
+import { publishAndPartition } from "@/lib/nostr/publish";
 import type { HandshakeState, D2AOfferPayload, D2ADeliverPayload, D2AMessage } from "./types";
 import {
   KIND_EPHEMERAL,
@@ -12,35 +11,6 @@ import {
   HANDSHAKE_TIMEOUT_MS,
 } from "./protocol";
 
-interface RelayResult {
-  published: string[];
-  failed: string[];
-}
-
-async function publishToRelays(
-  sk: Uint8Array,
-  template: EventTemplate,
-  relayUrls: string[],
-): Promise<RelayResult> {
-  const signed = finalizeEvent(template, sk);
-  const pool = new SimplePool();
-  const results = await Promise.allSettled(pool.publish(relayUrls, signed));
-  pool.destroy();
-
-  const published: string[] = [];
-  const failed: string[] = [];
-  results.forEach((result, i) => {
-    if (result.status === "fulfilled") {
-      published.push(relayUrls[i]);
-    } else {
-      console.warn(`Relay ${relayUrls[i]} publish failed:`, result.reason);
-      failed.push(relayUrls[i]);
-    }
-  });
-
-  return { published, failed };
-}
-
 async function sendD2AMessage(
   sk: Uint8Array,
   myPubkey: string,
@@ -49,20 +19,23 @@ async function sendD2AMessage(
   tag: string,
   payload: D2AMessage["payload"],
   relayUrls: string[],
-): Promise<RelayResult> {
+): Promise<{ published: string[]; failed: string[] }> {
   const message: D2AMessage = { type, fromPubkey: myPubkey, toPubkey: peerPubkey, payload };
   const encrypted = encryptMessage(JSON.stringify(message), sk, peerPubkey);
 
-  const template: EventTemplate = {
-    kind: KIND_EPHEMERAL,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [["p", peerPubkey], ["d2a", tag]],
-    content: encrypted,
-  };
+  const signed = finalizeEvent(
+    {
+      kind: KIND_EPHEMERAL,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [["p", peerPubkey], ["d2a", tag]],
+      content: encrypted,
+    },
+    sk,
+  );
 
-  const result = await publishToRelays(sk, template, relayUrls);
+  const result = await publishAndPartition(signed, relayUrls);
   if (result.published.length === 0) {
-    console.warn(`D2A ${type} to ${peerPubkey} failed on all relays`);
+    console.warn("[handshake] D2A", type, "to", peerPubkey, "failed on all relays");
   }
   return result;
 }
@@ -86,19 +59,19 @@ export async function sendOffer(
 
 export async function sendAccept(
   sk: Uint8Array, myPubkey: string, peerPubkey: string, relayUrls: string[],
-): Promise<RelayResult> {
+): Promise<{ published: string[]; failed: string[] }> {
   return sendD2AMessage(sk, myPubkey, peerPubkey, "accept", TAG_D2A_ACCEPT, {}, relayUrls);
 }
 
 export async function sendReject(
   sk: Uint8Array, myPubkey: string, peerPubkey: string, relayUrls: string[],
-): Promise<RelayResult> {
+): Promise<{ published: string[]; failed: string[] }> {
   return sendD2AMessage(sk, myPubkey, peerPubkey, "reject", TAG_D2A_REJECT, {}, relayUrls);
 }
 
 export async function deliverContent(
   sk: Uint8Array, myPubkey: string, peerPubkey: string, content: D2ADeliverPayload, relayUrls: string[],
-): Promise<RelayResult> {
+): Promise<{ published: string[]; failed: string[] }> {
   return sendD2AMessage(sk, myPubkey, peerPubkey, "deliver", TAG_D2A_DELIVER, content, relayUrls);
 }
 

@@ -293,7 +293,7 @@ When content is delivered, the full evaluation travels with it:
 }
 ```
 
-The receiving agent applies a final resonance check (≥ 0.1) before injecting the content into its feed, providing a last defense against irrelevant deliveries.
+The receiving agent rejects deliveries from undiscovered peers (not in the known peers map) and applies a resonance check (≥ 0.1) before injecting the content into its feed, providing a two-layer defense against irrelevant or unsolicited deliveries.
 
 ### Security Properties
 
@@ -392,6 +392,7 @@ aegis/
 │           ├── rss/route.ts             # RSS feed parsing (ETag/Last-Modified conditional)
 │           ├── twitter/route.ts         # X API search
 │           ├── nostr/route.ts           # Nostr relay query
+│           ├── briefing/route.ts       # Shared briefing fetch (Nostr NIP-23)
 │           └── discover-feed/route.ts   # RSS feed auto-discovery from any URL
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
@@ -424,9 +425,9 @@ aegis/
 │   │   └── sourceState.ts              # Source runtime state (backoff, health, adaptive timing)
 │   ├── nostr/
 │   │   ├── identity.ts                  # IC Principal -> Nostr keypair (SHA-256 derivation)
-│   │   ├── publish.ts                   # Kind 1 event signing + relay publish
+│   │   ├── publish.ts                   # Event signing + relay publish + publishAndPartition
 │   │   ├── encrypt.ts                   # NIP-44 encrypt/decrypt (XChaCha20-Poly1305)
-│   │   └── types.ts                     # Nostr kind constants
+│   │   └── types.ts                     # Nostr kind constants + mergeRelays utility
 │   ├── agent/
 │   │   ├── protocol.ts                  # D2A constants (kinds, tags, thresholds, timings)
 │   │   ├── discovery.ts                 # Presence broadcast + peer discovery + Jaccard resonance

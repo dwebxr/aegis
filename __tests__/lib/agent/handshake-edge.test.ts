@@ -146,7 +146,7 @@ describe("isHandshakeExpired — boundary conditions", () => {
   });
 
   it("expired check works for all phases", () => {
-    const phases = ["idle", "offered", "accepted", "delivering", "completed", "rejected"] as const;
+    const phases = ["offered", "accepted", "delivering", "completed", "rejected"] as const;
     for (const phase of phases) {
       const hs: HandshakeState = {
         peerId: "p",

@@ -5,20 +5,13 @@ import type { AddressPointer } from "nostr-tools/nip19";
 import { parseBriefingMarkdown } from "@/lib/briefing/serialize";
 import type { ParsedBriefing } from "@/lib/briefing/serialize";
 import { SharedBriefingView } from "@/components/shared/SharedBriefingView";
-import { KIND_LONG_FORM, DEFAULT_RELAYS } from "@/lib/nostr/types";
+import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
 
 export const maxDuration = 30;
 
 interface PageProps {
   params: Promise<{ naddr: string }>;
 }
-
-/** Extra relays for long-form content */
-const LONG_FORM_RELAYS = [
-  "wss://relay.nostr.band",
-  "wss://relay.damus.io",
-  "wss://nos.lol",
-];
 
 const briefingCache = new Map<string, { data: ParsedBriefing | null; at: number }>();
 
@@ -36,9 +29,7 @@ async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
     return null;
   }
 
-  const hintRelays = addr.relays && addr.relays.length > 0 ? addr.relays : DEFAULT_RELAYS;
-  const relaySet = new Set([...hintRelays, ...LONG_FORM_RELAYS]);
-  const relays = Array.from(relaySet);
+  const relays = mergeRelays(addr.relays);
 
   const { SimplePool, useWebSocketImplementation: setWsImpl } =
     await import("nostr-tools/pool");
@@ -87,20 +78,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
+  const desc = briefing.summary || `${briefing.insightCount} insights curated by Aegis AI`;
   return {
     title: briefing.title,
-    description: briefing.summary || `${briefing.insightCount} insights curated by Aegis AI`,
+    description: desc,
     openGraph: {
       type: "article",
       title: briefing.title,
-      description: briefing.summary || `${briefing.insightCount} insights curated by Aegis AI`,
+      description: desc,
       siteName: "Aegis",
       images: [{ url: "/og-image.png", width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
       title: briefing.title,
-      description: briefing.summary || `${briefing.insightCount} insights curated by Aegis AI`,
+      description: desc,
       images: ["/og-image.png"],
     },
   };

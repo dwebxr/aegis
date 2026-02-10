@@ -346,18 +346,16 @@ describe("AgentManager — handleDelivery", () => {
     const { callbacks } = makeCallbacks();
     mockCalculateResonance.mockReturnValue(0.5);
 
-    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
-    await mgr.start();
-
-    // Register the peer so resonance check works
+    // Peer must be discovered first — unknown peers are rejected
     mockDiscoverPeers.mockResolvedValueOnce([{
       nostrPubkey: "sender-pk",
       interests: ["ai"],
       capacity: 5,
       lastSeen: Date.now(),
     }]);
-    // Re-run discovery manually isn't easy, so we rely on the peer not being found
-    // which skips the resonance check (no peer profile → no check)
+
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+    await mgr.start(); // start() calls discoverAndNegotiate → registers the peer
 
     mockParseD2AMessage.mockReturnValue({
       type: "deliver",
@@ -384,13 +382,13 @@ describe("AgentManager — handleDelivery", () => {
     mgr.stop();
   });
 
-  it("accepts delivery from unknown peer (no resonance check when peer not in map)", async () => {
+  it("rejects delivery from unknown peer (not in discovered peers map)", async () => {
     const { callbacks } = makeCallbacks();
 
     const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
     await mgr.start();
 
-    // Peer not discovered — resonance check is skipped, delivery accepted
+    // Peer not discovered — delivery must be rejected (no trust)
     mockParseD2AMessage.mockReturnValue({
       type: "deliver",
       fromPubkey: "unknown-peer",
@@ -407,8 +405,8 @@ describe("AgentManager — handleDelivery", () => {
     onEventHandler({ pubkey: "unknown-peer", content: "encrypted-deliver" });
     await new Promise(r => setTimeout(r, 50));
 
-    expect(callbacks.onNewContent).toHaveBeenCalledTimes(1);
-    expect(mgr.getState().receivedItems).toBe(1);
+    expect(callbacks.onNewContent).not.toHaveBeenCalled();
+    expect(mgr.getState().receivedItems).toBe(0);
 
     mgr.stop();
   });
@@ -445,9 +443,12 @@ describe("AgentManager — message handler catch", () => {
     mgr.stop();
   });
 
-  it("does not crash when parseD2AMessage throws", async () => {
+  it("stays active when message handler throws (caught by subscribe wrapper)", async () => {
+    // parseD2AMessage itself never throws (catches internally), but if
+    // handleIncomingMessage throws for any reason, the .catch() in
+    // subscribeToMessages prevents an unhandled rejection.
     mockParseD2AMessage.mockImplementation(() => {
-      throw new Error("Decryption failed");
+      throw new Error("Unexpected failure");
     });
 
     const { callbacks } = makeCallbacks();

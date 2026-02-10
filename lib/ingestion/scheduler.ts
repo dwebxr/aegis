@@ -89,11 +89,7 @@ export class IngestionScheduler {
   }
 
   private persistStates(): void {
-    const obj: Record<string, SourceRuntimeState> = {};
-    this.sourceStates.forEach((state, key) => {
-      obj[key] = state;
-    });
-    saveSourceStates(obj);
+    saveSourceStates(Object.fromEntries(this.sourceStates));
   }
 
   private recordSourceError(key: string, error: string): void {

@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   }
   const { text, userContext } = body as { text?: string; userContext?: UserContext };
 
-  if (!text || typeof text !== "string" || text.trim().length === 0) {
+  if (typeof text !== "string" || !text.trim()) {
     return NextResponse.json({ error: "Text is required" }, { status: 400 });
   }
 

@@ -84,38 +84,28 @@ export async function POST(request: NextRequest) {
   // Step 2: If no feeds found via <link> tags, probe common paths
   if (feeds.length === 0) {
     const origin = parsedUrl.origin;
-    const probeResults = await Promise.allSettled(
+    const probed = await Promise.all(
       COMMON_PATHS.map(async (path) => {
         const probeUrl = `${origin}${path}`;
-        const probeBlocked = blockPrivateUrl(probeUrl);
-        if (probeBlocked) return null;
+        if (blockPrivateUrl(probeUrl)) return null;
 
-        const res = await fetch(probeUrl, {
-          method: "HEAD",
-          headers: { "User-Agent": "Aegis/2.0 Feed Discovery" },
-          signal: AbortSignal.timeout(5_000),
-          redirect: "follow",
-        });
-
-        if (res.ok) {
-          const contentType = res.headers.get("content-type") || "";
-          if (
-            contentType.includes("xml") ||
-            contentType.includes("rss") ||
-            contentType.includes("atom")
-          ) {
+        try {
+          const res = await fetch(probeUrl, {
+            method: "HEAD",
+            headers: { "User-Agent": "Aegis/2.0 Feed Discovery" },
+            signal: AbortSignal.timeout(5_000),
+            redirect: "follow",
+          });
+          const ct = res.headers.get("content-type") ?? "";
+          if (res.ok && (ct.includes("xml") || ct.includes("rss") || ct.includes("atom"))) {
             return { url: probeUrl, type: "rss" as const };
           }
-        }
+        } catch { /* probe failed — skip */ }
         return null;
       })
     );
 
-    for (const result of probeResults) {
-      if (result.status === "fulfilled" && result.value) {
-        feeds.push(result.value);
-      }
-    }
+    feeds.push(...probed.filter((f): f is NonNullable<typeof f> => f !== null));
   }
 
   return NextResponse.json({ feeds });

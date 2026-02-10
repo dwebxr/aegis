@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decode } from "nostr-tools/nip19";
 import type { AddressPointer } from "nostr-tools/nip19";
-import { KIND_LONG_FORM, DEFAULT_RELAYS } from "@/lib/nostr/types";
+import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
 
 export const maxDuration = 30;
-
-/** Extra relays for long-form content that may not be in the naddr hint */
-const LONG_FORM_RELAYS = [
-  "wss://relay.nostr.band",
-  "wss://relay.damus.io",
-  "wss://nos.lol",
-];
 
 export async function GET(request: NextRequest) {
   const naddr = request.nextUrl.searchParams.get("naddr");
@@ -32,10 +25,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Failed to decode naddr" }, { status: 400 });
   }
 
-  // Merge naddr relays + fallback relays, deduplicate
-  const hintRelays = addr.relays && addr.relays.length > 0 ? addr.relays : DEFAULT_RELAYS;
-  const relaySet = new Set([...hintRelays, ...LONG_FORM_RELAYS]);
-  const relays = Array.from(relaySet);
+  const relays = mergeRelays(addr.relays);
 
   const { SimplePool, useWebSocketImplementation: setWsImpl } =
     await import("nostr-tools/pool");

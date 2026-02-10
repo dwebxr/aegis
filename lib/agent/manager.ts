@@ -3,7 +3,7 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { ContentItem } from "@/lib/types/content";
-import type { AgentProfile, AgentState, HandshakeState, D2AMessage, D2AOfferPayload, D2ADeliverPayload } from "./types";
+import type { AgentProfile, AgentState, HandshakeState, D2AOfferPayload, D2ADeliverPayload } from "./types";
 import { broadcastPresence, discoverPeers, calculateResonance } from "./discovery";
 import { sendOffer, sendAccept, sendReject, deliverContent, parseD2AMessage, isHandshakeExpired } from "./handshake";
 import {
@@ -14,12 +14,7 @@ import {
 } from "./protocol";
 import type { SubCloser } from "nostr-tools/pool";
 import { errMsg } from "@/lib/utils/errors";
-
-const DEFAULT_RELAYS = [
-  "wss://relay.damus.io",
-  "wss://nos.lol",
-  "wss://relay.nostr.band",
-];
+import { DEFAULT_RELAYS } from "@/lib/nostr/types";
 
 interface AgentManagerCallbacks {
   onNewContent: (item: ContentItem) => void;
@@ -242,13 +237,8 @@ export class AgentManager {
   }
 
   private async handleIncomingMessage(senderPk: string, encryptedContent: string): Promise<void> {
-    let message: D2AMessage | null;
-    try {
-      message = parseD2AMessage(encryptedContent, this.sk, senderPk);
-    } catch (err) {
-      console.debug("[agent] Ignoring unparseable D2A message from", senderPk.slice(0, 8), ":", errMsg(err));
-      return;
-    }
+    // parseD2AMessage catches decrypt/parse failures internally and returns null
+    const message = parseD2AMessage(encryptedContent, this.sk, senderPk);
     if (!message) return;
 
     switch (message.type) {
@@ -353,19 +343,20 @@ export class AgentManager {
   }
 
   private async handleDelivery(senderPk: string, payload: D2ADeliverPayload): Promise<void> {
-    // Validate the content against our own preferences before accepting
     const prefs = this.callbacks.getPrefs();
     const peerProfile = this.peers.get(senderPk);
-    if (peerProfile) {
-      const resonance = calculateResonance(prefs, peerProfile);
-      if (resonance < 0.1) return; // Very low resonance, ignore
-    }
+
+    // Reject deliveries from undiscovered peers — no profile means no trust
+    if (!peerProfile) return;
+
+    const resonance = calculateResonance(prefs, peerProfile);
+    if (resonance < 0.1) return;
 
     const item: ContentItem = {
       id: uuidv4(),
       owner: "",
       author: payload.author,
-      avatar: "\uD83E\uDD16", // robot face for D2A-received content
+      avatar: "\uD83E\uDD16",
       text: payload.text,
       source: "nostr",
       scores: payload.scores,
@@ -390,13 +381,11 @@ export class AgentManager {
       handshake.completedAt = Date.now();
     }
 
-    // Trigger D2A match fee callback (content hash = first 32 chars of text)
     if (this.callbacks.onD2AMatchComplete) {
       this.d2aMatchCount++;
-      const contentHash = payload.text.slice(0, 32);
-      const senderPrincipalId = this.peers.get(senderPk)?.principalId;
+      const contentPreview = payload.text.slice(0, 32);
       try {
-        await this.callbacks.onD2AMatchComplete(senderPk, senderPrincipalId, contentHash);
+        await this.callbacks.onD2AMatchComplete(senderPk, peerProfile.principalId, contentPreview);
       } catch (err) {
         console.warn("[agent] onD2AMatchComplete callback failed:", errMsg(err));
       }
