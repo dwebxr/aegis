@@ -125,11 +125,14 @@ export default function AegisApp() {
         return [];
       },
       getUserContext: () => userContextRef.current,
+      onSourceAutoDisabled: (key, error) => {
+        addNotification(`Source auto-disabled after repeated failures: ${key} (${error})`, "error");
+      },
     });
     schedulerRef.current = scheduler;
     scheduler.start();
     return () => scheduler.stop();
-  }, [addContent, demoSchedulerSources]);
+  }, [addContent, demoSchedulerSources, addNotification]);
 
   // Clear demo content when user logs in
   useEffect(() => {

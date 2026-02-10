@@ -37,6 +37,27 @@ function extractAttr(field: unknown, attr: string): string | undefined {
   return undefined;
 }
 
+function extractImage(item: Record<string, unknown>, rawContent: string): string | undefined {
+  const enc = item.enclosure as { url?: string; type?: string } | undefined;
+  if (enc?.url && /image/i.test(enc.type || "")) return enc.url;
+  if (extractAttr(item.mediaThumbnail, "url")) return extractAttr(item.mediaThumbnail, "url");
+  if (extractAttr(item.mediaContent, "url") && /image/i.test(extractAttr(item.mediaContent, "type") || "")) {
+    return extractAttr(item.mediaContent, "url");
+  }
+  if (item.mediaGroup && typeof item.mediaGroup === "object") {
+    const group = item.mediaGroup as Record<string, unknown>;
+    const thumb = extractAttr(group["media:thumbnail"], "url");
+    if (thumb) return thumb;
+  }
+  if (item.itunes && typeof item.itunes === "object") {
+    const itunes = item.itunes as Record<string, unknown>;
+    if (typeof itunes.image === "string") return itunes.image;
+  }
+  const imgMatch = rawContent.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if (imgMatch?.[1]) return imgMatch[1];
+  return undefined;
+}
+
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 30, 60_000);
   if (limited) return limited;
@@ -47,7 +68,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 });
   }
-  const { feedUrl, limit = 20 } = body;
+  const { feedUrl, limit = 20, etag, lastModified } = body;
 
   if (!feedUrl || typeof feedUrl !== "string") {
     return NextResponse.json({ error: "Feed URL is required" }, { status: 400 });
@@ -58,6 +79,61 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: blocked }, { status: 400 });
   }
 
+  // Conditional request: manual fetch + parseString to support ETag/Last-Modified
+  if (etag || lastModified) {
+    try {
+      const headers: Record<string, string> = {
+        "User-Agent": "Aegis/2.0 Content Quality Filter",
+        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
+      };
+      if (etag) headers["If-None-Match"] = etag;
+      if (lastModified) headers["If-Modified-Since"] = lastModified;
+
+      const res = await fetch(feedUrl, {
+        headers,
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      // 304 Not Modified
+      if (res.status === 304) {
+        return NextResponse.json({
+          feedTitle: "",
+          notModified: true,
+          etag: res.headers.get("etag") || etag,
+          lastModified: res.headers.get("last-modified") || lastModified,
+          items: [],
+        });
+      }
+
+      if (!res.ok) {
+        return NextResponse.json({ error: `Feed returned HTTP ${res.status}` }, { status: 502 });
+      }
+
+      const xml = await res.text();
+      const feed = await parser.parseString(xml);
+
+      const responseEtag = res.headers.get("etag") || undefined;
+      const responseLastModified = res.headers.get("last-modified") || undefined;
+
+      const items = buildItems(feed, limit);
+
+      return NextResponse.json({
+        feedTitle: feed.title || feedUrl,
+        etag: responseEtag,
+        lastModified: responseLastModified,
+        items,
+      });
+    } catch (err: unknown) {
+      console.error("[fetch/rss] Conditional fetch failed:", feedUrl, err);
+      const msg = errMsg(err);
+      if (msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
+        return NextResponse.json({ error: "Could not reach this feed. Check the URL and try again." }, { status: 502 });
+      }
+      return NextResponse.json({ error: "Could not parse this feed. It may not be valid RSS/Atom." }, { status: 422 });
+    }
+  }
+
+  // Standard fetch (no conditional headers)
   let feed;
   try {
     feed = await parser.parseURL(feedUrl);
@@ -70,30 +146,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Could not parse this feed. It may not be valid RSS/Atom." }, { status: 422 });
   }
 
-  const items = (feed.items || []).slice(0, Math.min(limit, 50)).map(item => {
+  const items = buildItems(feed, limit);
+
+  return NextResponse.json({
+    feedTitle: feed.title || feedUrl,
+    items,
+  });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildItems(feed: Parser.Output<any>, limit: number) {
+  return (feed.items || []).slice(0, Math.min(limit, 50)).map(item => {
     const raw = item as unknown as Record<string, unknown>;
     const contentEncoded = typeof raw["content:encoded"] === "string" ? raw["content:encoded"] : "";
     const rawContent: string = contentEncoded || item.content || item.contentSnippet || item.summary || "";
     const textContent = rawContent.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-    const enc = item.enclosure as { url?: string; type?: string } | undefined;
-    let imageUrl: string | undefined;
-    if (enc?.url && /image/i.test(enc.type || "")) {
-      imageUrl = enc.url;
-    } else if (extractAttr(raw.mediaThumbnail, "url")) {
-      imageUrl = extractAttr(raw.mediaThumbnail, "url");
-    } else if (extractAttr(raw.mediaContent, "url") && /image/i.test(extractAttr(raw.mediaContent, "type") || "")) {
-      imageUrl = extractAttr(raw.mediaContent, "url");
-    } else if (raw.mediaGroup && typeof raw.mediaGroup === "object") {
-      const group = raw.mediaGroup as Record<string, unknown>;
-      const thumb = extractAttr(group["media:thumbnail"], "url");
-      if (thumb) imageUrl = thumb;
-    } else if (raw.itunes && typeof raw.itunes === "object") {
-      const itunes = raw.itunes as Record<string, unknown>;
-      if (typeof itunes.image === "string") imageUrl = itunes.image;
-    } else {
-      const imgMatch = rawContent.match(/<img[^>]+src=["']([^"']+)["']/i);
-      if (imgMatch?.[1]) imageUrl = imgMatch[1];
-    }
+    const imageUrl = extractImage(raw, rawContent);
     const rawAuthor = typeof raw.author === "string" ? raw.author : "";
     return {
       title: item.title || "",
@@ -103,10 +171,5 @@ export async function POST(request: NextRequest) {
       publishedDate: item.pubDate || item.isoDate || "",
       imageUrl,
     };
-  });
-
-  return NextResponse.json({
-    feedTitle: feed.title || feedUrl,
-    items,
   });
 }

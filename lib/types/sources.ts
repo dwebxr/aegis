@@ -28,6 +28,8 @@ export type SourceConfig =
   | { type: "twitter"; config: TwitterSourceConfig }
   | { type: "nostr"; config: NostrSourceConfig };
 
+export type SourceHealth = "healthy" | "degraded" | "error" | "disabled";
+
 /** Persisted source configuration (localStorage + IC) */
 export interface SavedSource {
   id: string;

@@ -1,12 +1,25 @@
 import { v4 as uuidv4 } from "uuid";
 import { quickSlopFilter } from "./quickFilter";
+import { ArticleDeduplicator } from "./dedup";
+import {
+  type SourceRuntimeState,
+  defaultState,
+  getSourceKey,
+  loadSourceStates,
+  saveSourceStates,
+  computeBackoffDelay,
+  computeAdaptiveInterval,
+  MAX_CONSECUTIVE_FAILURES,
+  BASE_CYCLE_MS,
+} from "./sourceState";
 import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { errMsg } from "@/lib/utils/errors";
 
-const CYCLE_INTERVAL_MS = 20 * 60 * 1000; // 20 minutes
 const MAX_ITEMS_PER_SOURCE = 5;
+const MAX_ENRICH_PER_CYCLE = 3;
+const ENRICH_MIN_WORDS = 100;
 
 interface SourceConfig {
   type: "rss" | "url" | "nostr";
@@ -19,6 +32,7 @@ interface SchedulerCallbacks {
   getSources: () => SourceConfig[];
   getUserContext: () => UserContext | null;
   onSourceError?: (sourceKey: string, error: string) => void;
+  onSourceAutoDisabled?: (sourceKey: string, error: string) => void;
 }
 
 export class IngestionScheduler {
@@ -26,16 +40,23 @@ export class IngestionScheduler {
   private initialTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private callbacks: SchedulerCallbacks;
   private running = false;
-  private sourceErrors = new Map<string, { count: number; lastError: string; lastAt: number }>();
+  private sourceStates: Map<string, SourceRuntimeState>;
+  private dedup: ArticleDeduplicator;
+  /** ETag / Last-Modified cache per source key */
+  private conditionalHeaders = new Map<string, { etag?: string; lastModified?: string }>();
 
   constructor(callbacks: SchedulerCallbacks) {
     this.callbacks = callbacks;
+    this.dedup = new ArticleDeduplicator();
+    // Load persisted source states
+    const persisted = loadSourceStates();
+    this.sourceStates = new Map(Object.entries(persisted));
   }
 
   start(): void {
     if (this.intervalId) return;
     this.initialTimeoutId = setTimeout(() => this.runCycle(), 5000);
-    this.intervalId = setInterval(() => this.runCycle(), CYCLE_INTERVAL_MS);
+    this.intervalId = setInterval(() => this.runCycle(), BASE_CYCLE_MS);
   }
 
   stop(): void {
@@ -49,18 +70,91 @@ export class IngestionScheduler {
     }
   }
 
+  getSourceStates(): ReadonlyMap<string, SourceRuntimeState> {
+    return this.sourceStates;
+  }
+
+  /** @deprecated Use getSourceStates() instead */
   getSourceErrors(): ReadonlyMap<string, { count: number; lastError: string; lastAt: number }> {
-    return this.sourceErrors;
+    const errors = new Map<string, { count: number; lastError: string; lastAt: number }>();
+    this.sourceStates.forEach((state, key) => {
+      if (state.errorCount > 0) {
+        errors.set(key, { count: state.errorCount, lastError: state.lastError, lastAt: state.lastErrorAt });
+      }
+    });
+    return errors;
+  }
+
+  resetDedup(): void {
+    this.dedup.reset();
+  }
+
+  private getOrCreateState(key: string): SourceRuntimeState {
+    let state = this.sourceStates.get(key);
+    if (!state) {
+      state = defaultState();
+      this.sourceStates.set(key, state);
+    }
+    return state;
+  }
+
+  private persistStates(): void {
+    const obj: Record<string, SourceRuntimeState> = {};
+    this.sourceStates.forEach((state, key) => {
+      obj[key] = state;
+    });
+    saveSourceStates(obj);
   }
 
   private recordSourceError(key: string, error: string): void {
-    const existing = this.sourceErrors.get(key);
-    this.sourceErrors.set(key, {
-      count: (existing?.count ?? 0) + 1,
-      lastError: error,
-      lastAt: Date.now(),
-    });
+    const state = this.getOrCreateState(key);
+    state.errorCount += 1;
+    state.lastError = error;
+    state.lastErrorAt = Date.now();
+
+    // Compute backoff
+    const backoff = computeBackoffDelay(state.errorCount);
+    state.nextFetchAt = Date.now() + backoff;
+
+    this.persistStates();
     this.callbacks.onSourceError?.(key, error);
+
+    // Auto-disable notification
+    if (state.errorCount >= MAX_CONSECUTIVE_FAILURES) {
+      this.callbacks.onSourceAutoDisabled?.(key, error);
+    }
+  }
+
+  private recordSourceSuccess(key: string, itemCount: number, scores: number[]): void {
+    const state = this.getOrCreateState(key);
+    state.errorCount = 0;
+    state.lastError = "";
+    state.lastSuccessAt = Date.now();
+    state.lastFetchedAt = Date.now();
+    state.itemsFetched = itemCount;
+
+    if (itemCount === 0) {
+      state.consecutiveEmpty += 1;
+    } else {
+      state.consecutiveEmpty = 0;
+    }
+
+    // Update average score
+    if (scores.length > 0) {
+      const newAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
+      const prevTotal = state.totalItemsScored;
+      state.averageScore =
+        prevTotal === 0
+          ? newAvg
+          : (state.averageScore * prevTotal + newAvg * scores.length) / (prevTotal + scores.length);
+      state.totalItemsScored += scores.length;
+    }
+
+    // Compute adaptive interval
+    const interval = computeAdaptiveInterval(state);
+    state.nextFetchAt = Date.now() + interval;
+
+    this.persistStates();
   }
 
   private async runCycle(): Promise<void> {
@@ -70,22 +164,50 @@ export class IngestionScheduler {
     try {
       const sources = this.callbacks.getSources();
       const userContext = this.callbacks.getUserContext();
+      const now = Date.now();
 
       for (const source of sources) {
         if (!source.enabled) continue;
-        const items = await this.fetchSource(source);
+
+        const key = getSourceKey(source.type, source.config);
+        const state = this.getOrCreateState(key);
+
+        // Skip if auto-disabled
+        if (state.errorCount >= MAX_CONSECUTIVE_FAILURES) continue;
+
+        // Skip if not yet due (adaptive/backoff timing)
+        if (state.nextFetchAt > now) continue;
+
+        const items = await this.fetchSource(source, key);
 
         // Quick filter to reduce API calls
         const passed = items.filter(raw => quickSlopFilter(raw.text));
 
+        // Deduplicate before scoring (saves Claude API calls)
+        const unique = passed.filter(raw => !this.dedup.isDuplicate(raw.sourceUrl, raw.text));
+
+        // Enrich short articles with full text
+        const enriched = await this.enrichItems(unique, source.type);
+
         // Send top N to Claude for full scoring
-        const toScore = passed.slice(0, MAX_ITEMS_PER_SOURCE);
+        const toScore = enriched.slice(0, MAX_ITEMS_PER_SOURCE);
+        const scores: number[] = [];
+
         for (const raw of toScore) {
           const scored = await this.scoreItem(raw, userContext);
           if (scored) {
+            this.dedup.markSeen(raw.sourceUrl, raw.text);
+            scores.push(scored.scores.composite);
             this.callbacks.onNewContent(scored);
           }
         }
+
+        // Mark remaining passed items as seen (even if not scored) to avoid re-fetching
+        for (const raw of unique.slice(MAX_ITEMS_PER_SOURCE)) {
+          this.dedup.markSeen(raw.sourceUrl, raw.text);
+        }
+
+        this.recordSourceSuccess(key, items.length, scores);
       }
     } catch (err) {
       console.error("[scheduler] Ingestion cycle failed:", errMsg(err));
@@ -94,34 +216,89 @@ export class IngestionScheduler {
     }
   }
 
-  private async fetchSource(source: SourceConfig): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+  /** Enrich short RSS articles by fetching full text via /api/fetch/url */
+  private async enrichItems(
+    items: Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>,
+    sourceType: string,
+  ): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+    if (sourceType !== "rss") return items;
+
+    let enrichCount = 0;
+    const result: typeof items = [];
+
+    for (const item of items) {
+      const wordCount = item.text.split(/\s+/).length;
+
+      if (wordCount < ENRICH_MIN_WORDS && item.sourceUrl && enrichCount < MAX_ENRICH_PER_CYCLE) {
+        try {
+          const res = await fetch("/api/fetch/url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: item.sourceUrl }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const fullText = `${data.title || ""}\n\n${data.content || ""}`.slice(0, 2000);
+            if (fullText.split(/\s+/).length > wordCount) {
+              result.push({ ...item, text: fullText, imageUrl: item.imageUrl || data.imageUrl });
+              enrichCount++;
+              continue;
+            }
+          }
+        } catch {
+          // Enrichment failed — use original
+        }
+      }
+
+      result.push(item);
+    }
+
+    return result;
+  }
+
+  private async fetchSource(source: SourceConfig, key: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
     switch (source.type) {
       case "rss":
-        return this.fetchRSS(source.config.feedUrl);
+        return this.fetchRSS(source.config.feedUrl, key);
       case "nostr":
         return this.fetchNostr(
           source.config.relays?.split(",").map(r => r.trim()) || ["wss://relay.damus.io"],
           source.config.pubkeys?.split(",").map(p => p.trim()),
+          key,
         );
       case "url":
-        return this.fetchURL(source.config.url);
+        return this.fetchURL(source.config.url, key);
       default:
         return [];
     }
   }
 
-  private async fetchRSS(feedUrl: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+  private async fetchRSS(feedUrl: string, key: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
     try {
+      const body: Record<string, unknown> = { feedUrl, limit: 10 };
+      const cached = this.conditionalHeaders.get(key);
+      if (cached?.etag) body.etag = cached.etag;
+      if (cached?.lastModified) body.lastModified = cached.lastModified;
+
       const res = await fetch("/api/fetch/rss", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feedUrl, limit: 10 }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        this.recordSourceError(`rss:${feedUrl}`, `HTTP ${res.status}`);
+        this.recordSourceError(key, `HTTP ${res.status}`);
         return [];
       }
       const data = await res.json();
+
+      // Update conditional headers for next request
+      if (data.etag || data.lastModified) {
+        this.conditionalHeaders.set(key, { etag: data.etag, lastModified: data.lastModified });
+      }
+
+      // 304 Not Modified — no new content
+      if (data.notModified) return [];
+
       return (data.items || []).map((item: { title: string; content: string; author?: string; link?: string; imageUrl?: string }) => ({
         text: `${item.title}\n\n${item.content}`.slice(0, 2000),
         author: item.author || data.feedTitle || "RSS",
@@ -131,12 +308,12 @@ export class IngestionScheduler {
     } catch (err) {
       const msg = errMsg(err);
       console.error("[scheduler] RSS fetch failed:", msg);
-      this.recordSourceError(`rss:${feedUrl}`, msg);
+      this.recordSourceError(key, msg);
       return [];
     }
   }
 
-  private async fetchNostr(relays: string[], pubkeys?: string[]): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+  private async fetchNostr(relays: string[], pubkeys: string[] | undefined, key: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
     try {
       const res = await fetch("/api/fetch/nostr", {
         method: "POST",
@@ -144,7 +321,7 @@ export class IngestionScheduler {
         body: JSON.stringify({ relays, pubkeys: pubkeys?.length ? pubkeys : undefined, limit: 20 }),
       });
       if (!res.ok) {
-        this.recordSourceError(`nostr:${relays[0] || "unknown"}`, `HTTP ${res.status}`);
+        this.recordSourceError(key, `HTTP ${res.status}`);
         return [];
       }
       const data = await res.json();
@@ -156,12 +333,12 @@ export class IngestionScheduler {
     } catch (err) {
       const msg = errMsg(err);
       console.error("[scheduler] Nostr fetch failed:", msg);
-      this.recordSourceError(`nostr:${relays[0] || "unknown"}`, msg);
+      this.recordSourceError(key, msg);
       return [];
     }
   }
 
-  private async fetchURL(url: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+  private async fetchURL(url: string, key: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
     try {
       const res = await fetch("/api/fetch/url", {
         method: "POST",
@@ -169,7 +346,7 @@ export class IngestionScheduler {
         body: JSON.stringify({ url }),
       });
       if (!res.ok) {
-        this.recordSourceError(`url:${url}`, `HTTP ${res.status}`);
+        this.recordSourceError(key, `HTTP ${res.status}`);
         return [];
       }
       const data = await res.json();
@@ -184,7 +361,7 @@ export class IngestionScheduler {
     } catch (err) {
       const msg = errMsg(err);
       console.error("[scheduler] URL fetch failed:", msg);
-      this.recordSourceError(`url:${url}`, msg);
+      this.recordSourceError(key, msg);
       return [];
     }
   }

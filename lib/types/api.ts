@@ -26,6 +26,9 @@ export interface FetchURLResponse {
 
 export interface FetchRSSResponse {
   feedTitle: string;
+  notModified?: boolean;
+  etag?: string;
+  lastModified?: string;
   items: Array<{
     title: string;
     content: string;

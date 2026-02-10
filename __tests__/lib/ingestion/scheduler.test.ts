@@ -195,6 +195,7 @@ describe("IngestionScheduler", () => {
       });
 
       // Mock fetch: first call is /api/fetch/rss, second is /api/analyze
+      // Content must be >100 words to skip the enrichment step (which would call /api/fetch/url)
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({
           ok: true,
@@ -202,7 +203,7 @@ describe("IngestionScheduler", () => {
             feedTitle: "Test Feed",
             items: [{
               title: "New research on transformer attention mechanisms shows improvement",
-              content: "Detailed analysis with data: 23% improvement in retrieval benchmarks with reproducible code at https://example.com/paper. The methodology uses sliding window approach combined with global token selection for long-context tasks.",
+              content: "Detailed analysis with data: 23% improvement in retrieval benchmarks with reproducible code at https://example.com/paper. The methodology uses sliding window approach combined with global token selection for long-context tasks. The researchers conducted extensive experiments across multiple datasets including GLUE, SuperGLUE, and SQuAD benchmarks. Results demonstrate consistent improvements over the baseline transformer architecture. The sliding window mechanism reduces computational complexity from quadratic to linear while maintaining attention quality. Global tokens serve as information aggregation points, enabling effective long-range dependency modeling. This approach has significant implications for processing lengthy documents and maintaining contextual understanding across large text spans. The paper also includes ablation studies showing the relative contribution of each component.",
               author: "Dr. Research",
               link: "https://example.com/article",
               imageUrl: "https://example.com/thumb.jpg",
@@ -296,6 +297,7 @@ describe("IngestionScheduler", () => {
         ]),
       });
 
+      // Content must be >100 words to skip the enrichment step
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({
           ok: true,
@@ -303,7 +305,7 @@ describe("IngestionScheduler", () => {
             feedTitle: "Good Feed",
             items: [{
               title: "Solid research with data",
-              content: "Detailed analysis: 42% improvement in benchmarks with reproducible methodology and comprehensive evaluation across multiple datasets. Published at https://example.com/paper with full source code.",
+              content: "Detailed analysis: 42% improvement in benchmarks with reproducible methodology and comprehensive evaluation across multiple datasets. Published at https://example.com/paper with full source code. The study evaluated performance across five different model architectures and three distinct task categories. Each experiment was replicated three times to ensure statistical significance. The authors provide a comprehensive comparison with existing state-of-the-art methods, showing consistent improvements across all evaluated metrics. Additionally, the computational overhead of the proposed approach is minimal, requiring only 15% more training time while achieving substantially better results on downstream tasks. The code and trained models are publicly available for reproducibility.",
               author: "Researcher",
               link: "https://example.com/good",
             }],
