@@ -2,6 +2,7 @@ import withSerwist from "@serwist/next";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ["ws"],
   webpack: (config, { isServer }) => {
     config.experiments = {
       ...config.experiments,
