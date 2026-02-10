@@ -28,7 +28,6 @@ export class ArticleDeduplicator {
     return this.fingerprints.has(fp);
   }
 
-  /** Mark an article as seen. */
   markSeen(url: string | undefined, text: string): void {
     const fp = this.computeFingerprint(text);
     if (url) {
@@ -55,7 +54,6 @@ export class ArticleDeduplicator {
       .join("");
   }
 
-  /** Clear all dedup state. */
   reset(): void {
     this.urls.clear();
     this.fingerprints.clear();
@@ -92,8 +90,8 @@ export class ArticleDeduplicator {
       if (data.urls) data.urls.forEach(u => this.urls.add(u));
       if (data.fingerprints) data.fingerprints.forEach(f => this.fingerprints.add(f));
       if (data.order) this.insertionOrder = data.order;
-    } catch {
-      // Corrupted data — start fresh
+    } catch (err) {
+      console.warn("[dedup] Corrupted localStorage data, starting fresh:", err);
     }
   }
 
@@ -105,8 +103,8 @@ export class ArticleDeduplicator {
         fingerprints: Array.from(this.fingerprints),
         order: this.insertionOrder,
       }));
-    } catch {
-      // localStorage full or unavailable
+    } catch (err) {
+      console.warn("[dedup] Failed to persist dedup state:", err);
     }
   }
 }

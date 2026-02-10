@@ -64,7 +64,8 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       const actor = createBackendActor(identityRef.current);
       actorRef.current = actor;
       return actor;
-    } catch {
+    } catch (err) {
+      console.warn("[sources] Failed to create IC actor:", err);
       return null;
     }
   }
@@ -289,9 +290,13 @@ function icToSaved(ic: SourceConfigEntry): SavedSource | null {
     console.warn(`[sources] Corrupted configJson for source ${ic.id}, skipping:`, err);
     return null;
   }
+  if (ic.sourceType !== "rss" && ic.sourceType !== "nostr") {
+    console.warn(`[sources] Unknown sourceType "${ic.sourceType}" for source ${ic.id}, skipping`);
+    return null;
+  }
   return {
     id: ic.id,
-    type: ic.sourceType as "rss" | "nostr",
+    type: ic.sourceType,
     label: (parsed.label as string) || ic.sourceType,
     enabled: ic.enabled,
     feedUrl: parsed.feedUrl as string | undefined,

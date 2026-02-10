@@ -12,16 +12,16 @@ Content quality filter that learns your taste, curates a zero-noise briefing, pu
 ```
 Browser                                  Internet Computer (Mainnet)
 ┌───────────────────────────────────┐    ┌──────────────────────────┐
-│  Next.js 14 (App Router)         │    │  aegis_backend canister  │
+│  Next.js 14 (App Router)          │    │  aegis_backend canister  │
 │                                   │    │  (Motoko)                │
 │  Tabs:                            │    │                          │
 │    Dashboard / Briefing / Burn    │◄──►│  - Evaluation storage    │
 │    Sources / Analytics            │    │  - User profiles         │
-│                                   │    │  - Source configs         │
+│                                   │    │  - Source configs        │
 │  API Routes:                      │    │  - Quality deposits/rep  │
 │    POST /api/analyze              │    │  - D2A match records     │
-│    POST /api/fetch/{url,rss,      │    │  - IC LLM scoring       │
-│         twitter,nostr}            │    │  - Engagement index      │
+│    POST /api/fetch/{url,rss,      │    │  - IC LLM scoring        │
+│      twitter,nostr,discover-feed} │    │  - Engagement index      │
 │                                   │    │  Internet Identity auth  │
 │  Client-side:                     │    └─────────┬────────────────┘
 │    Preference learning engine     │              │
@@ -45,6 +45,7 @@ Browser                                  Internet Computer (Mainnet)
    2. Anthropic Claude (premium, V/C/L)
    3. Heuristic fallback (client-side)
    + Per-IP API rate limiting (20-30 req/min)
+   + Per-instance daily API budget (500 calls/day)
 ```
 
 ---
@@ -337,6 +338,7 @@ The receiving agent applies a final resonance check (≥ 0.1) before injecting t
 ### Zero Feed Briefing
 - Ranks content by composite score, topic relevance, author trust, and recency
 - Surfaces 3–5 priority items + 1 serendipity pick (high novelty, outside your bubble)
+- Shareable briefings via Nostr NIP-23 long-form events with `/b/[naddr]` public pages
 - Background ingestion from configured sources with quick heuristic pre-filter
 
 ### Signal Publishing
@@ -346,10 +348,14 @@ The receiving agent applies a final resonance check (≥ 0.1) before injecting t
 - Optional PoQ stake attachment with range slider UI
 
 ### Multi-Source Ingestion
-- RSS/Atom feeds (YouTube, note.com, blogs — with thumbnail extraction)
+- RSS/Atom feeds (YouTube, note.com, blogs — with thumbnail extraction, ETag conditional fetch)
+- Feed auto-discovery from any blog/site URL
 - Nostr relay queries (by pubkey or global)
 - Direct URL article extraction
 - X (Twitter) API search
+- Article-level dedup (URL + content fingerprint SHA-256) to avoid redundant API calls
+- Adaptive fetch intervals (scales with source activity, exponential backoff on errors)
+- Auto-disable after 5 consecutive failures with user notification
 
 ## Tech Stack
 
@@ -366,7 +372,7 @@ The receiving agent applies a final resonance check (≥ 0.1) before injecting t
 | Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
 | Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
-| Test | Jest + ts-jest (366 tests, 30 suites) |
+| Test | Jest + ts-jest (796 tests, 60 suites) |
 
 ## Project Structure
 
@@ -375,19 +381,23 @@ aegis/
 ├── app/
 │   ├── page.tsx                         # Main app page
 │   ├── layout.tsx                       # Root layout + metadata + icons
+│   ├── b/[naddr]/page.tsx               # Shared briefing viewer (Nostr NIP-23)
+│   ├── offline/page.tsx                 # PWA offline fallback
 │   ├── favicon.ico                      # Browser tab icon
 │   └── api/
 │       ├── analyze/route.ts             # Claude V/C/L scoring + fallback
 │       ├── health/route.ts              # Health check endpoint
 │       └── fetch/
 │           ├── url/route.ts             # URL article extraction
-│           ├── rss/route.ts             # RSS feed parsing (YouTube/note.com thumbnails)
+│           ├── rss/route.ts             # RSS feed parsing (ETag/Last-Modified conditional)
 │           ├── twitter/route.ts         # X API search
-│           └── nostr/route.ts           # Nostr relay query
+│           ├── nostr/route.ts           # Nostr relay query
+│           └── discover-feed/route.ts   # RSS feed auto-discovery from any URL
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
 │   ├── tabs/                            # Dashboard, Briefing, Incinerator, Sources, Analytics
-│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, AgentStatusBadge
+│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, ShareBriefingModal
+│   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
 │   ├── sources/                         # ManualInput
 │   ├── auth/                            # LoginButton, UserBadge
 │   └── Providers.tsx                    # Notification + Auth + Content + Preference + Source + Agent
@@ -397,7 +407,8 @@ aegis/
 │   ├── ContentContext.tsx               # Content CRUD + IC sync + error notifications
 │   ├── PreferenceContext.tsx            # Preference learning lifecycle
 │   ├── SourceContext.tsx                # RSS/Nostr source management + IC sync
-│   └── AgentContext.tsx                 # D2A agent lifecycle + error notifications
+│   ├── AgentContext.tsx                 # D2A agent lifecycle + error notifications
+│   └── DemoContext.tsx                  # Demo mode for unauthenticated users
 ├── lib/
 │   ├── preferences/
 │   │   ├── types.ts                     # UserPreferenceProfile, constants
@@ -407,8 +418,10 @@ aegis/
 │   │   ├── ranker.ts                    # briefingScore, generateBriefing, serendipity
 │   │   └── types.ts                     # BriefingState, BriefingItem
 │   ├── ingestion/
-│   │   ├── scheduler.ts                 # Background fetch cycle (20 min interval)
-│   │   └── quickFilter.ts              # Heuristic pre-filter (Tier 1)
+│   │   ├── scheduler.ts                 # Background fetch cycle (adaptive intervals, enrichment)
+│   │   ├── quickFilter.ts              # Heuristic pre-filter (Tier 1)
+│   │   ├── dedup.ts                     # Article-level dedup (URL + SHA-256 fingerprint)
+│   │   └── sourceState.ts              # Source runtime state (backoff, health, adaptive timing)
 │   ├── nostr/
 │   │   ├── identity.ts                  # IC Principal -> Nostr keypair (SHA-256 derivation)
 │   │   ├── publish.ts                   # Kind 1 event signing + relay publish
@@ -426,10 +439,14 @@ aegis/
 │   │   ├── icpLedger.ts                # ICP Ledger actor (ICRC-1/2 balance, approve, allowance)
 │   │   └── declarations/               # Candid types + IDL factory
 │   ├── api/
-│   │   └── rateLimit.ts                 # Per-IP rate limiter for API routes (30 req/min)
+│   │   ├── rateLimit.ts                 # Per-IP rate limiter for API routes (30 req/min)
+│   │   └── dailyBudget.ts              # Per-instance daily API budget (500 calls/day)
 │   ├── types/                           # ContentItem, API response types, source types
-│   └── utils/                           # Score computation helpers
-├── __tests__/                           # 366 tests across 30 suites
+│   └── utils/
+│       ├── scores.ts                    # Score computation + relativeTime
+│       ├── errors.ts                    # errMsg() shared error formatter
+│       └── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
+├── __tests__/                           # 796 tests across 60 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -460,7 +477,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 366 tests
+npm test              # Run all 796 tests
 npm run test:watch    # Watch mode
 ```
 

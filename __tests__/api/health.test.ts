@@ -55,4 +55,11 @@ describe("GET /api/health", () => {
     expect(data.status).toBe("ok");
     expect(data.checks.anthropicKey).toBe("configured");
   });
+
+  it("includes node version and region", async () => {
+    const res = await GET();
+    const data = await res.json();
+    expect(data.node).toBe(process.version);
+    expect(data.region).toBe("local");
+  });
 });

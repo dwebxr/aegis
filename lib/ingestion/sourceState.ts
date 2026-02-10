@@ -26,16 +26,9 @@ export const BACKOFF_MS = [60_000, 300_000, 1_200_000, 3_600_000] as const;
 /** Auto-disable after this many consecutive failures */
 export const MAX_CONSECUTIVE_FAILURES = 5;
 
-/** Default cycle interval (2 minutes base) */
 export const BASE_CYCLE_MS = 2 * 60 * 1000;
-
-/** Max adaptive interval (2 hours) */
 const MAX_INTERVAL_MS = 2 * 60 * 60 * 1000;
-
-/** Min adaptive interval (5 minutes) */
 const MIN_INTERVAL_MS = 5 * 60 * 1000;
-
-/** Default interval (20 minutes) */
 const DEFAULT_INTERVAL_MS = 20 * 60 * 1000;
 
 export function defaultState(): SourceRuntimeState {
@@ -72,7 +65,8 @@ export function loadSourceStates(): Record<string, SourceRuntimeState> {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     return JSON.parse(raw) as Record<string, SourceRuntimeState>;
-  } catch {
+  } catch (err) {
+    console.warn("[sourceState] Corrupted localStorage data, resetting:", err);
     return {};
   }
 }
@@ -81,8 +75,8 @@ export function saveSourceStates(states: Record<string, SourceRuntimeState>): vo
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(states));
-  } catch {
-    // localStorage full or unavailable
+  } catch (err) {
+    console.warn("[sourceState] Failed to persist source states:", err);
   }
 }
 
@@ -106,7 +100,6 @@ export function computeAdaptiveInterval(state: SourceRuntimeState): number {
   return DEFAULT_INTERVAL_MS;
 }
 
-/** Determine source health from runtime state. */
 export function getSourceHealth(state: SourceRuntimeState): SourceHealth {
   if (state.errorCount >= MAX_CONSECUTIVE_FAILURES) return "disabled";
   if (state.errorCount >= 3) return "error";

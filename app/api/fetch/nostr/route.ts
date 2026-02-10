@@ -3,6 +3,8 @@ import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateRelay } from "@/lib/utils/url";
 
+export const maxDuration = 30;
+
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 30, 60_000);
   if (limited) return limited;
@@ -62,21 +64,23 @@ export async function POST(request: NextRequest) {
     filter.since = since;
   }
 
-  let events: Array<{ id: string; pubkey: string; content: string; created_at: number; tags: string[][] }> = [];
-
   try {
     const rawEvents = await Promise.race([
       pool.querySync(relays, filter),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
     ]);
 
-    events = rawEvents.map(e => ({
-      id: e.id,
-      pubkey: e.pubkey,
-      content: e.content,
-      created_at: e.created_at,
-      tags: e.tags,
-    }));
+    rawEvents.sort((a, b) => b.created_at - a.created_at);
+
+    return NextResponse.json({
+      events: rawEvents.map(e => ({
+        id: e.id,
+        pubkey: e.pubkey,
+        content: e.content,
+        createdAt: e.created_at,
+        tags: e.tags,
+      })),
+    });
   } catch (err: unknown) {
     console.error("[fetch/nostr] Relay query failed:", err);
     const msg = errMsg(err);
@@ -90,16 +94,4 @@ export async function POST(request: NextRequest) {
   } finally {
     pool.close(relays);
   }
-
-  events.sort((a, b) => b.created_at - a.created_at);
-
-  return NextResponse.json({
-    events: events.map(e => ({
-      id: e.id,
-      pubkey: e.pubkey,
-      content: e.content,
-      createdAt: e.created_at,
-      tags: e.tags,
-    })),
-  });
 }

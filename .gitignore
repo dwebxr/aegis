@@ -32,6 +32,9 @@ yarn-error.log*
 # dfx local replica
 .dfx/
 
+# mops (Motoko package manager)
+.mops/
+
 # vercel
 .vercel
 

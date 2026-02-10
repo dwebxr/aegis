@@ -39,7 +39,11 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
 
   const debouncedSave = useCallback((p: UserPreferenceProfile) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => saveProfile(p), 500);
+    saveTimeoutRef.current = setTimeout(() => {
+      if (!saveProfile(p)) {
+        console.error("[prefs] Preference save failed — changes may be lost on reload");
+      }
+    }, 500);
   }, []);
 
   useEffect(() => {

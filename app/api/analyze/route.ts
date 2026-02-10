@@ -5,6 +5,8 @@ import { rateLimit } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
 
+export const maxDuration = 30;
+
 function buildPrompt(text: string, userContext?: UserContext): string {
   const contentSlice = text.slice(0, 5000);
 

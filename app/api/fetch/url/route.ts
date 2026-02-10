@@ -3,6 +3,8 @@ import { extract } from "@extractus/article-extractor";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { blockPrivateUrl } from "@/lib/utils/url";
 
+export const maxDuration = 30;
+
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 30, 60_000);
   if (limited) return limited;

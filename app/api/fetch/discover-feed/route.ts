@@ -3,6 +3,8 @@ import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateUrl } from "@/lib/utils/url";
 
+export const maxDuration = 30;
+
 /** Common RSS feed paths to probe when no <link> tag is found */
 const COMMON_PATHS = ["/feed", "/rss", "/feed.xml", "/atom.xml", "/rss.xml", "/index.xml"];
 

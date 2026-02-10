@@ -8,7 +8,7 @@ import type { FetchURLResponse, FetchRSSResponse, FetchTwitterResponse, FetchNos
 import { useSources } from "@/contexts/SourceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemo } from "@/contexts/DemoContext";
-import { loadSourceStates, type SourceRuntimeState, getSourceHealth } from "@/lib/ingestion/sourceState";
+import { loadSourceStates, type SourceRuntimeState, getSourceHealth, getSourceKey } from "@/lib/ingestion/sourceState";
 import { relativeTime } from "@/lib/utils/scores";
 
 interface SourcesTabProps {
@@ -83,8 +83,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         const data = await res.json();
         setDiscoveredFeeds(data.feeds || []);
       }
-    } catch {
-      // Discovery failed silently
+    } catch (err) {
+      console.warn("[sources] Feed discovery failed:", err);
     } finally {
       setDiscoverLoading(false);
     }
@@ -142,8 +142,9 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
       const result = await onAnalyze(text, meta);
       setAnalyzedUrls(prev => new Set(prev).add(key));
       return result;
-    } catch {
+    } catch (err) {
       // Don't mark as analyzed on failure — allow retry
+      console.warn("[sources] Analysis failed, will allow retry:", err);
     }
   };
 
@@ -158,6 +159,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     const relays = nostrRelays.split("\n").map(r => r.trim()).filter(Boolean);
     const pubkeys = nostrPubkeys.split("\n").map(p => p.trim()).filter(Boolean);
     if (relays.length === 0) return;
+    const invalid = relays.find(r => !r.startsWith("wss://"));
+    if (invalid) { setNostrError("Relay URLs must use wss:// protocol"); return; }
     const label = pubkeys.length > 0 ? `Nostr (${pubkeys.length} keys)` : `Nostr (${relays.length} relays)`;
     const added = addSource({ type: "nostr", label, relays, pubkeys, enabled: true });
     if (!added) { setNostrError("This relay config is already saved"); return; }
@@ -193,11 +196,11 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     setEditingId(null);
   };
 
-  /** Get source key matching the sourceState map key format */
   const getStateKey = (s: typeof sources[number]): string => {
-    if (s.type === "rss") return `rss:${s.feedUrl || "unknown"}`;
-    if (s.type === "nostr") return `nostr:${(s.relays || []).join(",") || "unknown"}`;
-    return `${s.type}:unknown`;
+    const config: Record<string, string> = {};
+    if (s.type === "rss") config.feedUrl = s.feedUrl || "";
+    if (s.type === "nostr") config.relays = (s.relays || []).join(",");
+    return getSourceKey(s.type, config);
   };
 
   const sourceTabs: Array<{ id: "url" | "rss" | "twitter" | "nostr"; label: string; icon: React.ReactNode; color: string }> = [
@@ -526,6 +529,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
               <div style={{ marginTop: space[4], background: colors.bg.raised, borderRadius: radii.md, padding: space[4] }}>
                 <div style={{ display: "flex", gap: space[3], marginBottom: space[3] }}>
                   {urlResult.imageUrl && (
+                    /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
                     <img
                       src={urlResult.imageUrl}
                       alt=""
@@ -623,6 +627,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                 {rssResult.items.map((item, i) => (
                   <div key={i} style={{ background: colors.bg.raised, borderRadius: radii.md, padding: space[3], marginBottom: space[1], display: "flex", alignItems: "center", gap: space[3] }}>
                     {item.imageUrl && (
+                      /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
                       <img
                         src={item.imageUrl}
                         alt=""

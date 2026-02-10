@@ -101,31 +101,29 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
           getContent: () => contentRef.current,
           getPrefs: () => profileRef.current,
           onStateChange: (state) => setAgentState(state),
-          onD2AMatchComplete: (_senderPk, senderPrincipalId, contentHash) => {
+          onD2AMatchComplete: async (_senderPk, senderPrincipalId, contentHash) => {
             if (!senderPrincipalId) {
               console.warn("[agent] D2A match: sender has no IC principal, skipping fee");
               return;
             }
-            (async () => {
-              try {
-                const backend = await createBackendActorAsync(capturedIdentity);
-                const senderPrincipal = Principal.fromText(senderPrincipalId);
-                const matchId = uuidv4();
-                const result = await backend.recordD2AMatch(
-                  matchId,
-                  senderPrincipal,
-                  contentHash,
-                  BigInt(D2A_MATCH_FEE),
-                );
-                if (!("ok" in result)) {
-                  console.warn("[agent] D2A match recording failed:", result.err);
-                  addNotification("D2A match recording failed on IC", "error");
-                }
-              } catch (err) {
-                console.warn("[agent] recordD2AMatch call failed:", errMsg(err));
+            try {
+              const backend = await createBackendActorAsync(capturedIdentity);
+              const senderPrincipal = Principal.fromText(senderPrincipalId);
+              const matchId = uuidv4();
+              const result = await backend.recordD2AMatch(
+                matchId,
+                senderPrincipal,
+                contentHash,
+                BigInt(D2A_MATCH_FEE),
+              );
+              if (!("ok" in result)) {
+                console.warn("[agent] D2A match recording failed:", result.err);
                 addNotification("D2A match recording failed on IC", "error");
               }
-            })();
+            } catch (err) {
+              console.warn("[agent] recordD2AMatch call failed:", errMsg(err));
+              addNotification("D2A match recording failed on IC", "error");
+            }
           },
         },
         undefined, // relayUrls (use default)

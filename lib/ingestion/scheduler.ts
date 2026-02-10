@@ -20,8 +20,10 @@ import { errMsg } from "@/lib/utils/errors";
 const MAX_ITEMS_PER_SOURCE = 5;
 const MAX_ENRICH_PER_CYCLE = 3;
 const ENRICH_MIN_WORDS = 100;
+const MAX_TEXT_LENGTH = 2000;
+const MAX_DISPLAY_TEXT = 300;
 
-interface SourceConfig {
+interface SchedulerSource {
   type: "rss" | "url" | "nostr";
   config: Record<string, string>;
   enabled: boolean;
@@ -29,7 +31,7 @@ interface SourceConfig {
 
 interface SchedulerCallbacks {
   onNewContent: (item: ContentItem) => void;
-  getSources: () => SourceConfig[];
+  getSources: () => SchedulerSource[];
   getUserContext: () => UserContext | null;
   onSourceError?: (sourceKey: string, error: string) => void;
   onSourceAutoDisabled?: (sourceKey: string, error: string) => void;
@@ -48,7 +50,6 @@ export class IngestionScheduler {
   constructor(callbacks: SchedulerCallbacks) {
     this.callbacks = callbacks;
     this.dedup = new ArticleDeduplicator();
-    // Load persisted source states
     const persisted = loadSourceStates();
     this.sourceStates = new Map(Object.entries(persisted));
   }
@@ -72,17 +73,6 @@ export class IngestionScheduler {
 
   getSourceStates(): ReadonlyMap<string, SourceRuntimeState> {
     return this.sourceStates;
-  }
-
-  /** @deprecated Use getSourceStates() instead */
-  getSourceErrors(): ReadonlyMap<string, { count: number; lastError: string; lastAt: number }> {
-    const errors = new Map<string, { count: number; lastError: string; lastAt: number }>();
-    this.sourceStates.forEach((state, key) => {
-      if (state.errorCount > 0) {
-        errors.set(key, { count: state.errorCount, lastError: state.lastError, lastAt: state.lastErrorAt });
-      }
-    });
-    return errors;
   }
 
   resetDedup(): void {
@@ -112,14 +102,12 @@ export class IngestionScheduler {
     state.lastError = error;
     state.lastErrorAt = Date.now();
 
-    // Compute backoff
     const backoff = computeBackoffDelay(state.errorCount);
     state.nextFetchAt = Date.now() + backoff;
 
     this.persistStates();
     this.callbacks.onSourceError?.(key, error);
 
-    // Auto-disable notification
     if (state.errorCount >= MAX_CONSECUTIVE_FAILURES) {
       this.callbacks.onSourceAutoDisabled?.(key, error);
     }
@@ -150,7 +138,6 @@ export class IngestionScheduler {
       state.totalItemsScored += scores.length;
     }
 
-    // Compute adaptive interval
     const interval = computeAdaptiveInterval(state);
     state.nextFetchAt = Date.now() + interval;
 
@@ -178,7 +165,11 @@ export class IngestionScheduler {
         // Skip if not yet due (adaptive/backoff timing)
         if (state.nextFetchAt > now) continue;
 
+        const errorsBefore = state.errorCount;
         const items = await this.fetchSource(source, key);
+
+        // If fetch recorded an error, skip scoring and success tracking
+        if (state.errorCount > errorsBefore) continue;
 
         // Quick filter to reduce API calls
         const passed = items.filter(raw => quickSlopFilter(raw.text));
@@ -238,15 +229,15 @@ export class IngestionScheduler {
           });
           if (res.ok) {
             const data = await res.json();
-            const fullText = `${data.title || ""}\n\n${data.content || ""}`.slice(0, 2000);
+            const fullText = `${data.title || ""}\n\n${data.content || ""}`.slice(0, MAX_TEXT_LENGTH);
             if (fullText.split(/\s+/).length > wordCount) {
               result.push({ ...item, text: fullText, imageUrl: item.imageUrl || data.imageUrl });
               enrichCount++;
               continue;
             }
           }
-        } catch {
-          // Enrichment failed — use original
+        } catch (err) {
+          console.warn("[scheduler] Enrichment failed for", item.sourceUrl, ":", errMsg(err));
         }
       }
 
@@ -256,7 +247,7 @@ export class IngestionScheduler {
     return result;
   }
 
-  private async fetchSource(source: SourceConfig, key: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+  private async fetchSource(source: SchedulerSource, key: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
     switch (source.type) {
       case "rss":
         return this.fetchRSS(source.config.feedUrl, key);
@@ -291,7 +282,6 @@ export class IngestionScheduler {
       }
       const data = await res.json();
 
-      // Update conditional headers for next request
       if (data.etag || data.lastModified) {
         this.conditionalHeaders.set(key, { etag: data.etag, lastModified: data.lastModified });
       }
@@ -300,7 +290,7 @@ export class IngestionScheduler {
       if (data.notModified) return [];
 
       return (data.items || []).map((item: { title: string; content: string; author?: string; link?: string; imageUrl?: string }) => ({
-        text: `${item.title}\n\n${item.content}`.slice(0, 2000),
+        text: `${item.title}\n\n${item.content}`.slice(0, MAX_TEXT_LENGTH),
         author: item.author || data.feedTitle || "RSS",
         sourceUrl: item.link,
         imageUrl: item.imageUrl,
@@ -326,7 +316,7 @@ export class IngestionScheduler {
       }
       const data = await res.json();
       return (data.events || []).map((ev: { content: string; pubkey: string; id: string }) => ({
-        text: ev.content.slice(0, 2000),
+        text: ev.content.slice(0, MAX_TEXT_LENGTH),
         author: ev.pubkey.slice(0, 12) + "...",
         sourceUrl: `nostr:${ev.id}`,
       }));
@@ -351,9 +341,9 @@ export class IngestionScheduler {
       }
       const data = await res.json();
       let hostname = "unknown";
-      try { hostname = new URL(url).hostname; } catch { /* invalid URL */ }
+      try { hostname = new URL(url).hostname; } catch { /* noop */ }
       return [{
-        text: `${data.title || ""}\n\n${data.content || ""}`.slice(0, 2000),
+        text: `${data.title || ""}\n\n${data.content || ""}`.slice(0, MAX_TEXT_LENGTH),
         author: data.author || hostname,
         sourceUrl: url,
         imageUrl: data.imageUrl,
@@ -388,7 +378,7 @@ export class IngestionScheduler {
         owner: "",
         author: raw.author,
         avatar: raw.sourceUrl?.startsWith("nostr:") ? "\uD83D\uDD2E" : "\uD83D\uDCE1",
-        text: raw.text.slice(0, 300),
+        text: raw.text.slice(0, MAX_DISPLAY_TEXT),
         source: raw.sourceUrl?.startsWith("nostr:") ? "nostr" : "rss",
         sourceUrl: raw.sourceUrl,
         imageUrl: raw.imageUrl,

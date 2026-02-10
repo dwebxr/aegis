@@ -4,6 +4,17 @@ import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateUrl } from "@/lib/utils/url";
 
+export const maxDuration = 30;
+
+function feedErrorResponse(err: unknown, feedUrl: string, context: string): NextResponse {
+  console.error(`[fetch/rss] ${context}:`, feedUrl, err);
+  const msg = errMsg(err);
+  if (msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
+    return NextResponse.json({ error: "Could not reach this feed. Check the URL and try again." }, { status: 502 });
+  }
+  return NextResponse.json({ error: "Could not parse this feed. It may not be valid RSS/Atom." }, { status: 422 });
+}
+
 const parser = new Parser({
   timeout: 10000,
   headers: {
@@ -40,9 +51,11 @@ function extractAttr(field: unknown, attr: string): string | undefined {
 function extractImage(item: Record<string, unknown>, rawContent: string): string | undefined {
   const enc = item.enclosure as { url?: string; type?: string } | undefined;
   if (enc?.url && /image/i.test(enc.type || "")) return enc.url;
-  if (extractAttr(item.mediaThumbnail, "url")) return extractAttr(item.mediaThumbnail, "url");
-  if (extractAttr(item.mediaContent, "url") && /image/i.test(extractAttr(item.mediaContent, "type") || "")) {
-    return extractAttr(item.mediaContent, "url");
+  const thumbUrl = extractAttr(item.mediaThumbnail, "url");
+  if (thumbUrl) return thumbUrl;
+  const mediaUrl = extractAttr(item.mediaContent, "url");
+  if (mediaUrl && /image/i.test(extractAttr(item.mediaContent, "type") || "")) {
+    return mediaUrl;
   }
   if (item.mediaGroup && typeof item.mediaGroup === "object") {
     const group = item.mediaGroup as Record<string, unknown>;
@@ -124,12 +137,7 @@ export async function POST(request: NextRequest) {
         items,
       });
     } catch (err: unknown) {
-      console.error("[fetch/rss] Conditional fetch failed:", feedUrl, err);
-      const msg = errMsg(err);
-      if (msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
-        return NextResponse.json({ error: "Could not reach this feed. Check the URL and try again." }, { status: 502 });
-      }
-      return NextResponse.json({ error: "Could not parse this feed. It may not be valid RSS/Atom." }, { status: 422 });
+      return feedErrorResponse(err, feedUrl, "Conditional fetch failed");
     }
   }
 
@@ -138,12 +146,7 @@ export async function POST(request: NextRequest) {
   try {
     feed = await parser.parseURL(feedUrl);
   } catch (err: unknown) {
-    console.error("[fetch/rss] Parse failed:", feedUrl, err);
-    const msg = errMsg(err);
-    if (msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
-      return NextResponse.json({ error: "Could not reach this feed. Check the URL and try again." }, { status: 502 });
-    }
-    return NextResponse.json({ error: "Could not parse this feed. It may not be valid RSS/Atom." }, { status: 422 });
+    return feedErrorResponse(err, feedUrl, "Parse failed");
   }
 
   const items = buildItems(feed, limit);

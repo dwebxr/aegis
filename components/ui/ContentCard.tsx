@@ -230,6 +230,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
 
       <div style={{ display: "flex", gap: mobile ? space[3] : space[4], alignItems: "flex-start" }}>
         {item.imageUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
           <img
             src={item.imageUrl}
             alt=""

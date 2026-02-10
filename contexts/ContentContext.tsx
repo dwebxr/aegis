@@ -128,6 +128,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
             cContext: a.cContext.length > 0 ? a.cContext[0] : undefined,
             lSlop: a.lSlop.length > 0 ? a.lSlop[0] : undefined,
           };
+        } else if ("err" in icResult) {
+          console.warn("[analyze] IC LLM returned error, falling back to API:", icResult.err);
         }
       } catch (err) {
         console.warn("[analyze] IC LLM failed, falling back to API:", errMsg(err));

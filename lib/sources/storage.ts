@@ -1,15 +1,11 @@
 import type { SavedSource } from "@/lib/types/sources";
 
-const STORAGE_KEY_PREFIX = "aegis_sources_";
-
-function storageKey(principalId: string): string {
-  return `${STORAGE_KEY_PREFIX}${principalId}`;
-}
+const KEY_PREFIX = "aegis_sources_";
 
 export function loadSources(principalId: string): SavedSource[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(storageKey(principalId));
+    const raw = localStorage.getItem(KEY_PREFIX + principalId);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -22,7 +18,7 @@ export function loadSources(principalId: string): SavedSource[] {
 export function saveSources(principalId: string, sources: SavedSource[]): boolean {
   if (typeof window === "undefined") return false;
   try {
-    localStorage.setItem(storageKey(principalId), JSON.stringify(sources));
+    localStorage.setItem(KEY_PREFIX + principalId, JSON.stringify(sources));
     return true;
   } catch (err) {
     console.warn("[sources] Failed to save source configs:", err);

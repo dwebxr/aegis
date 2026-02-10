@@ -26,7 +26,7 @@ interface AgentManagerCallbacks {
   getContent: () => ContentItem[];
   getPrefs: () => UserPreferenceProfile;
   onStateChange: (state: AgentState) => void;
-  onD2AMatchComplete?: (senderPk: string, senderPrincipalId: string | undefined, contentHash: string) => void;
+  onD2AMatchComplete?: (senderPk: string, senderPrincipalId: string | undefined, contentHash: string) => void | Promise<void>;
 }
 
 export class AgentManager {
@@ -245,8 +245,9 @@ export class AgentManager {
     let message: D2AMessage | null;
     try {
       message = parseD2AMessage(encryptedContent, this.sk, senderPk);
-    } catch {
-      return; // Invalid message
+    } catch (err) {
+      console.debug("[agent] Ignoring unparseable D2A message from", senderPk.slice(0, 8), ":", errMsg(err));
+      return;
     }
     if (!message) return;
 
@@ -261,7 +262,7 @@ export class AgentManager {
         this.handleReject(senderPk);
         break;
       case "deliver":
-        this.handleDelivery(senderPk, message.payload as D2ADeliverPayload);
+        await this.handleDelivery(senderPk, message.payload as D2ADeliverPayload);
         break;
     }
   }
@@ -351,7 +352,7 @@ export class AgentManager {
     this.emitState();
   }
 
-  private handleDelivery(senderPk: string, payload: D2ADeliverPayload): void {
+  private async handleDelivery(senderPk: string, payload: D2ADeliverPayload): Promise<void> {
     // Validate the content against our own preferences before accepting
     const prefs = this.callbacks.getPrefs();
     const peerProfile = this.peers.get(senderPk);
@@ -394,7 +395,11 @@ export class AgentManager {
       this.d2aMatchCount++;
       const contentHash = payload.text.slice(0, 32);
       const senderPrincipalId = this.peers.get(senderPk)?.principalId;
-      this.callbacks.onD2AMatchComplete(senderPk, senderPrincipalId, contentHash);
+      try {
+        await this.callbacks.onD2AMatchComplete(senderPk, senderPrincipalId, contentHash);
+      } catch (err) {
+        console.warn("[agent] onD2AMatchComplete callback failed:", errMsg(err));
+      }
     }
 
     this.emitState();
