@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useMemo } from "react";
 import { ContentCard } from "@/components/ui/ContentCard";
+import { ShareBriefingModal } from "@/components/ui/ShareBriefingModal";
+import { ShareIcon } from "@/components/icons";
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { colors, space, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
@@ -12,33 +14,70 @@ interface BriefingTabProps {
   onValidate: (id: string) => void;
   onFlag: (id: string) => void;
   mobile?: boolean;
+  nostrKeys?: { sk: Uint8Array; pk: string } | null;
 }
 
-export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile }) => {
+export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showFiltered, setShowFiltered] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
 
   const insightCount = briefing.priority.length + (briefing.serendipity ? 1 : 0);
+  const canShare = nostrKeys && briefing.priority.length > 0;
 
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
       <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
-        <h1 style={{
-          fontSize: mobile ? t.display.mobileSz : t.display.size,
-          fontWeight: t.display.weight,
-          lineHeight: t.display.lineHeight,
-          letterSpacing: t.display.letterSpacing,
-          color: colors.text.primary,
-          margin: 0,
-        }}>
-          Your Briefing
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h1 style={{
+            fontSize: mobile ? t.display.mobileSz : t.display.size,
+            fontWeight: t.display.weight,
+            lineHeight: t.display.lineHeight,
+            letterSpacing: t.display.letterSpacing,
+            color: colors.text.primary,
+            margin: 0,
+          }}>
+            Your Briefing
+          </h1>
+          {canShare && (
+            <button
+              onClick={() => setShowShareModal(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: space[2],
+                padding: `${space[2]}px ${space[4]}px`,
+                background: colors.bg.surface,
+                border: `1px solid ${colors.border.default}`,
+                borderRadius: radii.md,
+                color: colors.purple[400],
+                fontSize: t.bodySm.size,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: transitions.fast,
+              }}
+            >
+              <ShareIcon s={16} />
+              Share
+            </button>
+          )}
+        </div>
         <p style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
           {insightCount} insights selected from {briefing.totalItems} items
         </p>
       </div>
+
+      {showShareModal && nostrKeys && (
+        <ShareBriefingModal
+          briefing={briefing}
+          nostrKeys={nostrKeys}
+          onClose={() => setShowShareModal(false)}
+          mobile={mobile}
+        />
+      )}
 
       {briefing.priority.length > 0 ? (
         <div>
