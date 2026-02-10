@@ -6,6 +6,7 @@ import { ContentProvider } from "@/contexts/ContentContext";
 import { PreferenceProvider, usePreferences } from "@/contexts/PreferenceContext";
 import { AgentProvider } from "@/contexts/AgentContext";
 import { SourceProvider } from "@/contexts/SourceContext";
+import { DemoProvider } from "@/contexts/DemoContext";
 
 function ContentWithPreferences({ children }: { children: React.ReactNode }) {
   const { onValidate, onFlag } = usePreferences();
@@ -20,6 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <NotificationProvider>
       <AuthProvider>
+        <DemoProvider>
         <PreferenceProvider>
           <ContentWithPreferences>
             <SourceProvider>
@@ -29,6 +31,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             </SourceProvider>
           </ContentWithPreferences>
         </PreferenceProvider>
+        </DemoProvider>
       </AuthProvider>
     </NotificationProvider>
   );

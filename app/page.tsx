@@ -14,6 +14,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { useSources } from "@/contexts/SourceContext";
 import { useAgent } from "@/contexts/AgentContext";
+import { useDemo } from "@/contexts/DemoContext";
+import { DEMO_SOURCES } from "@/lib/demo/sources";
+import { DemoBanner } from "@/components/ui/DemoBanner";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { publishSignalToNostr, buildAegisTags } from "@/lib/nostr/publish";
@@ -28,11 +31,12 @@ import { errMsg } from "@/lib/utils/errors";
 export default function AegisApp() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
-  const { content, isAnalyzing, analyze, validateItem, flagItem, addContent, loadFromIC } = useContent();
+  const { content, isAnalyzing, analyze, validateItem, flagItem, addContent, clearDemoContent, loadFromIC } = useContent();
   const { isAuthenticated, identity, principalText } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
   const { agentState } = useAgent();
+  const { isDemoMode } = useDemo();
 
   const [tab, setTab] = useState("dashboard");
   const [icpBalance, setIcpBalance] = useState<bigint | null>(null);
@@ -100,17 +104,37 @@ export default function AegisApp() {
   // Background ingestion scheduler
   const getSchedulerSourcesRef = useRef(getSchedulerSources);
   getSchedulerSourcesRef.current = getSchedulerSources;
+  const isDemoRef = useRef(isDemoMode);
+  isDemoRef.current = isDemoMode;
+
+  const demoSchedulerSources = useMemo(() =>
+    DEMO_SOURCES.map(s => ({
+      type: s.type as "rss" | "url" | "nostr",
+      config: { feedUrl: s.feedUrl! },
+      enabled: true,
+    })),
+  []);
 
   useEffect(() => {
     const scheduler = new IngestionScheduler({
       onNewContent: addContent,
-      getSources: () => getSchedulerSourcesRef.current(),
+      getSources: () => {
+        const userSources = getSchedulerSourcesRef.current();
+        if (userSources.length > 0) return userSources;
+        if (isDemoRef.current) return demoSchedulerSources;
+        return [];
+      },
       getUserContext: () => userContextRef.current,
     });
     schedulerRef.current = scheduler;
     scheduler.start();
     return () => scheduler.stop();
-  }, [addContent]);
+  }, [addContent, demoSchedulerSources]);
+
+  // Clear demo content when user logs in
+  useEffect(() => {
+    if (isAuthenticated) clearDemoContent();
+  }, [isAuthenticated, clearDemoContent]);
 
   const handleValidate = (id: string) => {
     validateItem(id);
@@ -262,6 +286,7 @@ export default function AegisApp() {
 
   return (
     <AppShell activeTab={tab} onTabChange={setTab}>
+      <DemoBanner mobile={mobile} />
       {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} />}
       {tab === "briefing" && <BriefingTab content={content} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} />}
       {tab === "incinerator" && (

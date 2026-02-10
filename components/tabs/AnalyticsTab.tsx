@@ -8,6 +8,7 @@ import { formatICP } from "@/lib/ic/icpLedger";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserReputation } from "@/lib/ic/declarations";
 import type { AgentState } from "@/lib/agent/types";
+import { useDemo } from "@/contexts/DemoContext";
 
 interface AnalyticsTabProps {
   content: ContentItem[];
@@ -18,6 +19,7 @@ interface AnalyticsTabProps {
 }
 
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation, engagementIndex, agentState, mobile }) => {
+  const { isDemoMode } = useDemo();
   const qual = content.filter(c => c.verdict === "quality");
   const slop = content.filter(c => c.verdict === "slop");
   const accuracy = content.length > 0 ? ((qual.length / content.length) * 100).toFixed(1) : "0.0";
@@ -42,6 +44,15 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
 
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
+      {isDemoMode && (
+        <div style={{
+          background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.15)",
+          borderRadius: radii.md, padding: `${space[2]}px ${space[4]}px`, marginBottom: space[4],
+          fontSize: t.bodySm.size, color: colors.blue[400], fontWeight: 600,
+        }}>
+          Analytics based on demo data. Login for persistent tracking.
+        </div>
+      )}
       <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
         <h1 style={{
           fontSize: mobile ? t.display.mobileSz : t.display.size,

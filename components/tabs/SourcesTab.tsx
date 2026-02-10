@@ -7,6 +7,7 @@ import type { FetchURLResponse, FetchRSSResponse, FetchTwitterResponse, FetchNos
 
 import { useSources } from "@/contexts/SourceContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDemo } from "@/contexts/DemoContext";
 
 interface SourcesTabProps {
   onAnalyze: (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
@@ -17,6 +18,7 @@ interface SourcesTabProps {
 export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, mobile }) => {
   const { sources, syncStatus, syncError, addSource, removeSource, toggleSource, updateSource } = useSources();
   const { isAuthenticated } = useAuth();
+  const { isDemoMode } = useDemo();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [editFeedUrl, setEditFeedUrl] = useState("");
@@ -247,7 +249,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                 }}>
                   {s.type}
                 </span>
-                <button
+                {!isDemoMode && <button
                   onClick={() => editingId === s.id ? cancelEdit() : startEdit(s)}
                   style={{
                     background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
@@ -257,8 +259,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   title="Edit source"
                 >
                   &#x270E;
-                </button>
-                <button
+                </button>}
+                {!isDemoMode && <button
                   onClick={() => removeSource(s.id)}
                   style={{
                     background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
@@ -268,7 +270,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   title="Remove source"
                 >
                   &#x2715;
-                </button>
+                </button>}
               </div>
 
               {/* Inline Editor */}
@@ -389,7 +391,17 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         </div>
       )}
 
-      {!isAuthenticated && sources.length === 0 && (
+      {isDemoMode && (
+        <div style={{
+          background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.15)",
+          borderRadius: radii.lg, padding: `${space[3]}px ${space[5]}px`, marginBottom: space[3],
+          fontSize: t.bodySm.size, color: colors.blue[400], fontWeight: 600,
+        }}>
+          Demo sources are read-only. Login to add your own feeds.
+        </div>
+      )}
+
+      {!isAuthenticated && !isDemoMode && sources.length === 0 && (
         <div style={{
           background: colors.bg.surface, border: `1px solid ${colors.border.default}`,
           borderRadius: radii.lg, padding: space[5], marginBottom: space[5],

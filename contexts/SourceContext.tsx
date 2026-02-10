@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
+import { useDemo } from "./DemoContext";
+import { DEMO_SOURCES } from "@/lib/demo/sources";
 import { useNotify } from "./NotificationContext";
 import { createBackendActor, createBackendActorAsync } from "@/lib/ic/actor";
 import { loadSources, saveSources } from "@/lib/sources/storage";
@@ -34,6 +36,7 @@ const SourceContext = createContext<SourceState>({
 export function SourceProvider({ children }: { children: React.ReactNode }) {
   const { addNotification } = useNotify();
   const { isAuthenticated, identity, principalText } = useAuth();
+  const { isDemoMode } = useDemo();
   const [sources, setSources] = useState<SavedSource[]>([]);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "error">("idle");
   const [syncError, setSyncError] = useState("");
@@ -159,12 +162,18 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     doSync();
   }, [isAuthenticated, identity, principalText]);
 
+  // Seed demo sources when in demo mode
+  useEffect(() => {
+    if (isDemoMode) setSources(DEMO_SOURCES);
+  }, [isDemoMode]);
+
   const persist = useCallback((next: SavedSource[]) => {
     const pt = principalTextRef.current;
     if (pt) saveSources(pt, next);
   }, []);
 
   const addSource = useCallback((partial: Omit<SavedSource, "id" | "createdAt">): boolean => {
+    if (isDemoMode) return false;
     // Duplicate check: same feedUrl (RSS) or same relays (Nostr)
     const existing = sourcesRef.current;
     if (partial.type === "rss" && partial.feedUrl) {
@@ -181,9 +190,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     });
     saveToIC(source);
     return true;
-  }, [persist]);
+  }, [persist, isDemoMode]);
 
   const removeSource = useCallback((id: string) => {
+    if (isDemoMode) return;
     setSources(prev => {
       const next = prev.filter(s => s.id !== id);
       persist(next);
@@ -198,9 +208,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           setSyncError("Failed to delete source from IC");
         });
     }
-  }, [persist]);
+  }, [persist, isDemoMode]);
 
   const toggleSource = useCallback((id: string) => {
+    if (isDemoMode) return;
     setSources(prev => {
       const next = prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s);
       persist(next);
@@ -208,9 +219,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     });
     const source = sourcesRef.current.find(s => s.id === id);
     if (source) saveToIC({ ...source, enabled: !source.enabled });
-  }, [persist]);
+  }, [persist, isDemoMode]);
 
   const updateSource = useCallback((id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => {
+    if (isDemoMode) return;
     setSources(prev => {
       const next = prev.map(s => s.id === id ? { ...s, ...partial } : s);
       persist(next);
@@ -218,7 +230,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     });
     const source = sourcesRef.current.find(s => s.id === id);
     if (source) saveToIC({ ...source, ...partial });
-  }, [persist]);
+  }, [persist, isDemoMode]);
 
   const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }> => {
     const result: Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }> = [];

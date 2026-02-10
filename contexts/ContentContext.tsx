@@ -20,6 +20,7 @@ interface ContentState {
   validateItem: (id: string) => void;
   flagItem: (id: string) => void;
   addContent: (item: ContentItem) => void;
+  clearDemoContent: () => void;
   syncToIC: () => Promise<void>;
   loadFromIC: () => Promise<void>;
 }
@@ -38,6 +39,7 @@ const ContentContext = createContext<ContentState>({
   validateItem: () => {},
   flagItem: () => {},
   addContent: () => {},
+  clearDemoContent: () => {},
   syncToIC: async () => {},
   loadFromIC: async () => {},
 });
@@ -259,6 +261,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     });
   }, []);
 
+  const clearDemoContent = useCallback(() => {
+    setContent(prev => prev.filter(c => c.owner !== ""));
+  }, []);
+
   const syncToIC = useCallback(async () => {
     if (!actorRef.current || !isAuthenticated || !principal) return;
     setIsSyncing(true);
@@ -354,8 +360,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const value = useMemo(() => ({
     content, isAnalyzing, isSyncing, syncStatus,
-    analyze, validateItem, flagItem, addContent, syncToIC, loadFromIC,
-  }), [content, isAnalyzing, isSyncing, syncStatus, analyze, validateItem, flagItem, addContent, syncToIC, loadFromIC]);
+    analyze, validateItem, flagItem, addContent, clearDemoContent, syncToIC, loadFromIC,
+  }), [content, isAnalyzing, isSyncing, syncStatus, analyze, validateItem, flagItem, addContent, clearDemoContent, syncToIC, loadFromIC]);
 
   return (
     <ContentContext.Provider value={value}>
