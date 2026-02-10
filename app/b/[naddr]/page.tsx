@@ -4,8 +4,11 @@ import { decode } from "nostr-tools/nip19";
 import type { AddressPointer } from "nostr-tools/nip19";
 import { fetchEventByAddress } from "@/lib/nostr/fetch";
 import { parseBriefingMarkdown } from "@/lib/briefing/serialize";
+import type { ParsedBriefing } from "@/lib/briefing/serialize";
 import { SharedBriefingView } from "@/components/shared/SharedBriefingView";
 import { DEFAULT_RELAYS, KIND_LONG_FORM } from "@/lib/nostr/types";
+
+export const maxDuration = 30;
 
 interface PageProps {
   params: Promise<{ naddr: string }>;
@@ -23,7 +26,13 @@ function decodeNaddr(naddr: string): AddressPointer | null {
   }
 }
 
-async function fetchBriefing(naddr: string) {
+// Cache to avoid double relay fetch (generateMetadata + page render share one request)
+const briefingCache = new Map<string, { data: ParsedBriefing | null; at: number }>();
+
+async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
+  const cached = briefingCache.get(naddr);
+  if (cached && Date.now() - cached.at < 30_000) return cached.data;
+
   const addr = decodeNaddr(naddr);
   if (!addr) return null;
 
@@ -33,9 +42,13 @@ async function fetchBriefing(naddr: string) {
       : DEFAULT_RELAYS;
 
   const event = await fetchEventByAddress(addr, relays);
-  if (!event) return null;
+  if (!event) {
+    briefingCache.set(naddr, { data: null, at: Date.now() });
+    return null;
+  }
 
   const parsed = parseBriefingMarkdown(event.content, event.tags);
+  briefingCache.set(naddr, { data: parsed, at: Date.now() });
   return parsed;
 }
 

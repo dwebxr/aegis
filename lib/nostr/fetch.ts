@@ -17,7 +17,7 @@ export interface NostrEvent {
 export async function fetchEventByAddress(
   addr: AddressPointer,
   relayUrls: string[],
-  timeoutMs = 8000,
+  timeoutMs = 12000,
 ): Promise<NostrEvent | null> {
   const { SimplePool, useWebSocketImplementation: setWsImpl } =
     await import("nostr-tools/pool");
@@ -30,17 +30,19 @@ export async function fetchEventByAddress(
     kinds: [addr.kind],
     authors: [addr.pubkey],
     "#d": [addr.identifier],
+    limit: 1,
   };
 
   try {
-    const event = await Promise.race([
-      pool.get(relayUrls, filter),
-      new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), timeoutMs),
+    const events = await Promise.race([
+      pool.querySync(relayUrls, filter),
+      new Promise<never[]>((resolve) =>
+        setTimeout(() => resolve([]), timeoutMs),
       ),
     ]);
 
-    return event as NostrEvent | null;
+    if (events.length === 0) return null;
+    return events[0] as unknown as NostrEvent;
   } catch (err) {
     console.error("[nostr/fetch] Failed to fetch event:", err);
     return null;
