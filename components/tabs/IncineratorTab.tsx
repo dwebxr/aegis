@@ -67,16 +67,18 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onA
         </div>
       </div>
 
-      <div style={{
-        background: colors.bg.surface,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: radii.xl,
-        padding: mobile ? space[5] : space[8],
-        marginBottom: mobile ? space[8] : space[12],
-      }}>
-        <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.secondary, marginBottom: space[4] }}>Manual Analysis</div>
-        <ManualInput onAnalyze={onAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />
-      </div>
+      {!onPublishSignal && (
+        <div style={{
+          background: colors.bg.surface,
+          border: `1px solid ${colors.border.default}`,
+          borderRadius: radii.xl,
+          padding: mobile ? space[5] : space[8],
+          marginBottom: mobile ? space[8] : space[12],
+        }}>
+          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.secondary, marginBottom: space[4] }}>Manual Analysis</div>
+          <ManualInput onAnalyze={onAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />
+        </div>
+      )}
 
       {onPublishSignal && (
         <div style={{
