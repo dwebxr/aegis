@@ -42,4 +42,50 @@ const serwist = new Serwist({
   },
 });
 
+// Push notification handler
+self.addEventListener("push", (event: PushEvent) => {
+  if (!event.data) return;
+
+  let data: { title?: string; body?: string; url?: string; tag?: string };
+  try {
+    data = event.data.json();
+  } catch {
+    data = { body: event.data.text() };
+  }
+
+  const options: NotificationOptions & { renotify?: boolean } = {
+    body: data.body || "Your new briefing is ready.",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    tag: data.tag || "aegis-briefing",
+    data: { url: data.url || "/" },
+    renotify: true,
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Aegis Briefing", options),
+  );
+});
+
+// Notification click handler
+self.addEventListener("notificationclick", (event: NotificationEvent) => {
+  event.notification.close();
+
+  const url = (event.notification.data as { url?: string })?.url || "/";
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then(clients => {
+        for (const client of clients) {
+          if ("focus" in client) {
+            (client as WindowClient).navigate(url);
+            return (client as WindowClient).focus();
+          }
+        }
+        return self.clients.openWindow(url);
+      }),
+  );
+});
+
 serwist.addEventListeners();

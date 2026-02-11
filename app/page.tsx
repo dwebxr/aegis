@@ -106,6 +106,8 @@ export default function AegisApp() {
   getSchedulerSourcesRef.current = getSchedulerSources;
   const isDemoRef = useRef(isDemoMode);
   isDemoRef.current = isDemoMode;
+  const principalTextRef = useRef(principalText);
+  principalTextRef.current = principalText;
 
   const demoSchedulerSources = useMemo(() =>
     DEMO_SOURCES.map(s => ({
@@ -127,6 +129,21 @@ export default function AegisApp() {
       getUserContext: () => userContextRef.current,
       onSourceAutoDisabled: (key, error) => {
         addNotification(`Source auto-disabled after repeated failures: ${key} (${error})`, "error");
+      },
+      onCycleComplete: (count) => {
+        const pt = principalTextRef.current;
+        if (!pt || !localStorage.getItem("aegis-push-enabled")) return;
+        fetch("/api/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            principal: pt,
+            title: "Aegis Briefing",
+            body: `${count} new item${count > 1 ? "s" : ""} scored — briefing updated.`,
+            url: "/",
+            tag: `briefing-${new Date().toISOString().slice(0, 13)}`,
+          }),
+        }).catch(() => {});
       },
     });
     schedulerRef.current = scheduler;

@@ -107,6 +107,19 @@ module {
     createdAt : Int;
   };
 
+  // ── Push Notification types ──
+
+  public type PushSubscriptionKeys = {
+    p256dh : Text;
+    auth : Text;
+  };
+
+  public type PushSubscription = {
+    endpoint : Text;
+    keys : PushSubscriptionKeys;
+    createdAt : Int;
+  };
+
   public type AnalysisTier = { #free; #premium };
 
   public type OnChainAnalysis = {

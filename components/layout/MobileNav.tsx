@@ -2,6 +2,7 @@
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AgentStatusBadge } from "@/components/ui/AgentStatusBadge";
+import { NotificationToggle } from "@/components/ui/NotificationToggle";
 import { colors, space, type as t, radii, transitions, fonts, shadows } from "@/styles/theme";
 import type { NavItem } from "./Sidebar";
 
@@ -56,6 +57,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
               <span>Logout</span>
             </button>
             <AgentStatusBadge compact />
+            <NotificationToggle />
           </>
         ) : (
           <button onClick={login} style={{

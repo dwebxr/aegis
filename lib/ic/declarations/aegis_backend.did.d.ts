@@ -108,6 +108,17 @@ export interface D2AMatchRecord {
   createdAt: bigint;
 }
 
+export interface PushSubscriptionKeys {
+  p256dh: string;
+  auth: string;
+}
+
+export interface PushSubscription {
+  endpoint: string;
+  keys: PushSubscriptionKeys;
+  createdAt: bigint;
+}
+
 export type AnalysisTier = { free: null } | { premium: null };
 
 export interface OnChainAnalysis {
@@ -152,4 +163,9 @@ export interface _SERVICE {
   sweepProtocolFees: ActorMethod<[], Result<string, string>>;
   topUpCycles: ActorMethod<[], Result<string, string>>;
   analyzeOnChain: ActorMethod<[string, string[]], Result<OnChainAnalysis, string>>;
+  registerPushSubscription: ActorMethod<[string, string, string], boolean>;
+  unregisterPushSubscription: ActorMethod<[string], boolean>;
+  getPushSubscriptions: ActorMethod<[Principal], PushSubscription[]>;
+  removePushSubscriptions: ActorMethod<[Principal, string[]], boolean>;
+  getPushSubscriptionCount: ActorMethod<[], bigint>;
 }

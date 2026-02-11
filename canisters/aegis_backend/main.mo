@@ -82,6 +82,10 @@ persistent actor AegisBackend {
   transient var d2aMatches = HashMap.HashMap<Text, Types.D2AMatchRecord>(16, Text.equal, Text.hash);
   transient var d2aOwnerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
 
+  // Push notification subscriptions
+  var stablePushSubscriptions : [(Principal, [Types.PushSubscription])] = [];
+  transient var pushSubscriptions = HashMap.HashMap<Principal, [Types.PushSubscription]>(16, Principal.equal, Principal.hash);
+
   // Owner -> evaluation IDs index for fast user queries
   transient var ownerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
 
@@ -124,6 +128,7 @@ persistent actor AegisBackend {
       voterBuf.add((signalId, Buffer.toArray(voters)));
     };
     stableSignalVoters := Buffer.toArray(voterBuf);
+    stablePushSubscriptions := Iter.toArray(pushSubscriptions.entries());
   };
 
   system func postupgrade() {
@@ -161,6 +166,8 @@ persistent actor AegisBackend {
       signalVoters.put(signalId, buf);
     };
     stableSignalVoters := [];
+    for ((p, subs) in stablePushSubscriptions.vals()) { pushSubscriptions.put(p, subs) };
+    stablePushSubscriptions := [];
     initCertCache();
   };
 
@@ -1078,6 +1085,106 @@ persistent actor AegisBackend {
 
     // E_index = validationRatio * avgComposite (0-10 scale)
     validationRatio * avgComposite;
+  };
+
+  // ──────────────────────────────────────
+  // Push Notification Subscriptions
+  // ──────────────────────────────────────
+
+  let MAX_PUSH_SUBS_PER_USER : Nat = 5;
+
+  public shared(msg) func registerPushSubscription(
+    endpoint : Text, p256dh : Text, auth : Text
+  ) : async Bool {
+    let caller = msg.caller;
+    if (not requireAuth(caller)) { return false };
+
+    let newSub : Types.PushSubscription = {
+      endpoint = endpoint;
+      keys = { p256dh = p256dh; auth = auth };
+      createdAt = Time.now();
+    };
+
+    switch (pushSubscriptions.get(caller)) {
+      case (?existing) {
+        // Deduplicate by endpoint
+        let filtered = Array.filter<Types.PushSubscription>(
+          existing, func(s) { s.endpoint != endpoint }
+        );
+        let updated = Array.append<Types.PushSubscription>(filtered, [newSub]);
+        // Keep most recent MAX entries
+        let limited = if (updated.size() > MAX_PUSH_SUBS_PER_USER) {
+          Array.tabulate<Types.PushSubscription>(
+            MAX_PUSH_SUBS_PER_USER,
+            func(i) { updated[updated.size() - MAX_PUSH_SUBS_PER_USER + i] }
+          );
+        } else { updated };
+        pushSubscriptions.put(caller, limited);
+      };
+      case null {
+        pushSubscriptions.put(caller, [newSub]);
+      };
+    };
+    true;
+  };
+
+  public shared(msg) func unregisterPushSubscription(endpoint : Text) : async Bool {
+    let caller = msg.caller;
+    if (not requireAuth(caller)) { return false };
+
+    switch (pushSubscriptions.get(caller)) {
+      case (?existing) {
+        let filtered = Array.filter<Types.PushSubscription>(
+          existing, func(s) { s.endpoint != endpoint }
+        );
+        if (filtered.size() == 0) {
+          pushSubscriptions.delete(caller);
+        } else {
+          pushSubscriptions.put(caller, filtered);
+        };
+        true;
+      };
+      case null { false };
+    };
+  };
+
+  public query func getPushSubscriptions(user : Principal) : async [Types.PushSubscription] {
+    switch (pushSubscriptions.get(user)) {
+      case (?subs) { subs };
+      case null { [] };
+    };
+  };
+
+  // Called from Vercel API route to clean up expired subscriptions (410/404)
+  public shared func removePushSubscriptions(
+    user : Principal, endpoints : [Text]
+  ) : async Bool {
+    switch (pushSubscriptions.get(user)) {
+      case (?existing) {
+        let filtered = Array.filter<Types.PushSubscription>(
+          existing, func(s) {
+            not Array.foldLeft<Text, Bool>(
+              endpoints, false, func(found, ep) { found or ep == s.endpoint }
+            )
+          }
+        );
+        if (filtered.size() == 0) {
+          pushSubscriptions.delete(user);
+        } else {
+          pushSubscriptions.put(user, filtered);
+        };
+        true;
+      };
+      case null { false };
+    };
+  };
+
+  public query func getPushSubscriptionCount() : async Nat {
+    var count : Nat = 0;
+    for ((_, subs) in pushSubscriptions.entries()) {
+      count += subs.size();
+    };
+    count;
   };
 
   // ──────────────────────────────────────

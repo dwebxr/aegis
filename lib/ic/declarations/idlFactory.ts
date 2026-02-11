@@ -109,6 +109,15 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     lSlop: IDL.Opt(IDL.Nat8),
   });
   const AnalyzeResult = IDL.Variant({ ok: OnChainAnalysis, err: IDL.Text });
+  const PushSubscriptionKeys = IDL.Record({
+    p256dh: IDL.Text,
+    auth: IDL.Text,
+  });
+  const PushSubscription = IDL.Record({
+    endpoint: IDL.Text,
+    keys: PushSubscriptionKeys,
+    createdAt: IDL.Int,
+  });
   return IDL.Service({
     getProfile: IDL.Func([IDL.Principal], [IDL.Opt(UserProfile)], ["query"]),
     getEvaluation: IDL.Func([IDL.Text], [IDL.Opt(ContentEvaluation)], ["query"]),
@@ -135,5 +144,10 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     sweepProtocolFees: IDL.Func([], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })], []),
     topUpCycles: IDL.Func([], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })], []),
     analyzeOnChain: IDL.Func([IDL.Text, IDL.Vec(IDL.Text)], [AnalyzeResult], []),
+    registerPushSubscription: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
+    unregisterPushSubscription: IDL.Func([IDL.Text], [IDL.Bool], []),
+    getPushSubscriptions: IDL.Func([IDL.Principal], [IDL.Vec(PushSubscription)], ["query"]),
+    removePushSubscriptions: IDL.Func([IDL.Principal, IDL.Vec(IDL.Text)], [IDL.Bool], []),
+    getPushSubscriptionCount: IDL.Func([], [IDL.Nat], ["query"]),
   });
 };

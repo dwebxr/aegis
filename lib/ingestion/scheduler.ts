@@ -35,6 +35,7 @@ interface SchedulerCallbacks {
   getUserContext: () => UserContext | null;
   onSourceError?: (sourceKey: string, error: string) => void;
   onSourceAutoDisabled?: (sourceKey: string, error: string) => void;
+  onCycleComplete?: (newItemCount: number) => void;
 }
 
 export class IngestionScheduler {
@@ -148,6 +149,7 @@ export class IngestionScheduler {
       const sources = this.callbacks.getSources();
       const userContext = this.callbacks.getUserContext();
       const now = Date.now();
+      let cycleNewItems = 0;
 
       for (const source of sources) {
         if (!source.enabled) continue;
@@ -186,6 +188,7 @@ export class IngestionScheduler {
             this.dedup.markSeen(raw.sourceUrl, raw.text);
             scores.push(scored.scores.composite);
             this.callbacks.onNewContent(scored);
+            cycleNewItems++;
           }
         }
 
@@ -195,6 +198,9 @@ export class IngestionScheduler {
         }
 
         this.recordSourceSuccess(key, items.length, scores);
+      }
+      if (cycleNewItems > 0) {
+        this.callbacks.onCycleComplete?.(cycleNewItems);
       }
     } catch (err) {
       console.error("[scheduler] Ingestion cycle failed:", errMsg(err));

@@ -5,6 +5,7 @@ import { ShieldIcon } from "@/components/icons";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserBadge } from "@/components/auth/UserBadge";
 import { AgentStatusBadge } from "@/components/ui/AgentStatusBadge";
+import { NotificationToggle } from "@/components/ui/NotificationToggle";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface NavItem {
@@ -97,6 +98,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
     {!collapsed && isAuthenticated && (
       <div style={{ marginBottom: space[3] }}>
         <AgentStatusBadge compact />
+      </div>
+    )}
+
+    {!collapsed && isAuthenticated && (
+      <div style={{ marginBottom: space[3] }}>
+        <NotificationToggle />
       </div>
     )}
 
