@@ -22,9 +22,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const { todayContent, todayQual, todaySlop, qual, slop, uniqueSources, dailyQuality, dailySlop, dayLabels } = useMemo(() => {
     const now = Date.now();
     const dayMs = 86400000;
-    const todayMidnight = new Date();
-    todayMidnight.setHours(0, 0, 0, 0);
-    const todayStart = todayMidnight.getTime();
+    const todayStart = now - dayMs;
     const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
 
     const todayContent = content.filter(c => c.createdAt >= todayStart);
@@ -82,9 +80,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: mobile ? space[3] : space[4] }}>
-          <StatCard icon={<ShieldIcon s={16} />} label="Quality" value={todayQual.length} sub={`of ${todayContent.length} evaluated today`} color={colors.cyan[400]} mobile={mobile} />
-          <StatCard icon={<FireIcon s={16} />} label="Burned" value={todaySlop.length} sub="slop items filtered today" color={colors.orange[400]} mobile={mobile} />
-          <StatCard icon={<ZapIcon s={16} />} label="Evaluated" value={todayContent.length} sub="total items today" color={colors.purple[400]} mobile={mobile} />
+          <StatCard icon={<ShieldIcon s={16} />} label="Quality" value={todayQual.length} sub={`of ${todayContent.length} in last 24h`} color={colors.cyan[400]} mobile={mobile} />
+          <StatCard icon={<FireIcon s={16} />} label="Burned" value={todaySlop.length} sub="slop filtered in last 24h" color={colors.orange[400]} mobile={mobile} />
+          <StatCard icon={<ZapIcon s={16} />} label="Evaluated" value={todayContent.length} sub="items in last 24h" color={colors.purple[400]} mobile={mobile} />
           <StatCard icon={<RSSIcon s={16} />} label="Sources" value={uniqueSources.size} sub="active feeds" color={colors.sky[400]} mobile={mobile} />
         </div>
       </div>
