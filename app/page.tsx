@@ -133,6 +133,10 @@ export default function AegisApp() {
       onCycleComplete: (count, items) => {
         const pt = principalTextRef.current;
         if (!pt || !localStorage.getItem("aegis-push-enabled")) return;
+        // Throttle: default 6h between push notifications
+        const PUSH_THROTTLE_MS = 6 * 60 * 60 * 1000;
+        const lastPush = Number(localStorage.getItem("aegis-push-last") || "0");
+        if (Date.now() - lastPush < PUSH_THROTTLE_MS) return;
         // Build notification body with item previews
         const quality = items.filter(i => i.verdict === "quality");
         const preview = (quality.length > 0 ? quality : items)
@@ -140,6 +144,7 @@ export default function AegisApp() {
           .map(i => `${i.verdict === "quality" ? "\u2713" : "\u2717"} ${i.text.slice(0, 60).replace(/\n/g, " ")}`)
           .join("\n");
         const summary = `${count} item${count > 1 ? "s" : ""} scored`;
+        localStorage.setItem("aegis-push-last", String(Date.now()));
         fetch("/api/push/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -148,7 +153,7 @@ export default function AegisApp() {
             title: `Aegis: ${summary}`,
             body: preview || summary,
             url: "/",
-            tag: `briefing-${new Date().toISOString().slice(0, 13)}`,
+            tag: `briefing-${new Date().toISOString().slice(0, 10)}`,
           }),
         }).catch(() => {});
       },
