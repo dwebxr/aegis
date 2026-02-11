@@ -22,7 +22,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const { todayContent, todayQual, todaySlop, qual, slop, uniqueSources, dailyQuality, dailySlop, dayLabels } = useMemo(() => {
     const now = Date.now();
     const dayMs = 86400000;
-    const todayStart = now - dayMs;
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    const todayStart = todayMidnight.getTime();
     const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
 
     const todayContent = content.filter(c => c.createdAt >= todayStart);
