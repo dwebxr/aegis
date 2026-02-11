@@ -7,6 +7,7 @@ import { BriefingTab } from "@/components/tabs/BriefingTab";
 import { IncineratorTab } from "@/components/tabs/IncineratorTab";
 import { SourcesTab } from "@/components/tabs/SourcesTab";
 import { AnalyticsTab } from "@/components/tabs/AnalyticsTab";
+import { SettingsTab } from "@/components/tabs/SettingsTab";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { useNotify } from "@/contexts/NotificationContext";
 import { useContent } from "@/contexts/ContentContext";
@@ -133,10 +134,15 @@ export default function AegisApp() {
       onCycleComplete: (count, items) => {
         const pt = principalTextRef.current;
         if (!pt || !localStorage.getItem("aegis-push-enabled")) return;
-        // Throttle: default 6h between push notifications
-        const PUSH_THROTTLE_MS = 6 * 60 * 60 * 1000;
-        const lastPush = Number(localStorage.getItem("aegis-push-last") || "0");
-        if (Date.now() - lastPush < PUSH_THROTTLE_MS) return;
+        // Throttle based on user-selected frequency (Settings tab)
+        const freq = localStorage.getItem("aegis-push-frequency") || "1x_day";
+        if (freq === "off") return;
+        if (freq !== "realtime") {
+          const throttleMap: Record<string, number> = { "1x_day": 24 * 60 * 60 * 1000, "3x_day": 8 * 60 * 60 * 1000 };
+          const throttleMs = throttleMap[freq] || 24 * 60 * 60 * 1000;
+          const lastPush = Number(localStorage.getItem("aegis-push-last") || "0");
+          if (Date.now() - lastPush < throttleMs) return;
+        }
         // Build notification body with item previews
         const quality = items.filter(i => i.verdict === "quality");
         const preview = (quality.length > 0 ? quality : items)
@@ -334,6 +340,7 @@ export default function AegisApp() {
       )}
       {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />}
       {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} />}
+      {tab === "settings" && <SettingsTab mobile={mobile} />}
     </AppShell>
   );
 }

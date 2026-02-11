@@ -32,7 +32,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
           return (
             <button key={it.id} onClick={() => onTabChange(it.id)} title={it.description} style={{
               display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-              background: "none", border: "none", cursor: "pointer", padding: `6px ${space[3]}px`,
+              background: "none", border: "none", cursor: "pointer", padding: `6px ${space[2]}px`,
               color: active ? colors.blue[400] : colors.text.disabled, transition: transitions.fast,
               fontFamily: "inherit",
             }}>
