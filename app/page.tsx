@@ -32,7 +32,7 @@ import { errMsg } from "@/lib/utils/errors";
 export default function AegisApp() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
-  const { content, isAnalyzing, analyze, validateItem, flagItem, addContent, clearDemoContent, loadFromIC } = useContent();
+  const { content, isAnalyzing, syncStatus, analyze, validateItem, flagItem, addContent, clearDemoContent, loadFromIC } = useContent();
   const { isAuthenticated, identity, principalText } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
@@ -325,7 +325,7 @@ export default function AegisApp() {
   return (
     <AppShell activeTab={tab} onTabChange={setTab}>
       <DemoBanner mobile={mobile} />
-      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} />}
+      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} />}
       {tab === "briefing" && <BriefingTab content={content} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} />}
       {tab === "incinerator" && (
         <IncineratorTab

@@ -12,9 +12,10 @@ interface DashboardTabProps {
   mobile?: boolean;
   onValidate: (id: string) => void;
   onFlag: (id: string) => void;
+  isLoading?: boolean;
 }
 
-export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag }) => {
+export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading }) => {
   const [showBurned, setShowBurned] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -138,7 +139,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[3] }}>
         Latest Quality
       </div>
-      {qual.length === 0 ? (
+      {isLoading ? (
+        <div style={{
+          textAlign: "center", padding: space[10],
+          color: colors.text.muted, background: colors.bg.surface,
+          borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
+          marginBottom: space[4],
+        }}>
+          <div style={{ fontSize: 32, marginBottom: space[3], animation: "pulse 2s infinite" }}>&#x1F6E1;</div>
+          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>Loading content...</div>
+          <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Syncing from Internet Computer</div>
+        </div>
+      ) : qual.length === 0 ? (
         <div style={{
           textAlign: "center", padding: space[10],
           color: colors.text.muted, background: colors.bg.surface,
