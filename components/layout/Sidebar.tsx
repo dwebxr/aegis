@@ -1,11 +1,9 @@
 "use client";
 import React from "react";
 import { fonts, colors, space, type as t, radii, transitions, shadows } from "@/styles/theme";
-import { ShieldIcon } from "@/components/icons";
+import { ShieldIcon, GearIcon } from "@/components/icons";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserBadge } from "@/components/auth/UserBadge";
-import { AgentStatusBadge } from "@/components/ui/AgentStatusBadge";
-import { NotificationToggle } from "@/components/ui/NotificationToggle";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface NavItem {
@@ -96,15 +94,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
     )}
 
     {!collapsed && isAuthenticated && (
-      <div style={{ marginBottom: space[3] }}>
-        <AgentStatusBadge compact />
-      </div>
-    )}
-
-    {!collapsed && isAuthenticated && (
-      <div style={{ marginBottom: space[3] }}>
-        <NotificationToggle />
-      </div>
+      <button onClick={() => onTabChange("settings")} style={{
+        display: "flex", alignItems: "center", gap: space[2],
+        padding: `${space[2]}px ${space[3]}px`, marginBottom: space[3],
+        background: activeTab === "settings" ? "rgba(37,99,235,0.12)" : "transparent",
+        border: activeTab === "settings" ? `1px solid rgba(37,99,235,0.2)` : "1px solid transparent",
+        borderRadius: radii.sm, cursor: "pointer", transition: transitions.fast, width: "100%",
+        color: activeTab === "settings" ? colors.blue[400] : colors.text.disabled,
+        fontFamily: "inherit",
+      }}>
+        <GearIcon s={16} />
+        <span style={{ fontSize: t.caption.size, fontWeight: activeTab === "settings" ? 700 : 500 }}>Settings</span>
+      </button>
     )}
 
     <a

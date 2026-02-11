@@ -3,7 +3,7 @@ import React from "react";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
-import { ShieldIcon, SearchIcon, FireIcon, RSSIcon, ChartIcon, GearIcon } from "@/components/icons";
+import { ShieldIcon, SearchIcon, FireIcon, RSSIcon, ChartIcon } from "@/components/icons";
 import { colors, fonts, space } from "@/styles/theme";
 import type { NavItem } from "./Sidebar";
 
@@ -19,7 +19,6 @@ const NAV_CONFIG = [
   { id: "incinerator", Icon: FireIcon, label: "Burn", description: "Evaluate & incinerate slop" },
   { id: "sources", Icon: RSSIcon, label: "Sources", description: "Manage feeds & inputs" },
   { id: "analytics", Icon: ChartIcon, label: "Stats", description: "Accuracy & performance" },
-  { id: "settings", Icon: GearIcon, label: "Settings", description: "Preferences & controls" },
 ] as const;
 
 function buildNavItems(size: number): NavItem[] {

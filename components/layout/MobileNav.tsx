@@ -1,8 +1,7 @@
 "use client";
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { AgentStatusBadge } from "@/components/ui/AgentStatusBadge";
-import { NotificationToggle } from "@/components/ui/NotificationToggle";
+import { GearIcon } from "@/components/icons";
 import { colors, space, type as t, radii, transitions, fonts, shadows } from "@/styles/theme";
 import type { NavItem } from "./Sidebar";
 
@@ -32,7 +31,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
           return (
             <button key={it.id} onClick={() => onTabChange(it.id)} title={it.description} style={{
               display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-              background: "none", border: "none", cursor: "pointer", padding: `6px ${space[2]}px`,
+              background: "none", border: "none", cursor: "pointer", padding: `6px ${space[3]}px`,
               color: active ? colors.blue[400] : colors.text.disabled, transition: transitions.fast,
               fontFamily: "inherit",
             }}>
@@ -56,8 +55,15 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
               <span style={{ fontSize: t.caption.size, color: colors.green[400], fontFamily: fonts.mono }}>{short}</span>
               <span>Logout</span>
             </button>
-            <AgentStatusBadge compact />
-            <NotificationToggle compact />
+            <button onClick={() => onTabChange("settings")} title="Settings" style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 28, height: 28, padding: 0,
+              background: "transparent", border: `1px solid ${colors.border.subtle}`,
+              borderRadius: radii.sm, cursor: "pointer", color: colors.text.disabled,
+              transition: transitions.fast,
+            }}>
+              <GearIcon s={14} />
+            </button>
           </>
         ) : (
           <button onClick={login} style={{
