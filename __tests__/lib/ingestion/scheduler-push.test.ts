@@ -66,6 +66,8 @@ describe("IngestionScheduler onCycleComplete", () => {
     if (mockOnCycleComplete.mock.calls.length > 0) {
       expect(typeof mockOnCycleComplete.mock.calls[0][0]).toBe("number");
       expect(mockOnCycleComplete.mock.calls[0][0]).toBeGreaterThan(0);
+      expect(Array.isArray(mockOnCycleComplete.mock.calls[0][1])).toBe(true);
+      expect(mockOnCycleComplete.mock.calls[0][1].length).toBe(mockOnCycleComplete.mock.calls[0][0]);
     }
   });
 

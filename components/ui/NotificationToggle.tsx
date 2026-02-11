@@ -4,7 +4,11 @@ import { colors, space, type as t, radii, transitions } from "@/styles/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePushNotification } from "@/hooks/usePushNotification";
 
-export const NotificationToggle: React.FC = () => {
+interface NotificationToggleProps {
+  compact?: boolean;
+}
+
+export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact }) => {
   const { isAuthenticated } = useAuth();
   const {
     isSupported,
@@ -26,6 +30,34 @@ export const NotificationToggle: React.FC = () => {
       await subscribe();
     }
   };
+
+  if (compact) {
+    const bellColor = isSubscribed ? colors.cyan[400] : denied ? colors.red[400] : colors.text.disabled;
+    return (
+      <button
+        onClick={handleToggle}
+        disabled={denied || isLoading}
+        title={isSubscribed ? "Push notifications on" : denied ? "Notifications blocked" : "Enable push notifications"}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 28, height: 28,
+          background: isSubscribed ? `${colors.cyan[500]}18` : "transparent",
+          border: `1px solid ${isSubscribed ? `${colors.cyan[500]}33` : colors.border.subtle}`,
+          borderRadius: radii.sm,
+          cursor: denied || isLoading ? "not-allowed" : "pointer",
+          opacity: denied || isLoading ? 0.4 : 1,
+          transition: transitions.fast,
+          padding: 0, flexShrink: 0,
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={bellColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          {isSubscribed && <circle cx="18" cy="4" r="3" fill={colors.cyan[400]} stroke="none" />}
+        </svg>
+      </button>
+    );
+  }
 
   return (
     <div style={{

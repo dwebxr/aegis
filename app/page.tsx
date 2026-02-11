@@ -130,16 +130,23 @@ export default function AegisApp() {
       onSourceAutoDisabled: (key, error) => {
         addNotification(`Source auto-disabled after repeated failures: ${key} (${error})`, "error");
       },
-      onCycleComplete: (count) => {
+      onCycleComplete: (count, items) => {
         const pt = principalTextRef.current;
         if (!pt || !localStorage.getItem("aegis-push-enabled")) return;
+        // Build notification body with item previews
+        const quality = items.filter(i => i.verdict === "quality");
+        const preview = (quality.length > 0 ? quality : items)
+          .slice(0, 3)
+          .map(i => `${i.verdict === "quality" ? "\u2713" : "\u2717"} ${i.text.slice(0, 60).replace(/\n/g, " ")}`)
+          .join("\n");
+        const summary = `${count} item${count > 1 ? "s" : ""} scored`;
         fetch("/api/push/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             principal: pt,
-            title: "Aegis Briefing",
-            body: `${count} new item${count > 1 ? "s" : ""} scored — briefing updated.`,
+            title: `Aegis: ${summary}`,
+            body: preview || summary,
             url: "/",
             tag: `briefing-${new Date().toISOString().slice(0, 13)}`,
           }),

@@ -57,7 +57,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
               <span>Logout</span>
             </button>
             <AgentStatusBadge compact />
-            <NotificationToggle />
+            <NotificationToggle compact />
           </>
         ) : (
           <button onClick={login} style={{
