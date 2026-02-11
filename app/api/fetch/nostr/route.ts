@@ -72,6 +72,30 @@ export async function POST(request: NextRequest) {
 
     rawEvents.sort((a, b) => b.created_at - a.created_at);
 
+    // Fetch Kind 0 profiles for authors
+    const uniquePubkeys = Array.from(new Set(rawEvents.map(e => e.pubkey)));
+    const profiles: Record<string, { name?: string; picture?: string }> = {};
+    if (uniquePubkeys.length > 0) {
+      try {
+        const metaEvents = await Promise.race([
+          pool.querySync(relays, { kinds: [0], authors: uniquePubkeys.slice(0, 50) }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("meta-timeout")), 5000)),
+        ]);
+        for (const me of metaEvents) {
+          if (profiles[me.pubkey]) continue; // keep first (most relays agree on)
+          try {
+            const meta = JSON.parse(me.content);
+            profiles[me.pubkey] = {
+              name: meta.display_name || meta.name || undefined,
+              picture: meta.picture || undefined,
+            };
+          } catch { /* invalid metadata JSON */ }
+        }
+      } catch {
+        // Timeout fetching profiles — not critical, continue without them
+      }
+    }
+
     return NextResponse.json({
       events: rawEvents.map(e => ({
         id: e.id,
@@ -80,6 +104,7 @@ export async function POST(request: NextRequest) {
         createdAt: e.created_at,
         tags: e.tags,
       })),
+      profiles,
     });
   } catch (err: unknown) {
     console.error("[fetch/nostr] Relay query failed:", err);

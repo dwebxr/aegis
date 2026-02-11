@@ -272,7 +272,7 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
               </button>
             </div>
 
-            <div style={{ display: "flex", gap: space[2], marginBottom: space[4] }}>
+            <div style={{ display: "flex", gap: space[2], marginBottom: space[4], flexWrap: "wrap" }}>
               {typeof navigator !== "undefined" && "share" in navigator && (
                 <button
                   onClick={handleWebShare}
@@ -293,6 +293,27 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
                   Share...
                 </button>
               )}
+              <a
+                href={`https://x.com/intent/tweet?text=${encodeURIComponent(`Aegis Briefing \u2014 ${insightCount} curated insights`)}&url=${encodeURIComponent(shareUrl)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  flex: 1,
+                  padding: `${space[2]}px ${space[3]}px`,
+                  background: colors.bg.surface,
+                  border: `1px solid ${colors.border.default}`,
+                  borderRadius: radii.md,
+                  color: colors.text.secondary,
+                  fontSize: t.bodySm.size,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textDecoration: "none",
+                  textAlign: "center",
+                  transition: transitions.fast,
+                }}
+              >
+                Post on X
+              </a>
               <a
                 href={`https://njump.me/${naddr}`}
                 target="_blank"

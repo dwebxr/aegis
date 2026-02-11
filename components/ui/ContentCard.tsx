@@ -218,7 +218,21 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
         marginBottom: space[2],
         ...(variant === "serendipity" ? { marginTop: space[1] } : {}),
       }}>
-        <span style={{ fontSize: isLarge ? 16 : 18 }}>{item.avatar}</span>
+        {item.avatar?.startsWith("http") ? (
+          /* eslint-disable-next-line @next/next/no-img-element -- Nostr profile avatar */
+          <img
+            src={item.avatar}
+            alt=""
+            style={{
+              width: isLarge ? 22 : 20, height: isLarge ? 22 : 20,
+              borderRadius: "50%", objectFit: "cover", flexShrink: 0,
+              border: `1px solid ${colors.border.default}`,
+            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <span style={{ fontSize: isLarge ? 16 : 18 }}>{item.avatar}</span>
+        )}
         <span style={{ fontWeight: 700, color: colors.text.secondary, fontSize: isLarge ? t.body.size : t.body.mobileSz, fontFamily: fonts.mono }}>{item.author}</span>
         <span style={{
           fontSize: t.caption.size, color: colors.text.muted,

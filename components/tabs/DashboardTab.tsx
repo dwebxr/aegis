@@ -7,6 +7,42 @@ import { ContentCard } from "@/components/ui/ContentCard";
 import { fonts, colors, space, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 
+function downloadFile(data: string, filename: string, mime: string) {
+  const blob = new Blob([data], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function contentToCSV(items: ContentItem[]): string {
+  const header = "id,author,source,verdict,composite,originality,insight,credibility,vSignal,cContext,lSlop,topics,text,reason,createdAt,sourceUrl";
+  const rows = items.map(c => {
+    const fields = [
+      c.id,
+      c.author,
+      c.source,
+      c.verdict,
+      c.scores.composite,
+      c.scores.originality,
+      c.scores.insight,
+      c.scores.credibility,
+      c.vSignal ?? "",
+      c.cContext ?? "",
+      c.lSlop ?? "",
+      (c.topics || []).join(";"),
+      `"${(c.text || "").replace(/"/g, '""')}"`,
+      `"${(c.reason || "").replace(/"/g, '""')}"`,
+      new Date(c.createdAt).toISOString(),
+      c.sourceUrl || "",
+    ];
+    return fields.join(",");
+  });
+  return [header, ...rows].join("\n");
+}
+
 interface DashboardTabProps {
   content: ContentItem[];
   mobile?: boolean;
@@ -16,10 +52,12 @@ interface DashboardTabProps {
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading }) => {
-  const [showBurned, setShowBurned] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop">("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [showAllContent, setShowAllContent] = useState(false);
 
-  const { todayContent, todayQual, todaySlop, qual, slop, uniqueSources, dailyQuality, dailySlop, dayLabels } = useMemo(() => {
+  const { todayContent, todayQual, todaySlop, uniqueSources, dailyQuality, dailySlop, dayLabels } = useMemo(() => {
     const now = Date.now();
     const dayMs = 86400000;
     const todayStart = now - dayMs;
@@ -28,8 +66,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     const todayContent = content.filter(c => c.createdAt >= todayStart);
     const todayQual = todayContent.filter(c => c.verdict === "quality");
     const todaySlop = todayContent.filter(c => c.verdict === "slop");
-    const qual = content.filter(c => c.verdict === "quality");
-    const slop = content.filter(c => c.verdict === "slop");
     const uniqueSources = new Set(content.map(c => c.source));
 
     const dailyQuality: number[] = [];
@@ -45,8 +81,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       dailySlop.push(dayItems.filter(c => c.verdict === "slop").length);
       dayLabels.push(dayNames[new Date(dayEnd).getDay()]);
     }
-    return { todayContent, todayQual, todaySlop, qual, slop, uniqueSources, dailyQuality, dailySlop, dayLabels };
+    return { todayContent, todayQual, todaySlop, uniqueSources, dailyQuality, dailySlop, dayLabels };
   }, [content]);
+
+  const availableSources = useMemo(() => Array.from(new Set(content.map(c => c.source))).sort(), [content]);
+
+  const filteredContent = useMemo(() => {
+    let items = content;
+    if (verdictFilter !== "all") items = items.filter(c => c.verdict === verdictFilter);
+    if (sourceFilter !== "all") items = items.filter(c => c.source === sourceFilter);
+    return items;
+  }, [content, verdictFilter, sourceFilter]);
+
+  const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
 
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
@@ -135,10 +182,105 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         ))}
       </div>
 
-      {/* Latest Quality */}
-      <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[3] }}>
-        Latest Quality
+      {/* Export */}
+      {content.length > 0 && (
+        <div style={{ display: "flex", gap: space[2], marginBottom: space[5] }}>
+          <button
+            onClick={() => downloadFile(contentToCSV(content), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv")}
+            style={{
+              padding: `${space[2]}px ${space[4]}px`,
+              background: colors.bg.surface,
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: radii.md,
+              color: colors.text.muted,
+              fontSize: t.bodySm.size,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              transition: transitions.fast,
+            }}
+          >
+            &#x1F4E5; Export CSV
+          </button>
+          <button
+            onClick={() => {
+              const data = content.map(c => ({
+                id: c.id, author: c.author, source: c.source, verdict: c.verdict,
+                scores: c.scores, vSignal: c.vSignal, cContext: c.cContext, lSlop: c.lSlop,
+                topics: c.topics, text: c.text, reason: c.reason,
+                createdAt: new Date(c.createdAt).toISOString(), sourceUrl: c.sourceUrl,
+              }));
+              downloadFile(JSON.stringify(data, null, 2), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
+            }}
+            style={{
+              padding: `${space[2]}px ${space[4]}px`,
+              background: colors.bg.surface,
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: radii.md,
+              color: colors.text.muted,
+              fontSize: t.bodySm.size,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              transition: transitions.fast,
+            }}
+          >
+            &#x1F4E5; Export JSON
+          </button>
+        </div>
+      )}
+
+      {/* Content with filters */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3], flexWrap: "wrap", gap: space[2] }}>
+        <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
+          Content {hasActiveFilter && <span style={{ fontSize: t.bodySm.size, color: colors.text.disabled }}>({filteredContent.length})</span>}
+        </div>
+        <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
+          {(["all", "quality", "slop"] as const).map(v => (
+            <button
+              key={v}
+              onClick={() => setVerdictFilter(v)}
+              style={{
+                padding: `${space[1]}px ${space[3]}px`,
+                background: verdictFilter === v ? (v === "quality" ? colors.green.bg : v === "slop" ? colors.red.bg : colors.bg.raised) : "transparent",
+                border: `1px solid ${verdictFilter === v ? (v === "quality" ? colors.green.border : v === "slop" ? colors.red.border : colors.border.emphasis) : colors.border.default}`,
+                borderRadius: radii.pill,
+                color: verdictFilter === v ? (v === "quality" ? colors.green[400] : v === "slop" ? colors.red[400] : colors.text.secondary) : colors.text.disabled,
+                fontSize: t.caption.size,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: transitions.fast,
+                textTransform: "capitalize",
+              }}
+            >
+              {v}
+            </button>
+          ))}
+          {availableSources.length > 1 && (
+            <select
+              value={sourceFilter}
+              onChange={e => setSourceFilter(e.target.value)}
+              style={{
+                padding: `${space[1]}px ${space[2]}px`,
+                background: sourceFilter !== "all" ? colors.bg.raised : "transparent",
+                border: `1px solid ${sourceFilter !== "all" ? colors.border.emphasis : colors.border.default}`,
+                borderRadius: radii.pill,
+                color: sourceFilter !== "all" ? colors.text.secondary : colors.text.disabled,
+                fontSize: t.caption.size,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                outline: "none",
+              }}
+            >
+              <option value="all">all sources</option>
+              {availableSources.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+        </div>
       </div>
+
       {isLoading ? (
         <div style={{
           textAlign: "center", padding: space[10],
@@ -150,7 +292,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>Loading content...</div>
           <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Syncing from Internet Computer</div>
         </div>
-      ) : qual.length === 0 ? (
+      ) : filteredContent.length === 0 ? (
         <div style={{
           textAlign: "center", padding: space[10],
           color: colors.text.muted, background: colors.bg.surface,
@@ -158,71 +300,49 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           marginBottom: space[4],
         }}>
           <div style={{ fontSize: 32, marginBottom: space[3] }}>&#x1F50D;</div>
-          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>No content yet</div>
-          <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Add sources or analyze content to get started</div>
+          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
+            {hasActiveFilter ? "No matching content" : "No content yet"}
+          </div>
+          <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>
+            {hasActiveFilter ? "Try adjusting your filters" : "Add sources or analyze content to get started"}
+          </div>
         </div>
-      ) : qual.slice(0, 3).map(it => (
-        <ContentCard
-          key={it.id}
-          item={it}
-          expanded={expanded === it.id}
-          onToggle={() => setExpanded(expanded === it.id ? null : it.id)}
-          onValidate={onValidate}
-          onFlag={onFlag}
-          mobile={mobile}
-        />
-      ))}
-
-      {/* Recently Burned */}
-      {slop.length > 0 && (
-        <div style={{ marginTop: space[5] }}>
-          <button
-            onClick={() => setShowBurned(!showBurned)}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: space[2],
-              padding: `${space[3]}px ${space[4]}px`,
-              background: colors.bg.surface,
-              border: `1px solid ${colors.border.default}`,
-              borderRadius: radii.md,
-              color: colors.text.muted,
-              fontSize: t.bodySm.size,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: transitions.normal,
-              fontFamily: "inherit",
-            }}
-          >
-            <span style={{
-              transform: showBurned ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform .2s",
-              display: "inline-block",
-            }}>
-              &#x25BC;
-            </span>
-            Recently Burned ({slop.length} items)
-          </button>
-
-          {showBurned && (
-            <div style={{ marginTop: space[3] }}>
-              {slop.slice(0, 5).map((it, i) => (
-                <div key={it.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
-                  <ContentCard
-                    item={it}
-                    expanded={expanded === it.id}
-                    onToggle={() => setExpanded(expanded === it.id ? null : it.id)}
-                    onValidate={onValidate}
-                    onFlag={onFlag}
-                    mobile={mobile}
-                  />
-                </div>
-              ))}
+      ) : (
+        <>
+          {filteredContent.slice(0, showAllContent ? 50 : 5).map((it, i) => (
+            <div key={it.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
+              <ContentCard
+                item={it}
+                expanded={expanded === it.id}
+                onToggle={() => setExpanded(expanded === it.id ? null : it.id)}
+                onValidate={onValidate}
+                onFlag={onFlag}
+                mobile={mobile}
+              />
             </div>
+          ))}
+          {filteredContent.length > 5 && !showAllContent && (
+            <button
+              onClick={() => setShowAllContent(true)}
+              style={{
+                width: "100%",
+                padding: `${space[3]}px ${space[4]}px`,
+                background: colors.bg.surface,
+                border: `1px solid ${colors.border.default}`,
+                borderRadius: radii.md,
+                color: colors.text.muted,
+                fontSize: t.bodySm.size,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: transitions.normal,
+                marginTop: space[2],
+              }}
+            >
+              Show all ({filteredContent.length} items)
+            </button>
           )}
-        </div>
+        </>
       )}
     </div>
   );

@@ -206,9 +206,9 @@ export class IngestionScheduler {
   }
 
   private async enrichItems(
-    items: Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>,
+    items: Array<{ text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string }>,
     sourceType: string,
-  ): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+  ): Promise<Array<{ text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string }>> {
     if (sourceType !== "rss") return items;
 
     let enrichCount = 0;
@@ -244,7 +244,7 @@ export class IngestionScheduler {
     return result;
   }
 
-  private async fetchSource(source: SchedulerSource, key: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+  private async fetchSource(source: SchedulerSource, key: string): Promise<Array<{ text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string }>> {
     switch (source.type) {
       case "rss":
         return this.fetchRSS(source.config.feedUrl, key);
@@ -300,7 +300,7 @@ export class IngestionScheduler {
     }
   }
 
-  private async fetchNostr(relays: string[], pubkeys: string[] | undefined, key: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+  private async fetchNostr(relays: string[], pubkeys: string[] | undefined, key: string): Promise<Array<{ text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string }>> {
     try {
       const res = await fetch("/api/fetch/nostr", {
         method: "POST",
@@ -312,11 +312,16 @@ export class IngestionScheduler {
         return [];
       }
       const data = await res.json();
-      return (data.events || []).map((ev: { content: string; pubkey: string; id: string }) => ({
-        text: ev.content.slice(0, MAX_TEXT_LENGTH),
-        author: ev.pubkey.slice(0, 12) + "...",
-        sourceUrl: `nostr:${ev.id}`,
-      }));
+      const profiles: Record<string, { name?: string; picture?: string }> = data.profiles || {};
+      return (data.events || []).map((ev: { content: string; pubkey: string; id: string }) => {
+        const profile = profiles[ev.pubkey];
+        return {
+          text: ev.content.slice(0, MAX_TEXT_LENGTH),
+          author: profile?.name || ev.pubkey.slice(0, 12) + "...",
+          avatar: profile?.picture,
+          sourceUrl: `nostr:${ev.id}`,
+        };
+      });
     } catch (err) {
       const msg = errMsg(err);
       console.error("[scheduler] Nostr fetch failed:", msg);
@@ -354,7 +359,7 @@ export class IngestionScheduler {
   }
 
   private async scoreItem(
-    raw: { text: string; author: string; sourceUrl?: string; imageUrl?: string },
+    raw: { text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string },
     userContext: UserContext | null,
   ): Promise<ContentItem | null> {
     try {
@@ -374,7 +379,7 @@ export class IngestionScheduler {
         id: uuidv4(),
         owner: "",
         author: raw.author,
-        avatar: raw.sourceUrl?.startsWith("nostr:") ? "\uD83D\uDD2E" : "\uD83D\uDCE1",
+        avatar: raw.avatar || (raw.sourceUrl?.startsWith("nostr:") ? "\uD83D\uDD2E" : "\uD83D\uDCE1"),
         text: raw.text.slice(0, MAX_DISPLAY_TEXT),
         source: raw.sourceUrl?.startsWith("nostr:") ? "nostr" : "rss",
         sourceUrl: raw.sourceUrl,
