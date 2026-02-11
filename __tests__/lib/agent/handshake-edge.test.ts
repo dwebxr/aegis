@@ -96,6 +96,29 @@ describe("parseD2AMessage — edge cases", () => {
     expect(payload.topics).toContain("テスト");
   });
 
+  it("returns null for encrypted valid JSON missing required D2A fields", () => {
+    // Peer sends valid JSON that decrypts but isn't a proper D2AMessage
+    const badMsg = { type: "offer", fromPubkey: pk1 }; // missing toPubkey, payload
+    const encrypted = encryptMessage(JSON.stringify(badMsg), sk1, pk2);
+    expect(parseD2AMessage(encrypted, sk2, pk1)).toBeNull();
+  });
+
+  it("returns null for encrypted JSON with invalid type", () => {
+    const badMsg = { type: "unknown", fromPubkey: pk1, toPubkey: pk2, payload: {} };
+    const encrypted = encryptMessage(JSON.stringify(badMsg), sk1, pk2);
+    expect(parseD2AMessage(encrypted, sk2, pk1)).toBeNull();
+  });
+
+  it("returns null for encrypted array instead of object", () => {
+    const encrypted = encryptMessage("[1,2,3]", sk1, pk2);
+    expect(parseD2AMessage(encrypted, sk2, pk1)).toBeNull();
+  });
+
+  it("returns null for encrypted null", () => {
+    const encrypted = encryptMessage("null", sk1, pk2);
+    expect(parseD2AMessage(encrypted, sk2, pk1)).toBeNull();
+  });
+
   it("returns null when decrypting with wrong key", () => {
     const wrongSk = new Uint8Array(32).fill(99);
     const msg: D2AMessage = {

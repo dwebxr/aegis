@@ -1,4 +1,3 @@
-/** Persisted source configuration (localStorage + IC) */
 export interface SavedSource {
   id: string;
   type: "rss" | "nostr";

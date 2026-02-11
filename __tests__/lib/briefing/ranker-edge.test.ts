@@ -189,7 +189,7 @@ describe("generateBriefing — negative topic affinities", () => {
 });
 
 describe("generateBriefing — zero and extreme scores", () => {
-  it("handles items with composite score of 0", () => {
+  it("filters items with composite below qualityThreshold", () => {
     const items = [
       makeItem({
         id: "zero-score",
@@ -197,8 +197,9 @@ describe("generateBriefing — zero and extreme scores", () => {
       }),
     ];
     const result = generateBriefing(items, makeProfile());
-    expect(result.priority).toHaveLength(1);
-    expect(result.priority[0].briefingScore).toBe(0);
+    // Default qualityThreshold is 4.0; composite 0 is below → excluded from priority
+    expect(result.priority).toHaveLength(0);
+    expect(result.filteredOut).toHaveLength(1);
   });
 
   it("handles items with composite score of 10", () => {
@@ -254,11 +255,11 @@ describe("generateBriefing — extreme recency", () => {
       makeItem({
         id: "fresh",
         createdAt: Date.now(),
-        scores: { originality: 3, insight: 3, credibility: 3, composite: 3 },
+        scores: { originality: 5, insight: 5, credibility: 5, composite: 5 },
       }),
     ];
     const result = generateBriefing(items, makeProfile());
-    // Fresh low-score item should rank higher than ancient high-score item
+    // Fresh item should rank higher than ancient high-score item due to decay
     expect(result.priority[0].item.id).toBe("fresh");
   });
 

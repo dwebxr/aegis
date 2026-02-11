@@ -20,10 +20,7 @@ export interface SourceRuntimeState {
 
 export type SourceHealth = "healthy" | "degraded" | "error" | "disabled";
 
-/** Exponential backoff delays: 1min → 5min → 20min → 60min */
 export const BACKOFF_MS = [60_000, 300_000, 1_200_000, 3_600_000] as const;
-
-/** Auto-disable after this many consecutive failures */
 export const MAX_CONSECUTIVE_FAILURES = 5;
 
 export const BASE_CYCLE_MS = 2 * 60 * 1000;
@@ -59,12 +56,29 @@ export function getSourceKey(type: string, config: Record<string, string>): stri
   }
 }
 
+function isValidState(v: unknown): v is SourceRuntimeState {
+  if (!v || typeof v !== "object") return false;
+  const s = v as Record<string, unknown>;
+  return (
+    typeof s.errorCount === "number" &&
+    typeof s.nextFetchAt === "number" &&
+    typeof s.averageScore === "number"
+  );
+}
+
 export function loadSourceStates(): Record<string, SourceRuntimeState> {
   if (typeof globalThis.localStorage === "undefined") return {};
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
-    return JSON.parse(raw) as Record<string, SourceRuntimeState>;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+
+    const result: Record<string, SourceRuntimeState> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      result[key] = isValidState(value) ? value : defaultState();
+    }
+    return result;
   } catch (err) {
     console.warn("[sourceState] Corrupted localStorage data, resetting:", err);
     return {};
@@ -80,14 +94,12 @@ export function saveSourceStates(states: Record<string, SourceRuntimeState>): vo
   }
 }
 
-/** Compute backoff delay from error count. Returns ms. */
 export function computeBackoffDelay(errorCount: number): number {
   if (errorCount <= 0) return 0;
   const idx = Math.min(errorCount - 1, BACKOFF_MS.length - 1);
   return BACKOFF_MS[idx];
 }
 
-/** Compute adaptive fetch interval based on source activity. */
 export function computeAdaptiveInterval(state: SourceRuntimeState): number {
   // Consecutive empty fetches → slow down
   if (state.consecutiveEmpty >= 3) {

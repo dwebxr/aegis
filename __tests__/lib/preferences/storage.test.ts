@@ -67,6 +67,31 @@ describe("preferences/storage", () => {
       expect(loaded.principalId).toBe("user-1");
     });
 
+    it("returns empty profile when calibration is missing", () => {
+      localStorage.setItem("aegis_prefs_user-1", JSON.stringify({
+        version: 1,
+        principalId: "user-1",
+        topicAffinities: {},
+        authorTrust: {},
+        recentTopics: [],
+      }));
+      const loaded = loadProfile("user-1");
+      expect(loaded.calibration.qualityThreshold).toBe(4.0);
+    });
+
+    it("returns empty profile when recentTopics is not an array", () => {
+      localStorage.setItem("aegis_prefs_user-1", JSON.stringify({
+        version: 1,
+        principalId: "user-1",
+        topicAffinities: {},
+        authorTrust: {},
+        calibration: { originalityWeight: 0.4, insightWeight: 0.35, credibilityWeight: 0.25, qualityThreshold: 4 },
+        recentTopics: "not an array",
+      }));
+      const loaded = loadProfile("user-1");
+      expect(loaded.recentTopics).toEqual([]);
+    });
+
     it("uses principal-specific storage keys", () => {
       const p1 = createEmptyProfile("user-a");
       p1.totalValidated = 10;

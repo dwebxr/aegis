@@ -3,8 +3,6 @@
  * Checks hostnames and URLs against private/internal network ranges.
  */
 
-/** Check if a hostname points to a private or reserved network.
- *  Returns an error message if blocked, or null if allowed. */
 export function blockPrivateHostname(hostname: string): string | null {
   const h = hostname.toLowerCase();
 
@@ -33,8 +31,6 @@ export function blockPrivateHostname(hostname: string): string | null {
   return null;
 }
 
-/** Check a full URL (http/https) against private networks.
- *  Returns an error message if blocked, or null if allowed. */
 export function blockPrivateUrl(urlString: string): string | null {
   let parsed: URL;
   try {
@@ -50,8 +46,6 @@ export function blockPrivateUrl(urlString: string): string | null {
   return blockPrivateHostname(parsed.hostname);
 }
 
-/** Check a WebSocket relay URL (wss://) against private networks.
- *  Returns an error message if blocked, or null if allowed. */
 export function blockPrivateRelay(relayUrl: string): string | null {
   let parsed: URL;
   try {

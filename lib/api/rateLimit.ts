@@ -5,6 +5,7 @@ interface WindowEntry {
   resetAt: number;
 }
 
+const MAX_WINDOW_ENTRIES = 10_000;
 const windows = new Map<string, WindowEntry>();
 
 // Cleanup stale entries every 60 seconds to prevent unbounded memory growth
@@ -15,7 +16,6 @@ if (typeof setInterval !== "undefined") {
       if (now >= entry.resetAt) windows.delete(key);
     });
   }, 60_000);
-  // Allow Node.js process to exit even if this timer is active (prevents test hangs)
   if (typeof timer === "object" && "unref" in timer) timer.unref();
 }
 
@@ -25,22 +25,17 @@ function getClientIP(request: NextRequest): string {
     || "unknown";
 }
 
-/** Clear all rate limit windows (for testing only). */
 export function _resetRateLimits(): void {
   windows.clear();
 }
 
 /**
- * Check rate limit for a request. Returns null if allowed, or a 429 NextResponse if exceeded.
+ * Returns null if allowed, or 429 NextResponse if exceeded.
  *
  * LIMITATION: On Vercel serverless, state is per-instance (warm start).
  * Cold starts get a fresh Map. This provides burst protection within a
  * single instance but does not limit across distributed instances.
  * For stronger guarantees, migrate to Vercel KV or Redis.
- *
- * @param request - The incoming request
- * @param limit - Max requests per window (default: 30)
- * @param windowMs - Window duration in ms (default: 60_000 = 1 minute)
  */
 export function rateLimit(request: NextRequest, limit = 30, windowMs = 60_000): NextResponse | null {
   const ip = getClientIP(request);
@@ -48,6 +43,10 @@ export function rateLimit(request: NextRequest, limit = 30, windowMs = 60_000): 
   const entry = windows.get(ip);
 
   if (!entry || now >= entry.resetAt) {
+    if (windows.size >= MAX_WINDOW_ENTRIES) {
+      const oldest = windows.keys().next().value;
+      if (oldest) windows.delete(oldest);
+    }
     windows.set(ip, { count: 1, resetAt: now + windowMs });
     return null;
   }

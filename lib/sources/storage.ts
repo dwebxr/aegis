@@ -8,7 +8,11 @@ export function loadSources(principalId: string): SavedSource[] {
     const raw = localStorage.getItem(KEY_PREFIX + principalId);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (s): s is SavedSource =>
+        s && typeof s.id === "string" && typeof s.type === "string" && typeof s.enabled === "boolean",
+    );
   } catch (err) {
     console.warn("[sources] Failed to load source configs:", err);
     return [];

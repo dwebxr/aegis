@@ -47,7 +47,7 @@ async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
   try {
     const events = await Promise.race([
       pool.querySync(relays, filter),
-      new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 15000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000)),
     ]);
 
     if (events.length === 0) {
@@ -60,7 +60,12 @@ async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
     briefingCache.set(naddr, { data: parsed, at: Date.now() });
     return parsed;
   } catch (err) {
-    console.error("[briefing/page] Relay query failed:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === "timeout") {
+      console.warn("[briefing/page] Relay query timed out for", naddr);
+    } else {
+      console.error("[briefing/page] Relay query failed:", err);
+    }
     briefingCache.set(naddr, { data: null, at: Date.now() });
     return null;
   } finally {

@@ -11,7 +11,6 @@ export interface PublishResult {
   relaysFailed: string[];
 }
 
-/** Publish a signed event and partition relays by success/failure */
 export async function publishAndPartition(
   signed: ReturnType<typeof finalizeEvent>,
   urls: string[],

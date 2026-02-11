@@ -14,14 +14,12 @@ import { errMsg } from "@/lib/utils/errors";
 interface ContentState {
   content: ContentItem[];
   isAnalyzing: boolean;
-  isSyncing: boolean;
   syncStatus: "idle" | "syncing" | "synced" | "offline";
   analyze: (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
   validateItem: (id: string) => void;
   flagItem: (id: string) => void;
   addContent: (item: ContentItem) => void;
   clearDemoContent: () => void;
-  syncToIC: () => Promise<void>;
   loadFromIC: () => Promise<void>;
 }
 
@@ -33,14 +31,12 @@ type PreferenceCallbacks = {
 const ContentContext = createContext<ContentState>({
   content: [],
   isAnalyzing: false,
-  isSyncing: false,
   syncStatus: "idle",
   analyze: async () => ({ originality: 0, insight: 0, credibility: 0, composite: 0, verdict: "slop" as const, reason: "" }),
   validateItem: () => {},
   flagItem: () => {},
   addContent: () => {},
   clearDemoContent: () => {},
-  syncToIC: async () => {},
   loadFromIC: async () => {},
 });
 
@@ -62,12 +58,34 @@ function mapSourceBack(s: ContentSource): string {
   return "manual";
 }
 
+function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal").Principal) {
+  return {
+    id: c.id,
+    owner,
+    author: c.author,
+    avatar: c.avatar,
+    text: c.text,
+    source: mapSource(c.source),
+    sourceUrl: c.sourceUrl ? [c.sourceUrl] as [string] : [] as [],
+    scores: {
+      originality: Math.round(c.scores.originality),
+      insight: Math.round(c.scores.insight),
+      credibility: Math.round(c.scores.credibility),
+      compositeScore: c.scores.composite,
+    },
+    verdict: c.verdict === "quality" ? { quality: null } : { slop: null },
+    reason: c.reason,
+    createdAt: BigInt(c.createdAt * 1_000_000),
+    validated: c.validated,
+    flagged: c.flagged,
+  };
+}
+
 export function ContentProvider({ children, preferenceCallbacks }: { children: React.ReactNode; preferenceCallbacks?: PreferenceCallbacks }) {
   const { addNotification } = useNotify();
   const { isAuthenticated, identity, principal } = useAuth();
   const [content, setContent] = useState<ContentItem[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "offline">("idle");
   const actorRef = useRef<_SERVICE | null>(null);
   const contentRef = useRef(content);
@@ -94,7 +112,18 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   useEffect(() => {
     const timestampTimer = setInterval(() => {
-      setContent(prev => prev.map(c => ({ ...c, timestamp: relativeTime(c.createdAt) })));
+      setContent(prev => {
+        let changed = false;
+        const next = prev.map(c => {
+          const ts = relativeTime(c.createdAt);
+          if (ts !== c.timestamp) {
+            changed = true;
+            return { ...c, timestamp: ts };
+          }
+          return c;
+        });
+        return changed ? next : prev;
+      });
     }, 30000);
     return () => clearInterval(timestampTimer);
   }, []);
@@ -192,26 +221,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     setContent(prev => [evaluation, ...prev]);
 
     if (actorRef.current && isAuthenticated && principal) {
-      actorRef.current.saveEvaluation({
-        id: evaluation.id,
-        owner: principal,
-        author: evaluation.author,
-        avatar: evaluation.avatar,
-        text: evaluation.text,
-        source: meta?.sourceUrl ? { url: null } : { manual: null },
-        sourceUrl: evaluation.sourceUrl ? [evaluation.sourceUrl] as [string] : [] as [],
-        scores: {
-          originality: Math.round(evaluation.scores.originality),
-          insight: Math.round(evaluation.scores.insight),
-          credibility: Math.round(evaluation.scores.credibility),
-          compositeScore: evaluation.scores.composite,
-        },
-        verdict: evaluation.verdict === "quality" ? { quality: null } : { slop: null },
-        reason: evaluation.reason,
-        createdAt: BigInt(evaluation.createdAt * 1_000_000),
-        validated: evaluation.validated,
-        flagged: evaluation.flagged,
-      }).catch((err: unknown) => {
+      actorRef.current.saveEvaluation(toICEvaluation(evaluation, principal)).catch((err: unknown) => {
         console.warn("[content] IC saveEvaluation failed:", errMsg(err));
         setSyncStatus("offline");
         addNotification("Evaluation saved locally but IC sync failed", "error");
@@ -269,91 +279,36 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
     setContent(prev => [owned, ...prev]);
 
-    // Persist to IC canister (fire-and-forget, same pattern as analyze)
+    // Persist to IC canister (fire-and-forget)
     if (actorRef.current && isAuthenticated && principal) {
-      actorRef.current.saveEvaluation({
-        id: owned.id,
-        owner: principal,
-        author: owned.author,
-        avatar: owned.avatar,
-        text: owned.text,
-        source: mapSource(owned.source),
-        sourceUrl: owned.sourceUrl ? [owned.sourceUrl] as [string] : [] as [],
-        scores: {
-          originality: Math.round(owned.scores.originality),
-          insight: Math.round(owned.scores.insight),
-          credibility: Math.round(owned.scores.credibility),
-          compositeScore: owned.scores.composite,
-        },
-        verdict: owned.verdict === "quality" ? { quality: null } : { slop: null },
-        reason: owned.reason,
-        createdAt: BigInt(owned.createdAt * 1_000_000),
-        validated: owned.validated,
-        flagged: owned.flagged,
-      }).catch((err: unknown) => {
+      actorRef.current.saveEvaluation(toICEvaluation(owned, principal)).catch((err: unknown) => {
         console.warn("[content] IC save (addContent) failed:", errMsg(err));
+        setSyncStatus("offline");
+        addNotification("Content saved locally but IC sync failed", "error");
       });
     }
-  }, [isAuthenticated, principal]);
+  }, [isAuthenticated, principal, addNotification]);
 
   const clearDemoContent = useCallback(() => {
     setContent(prev => prev.filter(c => c.owner !== ""));
   }, []);
 
-  const syncToIC = useCallback(async () => {
-    if (!actorRef.current || !isAuthenticated || !principal) return;
-    setIsSyncing(true);
-    setSyncStatus("syncing");
-
-    const userContent = contentRef.current.filter(c => c.owner === principal.toText());
-    if (userContent.length === 0) {
-      setIsSyncing(false);
-      setSyncStatus("synced");
-      return;
-    }
-
-    const evals = userContent.map(c => ({
-      id: c.id,
-      owner: principal,
-      author: c.author,
-      avatar: c.avatar,
-      text: c.text,
-      source: mapSource(c.source),
-      sourceUrl: c.sourceUrl ? [c.sourceUrl] as [string] : [] as [],
-      scores: {
-        originality: Math.round(c.scores.originality),
-        insight: Math.round(c.scores.insight),
-        credibility: Math.round(c.scores.credibility),
-        compositeScore: c.scores.composite,
-      },
-      verdict: c.verdict === "quality" ? { quality: null } : { slop: null },
-      reason: c.reason,
-      createdAt: BigInt(c.createdAt * 1_000_000),
-      validated: c.validated,
-      flagged: c.flagged,
-    }));
-
-    try {
-      await actorRef.current.batchSaveEvaluations(evals);
-      setSyncStatus("synced");
-    } catch (err) {
-      console.error("[content] Failed to sync to IC:", errMsg(err));
-      setSyncStatus("offline");
-      addNotification("Batch sync to IC failed", "error");
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [isAuthenticated, principal, addNotification]);
-
   const loadFromIC = useCallback(async () => {
     if (!actorRef.current || !isAuthenticated || !principal) return;
-    setIsSyncing(true);
     setSyncStatus("syncing");
 
     try {
-      const icEvals = await actorRef.current.getUserEvaluations(principal, BigInt(0), BigInt(100));
+      const PAGE_SIZE = BigInt(100);
+      const allEvals: Awaited<ReturnType<_SERVICE["getUserEvaluations"]>> = [];
+      let offset = BigInt(0);
+      for (;;) {
+        const page = await actorRef.current.getUserEvaluations(principal, offset, PAGE_SIZE);
+        allEvals.push(...page);
+        if (BigInt(page.length) < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
 
-      const loaded: ContentItem[] = icEvals.map(e => ({
+      const loaded: ContentItem[] = allEvals.map(e => ({
         id: e.id,
         owner: e.owner.toText(),
         author: e.author,
@@ -388,15 +343,13 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       console.error("[content] Failed to load from IC:", errMsg(err));
       setSyncStatus("offline");
       addNotification("Could not load content history from IC", "error");
-    } finally {
-      setIsSyncing(false);
     }
   }, [isAuthenticated, principal, addNotification]);
 
   const value = useMemo(() => ({
-    content, isAnalyzing, isSyncing, syncStatus,
-    analyze, validateItem, flagItem, addContent, clearDemoContent, syncToIC, loadFromIC,
-  }), [content, isAnalyzing, isSyncing, syncStatus, analyze, validateItem, flagItem, addContent, clearDemoContent, syncToIC, loadFromIC]);
+    content, isAnalyzing, syncStatus,
+    analyze, validateItem, flagItem, addContent, clearDemoContent, loadFromIC,
+  }), [content, isAnalyzing, syncStatus, analyze, validateItem, flagItem, addContent, clearDemoContent, loadFromIC]);
 
   return (
     <ContentContext.Provider value={value}>

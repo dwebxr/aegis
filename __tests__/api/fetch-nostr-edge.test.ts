@@ -19,6 +19,7 @@ describe("POST /api/fetch/nostr — edge cases", () => {
     _resetRateLimits();
   });
 
+  // Tests in this block hit real relays via dynamic import; route has 8s internal timeout
   describe("filter construction", () => {
     it("accepts optional pubkeys array", async () => {
       // This will attempt a real relay connection which will likely timeout/fail
@@ -30,7 +31,7 @@ describe("POST /api/fetch/nostr — edge cases", () => {
       }));
       // Should not be 400 (will be 200 with timeout warning or 502)
       expect(res.status).not.toBe(400);
-    });
+    }, 15000);
 
     it("accepts optional hashtags array", async () => {
       const res = await POST(makeRequest({
@@ -39,7 +40,7 @@ describe("POST /api/fetch/nostr — edge cases", () => {
         limit: 5,
       }));
       expect(res.status).not.toBe(400);
-    });
+    }, 15000);
 
     it("accepts optional since parameter", async () => {
       const res = await POST(makeRequest({
@@ -48,7 +49,7 @@ describe("POST /api/fetch/nostr — edge cases", () => {
         limit: 5,
       }));
       expect(res.status).not.toBe(400);
-    });
+    }, 15000);
 
     it("clamps limit to max 100", async () => {
       // With limit > 100, the route clamps internally
@@ -58,7 +59,7 @@ describe("POST /api/fetch/nostr — edge cases", () => {
       }));
       // No 400 — clamping is internal
       expect(res.status).not.toBe(400);
-    });
+    }, 15000);
 
     it("accepts valid relay with path", async () => {
       const res = await POST(makeRequest({
@@ -66,7 +67,7 @@ describe("POST /api/fetch/nostr — edge cases", () => {
         limit: 1,
       }));
       expect(res.status).not.toBe(400);
-    });
+    }, 15000);
   });
 
   describe("multiple relay validation", () => {
@@ -91,7 +92,7 @@ describe("POST /api/fetch/nostr — edge cases", () => {
         relays: ["wss://relay.damus.io"],
       }));
       expect(res.status).not.toBe(400);
-    });
+    }, 15000);
   });
 
   describe("rate limiting", () => {

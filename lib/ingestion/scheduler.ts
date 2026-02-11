@@ -124,7 +124,6 @@ export class IngestionScheduler {
       state.consecutiveEmpty = 0;
     }
 
-    // Update average score
     if (scores.length > 0) {
       const newAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
       const prevTotal = state.totalItemsScored;
@@ -169,16 +168,12 @@ export class IngestionScheduler {
         // If fetch recorded an error, skip scoring and success tracking
         if (state.errorCount > errorsBefore) continue;
 
-        // Quick filter to reduce API calls
         const passed = items.filter(raw => quickSlopFilter(raw.text));
 
         // Deduplicate before scoring (saves Claude API calls)
         const unique = passed.filter(raw => !this.dedup.isDuplicate(raw.sourceUrl, raw.text));
 
-        // Enrich short articles with full text
         const enriched = await this.enrichItems(unique, source.type);
-
-        // Send top N to Claude for full scoring
         const toScore = enriched.slice(0, MAX_ITEMS_PER_SOURCE);
         const scores: number[] = [];
 
@@ -205,11 +200,11 @@ export class IngestionScheduler {
     } catch (err) {
       console.error("[scheduler] Ingestion cycle failed:", errMsg(err));
     } finally {
+      this.dedup.flush();
       this.running = false;
     }
   }
 
-  /** Enrich short RSS articles by fetching full text via /api/fetch/url */
   private async enrichItems(
     items: Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>,
     sourceType: string,

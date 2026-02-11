@@ -88,7 +88,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         });
       } catch (err) {
         console.warn("[agent] D2A fee pre-approve failed:", errMsg(err));
-        addNotification("D2A fee pre-approval failed — matches may not settle", "error");
+        addNotification("D2A agent could not start — ICP fee approval failed. Check your balance.", "error");
+        return;
       }
       if (cancelled) return;
 

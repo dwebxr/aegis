@@ -8,11 +8,20 @@ export function loadProfile(principalId: string): UserPreferenceProfile {
   try {
     const raw = localStorage.getItem(KEY_PREFIX + principalId);
     if (!raw) return createEmptyProfile(principalId);
-    const parsed = JSON.parse(raw) as UserPreferenceProfile;
-    if (parsed.version !== 1 || parsed.principalId !== principalId) {
+    const parsed = JSON.parse(raw);
+    if (
+      !parsed ||
+      parsed.version !== 1 ||
+      parsed.principalId !== principalId ||
+      typeof parsed.topicAffinities !== "object" ||
+      typeof parsed.authorTrust !== "object" ||
+      !parsed.calibration ||
+      typeof parsed.calibration.qualityThreshold !== "number" ||
+      !Array.isArray(parsed.recentTopics)
+    ) {
       return createEmptyProfile(principalId);
     }
-    return parsed;
+    return parsed as UserPreferenceProfile;
   } catch (err) {
     console.warn("[prefs] Failed to load preference profile:", err);
     return createEmptyProfile(principalId);

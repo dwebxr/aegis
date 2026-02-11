@@ -60,6 +60,18 @@ describe("sources/storage", () => {
       expect(loadSources("principal-1")).toEqual([]);
     });
 
+    it("filters out malformed items missing required fields", () => {
+      localStorage.setItem("aegis_sources_principal-1", JSON.stringify([
+        { id: "good", type: "rss", label: "Good", enabled: true, createdAt: 0 },
+        { not: "a source" },
+        null,
+        { id: "no-type", enabled: true },
+      ]));
+      const loaded = loadSources("principal-1");
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].id).toBe("good");
+    });
+
     it("isolates sources by principal ID", () => {
       saveSources("user-a", [makeFakeSource({ label: "A's feed" })]);
       saveSources("user-b", [makeFakeSource({ label: "B's feed" })]);

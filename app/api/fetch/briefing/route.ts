@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
   try {
     const events = await Promise.race([
       pool.querySync(relays, filter),
-      new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 15000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000)),
     ]);
 
     if (events.length === 0) {
@@ -61,6 +61,10 @@ export async function GET(request: NextRequest) {
       created_at: event.created_at,
     });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === "timeout") {
+      return NextResponse.json({ error: "Relay query timed out" }, { status: 504 });
+    }
     console.error("[fetch/briefing] Relay query failed:", err);
     return NextResponse.json({ error: "Relay query failed" }, { status: 502 });
   } finally {

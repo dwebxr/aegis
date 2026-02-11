@@ -1,6 +1,5 @@
 import type { SavedSource } from "@/lib/types/sources";
 
-/** Preset RSS feeds for demo mode */
 export const DEMO_SOURCES: SavedSource[] = [
   {
     id: "demo-hn",

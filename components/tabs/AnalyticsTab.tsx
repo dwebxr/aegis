@@ -4,6 +4,7 @@ import { fonts, colors, space, type as t, radii, kpiLabelStyle } from "@/styles/
 import { ShieldIcon, FireIcon, ZapIcon } from "@/components/icons";
 import { StatCard } from "@/components/ui/StatCard";
 import { BarChart } from "@/components/ui/BarChart";
+import { scoreColor } from "@/lib/utils/scores";
 import { formatICP } from "@/lib/ic/icpLedger";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserReputation } from "@/lib/ic/declarations";
@@ -109,7 +110,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
 
           <div style={{ display: "flex", alignItems: "center", gap: mobile ? 16 : 24, marginBottom: space[4], flexWrap: "wrap" }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: mobile ? 36 : 48, fontWeight: 800, color: trustColor(reputation.trustScore), fontFamily: fonts.mono }}>
+              <div style={{ fontSize: mobile ? 36 : 48, fontWeight: 800, color: scoreColor(reputation.trustScore), fontFamily: fonts.mono }}>
                 {reputation.trustScore.toFixed(1)}
               </div>
               <div style={{ ...kpiLabelStyle }}>Trust Score</div>
@@ -172,7 +173,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
               <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.sky[400], marginBottom: space[4] }}>Engagement Index</div>
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: mobile ? 36 : 48, fontWeight: 800, color: trustColor(engagementIndex), fontFamily: fonts.mono }}>
+                  <div style={{ fontSize: mobile ? 36 : 48, fontWeight: 800, color: scoreColor(engagementIndex), fontFamily: fonts.mono }}>
                     {engagementIndex.toFixed(2)}
                   </div>
                   <div style={{ ...kpiLabelStyle }}>E_index</div>
@@ -242,12 +243,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
     </div>
   );
 };
-
-function trustColor(score: number): string {
-  if (score >= 7) return "#34d399";
-  if (score >= 4) return "#f59e0b";
-  return "#f87171";
-}
 
 function returnRate(rep: UserReputation): string {
   const total = Number(rep.qualitySignals) + Number(rep.slopSignals);

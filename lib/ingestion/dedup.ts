@@ -13,6 +13,7 @@ export class ArticleDeduplicator {
   private fingerprints: Set<string>;
   /** Insertion-order tracking for FIFO pruning */
   private insertionOrder: string[];
+  private dirty = false;
 
   constructor() {
     this.urls = new Set();
@@ -21,7 +22,6 @@ export class ArticleDeduplicator {
     this.load();
   }
 
-  /** Check if an article has been seen before (by URL or content fingerprint). */
   isDuplicate(url: string | undefined, text: string): boolean {
     if (url && this.urls.has(url)) return true;
     const fp = this.computeFingerprint(text);
@@ -37,7 +37,14 @@ export class ArticleDeduplicator {
     this.fingerprints.add(fp);
     this.insertionOrder.push(`f:${fp}`);
     this.prune();
-    this.save();
+    this.dirty = true;
+  }
+
+  flush(): void {
+    if (this.dirty) {
+      this.save();
+      this.dirty = false;
+    }
   }
 
   /** Normalize text and compute SHA-256 fingerprint (first 16 bytes as hex). */

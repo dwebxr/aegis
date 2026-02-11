@@ -41,7 +41,10 @@ export function generateBriefing(
   content: ContentItem[],
   prefs: UserPreferenceProfile,
 ): BriefingState {
-  const qualityItems = content.filter(c => c.verdict === "quality" && !c.flagged);
+  const threshold = prefs.calibration.qualityThreshold;
+  const qualityItems = content.filter(c =>
+    c.verdict === "quality" && !c.flagged && c.scores.composite >= threshold,
+  );
 
   const scored: Array<{ item: ContentItem; score: number }> = qualityItems.map(item => ({
     item,

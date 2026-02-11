@@ -35,7 +35,7 @@ async function sendD2AMessage(
 
   const result = await publishAndPartition(signed, relayUrls);
   if (result.published.length === 0) {
-    console.warn("[handshake] D2A", type, "to", peerPubkey, "failed on all relays");
+    throw new Error(`D2A ${type} to ${peerPubkey.slice(0, 8)}... failed on all ${relayUrls.length} relays`);
   }
   return result;
 }
@@ -75,6 +75,8 @@ export async function deliverContent(
   return sendD2AMessage(sk, myPubkey, peerPubkey, "deliver", TAG_D2A_DELIVER, content, relayUrls);
 }
 
+const VALID_D2A_TYPES = new Set<D2AMessage["type"]>(["offer", "accept", "reject", "deliver"]);
+
 export function parseD2AMessage(
   encryptedContent: string,
   recipientSk: Uint8Array,
@@ -82,8 +84,23 @@ export function parseD2AMessage(
 ): D2AMessage | null {
   try {
     const decrypted = decryptMessage(encryptedContent, recipientSk, senderPk);
-    return JSON.parse(decrypted) as D2AMessage;
-  } catch {
+    const parsed = JSON.parse(decrypted);
+
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !VALID_D2A_TYPES.has(parsed.type) ||
+      typeof parsed.fromPubkey !== "string" ||
+      typeof parsed.toPubkey !== "string" ||
+      !("payload" in parsed)
+    ) {
+      console.warn("[handshake] Malformed D2A message from", senderPk.slice(0, 8) + "...: missing required fields");
+      return null;
+    }
+
+    return parsed as D2AMessage;
+  } catch (err) {
+    console.warn("[handshake] Failed to parse D2A message from", senderPk.slice(0, 8) + "...:", err instanceof SyntaxError ? "invalid JSON" : "decrypt failed");
     return null;
   }
 }

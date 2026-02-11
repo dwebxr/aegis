@@ -77,6 +77,23 @@ describe("sourceState", () => {
       store["aegis_source_states"] = "{broken json";
       expect(loadSourceStates()).toEqual({});
     });
+
+    it("replaces invalid entries with defaultState", () => {
+      store["aegis_source_states"] = JSON.stringify({
+        "rss:good": { ...defaultState(), errorCount: 2 },
+        "rss:bad": { not: "a valid state" },
+        "rss:null": null,
+      });
+      const loaded = loadSourceStates();
+      expect(loaded["rss:good"].errorCount).toBe(2);
+      expect(loaded["rss:bad"].errorCount).toBe(0); // replaced with default
+      expect(loaded["rss:null"].errorCount).toBe(0); // replaced with default
+    });
+
+    it("returns empty on non-object JSON", () => {
+      store["aegis_source_states"] = '"just a string"';
+      expect(loadSourceStates()).toEqual({});
+    });
   });
 
   describe("computeBackoffDelay", () => {

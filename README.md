@@ -1,4 +1,4 @@
-# Aegis — D2A Social Agent Network
+# Aegis — D2A Social Agent Protocol
 
 Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol — with on-chain quality assurance deposits and D2A content provision fees.
 
@@ -372,7 +372,7 @@ The receiving agent rejects deliveries from undiscovered peers (not in the known
 | Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
 | Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
-| Test | Jest + ts-jest (796 tests, 60 suites) |
+| Test | Jest + ts-jest (905 tests, 68 suites) |
 
 ## Project Structure
 
@@ -478,7 +478,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 796 tests
+npm test              # Run all 905 tests
 npm run test:watch    # Watch mode
 ```
 

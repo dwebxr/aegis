@@ -11,7 +11,6 @@ const DAILY_BUDGET = parseInt(process.env.ANTHROPIC_DAILY_BUDGET || "500", 10);
 let dailyApiCalls = 0;
 let dailyResetAt = Date.now() + 86_400_000;
 
-/** Returns true if within the daily budget. */
 export function withinDailyBudget(): boolean {
   const now = Date.now();
   if (now >= dailyResetAt) {
@@ -21,12 +20,11 @@ export function withinDailyBudget(): boolean {
   return dailyApiCalls < DAILY_BUDGET;
 }
 
-/** Increment the daily call counter. Call after a successful API request. */
+/** Call after a successful API request. */
 export function recordApiCall(): void {
   dailyApiCalls++;
 }
 
-/** Reset daily budget counter (for testing only). */
 export function _resetDailyBudget(): void {
   dailyApiCalls = 0;
   dailyResetAt = Date.now() + 86_400_000;

@@ -87,6 +87,7 @@ describe("ArticleDeduplicator", () => {
     it("persists across instances", () => {
       const dedup1 = new ArticleDeduplicator();
       dedup1.markSeen("https://example.com/1", "unique content here");
+      dedup1.flush();
 
       // New instance should load from localStorage
       const dedup2 = new ArticleDeduplicator();

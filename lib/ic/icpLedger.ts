@@ -112,7 +112,6 @@ export const MIN_STAKE = BigInt(100_000); // 0.001 ICP
 export const MAX_STAKE = BigInt(100_000_000); // 1.0 ICP
 export const E8S = BigInt(100_000_000); // 1 ICP in e8s
 
-/** Format e8s to human-readable ICP string */
 export function formatICP(e8s: bigint): string {
   const whole = e8s / E8S;
   const frac = e8s % E8S;

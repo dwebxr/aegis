@@ -38,8 +38,8 @@ export class AgentManager {
   private consecutiveErrors = 0;
   private lastError?: string;
 
-  private presenceInterval: ReturnType<typeof setInterval> | null = null;
-  private discoveryInterval: ReturnType<typeof setInterval> | null = null;
+  private presenceInterval: ReturnType<typeof setTimeout> | null = null;
+  private discoveryInterval: ReturnType<typeof setTimeout> | null = null;
   private listenerPool: SimplePool | null = null;
   private listenerSub: SubCloser | null = null;
   private active = false;
@@ -60,6 +60,40 @@ export class AgentManager {
     this.principalId = principalId;
   }
 
+  /** Compute delay with exponential backoff: base * 2^(errors-1), capped at 15min */
+  private backoffDelay(baseMs: number): number {
+    if (this.consecutiveErrors === 0) return baseMs;
+    return Math.min(baseMs * Math.pow(2, this.consecutiveErrors - 1), 15 * 60 * 1000);
+  }
+
+  private schedulePresence(): void {
+    if (!this.active) return;
+    const delay = this.backoffDelay(PRESENCE_BROADCAST_INTERVAL_MS);
+    this.presenceInterval = setTimeout(() => {
+      this.broadcastMyPresence()
+        .then(() => this.clearErrors())
+        .catch(err => {
+          this.recordError(errMsg(err));
+          console.warn("[agent] Presence broadcast failed:", errMsg(err));
+        })
+        .finally(() => this.schedulePresence());
+    }, delay);
+  }
+
+  private scheduleDiscovery(): void {
+    if (!this.active) return;
+    const delay = this.backoffDelay(DISCOVERY_POLL_INTERVAL_MS);
+    this.discoveryInterval = setTimeout(() => {
+      this.discoverAndNegotiate()
+        .then(() => this.clearErrors())
+        .catch(err => {
+          this.recordError(errMsg(err));
+          console.warn("[agent] Discovery/negotiate failed:", errMsg(err));
+        })
+        .finally(() => this.scheduleDiscovery());
+    }, delay);
+  }
+
   async start(): Promise<void> {
     this.active = true;
     this.emitState();
@@ -72,14 +106,7 @@ export class AgentManager {
       console.warn("[agent] Initial presence broadcast failed:", errMsg(err));
     }
 
-    this.presenceInterval = setInterval(() => {
-      this.broadcastMyPresence()
-        .then(() => this.clearErrors())
-        .catch(err => {
-          this.recordError(errMsg(err));
-          console.warn("[agent] Presence broadcast failed:", errMsg(err));
-        });
-    }, PRESENCE_BROADCAST_INTERVAL_MS);
+    this.schedulePresence();
 
     try {
       await this.discoverAndNegotiate();
@@ -89,22 +116,15 @@ export class AgentManager {
       console.warn("[agent] Initial discovery failed:", errMsg(err));
     }
 
-    this.discoveryInterval = setInterval(() => {
-      this.discoverAndNegotiate()
-        .then(() => this.clearErrors())
-        .catch(err => {
-          this.recordError(errMsg(err));
-          console.warn("[agent] Discovery/negotiate failed:", errMsg(err));
-        });
-    }, DISCOVERY_POLL_INTERVAL_MS);
+    this.scheduleDiscovery();
 
     this.subscribeToMessages();
   }
 
   stop(): void {
     this.active = false;
-    if (this.presenceInterval) clearInterval(this.presenceInterval);
-    if (this.discoveryInterval) clearInterval(this.discoveryInterval);
+    if (this.presenceInterval) clearTimeout(this.presenceInterval);
+    if (this.discoveryInterval) clearTimeout(this.discoveryInterval);
     this.presenceInterval = null;
     this.discoveryInterval = null;
     this.listenerSub?.close();

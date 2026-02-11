@@ -64,9 +64,6 @@ export function heuristicScores(text: string): HeuristicScores {
   };
 }
 
-/**
- * Quick slop filter — returns true if content passes (likely not slop).
- */
 export function quickSlopFilter(text: string, threshold: number = 3.5): boolean {
   return heuristicScores(text).composite >= threshold;
 }

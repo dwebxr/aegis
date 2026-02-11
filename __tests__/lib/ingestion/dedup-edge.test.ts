@@ -132,6 +132,7 @@ describe("ArticleDeduplicator — edge cases", () => {
     it("survives reconstruction from localStorage", () => {
       const dedup1 = new ArticleDeduplicator();
       dedup1.markSeen("https://example.com/persisted", "Persisted content");
+      dedup1.flush();
 
       // Create new instance — should load from localStorage
       const dedup2 = new ArticleDeduplicator();
@@ -152,6 +153,7 @@ describe("ArticleDeduplicator — edge cases", () => {
     it("clears all state and localStorage", () => {
       const dedup = new ArticleDeduplicator();
       dedup.markSeen("https://example.com/x", "Content");
+      dedup.flush();
       expect(dedup.size).toBeGreaterThan(0);
 
       dedup.reset();
