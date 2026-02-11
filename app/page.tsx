@@ -203,12 +203,13 @@ export default function AegisApp() {
     text: string,
     scores: AnalyzeResponse,
     stakeAmount?: bigint,
+    imageUrl?: string,
   ): Promise<{ eventId: string | null; relaysPublished: string[] }> => {
     if (!nostrKeys) {
       return { eventId: null, relaysPublished: [] };
     }
 
-    const tags = buildAegisTags(scores.composite, scores.vSignal, scores.topics || []);
+    const tags = buildAegisTags(scores.composite, scores.vSignal, scores.topics || [], imageUrl);
 
     // Staking is mandatory for authenticated users
     if (identity && principalText && !stakeAmount) {
@@ -216,8 +217,9 @@ export default function AegisApp() {
       return { eventId: null, relaysPublished: [] };
     }
 
-    // Publish to Nostr relays
-    const result = await publishSignalToNostr(text, nostrKeys.sk, tags);
+    // Publish to Nostr relays (append image URL to content — Nostr clients auto-render it)
+    const publishText = imageUrl ? `${text}\n\n${imageUrl}` : text;
+    const result = await publishSignalToNostr(publishText, nostrKeys.sk, tags);
 
     const signalId = uuidv4();
 
@@ -289,6 +291,7 @@ export default function AegisApp() {
       avatar: "\uD83D\uDCE1",
       text: text.slice(0, 300),
       source: "manual",
+      imageUrl: imageUrl || undefined,
       scores: {
         originality: scores.originality,
         insight: scores.insight,

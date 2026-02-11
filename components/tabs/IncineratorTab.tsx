@@ -9,7 +9,7 @@ import type { AnalyzeResponse } from "@/lib/types/api";
 interface IncineratorTabProps {
   isAnalyzing: boolean;
   onAnalyze: (text: string) => Promise<AnalyzeResponse>;
-  onPublishSignal?: (text: string, scores: AnalyzeResponse, stakeAmount?: bigint) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
+  onPublishSignal?: (text: string, scores: AnalyzeResponse, stakeAmount?: bigint, imageUrl?: string) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
   nostrPubkey?: string | null;
   icpBalance?: bigint | null;
   stakingEnabled?: boolean;

@@ -47,6 +47,7 @@ export function buildAegisTags(
   composite: number,
   vSignal: number | undefined,
   topics: string[],
+  imageUrl?: string,
 ): string[][] {
   const tags: string[][] = [
     ["aegis", "v1"],
@@ -58,6 +59,9 @@ export function buildAegisTags(
   }
   for (const topic of topics) {
     tags.push(["t", topic]);
+  }
+  if (imageUrl) {
+    tags.push(["imeta", `url ${imageUrl}`]);
   }
   return tags;
 }

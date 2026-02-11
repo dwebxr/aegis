@@ -1,13 +1,16 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { fonts } from "@/styles/theme";
 import { ScoreRing } from "./ScoreRing";
 import { scoreColor } from "@/lib/utils/scores";
 import { formatICP, MIN_STAKE, MAX_STAKE } from "@/lib/ic/icpLedger";
 import type { AnalyzeResponse } from "@/lib/types/api";
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
 interface SignalComposerProps {
-  onPublish: (text: string, scores: AnalyzeResponse, stakeAmount?: bigint) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
+  onPublish: (text: string, scores: AnalyzeResponse, stakeAmount?: bigint, imageUrl?: string) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
   onAnalyze: (text: string) => Promise<AnalyzeResponse>;
   isAnalyzing: boolean;
   nostrPubkey: string | null;
@@ -21,8 +24,14 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
   const [selfScore, setSelfScore] = useState<AnalyzeResponse | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<{ eventId: string | null; relaysPublished: string[] } | null>(null);
-  // Slider value in e8s steps: 100_000 (0.001) to 100_000_000 (1.0)
-  const [stakeE8s, setStakeE8s] = useState(1_000_000); // Default: 0.01 ICP
+  const [stakeE8s, setStakeE8s] = useState(1_000_000);
+
+  // Image state
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSelfEvaluate = async () => {
     if (!text.trim()) return;
@@ -36,7 +45,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
     if (!selfScore) return;
     setIsPublishing(true);
     try {
-      const result = await onPublish(text, selfScore, effectiveStake);
+      const result = await onPublish(text, selfScore, effectiveStake, imageUrl || undefined);
       setPublishResult(result);
     } finally {
       setIsPublishing(false);
@@ -46,21 +55,72 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
   const rawMax = icpBalance != null
     ? Number(icpBalance < MAX_STAKE ? icpBalance : MAX_STAKE)
     : Number(MAX_STAKE);
-  // Ensure slider max >= min so the HTML range input doesn't break
   const maxStakeE8s = Math.max(rawMax, Number(MIN_STAKE));
   const hasBalance = icpBalance != null && icpBalance >= MIN_STAKE;
 
-  // Clamp stakeE8s when max changes (e.g. balance drops)
   useEffect(() => {
     if (stakeE8s > maxStakeE8s) {
       setStakeE8s(Math.max(Number(MIN_STAKE), maxStakeE8s));
     }
   }, [maxStakeE8s, stakeE8s]);
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageError(null);
+
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      setImageError("Use JPEG, PNG, GIF, or WebP");
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setImageError(`Too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max: 5MB`);
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setImagePreview(preview);
+    setImageUrl(null);
+    setSelfScore(null);
+
+    setIsUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/upload/image", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        setImageError(data.error || "Upload failed");
+        setImagePreview(null);
+        URL.revokeObjectURL(preview);
+      } else {
+        setImageUrl(data.url);
+      }
+    } catch {
+      setImageError("Upload failed — check connection");
+      setImagePreview(null);
+      URL.revokeObjectURL(preview);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+    setImageUrl(null);
+    setImageError(null);
+    setSelfScore(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleReset = () => {
     setText("");
     setSelfScore(null);
     setPublishResult(null);
+    handleRemoveImage();
   };
 
   if (publishResult) {
@@ -116,26 +176,82 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
         }}
       />
 
+      {/* Image preview */}
+      {imagePreview && (
+        <div style={{ position: "relative", display: "inline-block", marginTop: 8 }}>
+          <img
+            src={imagePreview}
+            alt="Attached"
+            style={{ maxHeight: 120, maxWidth: "100%", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)" }}
+          />
+          {isUploading && (
+            <div style={{
+              position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(0,0,0,0.6)", borderRadius: 8, fontSize: 11, color: "#94a3b8", fontWeight: 600,
+            }}>
+              Uploading...
+            </div>
+          )}
+          <button
+            onClick={handleRemoveImage}
+            style={{
+              position: "absolute", top: 4, right: 4, width: 20, height: 20,
+              background: "rgba(0,0,0,0.7)", border: "none", borderRadius: "50%",
+              color: "#f87171", fontSize: 12, cursor: "pointer", display: "flex",
+              alignItems: "center", justifyContent: "center", lineHeight: 1,
+            }}
+          >
+            &#x2715;
+          </button>
+        </div>
+      )}
+
+      {imageError && (
+        <div style={{ fontSize: 10, color: "#f87171", marginTop: 4, fontWeight: 600 }}>{imageError}</div>
+      )}
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, gap: 10, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 10, color: "#64748b" }}>
-          {text.length}/5000 characters
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 10, color: "#64748b" }}>
+            {text.length}/5000 characters
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            onChange={handleImageSelect}
+            style={{ display: "none" }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            title="Attach image"
+            style={{
+              background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6,
+              padding: "3px 8px", cursor: isUploading ? "not-allowed" : "pointer", color: "#64748b",
+              fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center", gap: 4,
+            }}
+          >
+            &#x1F4F7;
+            {imageUrl && <span style={{ fontSize: 9, color: "#34d399" }}>&#x2713;</span>}
+          </button>
         </div>
 
         {!selfScore ? (
           <button
             onClick={handleSelfEvaluate}
-            disabled={!text.trim() || isAnalyzing}
+            disabled={!text.trim() || isAnalyzing || isUploading}
             style={{
               padding: mobile ? "10px 20px" : "10px 28px",
-              background: text.trim() && !isAnalyzing
+              background: text.trim() && !isAnalyzing && !isUploading
                 ? "linear-gradient(135deg, #7c3aed, #2563eb)"
                 : "rgba(255,255,255,0.05)",
               border: "none",
               borderRadius: 10,
-              color: text.trim() && !isAnalyzing ? "#fff" : "#64748b",
+              color: text.trim() && !isAnalyzing && !isUploading ? "#fff" : "#64748b",
               fontSize: 13,
               fontWeight: 700,
-              cursor: text.trim() && !isAnalyzing ? "pointer" : "not-allowed",
+              cursor: text.trim() && !isAnalyzing && !isUploading ? "pointer" : "not-allowed",
             }}
           >
             {isAnalyzing ? "Evaluating..." : "Self-Evaluate"}
