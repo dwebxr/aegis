@@ -141,20 +141,33 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Standard fetch (no conditional headers)
-  let feed;
+  // Standard fetch — use fetch + parseString (not parseURL) to handle 308 redirects
   try {
-    feed = await parser.parseURL(feedUrl);
+    const res = await fetch(feedUrl, {
+      headers: {
+        "User-Agent": "Aegis/2.0 Content Quality Filter",
+        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!res.ok) {
+      return NextResponse.json({ error: `Feed returned HTTP ${res.status}` }, { status: 502 });
+    }
+
+    const xml = await res.text();
+    const feed = await parser.parseString(xml);
+    const items = buildItems(feed, limit);
+
+    return NextResponse.json({
+      feedTitle: feed.title || feedUrl,
+      etag: res.headers.get("etag") || undefined,
+      lastModified: res.headers.get("last-modified") || undefined,
+      items,
+    });
   } catch (err: unknown) {
     return feedErrorResponse(err, feedUrl, "Parse failed");
   }
-
-  const items = buildItems(feed, limit);
-
-  return NextResponse.json({
-    feedTitle: feed.title || feedUrl,
-    items,
-  });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
