@@ -255,13 +255,46 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
 
   const addContent = useCallback((item: ContentItem) => {
-    setContent(prev => {
-      // Deduplicate by sourceUrl (URL/RSS) or by text (manual/nostr)
-      if (item.sourceUrl && prev.some(c => c.sourceUrl === item.sourceUrl)) return prev;
-      if (!item.sourceUrl && prev.some(c => c.text === item.text)) return prev;
-      return [item, ...prev];
-    });
-  }, []);
+    // Deduplicate by sourceUrl (URL/RSS) or by text (manual/nostr)
+    const isDuplicate = contentRef.current.some(c =>
+      (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
+      (!item.sourceUrl && c.text === item.text),
+    );
+    if (isDuplicate) return;
+
+    // Set owner if authenticated and item has no owner (e.g. scheduler items)
+    const owned = (!item.owner && isAuthenticated && principal)
+      ? { ...item, owner: principal.toText() }
+      : item;
+
+    setContent(prev => [owned, ...prev]);
+
+    // Persist to IC canister (fire-and-forget, same pattern as analyze)
+    if (actorRef.current && isAuthenticated && principal) {
+      actorRef.current.saveEvaluation({
+        id: owned.id,
+        owner: principal,
+        author: owned.author,
+        avatar: owned.avatar,
+        text: owned.text,
+        source: mapSource(owned.source),
+        sourceUrl: owned.sourceUrl ? [owned.sourceUrl] as [string] : [] as [],
+        scores: {
+          originality: Math.round(owned.scores.originality),
+          insight: Math.round(owned.scores.insight),
+          credibility: Math.round(owned.scores.credibility),
+          compositeScore: owned.scores.composite,
+        },
+        verdict: owned.verdict === "quality" ? { quality: null } : { slop: null },
+        reason: owned.reason,
+        createdAt: BigInt(owned.createdAt * 1_000_000),
+        validated: owned.validated,
+        flagged: owned.flagged,
+      }).catch((err: unknown) => {
+        console.warn("[content] IC save (addContent) failed:", errMsg(err));
+      });
+    }
+  }, [isAuthenticated, principal]);
 
   const clearDemoContent = useCallback(() => {
     setContent(prev => prev.filter(c => c.owner !== ""));
