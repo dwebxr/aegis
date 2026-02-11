@@ -15,9 +15,10 @@ interface BriefingTabProps {
   onFlag: (id: string) => void;
   mobile?: boolean;
   nostrKeys?: { sk: Uint8Array; pk: string } | null;
+  isLoading?: boolean;
 }
 
-export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys }) => {
+export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys, isLoading }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showFiltered, setShowFiltered] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -79,7 +80,18 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         />
       )}
 
-      {briefing.priority.length > 0 ? (
+      {isLoading ? (
+        <div style={{
+          textAlign: "center", padding: space[10],
+          color: colors.text.muted, background: colors.bg.surface,
+          borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
+          marginBottom: space[4],
+        }}>
+          <div style={{ fontSize: 32, marginBottom: space[3], animation: "pulse 2s infinite" }}>&#x1F6E1;</div>
+          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>Loading briefing...</div>
+          <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Syncing from Internet Computer</div>
+        </div>
+      ) : briefing.priority.length > 0 ? (
         <div>
           {briefing.priority.map((b, i) => (
             <div key={b.item.id} style={{ animation: `slideUp .3s ease ${i * 0.06}s both` }}>

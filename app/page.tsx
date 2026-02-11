@@ -326,7 +326,7 @@ export default function AegisApp() {
     <AppShell activeTab={tab} onTabChange={setTab}>
       <DemoBanner mobile={mobile} />
       {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} />}
-      {tab === "briefing" && <BriefingTab content={content} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} />}
+      {tab === "briefing" && <BriefingTab content={content} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} />}
       {tab === "incinerator" && (
         <IncineratorTab
           isAnalyzing={isAnalyzing}
