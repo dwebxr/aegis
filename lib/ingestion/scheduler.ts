@@ -305,7 +305,7 @@ export class IngestionScheduler {
       const res = await fetch("/api/fetch/nostr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ relays, pubkeys: pubkeys?.length ? pubkeys : undefined, limit: 20 }),
+        body: JSON.stringify({ relays, pubkeys: pubkeys?.filter(Boolean).length ? pubkeys.filter(Boolean) : undefined, limit: 20 }),
       });
       if (!res.ok) {
         this.recordSourceError(key, `HTTP ${res.status}`);
