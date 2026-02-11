@@ -11,6 +11,36 @@ import type { UserContext } from "@/lib/preferences/types";
 import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 
+const CONTENT_CACHE_KEY = "aegis-content-cache";
+const MAX_CACHED_ITEMS = 200;
+
+function loadCachedContent(): ContentItem[] {
+  if (typeof globalThis.localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CONTENT_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (c: unknown): c is ContentItem =>
+        !!c && typeof c === "object" &&
+        typeof (c as ContentItem).id === "string" &&
+        typeof (c as ContentItem).createdAt === "number",
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveCachedContent(items: ContentItem[]): void {
+  if (typeof globalThis.localStorage === "undefined") return;
+  try {
+    localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(items.slice(0, MAX_CACHED_ITEMS)));
+  } catch {
+    // localStorage full — ignore
+  }
+}
+
 interface ContentState {
   content: ContentItem[];
   isAnalyzing: boolean;
@@ -84,7 +114,7 @@ function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal").Prin
 export function ContentProvider({ children, preferenceCallbacks }: { children: React.ReactNode; preferenceCallbacks?: PreferenceCallbacks }) {
   const { addNotification } = useNotify();
   const { isAuthenticated, identity, principal } = useAuth();
-  const [content, setContent] = useState<ContentItem[]>([]);
+  const [content, setContent] = useState<ContentItem[]>(() => loadCachedContent());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "offline">("idle");
   const actorRef = useRef<_SERVICE | null>(null);
@@ -109,6 +139,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       setSyncStatus("offline");
     }
   }, [isAuthenticated, identity, addNotification]);
+
+  // Persist content to localStorage whenever it changes
+  useEffect(() => {
+    saveCachedContent(content);
+  }, [content]);
 
   useEffect(() => {
     const timestampTimer = setInterval(() => {
