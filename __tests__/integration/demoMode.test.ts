@@ -1,7 +1,3 @@
-/**
- * Integration tests for demo mode logic.
- * Tests scheduler source injection, content cleanup, and source mutation guards.
- */
 import { DEMO_SOURCES } from "@/lib/demo/sources";
 import type { ContentItem } from "@/lib/types/content";
 

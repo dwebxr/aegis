@@ -1,8 +1,3 @@
-/**
- * Edge case tests for lib/briefing/serialize.ts
- * Tests parseBriefingMarkdown with malformed input, missing fields,
- * round-trip data integrity, and boundary conditions.
- */
 import {
   serializeBriefing,
   parseBriefingMarkdown,

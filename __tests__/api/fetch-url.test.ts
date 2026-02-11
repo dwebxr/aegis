@@ -1,8 +1,3 @@
-/**
- * Tests for /api/fetch/url route.
- * Tests input validation with the real handler (no mocking).
- * Extraction tests are skipped since they require network calls.
- */
 import { POST } from "@/app/api/fetch/url/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";

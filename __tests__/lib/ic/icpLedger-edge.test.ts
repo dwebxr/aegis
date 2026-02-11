@@ -1,6 +1,3 @@
-/**
- * Edge case tests for lib/ic/icpLedger.ts — formatICP precision boundaries.
- */
 jest.mock("@dfinity/agent", () => ({}));
 
 import { formatICP, E8S, ICP_FEE } from "@/lib/ic/icpLedger";

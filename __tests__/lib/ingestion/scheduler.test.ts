@@ -1,8 +1,3 @@
-/**
- * Tests for lib/ingestion/scheduler.ts
- * Tests scheduler lifecycle (start/stop), concurrent protection, and source routing.
- * Uses fake timers and a mock fetch to test real code paths without network.
- */
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 
 // Mock fetch globally for scheduler tests

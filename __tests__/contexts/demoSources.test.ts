@@ -1,6 +1,3 @@
-/**
- * Tests for demo mode constants and source validation.
- */
 import { DEMO_SOURCES } from "@/lib/demo/sources";
 
 describe("DEMO_SOURCES", () => {

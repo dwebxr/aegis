@@ -1,8 +1,3 @@
-/**
- * Integration test for /api/analyze route.
- * Tests the actual POST handler with real heuristicScores (no mocking).
- * API key is not set in test env, so this exercises the fallback path.
- */
 import { POST } from "@/app/api/analyze/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";

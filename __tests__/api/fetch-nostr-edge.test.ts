@@ -1,7 +1,3 @@
-/**
- * Edge case tests for /api/fetch/nostr route.
- * Tests filter combinations, limit clamping, event sorting, and the dynamic import path.
- */
 import { POST } from "@/app/api/fetch/nostr/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";

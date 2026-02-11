@@ -1,6 +1,3 @@
-/**
- * Tests for IngestionScheduler onCycleComplete callback.
- */
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 
 // Mock fetch

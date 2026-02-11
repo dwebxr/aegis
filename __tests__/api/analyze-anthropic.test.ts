@@ -1,8 +1,3 @@
-/**
- * Tests for /api/analyze route — Anthropic API path.
- * Mocks fetch at the boundary to test real route logic with simulated Claude responses.
- * Covers: successful Claude response, malformed JSON, API errors, timeout, V/C/L personalization.
- */
 import { POST } from "@/app/api/analyze/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";

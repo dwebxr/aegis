@@ -1,8 +1,3 @@
-/**
- * Edge case and boundary tests for lib/briefing/ranker.ts — generateBriefing.
- * Covers: tied scores, large datasets, empty topics, validated items,
- * negative affinities, zero-score items, extreme recency decay.
- */
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { createEmptyProfile } from "@/lib/preferences/types";
 import type { ContentItem } from "@/lib/types/content";

@@ -44,7 +44,7 @@ Browser                                  Internet Computer (Mainnet)
    1. IC LLM (Llama 3.1 8B, free, on-chain)
    2. Anthropic Claude (premium, V/C/L)
    3. Heuristic fallback (client-side)
-   + Per-IP API rate limiting (20-30 req/min)
+   + Per-IP API rate limiting (5-60 req/min per route)
    + Per-instance daily API budget (500 calls/day)
 ```
 
@@ -344,6 +344,7 @@ The receiving agent rejects deliveries from undiscovered peers (not in the known
 ### Signal Publishing
 - Deterministic Nostr keypair derived from IC Principal (no extra key management)
 - Self-evaluated posts published as Kind 1 events with `aegis-score` tags
+- Image attachment via nostr.build (NIP-92 imeta tag, JPEG/PNG/GIF/WebP, max 5MB)
 - Client-side signing — private key never leaves the browser
 - Optional PoQ stake attachment with range slider UI
 
@@ -356,6 +357,7 @@ The receiving agent rejects deliveries from undiscovered peers (not in the known
 - Article-level dedup (URL + content fingerprint SHA-256) to avoid redundant API calls
 - Adaptive fetch intervals (scales with source activity, exponential backoff on errors)
 - Auto-disable after 5 consecutive failures with user notification
+- CSV export with RFC-compliant escaping (handles commas, quotes, newlines in all fields)
 
 ## Tech Stack
 
@@ -372,7 +374,7 @@ The receiving agent rejects deliveries from undiscovered peers (not in the known
 | Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
 | Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
-| Test | Jest + ts-jest (905 tests, 68 suites) |
+| Test | Jest + ts-jest (1149 tests, 86 suites, 95% stmt coverage) |
 
 ## Project Structure
 
@@ -386,7 +388,9 @@ aegis/
 │   ├── favicon.ico                      # Browser tab icon
 │   └── api/
 │       ├── analyze/route.ts             # Claude V/C/L scoring + fallback
-│       ├── health/route.ts              # Health check endpoint
+│       ├── health/route.ts              # Health check + IC canister connectivity
+│       ├── upload/image/route.ts        # Image upload proxy (nostr.build)
+│       ├── push/send/route.ts           # Web Push notification sender
 │       └── fetch/
 │           ├── url/route.ts             # URL article extraction
 │           ├── rss/route.ts             # RSS feed parsing (ETag/Last-Modified conditional)
@@ -446,8 +450,9 @@ aegis/
 │   └── utils/
 │       ├── scores.ts                    # Score computation + relativeTime
 │       ├── errors.ts                    # errMsg() shared error formatter
-│       └── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
-├── __tests__/                           # 796 tests across 60 suites
+│       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
+│       └── csv.ts                       # CSV export (RFC-compliant escaping)
+├── __tests__/                           # 1149 tests across 86 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -478,7 +483,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 905 tests
+npm test              # Run all 1149 tests
 npm run test:watch    # Watch mode
 ```
 

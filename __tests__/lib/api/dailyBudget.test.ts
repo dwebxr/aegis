@@ -1,7 +1,3 @@
-/**
- * Tests for lib/api/dailyBudget.ts
- * Tests daily budget enforcement, reset at 24h boundary, and exhaustion.
- */
 import { withinDailyBudget, recordApiCall, _resetDailyBudget } from "@/lib/api/dailyBudget";
 
 describe("dailyBudget", () => {

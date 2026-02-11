@@ -1,6 +1,3 @@
-/**
- * Edge case tests for handshake module — real crypto operations.
- */
 import { parseD2AMessage, isHandshakeExpired } from "@/lib/agent/handshake";
 import { encryptMessage } from "@/lib/nostr/encrypt";
 import { getPublicKey } from "nostr-tools/pure";

@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { decode } from "nostr-tools/nip19";
 import type { AddressPointer } from "nostr-tools/nip19";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
+import { rateLimit } from "@/lib/api/rateLimit";
 
 export const maxDuration = 30;
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request, 30, 60_000);
+  if (limited) return limited;
+
   const naddr = request.nextUrl.searchParams.get("naddr");
   if (!naddr) {
     return NextResponse.json({ error: "naddr parameter required" }, { status: 400 });

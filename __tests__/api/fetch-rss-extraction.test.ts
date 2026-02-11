@@ -1,8 +1,3 @@
-/**
- * Tests for RSS route image extraction and item building.
- * Uses mocked fetch to feed specific RSS XML through the handler,
- * testing extractAttr/extractImage/buildItems behavior end-to-end.
- */
 import { POST } from "@/app/api/fetch/rss/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";

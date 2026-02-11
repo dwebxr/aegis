@@ -1,7 +1,3 @@
-/**
- * Tests for D2A protocol fee constants, staking thresholds,
- * and fee distribution math.
- */
 // Mock @dfinity/agent to avoid BigInt incompatibility in Jest
 jest.mock("@dfinity/agent", () => ({}));
 

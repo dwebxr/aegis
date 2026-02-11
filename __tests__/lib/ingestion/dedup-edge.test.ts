@@ -1,8 +1,3 @@
-/**
- * Edge case tests for lib/ingestion/dedup.ts
- * Tests fingerprint stability, near-duplicate handling, pruning boundary,
- * and concurrent dedup operations.
- */
 import { ArticleDeduplicator } from "@/lib/ingestion/dedup";
 
 // Mock localStorage

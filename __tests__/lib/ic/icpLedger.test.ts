@@ -1,6 +1,3 @@
-/**
- * Tests for ICP ledger utilities: formatICP, constants, and actor creation.
- */
 // Mock @dfinity/agent to avoid BigInt incompatibility in Jest
 jest.mock("@dfinity/agent", () => ({}));
 

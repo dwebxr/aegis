@@ -1,7 +1,3 @@
-/**
- * Tests for /api/fetch/twitter route.
- * Tests input validation with the real handler (no mocking).
- */
 import { POST } from "@/app/api/fetch/twitter/route";
 import { NextRequest } from "next/server";
 

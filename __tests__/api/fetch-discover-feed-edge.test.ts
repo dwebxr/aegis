@@ -1,7 +1,3 @@
-/**
- * Edge case tests for /api/fetch/discover-feed route.
- * Tests URL resolution, multiple link tags, content-type parsing, probe fallbacks.
- */
 import { POST } from "@/app/api/fetch/discover-feed/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";

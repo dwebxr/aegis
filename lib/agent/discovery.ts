@@ -109,7 +109,10 @@ export async function discoverPeers(
         interests.push(tag[1]);
       }
       if (tag[0] === TAG_D2A_CAPACITY && tag[1]) {
-        capacity = parseInt(tag[1]) || 5;
+        const parsed = parseInt(tag[1], 10);
+        if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 100) {
+          capacity = parsed;
+        }
       }
       if (tag[0] === TAG_D2A_PRINCIPAL && tag[1]) {
         principalId = tag[1];

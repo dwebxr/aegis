@@ -1,7 +1,3 @@
-/**
- * Tests for /api/fetch/rss conditional requests (ETag/Last-Modified).
- * Tests the conditional request path, 304 responses, and error edge cases.
- */
 import { POST } from "@/app/api/fetch/rss/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";

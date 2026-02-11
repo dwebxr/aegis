@@ -1,10 +1,3 @@
-/**
- * Tests for lib/ic/agent.ts — environment-dependent configuration functions.
- * Tests getHost, getInternetIdentityUrl, getCanisterId, getDerivationOrigin.
- * Mocks @dfinity/agent at the boundary (BigInt/BLS incompatible in test env)
- * but tests real config logic.
- */
-
 // Mock @dfinity/agent to avoid BLS12-381 BigInt errors in test environment
 jest.mock("@dfinity/agent", () => ({
   HttpAgent: {

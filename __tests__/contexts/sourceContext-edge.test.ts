@@ -1,10 +1,6 @@
 /**
  * @jest-environment jsdom
  */
-/**
- * Tests for source storage edge cases.
- * Uses jsdom for real localStorage access (same as storage.test.ts).
- */
 import { loadSources, saveSources } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
 

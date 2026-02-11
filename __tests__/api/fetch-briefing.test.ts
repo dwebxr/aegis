@@ -1,8 +1,3 @@
-/**
- * Tests for /api/fetch/briefing route.
- * Tests input validation for GET endpoint with naddr parameter.
- * Mocks nostr-tools and ws to avoid real relay connections.
- */
 jest.mock("nostr-tools/nip19", () => ({
   decode: jest.fn(),
 }));
@@ -23,6 +18,7 @@ import { GET } from "@/app/api/fetch/briefing/route";
 import { NextRequest } from "next/server";
 import { decode } from "nostr-tools/nip19";
 import { SimplePool } from "nostr-tools/pool";
+import { _resetRateLimits } from "@/lib/api/rateLimit";
 
 const mockDecode = decode as jest.MockedFunction<typeof decode>;
 
@@ -35,6 +31,7 @@ function makeRequest(params: Record<string, string> = {}): NextRequest {
 describe("GET /api/fetch/briefing", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    _resetRateLimits();
   });
 
   describe("input validation", () => {
@@ -169,6 +166,17 @@ describe("GET /api/fetch/briefing", () => {
 
       await GET(makeRequest({ naddr: "naddr1valid" }));
       expect(mockClose).toHaveBeenCalled();
+    });
+  });
+
+  describe("rate limiting", () => {
+    it("returns 429 after exceeding 30 requests per minute", async () => {
+      for (let i = 0; i < 30; i++) {
+        const res = await GET(makeRequest());
+        expect(res.status).toBe(400); // missing naddr, but not rate-limited
+      }
+      const res = await GET(makeRequest());
+      expect(res.status).toBe(429);
     });
   });
 });

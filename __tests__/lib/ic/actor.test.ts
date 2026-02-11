@@ -1,6 +1,3 @@
-/**
- * Tests for createBackendActorAsync — syncTime failure path.
- */
 const mockSyncTime = jest.fn();
 const mockCreateActor = jest.fn().mockReturnValue({});
 

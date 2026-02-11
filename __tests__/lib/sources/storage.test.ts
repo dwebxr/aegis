@@ -1,10 +1,6 @@
 /**
  * @jest-environment jsdom
  */
-/**
- * Tests for lib/sources/storage.ts
- * Exercises real localStorage via jsdom environment.
- */
 import { loadSources, saveSources } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
 

@@ -161,7 +161,9 @@ export default function AegisApp() {
             url: "/",
             tag: `briefing-${new Date().toISOString().slice(0, 10)}`,
           }),
-        }).catch(() => {});
+        }).catch((err: unknown) => {
+          console.warn("[push] Send notification failed:", err instanceof Error ? err.message : err);
+        });
       },
     });
     schedulerRef.current = scheduler;

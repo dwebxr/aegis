@@ -1,6 +1,3 @@
-/**
- * Edge case tests for score utilities — boundary conditions, invalid inputs.
- */
 import { scoreColor, relativeTime } from "@/lib/utils/scores";
 
 describe("scoreColor — edge cases", () => {

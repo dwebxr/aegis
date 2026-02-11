@@ -1,8 +1,3 @@
-/**
- * Edge case tests for lib/preferences/engine.ts
- * Tests conflicting feedback, affinity saturation, threshold clamping,
- * recentTopics overflow, and getContext filtering.
- */
 import { learn, getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { createEmptyProfile, TOPIC_AFFINITY_CAP, TOPIC_AFFINITY_FLOOR, AUTHOR_TRUST_CAP, AUTHOR_TRUST_FLOOR, RECENT_TOPICS_MAX } from "@/lib/preferences/types";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";

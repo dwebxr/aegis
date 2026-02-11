@@ -1,7 +1,3 @@
-/**
- * Tests for AgentManager D2A match callback, concurrent behavior,
- * and state transitions.
- */
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import { createEmptyProfile } from "@/lib/preferences/types";

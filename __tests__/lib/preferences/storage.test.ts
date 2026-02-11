@@ -1,10 +1,6 @@
 /**
  * @jest-environment jsdom
  */
-/**
- * Tests for lib/preferences/storage.ts
- * Exercises real localStorage via jsdom environment.
- */
 import { loadProfile, saveProfile } from "@/lib/preferences/storage";
 import { createEmptyProfile } from "@/lib/preferences/types";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";

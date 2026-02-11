@@ -1,8 +1,3 @@
-/**
- * Integration flow tests for AgentManager — full offer→accept→deliver cycle.
- * Tests the complete D2A handshake lifecycle with multiple peers,
- * handshake cleanup/re-offer, and handleAccept content-not-found edge case.
- */
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import { createEmptyProfile } from "@/lib/preferences/types";

@@ -1,7 +1,3 @@
-/**
- * Edge case tests for lib/api/rateLimit.ts
- * Tests window expiry, IP header parsing, boundary conditions.
- */
 import { rateLimit, _resetRateLimits } from "@/lib/api/rateLimit";
 import { NextRequest } from "next/server";
 

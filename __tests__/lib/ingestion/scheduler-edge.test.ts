@@ -1,8 +1,3 @@
-/**
- * Edge case tests for lib/ingestion/scheduler.ts
- * Tests concurrent cycle protection, backoff integration, dedup boundary,
- * enrichment edge cases, and adaptive interval behavior.
- */
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 
 const originalFetch = global.fetch;

@@ -1,6 +1,3 @@
-/**
- * Tests for /api/push/send route.
- */
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";
 

@@ -1,6 +1,3 @@
-/**
- * Tests for calculateResonance edge cases — real code, no mocking.
- */
 import { calculateResonance } from "@/lib/agent/discovery";
 import { createEmptyProfile } from "@/lib/preferences/types";
 import type { AgentProfile } from "@/lib/agent/types";

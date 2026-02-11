@@ -1,8 +1,3 @@
-/**
- * Tests for IngestionScheduler — Nostr and URL source types, edge cases.
- * Tests real fetchSource routing, error resilience, MAX_ITEMS_PER_SOURCE cap,
- * concurrent cycle protection, and multi-source partial failure.
- */
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 
 const originalFetch = global.fetch;

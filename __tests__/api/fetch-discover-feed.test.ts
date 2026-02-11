@@ -1,7 +1,3 @@
-/**
- * Tests for /api/fetch/discover-feed route.
- * Tests input validation with the real handler.
- */
 import { POST } from "@/app/api/fetch/discover-feed/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";

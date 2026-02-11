@@ -1,7 +1,3 @@
-/**
- * Edge case tests for lib/utils/url.ts
- * Tests boundary IPs, protocol edge cases, and hostname variations.
- */
 import { blockPrivateUrl, blockPrivateHostname, blockPrivateRelay } from "@/lib/utils/url";
 
 describe("blockPrivateHostname — edge cases", () => {

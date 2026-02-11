@@ -1,7 +1,3 @@
-/**
- * Edge case tests for lib/ingestion/quickFilter.ts
- * Tests boundary conditions, Unicode, extreme content, and score clamping.
- */
 import { heuristicScores, quickSlopFilter } from "@/lib/ingestion/quickFilter";
 
 describe("heuristicScores — edge cases", () => {

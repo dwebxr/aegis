@@ -204,9 +204,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     if (actor) {
       actor.deleteSourceConfig(id)
         .catch((err: unknown) => {
-          console.error("[sources] IC delete failed:", err);
+          console.error("[sources] IC delete failed:", errMsg(err));
           setSyncStatus("error");
           setSyncError("Failed to delete source from IC");
+          addNotification("Source removed locally but IC sync failed", "error");
         });
     }
   }, [persist, isDemoMode]);

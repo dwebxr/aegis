@@ -1,7 +1,3 @@
-/**
- * Edge case tests for lib/ingestion/sourceState.ts
- * Tests boundary conditions for backoff, adaptive intervals, and state persistence.
- */
 import {
   defaultState,
   getSourceKey,

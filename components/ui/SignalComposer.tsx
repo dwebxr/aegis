@@ -179,6 +179,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
       {/* Image preview */}
       {imagePreview && (
         <div style={{ position: "relative", display: "inline-block", marginTop: 8 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview URL */}
           <img
             src={imagePreview}
             alt="Attached"

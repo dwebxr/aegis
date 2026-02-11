@@ -1,8 +1,3 @@
-/**
- * Tests for AgentManager error handling paths.
- * Covers: start() failures, handleOffer relay failures,
- * handleAccept delivery failures (phase → "rejected"), message handler catch.
- */
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import { createEmptyProfile } from "@/lib/preferences/types";

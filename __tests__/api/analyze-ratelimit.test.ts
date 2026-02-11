@@ -1,7 +1,3 @@
-/**
- * Tests for /api/analyze rate limiting integration.
- * Verifies that the analyze endpoint enforces rate limits with real code paths.
- */
 import { POST } from "@/app/api/analyze/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";

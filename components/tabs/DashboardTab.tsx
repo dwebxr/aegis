@@ -6,6 +6,7 @@ import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard } from "@/components/ui/ContentCard";
 import { fonts, colors, space, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
+import { contentToCSV } from "@/lib/utils/csv";
 
 function downloadFile(data: string, filename: string, mime: string) {
   const blob = new Blob([data], { type: mime });
@@ -15,24 +16,6 @@ function downloadFile(data: string, filename: string, mime: string) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-function csvEscape(s: string): string {
-  const escaped = s.replace(/"/g, '""');
-  return /[,"\n\r]/.test(s) ? `"${escaped}"` : escaped;
-}
-
-function contentToCSV(items: ContentItem[]): string {
-  const header = "id,author,source,verdict,composite,originality,insight,credibility,vSignal,cContext,lSlop,topics,text,reason,createdAt,sourceUrl";
-  const rows = items.map(c => [
-    c.id, csvEscape(c.author), c.source, c.verdict,
-    c.scores.composite, c.scores.originality, c.scores.insight, c.scores.credibility,
-    c.vSignal ?? "", c.cContext ?? "", c.lSlop ?? "",
-    csvEscape((c.topics || []).join(";")),
-    csvEscape(c.text || ""), csvEscape(c.reason || ""),
-    new Date(c.createdAt).toISOString(), c.sourceUrl || "",
-  ].join(","));
-  return [header, ...rows].join("\n");
 }
 
 interface DashboardTabProps {

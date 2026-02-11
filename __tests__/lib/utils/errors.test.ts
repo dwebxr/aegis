@@ -1,7 +1,3 @@
-/**
- * Tests for lib/utils/errors.ts — errMsg utility.
- * Covers: Error objects, non-Error values, edge cases (null, undefined, objects, symbols).
- */
 import { errMsg } from "@/lib/utils/errors";
 
 describe("errMsg", () => {
