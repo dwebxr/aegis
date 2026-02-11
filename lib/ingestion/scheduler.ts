@@ -178,7 +178,7 @@ export class IngestionScheduler {
         const scores: number[] = [];
 
         for (const raw of toScore) {
-          const scored = await this.scoreItem(raw, userContext);
+          const scored = await this.scoreItem(raw, userContext, source.type);
           if (scored) {
             this.dedup.markSeen(raw.sourceUrl, raw.text);
             scores.push(scored.scores.composite);
@@ -257,6 +257,7 @@ export class IngestionScheduler {
       case "url":
         return this.fetchURL(source.config.url, key);
       default:
+        console.warn(`[scheduler] Unknown source type: ${source.type}`);
         return [];
     }
   }
@@ -361,6 +362,7 @@ export class IngestionScheduler {
   private async scoreItem(
     raw: { text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string },
     userContext: UserContext | null,
+    sourceType: SchedulerSource["type"],
   ): Promise<ContentItem | null> {
     try {
       const body: Record<string, unknown> = { text: raw.text, source: "auto" };
@@ -379,9 +381,9 @@ export class IngestionScheduler {
         id: uuidv4(),
         owner: "",
         author: raw.author,
-        avatar: raw.avatar || (raw.sourceUrl?.startsWith("nostr:") ? "\uD83D\uDD2E" : "\uD83D\uDCE1"),
+        avatar: raw.avatar || (sourceType === "nostr" ? "\uD83D\uDD2E" : "\uD83D\uDCE1"),
         text: raw.text.slice(0, MAX_DISPLAY_TEXT),
-        source: raw.sourceUrl?.startsWith("nostr:") ? "nostr" : "rss",
+        source: sourceType,
         sourceUrl: raw.sourceUrl,
         imageUrl: raw.imageUrl,
         scores: {

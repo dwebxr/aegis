@@ -52,7 +52,8 @@ export async function POST(request: NextRequest) {
       const html = await res.text();
       const linkRegex = /<link[^>]+rel=["']alternate["'][^>]*>/gi;
       let match;
-      while ((match = linkRegex.exec(html)) !== null) {
+      let iters = 0;
+      while ((match = linkRegex.exec(html)) !== null && iters++ < 100) {
         const tag = match[0];
         const typeMatch = tag.match(/type=["']([^"']+)["']/);
         const hrefMatch = tag.match(/href=["']([^"']+)["']/);

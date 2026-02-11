@@ -1,8 +1,6 @@
 import {
   serializeBriefing,
   parseBriefingMarkdown,
-  type SerializedBriefing,
-  type ParsedBriefing,
 } from "@/lib/briefing/serialize";
 import type { BriefingState } from "@/lib/briefing/types";
 import type { ContentItem } from "@/lib/types/content";

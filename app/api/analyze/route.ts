@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { text, userContext } = body as { text?: string; userContext?: UserContext };
+  const { text, userContext: rawCtx } = body as { text?: string; userContext?: UserContext };
 
   if (typeof text !== "string" || !text.trim()) {
     return NextResponse.json({ error: "Text is required" }, { status: 400 });
@@ -67,6 +67,16 @@ export async function POST(request: NextRequest) {
   if (text.length > 10000) {
     return NextResponse.json({ error: "Text exceeds 10000 character limit" }, { status: 400 });
   }
+
+  // Sanitize userContext: only allow short string arrays for topic fields
+  const sanitizeTopics = (arr: unknown): string[] =>
+    Array.isArray(arr) ? arr.filter((t): t is string => typeof t === "string" && t.length < 80).slice(0, 20) : [];
+  const userContext: UserContext | undefined = rawCtx ? {
+    recentTopics: sanitizeTopics(rawCtx.recentTopics),
+    highAffinityTopics: sanitizeTopics(rawCtx.highAffinityTopics),
+    lowAffinityTopics: sanitizeTopics(rawCtx.lowAffinityTopics),
+    trustedAuthors: sanitizeTopics(rawCtx.trustedAuthors),
+  } : undefined;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || !withinDailyBudget()) {

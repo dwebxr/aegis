@@ -168,7 +168,7 @@ export class AgentManager {
 
   private async broadcastMyPresence(): Promise<void> {
     const prefs = this.callbacks.getPrefs();
-    const interests = Object.entries(prefs.topicAffinities)
+    const interests = Object.entries(prefs.topicAffinities || {})
       .filter(([, v]) => v >= 0.2)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 20)
@@ -279,7 +279,7 @@ export class AgentManager {
 
   private async handleOffer(senderPk: string, offer: D2AOfferPayload): Promise<void> {
     const prefs = this.callbacks.getPrefs();
-    const topicAffinity = prefs.topicAffinities[offer.topic] ?? 0;
+    const topicAffinity = (prefs.topicAffinities || {})[offer.topic] ?? 0;
 
     try {
       if (topicAffinity > 0 && offer.score >= 6) {

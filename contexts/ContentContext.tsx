@@ -70,22 +70,15 @@ const ContentContext = createContext<ContentState>({
   loadFromIC: async () => {},
 });
 
+const SOURCE_KEYS = ["rss", "url", "twitter", "nostr", "manual"] as const;
+
 function mapSource(s: string): ContentSource {
-  switch (s) {
-    case "rss": return { rss: null };
-    case "url": return { url: null };
-    case "twitter": return { twitter: null };
-    case "nostr": return { nostr: null };
-    default: return { manual: null };
-  }
+  const key = SOURCE_KEYS.includes(s as typeof SOURCE_KEYS[number]) ? s : "manual";
+  return { [key]: null } as ContentSource;
 }
 
 function mapSourceBack(s: ContentSource): string {
-  if ("rss" in s) return "rss";
-  if ("url" in s) return "url";
-  if ("twitter" in s) return "twitter";
-  if ("nostr" in s) return "nostr";
-  return "manual";
+  return SOURCE_KEYS.find(k => k in s) || "manual";
 }
 
 function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal").Principal) {
