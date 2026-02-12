@@ -152,7 +152,7 @@ describe("createAgent", () => {
     );
   });
 
-  it("calls fetchRootKey when local", () => {
+  it("does not call fetchRootKey (deferred to ensureRootKey)", () => {
     // @ts-expect-error -- mock window
     globalThis.window = { location: { hostname: "localhost" } };
     const mockFetchRootKey = jest.fn().mockResolvedValue(undefined);
@@ -162,18 +162,44 @@ describe("createAgent", () => {
     const { createAgent } = importAgentModule();
     createAgent();
 
-    expect(mockFetchRootKey).toHaveBeenCalled();
+    expect(mockFetchRootKey).not.toHaveBeenCalled();
+  });
+});
+
+describe("ensureRootKey", () => {
+  it("calls fetchRootKey when local", async () => {
+    // @ts-expect-error -- mock window
+    globalThis.window = { location: { hostname: "localhost" } };
+    const mockFetchRootKey = jest.fn().mockResolvedValue(undefined);
+    const mockAgent = { fetchRootKey: mockFetchRootKey };
+    const { HttpAgent } = require("@dfinity/agent");
+    HttpAgent.createSync.mockReturnValue(mockAgent);
+
+    const { ensureRootKey } = importAgentModule();
+    await ensureRootKey(mockAgent as any);
+
+    expect(mockFetchRootKey).toHaveBeenCalledTimes(1);
   });
 
-  it("does not call fetchRootKey when not local", () => {
+  it("does not call fetchRootKey when not local", async () => {
     delete process.env.NEXT_PUBLIC_IC_HOST;
     const mockFetchRootKey = jest.fn().mockResolvedValue(undefined);
-    const { HttpAgent } = require("@dfinity/agent");
-    HttpAgent.createSync.mockReturnValue({ fetchRootKey: mockFetchRootKey });
+    const mockAgent = { fetchRootKey: mockFetchRootKey };
 
-    const { createAgent } = importAgentModule();
-    createAgent();
+    const { ensureRootKey } = importAgentModule();
+    await ensureRootKey(mockAgent as any);
 
     expect(mockFetchRootKey).not.toHaveBeenCalled();
+  });
+
+  it("propagates fetchRootKey errors to caller", async () => {
+    // @ts-expect-error -- mock window
+    globalThis.window = { location: { hostname: "localhost" } };
+    const mockAgent = { fetchRootKey: jest.fn().mockRejectedValue(new Error("Connection refused")) };
+    const { HttpAgent } = require("@dfinity/agent");
+    HttpAgent.createSync.mockReturnValue(mockAgent);
+
+    const { ensureRootKey } = importAgentModule();
+    await expect(ensureRootKey(mockAgent as any)).rejects.toThrow("Connection refused");
   });
 });

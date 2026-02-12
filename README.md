@@ -438,7 +438,9 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
 | Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
-| Test | Jest + ts-jest (1149 tests, 86 suites, 95% stmt coverage) |
+| CI/CD | GitHub Actions (lint → test → build on push/PR) |
+| Monitoring | Sentry (@sentry/nextjs, conditional on DSN) |
+| Test | Jest + ts-jest (1317 tests, 96 suites) |
 
 ## Project Structure
 
@@ -526,24 +528,29 @@ aegis/
 │       ├── errors.ts                    # errMsg() shared error formatter
 │       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       └── csv.ts                       # CSV export (RFC-compliant escaping)
-├── __tests__/                           # 1149 tests across 86 suites
+├── __tests__/                           # 1317 tests across 96 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
 │       ├── types.mo                     # Type definitions (incl. StakeRecord, UserReputation, D2AMatchRecord)
 │       ├── ledger.mo                    # ICRC-1/2 ICP Ledger + CMC interface module
 │       └── aegis_backend.did            # Candid interface
+├── .github/workflows/ci.yml             # GitHub Actions CI (lint → test → build)
+├── sentry.client.config.ts              # Sentry client-side init (conditional on DSN)
+├── sentry.server.config.ts              # Sentry server-side init
+├── sentry.edge.config.ts                # Sentry edge runtime init
+├── instrumentation.ts                   # Next.js instrumentation hook (Sentry)
 ├── public/                              # Icons (apple-touch-icon, favicons, PWA)
 ├── mops.toml                            # Motoko package manager (mo:llm, mo:json)
 ├── dfx.json                             # IC project config (packtool: mops sources)
-└── next.config.mjs                      # Webpack polyfills for @dfinity
+└── next.config.mjs                      # Webpack polyfills + Serwist PWA + Sentry
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - [dfx](https://internetcomputer.org/docs/current/developer-docs/getting-started/install/) (for canister development)
 
 ### Local Development
@@ -557,7 +564,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 1149 tests
+npm test              # Run all 1317 tests
 npm run test:watch    # Watch mode
 ```
 
@@ -577,11 +584,22 @@ NEXT_PUBLIC_INTERNET_IDENTITY_URL=https://identity.ic0.app
 # NEXT_PUBLIC_CANISTER_ID=uxrrr-q7777-77774-qaaaq-cai
 # NEXT_PUBLIC_INTERNET_IDENTITY_URL=http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai
 
+# Push Notifications (optional)
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=...      # VAPID public key
+VAPID_PRIVATE_KEY=...                 # VAPID private key
+VAPID_SUBJECT=mailto:admin@example.com
+
 # x402 D2A Payment Gateway (optional)
 X402_RECEIVER_ADDRESS=0x...           # EVM address for USDC payments
 X402_NETWORK=eip155:84532             # Base Sepolia (or eip155:8453 for mainnet)
 X402_PRICE=$0.01                      # Per-briefing price
 X402_FACILITATOR_URL=https://x402.org/facilitator
+
+# Sentry Error Tracking (optional — no-op if DSN not set)
+NEXT_PUBLIC_SENTRY_DSN=...            # Sentry DSN for error tracking
+SENTRY_ORG=...                        # Sentry org slug (for source map upload)
+SENTRY_PROJECT=...                    # Sentry project slug
+SENTRY_AUTH_TOKEN=...                 # Sentry auth token
 ```
 
 ### Canister Development

@@ -9,6 +9,7 @@ jest.mock("@/lib/ic/agent", () => ({
   createAgent: jest.fn().mockReturnValue({
     syncTime: (...args: unknown[]) => mockSyncTime(...args),
   }),
+  ensureRootKey: jest.fn().mockResolvedValue(undefined),
   getCanisterId: jest.fn().mockReturnValue("test-canister-id"),
 }));
 
@@ -45,24 +46,24 @@ describe("createBackendActorAsync", () => {
   it("returns actor even when syncTime throws (clock drift tolerance)", async () => {
     mockSyncTime.mockRejectedValueOnce(new Error("Network unreachable"));
 
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+    const errorSpy = jest.spyOn(console, "error").mockImplementation();
 
     const actor = await createBackendActorAsync();
 
     expect(mockSyncTime).toHaveBeenCalledTimes(1);
     expect(mockCreateActor).toHaveBeenCalledTimes(1);
     expect(actor).toEqual({ mock: "actor" });
-    expect(warnSpy).toHaveBeenCalledWith(
-      "[ic] syncTime failed (clock drift possible):",
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[ic] syncTime failed — IC calls may fail with certificate errors:",
       "Network unreachable"
     );
 
-    warnSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it("does not call createActor twice on syncTime failure", async () => {
     mockSyncTime.mockRejectedValueOnce(new Error("Timeout"));
-    jest.spyOn(console, "warn").mockImplementation();
+    jest.spyOn(console, "error").mockImplementation();
 
     await createBackendActorAsync();
 

@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);
   if (limited) return limited;
 
-  const info = {
+  return withCors(NextResponse.json({
     name: "Aegis",
     description: "D2A Social Agent Platform — AI-curated content briefings with V/C/L scoring",
     version: "1.0",
@@ -21,26 +21,13 @@ export async function GET(request: NextRequest) {
         network: X402_NETWORK,
         currency: "USDC",
         description: "Get curated briefing with scored content items",
-        params: {
-          principal: "(optional) IC principal for user-specific briefing",
-        },
+        params: { principal: "(optional) IC principal for user-specific briefing" },
       },
-      info: {
-        url: "/api/d2a/info",
-        method: "GET",
-        auth: "none",
-        description: "Service metadata (this endpoint)",
-      },
-      health: {
-        url: "/api/d2a/health",
-        method: "GET",
-        auth: "none",
-        description: "Service health check",
-      },
+      info: { url: "/api/d2a/info", method: "GET", auth: "none" },
+      health: { url: "/api/d2a/health", method: "GET", auth: "none" },
     },
     payment: {
       protocol: "x402",
-      facilitator: (process.env.X402_FACILITATOR_URL || "https://x402.org/facilitator").trim(),
       receiver: X402_RECEIVER || "not configured",
       network: X402_NETWORK,
       price: X402_PRICE,
@@ -61,13 +48,8 @@ export async function GET(request: NextRequest) {
         composite: "Weighted final score (0-10)",
       },
     },
-    compatibility: {
-      erc8004: false,
-      x402Version: 2,
-    },
-  };
-
-  return withCors(NextResponse.json(info), request.headers.get("origin"));
+    compatibility: { erc8004: false, x402Version: 2 },
+  }), request.headers.get("origin"));
 }
 
 export async function OPTIONS(request: NextRequest) {

@@ -8,15 +8,16 @@ interface WindowEntry {
 const MAX_WINDOW_ENTRIES = 10_000;
 const windows = new Map<string, WindowEntry>();
 
-// Cleanup stale entries every 60 seconds to prevent unbounded memory growth
+// Cleanup stale entries to prevent unbounded memory growth
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 if (typeof setInterval !== "undefined") {
-  const timer = setInterval(() => {
+  cleanupTimer = setInterval(() => {
     const now = Date.now();
     windows.forEach((entry, key) => {
       if (now >= entry.resetAt) windows.delete(key);
     });
   }, 60_000);
-  if (typeof timer === "object" && "unref" in timer) timer.unref();
+  if (typeof cleanupTimer === "object" && "unref" in cleanupTimer) cleanupTimer.unref();
 }
 
 function getClientIP(request: NextRequest): string {
@@ -27,6 +28,10 @@ function getClientIP(request: NextRequest): string {
 
 export function _resetRateLimits(): void {
   windows.clear();
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+    cleanupTimer = null;
+  }
 }
 
 /**

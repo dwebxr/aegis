@@ -133,7 +133,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     }
   }, [isAuthenticated, identity, addNotification]);
 
-  // Persist content to localStorage whenever it changes
   useEffect(() => {
     saveCachedContent(content);
   }, [content]);

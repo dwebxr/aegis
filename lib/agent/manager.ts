@@ -190,7 +190,6 @@ export class AgentManager {
   }
 
   private async discoverAndNegotiate(): Promise<void> {
-    // Remove completed/rejected/expired handshakes so peers can be re-offered
     this.cleanupStaleHandshakes();
 
     const prefs = this.callbacks.getPrefs();

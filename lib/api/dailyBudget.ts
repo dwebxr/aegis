@@ -1,10 +1,6 @@
 /**
  * Per-instance daily budget for expensive API calls (e.g. Anthropic).
  * Prevents runaway costs if rate limiting is bypassed across serverless instances.
- *
- * LIMITATION: Like rateLimit, this is per-instance on Vercel serverless.
- * Each warm instance tracks its own counter independently.
- * For stronger guarantees, migrate to Vercel KV or Redis.
  */
 
 const DAILY_BUDGET = parseInt(process.env.ANTHROPIC_DAILY_BUDGET || "500", 10);
@@ -20,7 +16,6 @@ export function withinDailyBudget(): boolean {
   return dailyApiCalls < DAILY_BUDGET;
 }
 
-/** Call after a successful API request. */
 export function recordApiCall(): void {
   dailyApiCalls++;
 }

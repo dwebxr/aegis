@@ -11,34 +11,24 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimit(request, 30, 60_000);
   if (limited) return limited;
 
+  const origin = request.headers.get("origin");
   const principal = request.nextUrl.searchParams.get("principal") || undefined;
 
   try {
     const briefing = await getLatestBriefing(principal);
     if (!briefing) {
       return withCors(
-        NextResponse.json(
-          { error: "No briefing available", hint: "User has no briefing data yet" },
-          { status: 404 },
-        ),
-        request.headers.get("origin"),
+        NextResponse.json({ error: "No briefing available", hint: "User has no briefing data yet" }, { status: 404 }),
+        origin,
       );
     }
-
-    return withCors(
-      NextResponse.json(briefing),
-      request.headers.get("origin"),
-    );
+    return withCors(NextResponse.json(briefing), origin);
   } catch (error) {
     console.error("[d2a/briefing] Error:", error);
-    return withCors(
-      NextResponse.json({ error: "Failed to fetch briefing" }, { status: 500 }),
-      request.headers.get("origin"),
-    );
+    return withCors(NextResponse.json({ error: "Failed to fetch briefing" }, { status: 500 }), origin);
   }
 }
 
-// x402-gated GET: requires USDC payment on Base
 export const GET = X402_RECEIVER
   ? withX402(
       handleGet,
@@ -54,7 +44,7 @@ export const GET = X402_RECEIVER
       },
       resourceServer,
     )
-  : handleGet; // Ungated fallback when no receiver configured
+  : handleGet;
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);

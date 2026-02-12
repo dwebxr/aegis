@@ -71,7 +71,6 @@ export async function POST(request: NextRequest) {
       ),
     );
 
-    // Collect expired subscriptions for cleanup
     const expiredEndpoints: string[] = [];
     results.forEach((result, i) => {
       if (result.status === "rejected") {

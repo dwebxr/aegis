@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs";
 import withSerwist from "@serwist/next";
 
 /** @type {import('next').NextConfig} */
@@ -27,8 +28,15 @@ const nextConfig = {
   },
 };
 
-export default withSerwist({
+const withPWA = withSerwist({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
-})(nextConfig);
+});
+
+export default withSentryConfig(withPWA(nextConfig), {
+  silent: true,
+  org: process.env.SENTRY_ORG || "",
+  project: process.env.SENTRY_PROJECT || "",
+  disableSourceMapUpload: !process.env.SENTRY_AUTH_TOKEN,
+});

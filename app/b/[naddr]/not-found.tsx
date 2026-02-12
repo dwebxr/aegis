@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { colors, space, type as t, radii, shadows, transitions, fonts } from "@/styles/theme";
 
 export default function BriefingNotFound() {
@@ -40,7 +41,7 @@ export default function BriefingNotFound() {
         Check the URL or try again later.
       </p>
 
-      <a
+      <Link
         href="/"
         style={{
           display: "inline-block",
@@ -56,7 +57,7 @@ export default function BriefingNotFound() {
         }}
       >
         Try Aegis
-      </a>
+      </Link>
     </div>
   );
 }

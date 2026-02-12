@@ -133,7 +133,6 @@ export async function POST(request: NextRequest) {
   try {
     parsed = JSON.parse(clean);
   } catch {
-    // AI returned non-JSON — use heuristic instead of unreliable regex extraction
     console.warn("[analyze] AI returned non-JSON (length:", clean.length, "), falling back to heuristic");
     const fallback = heuristicScores(text);
     return NextResponse.json({ error: "Failed to parse AI response", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });

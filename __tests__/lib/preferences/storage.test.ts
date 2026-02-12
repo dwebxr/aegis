@@ -33,7 +33,7 @@ describe("preferences/storage", () => {
     });
 
     it("rejects profile with wrong version", () => {
-      const profile = createEmptyProfile("user-1") as Record<string, unknown>;
+      const profile = createEmptyProfile("user-1") as unknown as Record<string, unknown>;
       profile.version = 99;
       localStorage.setItem("aegis_prefs_user-1", JSON.stringify(profile));
 
@@ -81,7 +81,7 @@ describe("preferences/storage", () => {
         principalId: "user-1",
         topicAffinities: {},
         authorTrust: {},
-        calibration: { originalityWeight: 0.4, insightWeight: 0.35, credibilityWeight: 0.25, qualityThreshold: 4 },
+        calibration: { qualityThreshold: 4 },
         recentTopics: "not an array",
       }));
       const loaded = loadProfile("user-1");
@@ -146,7 +146,7 @@ describe("preferences/storage", () => {
       const profile = createEmptyProfile("roundtrip-user");
       profile.topicAffinities = { ml: 0.9, politics: -0.3 };
       profile.authorTrust = { alice: { validates: 5, flags: 1, trust: 0.6 } };
-      profile.calibration = { originalityWeight: 0.5, insightWeight: 0.3, credibilityWeight: 0.2, qualityThreshold: 5.0 };
+      profile.calibration = { qualityThreshold: 5.0 };
       profile.recentTopics = [{ topic: "ai", timestamp: 1000, weight: 0.8 }];
       profile.totalValidated = 100;
       profile.totalFlagged = 25;

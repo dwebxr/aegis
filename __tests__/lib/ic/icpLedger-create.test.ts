@@ -11,6 +11,7 @@ jest.mock("@/lib/ic/agent", () => ({
   createAgent: () => ({
     syncTime: () => mockSyncTime(),
   }),
+  ensureRootKey: jest.fn().mockResolvedValue(undefined),
 }));
 
 import { createICPLedgerActorAsync } from "@/lib/ic/icpLedger";

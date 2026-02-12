@@ -82,18 +82,16 @@ export async function POST(request: NextRequest) {
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error("meta-timeout")), 5000)),
         ]);
         for (const me of metaEvents) {
-          if (profiles[me.pubkey]) continue; // keep first (most relays agree on)
+          if (profiles[me.pubkey]) continue;
           try {
             const meta = JSON.parse(me.content);
             profiles[me.pubkey] = {
               name: meta.display_name || meta.name || undefined,
               picture: meta.picture || undefined,
             };
-          } catch { /* invalid metadata JSON */ }
+          } catch { }
         }
-      } catch {
-        // Timeout fetching profiles — not critical, continue without them
-      }
+      } catch { }
     }
 
     return NextResponse.json({

@@ -2,6 +2,8 @@ import { POST } from "@/app/api/upload/image/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";
 
+const originalFetch = global.fetch;
+
 function makeUploadRequest(file?: Blob, fieldName = "file"): NextRequest {
   const formData = new FormData();
   if (file) formData.append(fieldName, file);
@@ -14,6 +16,11 @@ function makeUploadRequest(file?: Blob, fieldName = "file"): NextRequest {
 describe("POST /api/upload/image", () => {
   beforeEach(() => {
     _resetRateLimits();
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401 });
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
   });
 
   describe("input validation", () => {
@@ -62,7 +69,6 @@ describe("POST /api/upload/image", () => {
     });
 
     it("returns 400 for file exceeding 5MB", async () => {
-      // 5MB + 1 byte
       const bigData = new Uint8Array(5 * 1024 * 1024 + 1);
       const file = new Blob([bigData], { type: "image/jpeg" });
       const res = await POST(makeUploadRequest(file));
@@ -83,15 +89,12 @@ describe("POST /api/upload/image", () => {
   });
 
   describe("accepted file types", () => {
-    // These will fail at the fetch stage (nostr.build not reachable in tests)
-    // but we verify they pass input validation by checking the error is NOT 400
     const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
     for (const type of validTypes) {
       it(`accepts ${type} files (passes validation)`, async () => {
         const file = new Blob(["fake-image-data"], { type });
         const res = await POST(makeUploadRequest(file));
-        // Should NOT be 400 (input validation passed), will be 502 (upstream unreachable)
         expect(res.status).not.toBe(400);
       });
     }
@@ -102,7 +105,6 @@ describe("POST /api/upload/image", () => {
       const data = new Uint8Array(5 * 1024 * 1024);
       const file = new Blob([data], { type: "image/jpeg" });
       const res = await POST(makeUploadRequest(file));
-      // Exactly 5MB should pass validation → 502 (upstream unreachable)
       expect(res.status).not.toBe(400);
     }, 15000);
 
@@ -115,20 +117,8 @@ describe("POST /api/upload/image", () => {
   });
 
   describe("nostr.build interaction", () => {
-    const originalFetch = global.fetch;
-    let fetchMock: jest.Mock;
-
-    beforeEach(() => {
-      fetchMock = jest.fn();
-      global.fetch = fetchMock;
-    });
-
-    afterEach(() => {
-      global.fetch = originalFetch;
-    });
-
     it("returns URL on successful upload", async () => {
-      fetchMock.mockResolvedValue({
+      (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ status: "success", data: [{ url: "https://nostr.build/i/abc123.jpg" }] }),
       });
@@ -140,7 +130,7 @@ describe("POST /api/upload/image", () => {
     });
 
     it("returns 502 when nostr.build returns non-OK", async () => {
-      fetchMock.mockResolvedValue({ ok: false, status: 500 });
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 500 });
       const file = new Blob(["fake-png"], { type: "image/png" });
       const res = await POST(makeUploadRequest(file));
       expect(res.status).toBe(502);
@@ -149,7 +139,7 @@ describe("POST /api/upload/image", () => {
     });
 
     it("returns 502 when nostr.build returns invalid JSON", async () => {
-      fetchMock.mockResolvedValue({
+      (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: () => Promise.reject(new Error("Unexpected token")),
       });
@@ -161,7 +151,7 @@ describe("POST /api/upload/image", () => {
     });
 
     it("returns 502 when response has no URL in data", async () => {
-      fetchMock.mockResolvedValue({
+      (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ status: "success", data: [] }),
       });
@@ -173,7 +163,7 @@ describe("POST /api/upload/image", () => {
     });
 
     it("returns 502 when fetch throws (host unreachable)", async () => {
-      fetchMock.mockRejectedValue(new Error("ECONNREFUSED"));
+      (global.fetch as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED"));
       const file = new Blob(["fake"], { type: "image/jpeg" });
       const res = await POST(makeUploadRequest(file));
       expect(res.status).toBe(502);
@@ -182,7 +172,7 @@ describe("POST /api/upload/image", () => {
     });
 
     it("returns 502 when response data has null URL", async () => {
-      fetchMock.mockResolvedValue({
+      (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ data: [{ url: null }] }),
       });
@@ -203,7 +193,6 @@ describe("POST /api/upload/image", () => {
 
     it("returns 429 after exceeding 5 requests", async () => {
       const file = new Blob(["img"], { type: "image/jpeg" });
-      // Exhaust rate limit (5 requests)
       for (let i = 0; i < 5; i++) {
         await POST(makeUploadRequest(file));
       }

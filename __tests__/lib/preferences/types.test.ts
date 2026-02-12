@@ -30,9 +30,6 @@ describe("createEmptyProfile", () => {
 
   it("applies default calibration", () => {
     const profile = createEmptyProfile("p1");
-    expect(profile.calibration.originalityWeight).toBe(0.40);
-    expect(profile.calibration.insightWeight).toBe(0.35);
-    expect(profile.calibration.credibilityWeight).toBe(0.25);
     expect(profile.calibration.qualityThreshold).toBe(4.0);
   });
 
@@ -65,10 +62,8 @@ describe("constants", () => {
     expect(AUTHOR_TRUST_FLOOR).toBe(-1.0);
   });
 
-  it("DEFAULT_CALIBRATION weights sum to 1.0", () => {
-    const sum = DEFAULT_CALIBRATION.originalityWeight
-      + DEFAULT_CALIBRATION.insightWeight
-      + DEFAULT_CALIBRATION.credibilityWeight;
-    expect(sum).toBeCloseTo(1.0);
+  it("DEFAULT_CALIBRATION has valid qualityThreshold", () => {
+    expect(DEFAULT_CALIBRATION.qualityThreshold).toBeGreaterThan(0);
+    expect(DEFAULT_CALIBRATION.qualityThreshold).toBeLessThan(10);
   });
 });

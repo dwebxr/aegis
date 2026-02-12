@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import Link from "next/link";
 import { colors, space, type as t, radii, shadows, transitions, scoreGrade, fonts } from "@/styles/theme";
 import type { ParsedBriefing, ParsedBriefingItem } from "@/lib/briefing/serialize";
 
@@ -170,7 +171,7 @@ export const SharedBriefingView: React.FC<SharedBriefingViewProps> = ({ briefing
         padding: `${space[4]}px ${space[5]}px`,
       }}>
         <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <a
+          <Link
             href="/"
             style={{
               display: "flex",
@@ -184,7 +185,7 @@ export const SharedBriefingView: React.FC<SharedBriefingViewProps> = ({ briefing
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
             <span style={{ fontSize: t.h3.size, fontWeight: 700 }}>Aegis</span>
-          </a>
+          </Link>
           <a
             href={`https://njump.me/${naddr}`}
             target="_blank"
@@ -324,7 +325,7 @@ export const SharedBriefingView: React.FC<SharedBriefingViewProps> = ({ briefing
           }}>
             Zero-noise briefings powered by AI + Nostr + Internet Computer
           </p>
-          <a
+          <Link
             href="/"
             style={{
               display: "inline-block",
@@ -340,7 +341,7 @@ export const SharedBriefingView: React.FC<SharedBriefingViewProps> = ({ briefing
             }}
           >
             Try Aegis
-          </a>
+          </Link>
         </div>
       </main>
 

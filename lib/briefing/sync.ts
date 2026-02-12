@@ -4,7 +4,7 @@ import type { BriefingState } from "./types";
 import type { D2ABriefingResponse, D2ABriefingItem } from "@/lib/d2a/types";
 
 function toBriefingItem(bi: BriefingState["priority"][0]): D2ABriefingItem {
-  const item = bi.item;
+  const { item } = bi;
   return {
     title: item.text.slice(0, 80),
     content: item.text,
@@ -15,9 +15,9 @@ function toBriefingItem(bi: BriefingState["priority"][0]): D2ABriefingItem {
       insight: item.scores.insight,
       credibility: item.scores.credibility,
       composite: item.scores.composite,
-      ...(item.vSignal !== undefined && { vSignal: item.vSignal }),
-      ...(item.cContext !== undefined && { cContext: item.cContext }),
-      ...(item.lSlop !== undefined && { lSlop: item.lSlop }),
+      vSignal: item.vSignal,
+      cContext: item.cContext,
+      lSlop: item.lSlop,
     },
     verdict: item.verdict,
     reason: item.reason,
@@ -65,11 +65,10 @@ export async function syncBriefingToCanister(
   nostrPubkey: string | null = null,
 ): Promise<boolean> {
   try {
-    const response = briefingToD2AResponse(state, nostrPubkey);
-    const json = JSON.stringify(response);
+    const json = JSON.stringify(briefingToD2AResponse(state, nostrPubkey));
     return await actor.saveLatestBriefing(json);
   } catch (e) {
-    console.error("[briefing/sync] Failed to sync briefing to canister:", e);
+    console.error("[briefing/sync] Failed to sync:", e);
     return false;
   }
 }

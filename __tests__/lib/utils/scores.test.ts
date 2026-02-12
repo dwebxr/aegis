@@ -5,7 +5,7 @@ describe("scoreColor", () => {
     expect(scoreColor(7)).toBe("#34d399");
     expect(scoreColor(7.5)).toBe("#34d399");
     expect(scoreColor(10)).toBe("#34d399");
-    expect(scoreColor(100)).toBe("#34d399"); // out-of-range still works
+    expect(scoreColor(100)).toBe("#34d399");
   });
 
   it("returns yellow for mid scores (4-6.9)", () => {
@@ -17,7 +17,7 @@ describe("scoreColor", () => {
   it("returns red for low scores (< 4)", () => {
     expect(scoreColor(3.9)).toBe("#f87171");
     expect(scoreColor(0)).toBe("#f87171");
-    expect(scoreColor(-1)).toBe("#f87171"); // negative
+    expect(scoreColor(-1)).toBe("#f87171");
   });
 
   it("handles exact boundaries", () => {
@@ -31,8 +31,8 @@ describe("scoreColor", () => {
 describe("relativeTime", () => {
   it("returns 'just now' for timestamps within the last minute", () => {
     expect(relativeTime(Date.now())).toBe("just now");
-    expect(relativeTime(Date.now() - 30_000)).toBe("just now"); // 30 sec
-    expect(relativeTime(Date.now() - 59_000)).toBe("just now"); // 59 sec
+    expect(relativeTime(Date.now() - 30_000)).toBe("just now");
+    expect(relativeTime(Date.now() - 59_000)).toBe("just now");
   });
 
   it("returns minutes for timestamps 1-59 minutes ago", () => {

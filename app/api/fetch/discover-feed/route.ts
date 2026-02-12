@@ -5,7 +5,6 @@ import { blockPrivateUrl } from "@/lib/utils/url";
 
 export const maxDuration = 30;
 
-/** Common RSS feed paths to probe when no <link> tag is found */
 const COMMON_PATHS = ["/feed", "/rss", "/feed.xml", "/atom.xml", "/rss.xml", "/index.xml"];
 
 export async function POST(request: NextRequest) {
@@ -101,7 +100,7 @@ export async function POST(request: NextRequest) {
           if (res.ok && (ct.includes("xml") || ct.includes("rss") || ct.includes("atom"))) {
             return { url: probeUrl, type: "rss" as const };
           }
-        } catch { /* probe failed — skip */ }
+        } catch { }
         return null;
       })
     );

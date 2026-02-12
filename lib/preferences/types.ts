@@ -11,9 +11,6 @@ export interface RecentTopic {
 }
 
 export interface ScoringCalibration {
-  originalityWeight: number;
-  insightWeight: number;
-  credibilityWeight: number;
   qualityThreshold: number;
 }
 
@@ -37,9 +34,6 @@ export interface UserContext {
 }
 
 export const DEFAULT_CALIBRATION: ScoringCalibration = {
-  originalityWeight: 0.40,
-  insightWeight: 0.35,
-  credibilityWeight: 0.25,
   qualityThreshold: 4.0,
 };
 

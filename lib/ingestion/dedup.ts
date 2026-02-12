@@ -74,8 +74,7 @@ export class ArticleDeduplicator {
 
   private prune(): void {
     while (this.insertionOrder.length > MAX_ENTRIES) {
-      const oldest = this.insertionOrder.shift();
-      if (!oldest) break;
+      const oldest = this.insertionOrder.shift()!;
       if (oldest.startsWith("u:")) {
         this.urls.delete(oldest.slice(2));
       } else if (oldest.startsWith("f:")) {

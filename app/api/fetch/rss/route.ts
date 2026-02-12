@@ -30,8 +30,7 @@ const parser = new Parser({
   },
 });
 
-/** Extract an XML attribute from rss-parser's custom field value.
- *  rss-parser returns custom fields as either { $: { url, ... } } or a raw string. */
+/** Extract an XML attribute from rss-parser's custom field value. */
 function extractAttr(field: unknown, attr: string): string | undefined {
   if (!field) return undefined;
   if (typeof field === "string") return attr === "url" ? field : undefined;

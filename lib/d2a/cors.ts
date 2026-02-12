@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const ALLOWED_ORIGINS = [
-  "https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io", // Coo canister
+  "https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io",
   "https://aegis.dwebxr.xyz",
 ];
 
-export function corsHeaders(origin?: string | null): Record<string, string> {
+function corsHeaders(origin?: string | null): Record<string, string> {
   const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "*";
   return {
     "Access-Control-Allow-Origin": allowed,
@@ -16,14 +16,12 @@ export function corsHeaders(origin?: string | null): Record<string, string> {
   };
 }
 
-export function corsOptionsResponse(request: { headers: { get(name: string): string | null } }): NextResponse {
-  const origin = request.headers.get("origin");
-  return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
+export function corsOptionsResponse(request: NextRequest): NextResponse {
+  return new NextResponse(null, { status: 204, headers: corsHeaders(request.headers.get("origin")) });
 }
 
 export function withCors(response: NextResponse, origin?: string | null): NextResponse {
-  const headers = corsHeaders(origin);
-  for (const [key, value] of Object.entries(headers)) {
+  for (const [key, value] of Object.entries(corsHeaders(origin))) {
     response.headers.set(key, value);
   }
   return response;
