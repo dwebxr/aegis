@@ -1,0 +1,30 @@
+import { NextResponse } from "next/server";
+
+const ALLOWED_ORIGINS = [
+  "https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io", // Coo canister
+  "https://aegis.dwebxr.xyz",
+];
+
+export function corsHeaders(origin?: string | null): Record<string, string> {
+  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "*";
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-PAYMENT, PAYMENT-SIGNATURE",
+    "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-PAYMENT-REQUIRED, X-PAYMENT-RESPONSE",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
+export function corsOptionsResponse(request: { headers: { get(name: string): string | null } }): NextResponse {
+  const origin = request.headers.get("origin");
+  return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
+}
+
+export function withCors(response: NextResponse, origin?: string | null): NextResponse {
+  const headers = corsHeaders(origin);
+  for (const [key, value] of Object.entries(headers)) {
+    response.headers.set(key, value);
+  }
+  return response;
+}

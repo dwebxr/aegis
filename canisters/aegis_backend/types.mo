@@ -120,6 +120,14 @@ module {
     createdAt : Int;
   };
 
+  // ── D2A Briefing Snapshot ──
+
+  public type D2ABriefingSnapshot = {
+    owner : Principal;
+    briefingJson : Text;    // Serialized D2ABriefingResponse JSON
+    generatedAt : Int;      // Timestamp (nanoseconds)
+  };
+
   public type AnalysisTier = { #free; #premium };
 
   public type OnChainAnalysis = {

@@ -149,5 +149,7 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     getPushSubscriptions: IDL.Func([IDL.Principal], [IDL.Vec(PushSubscription)], ["query"]),
     removePushSubscriptions: IDL.Func([IDL.Principal, IDL.Vec(IDL.Text)], [IDL.Bool], []),
     getPushSubscriptionCount: IDL.Func([], [IDL.Nat], ["query"]),
+    saveLatestBriefing: IDL.Func([IDL.Text], [IDL.Bool], []),
+    getLatestBriefing: IDL.Func([IDL.Principal], [IDL.Opt(IDL.Text)], ["query"]),
   });
 };

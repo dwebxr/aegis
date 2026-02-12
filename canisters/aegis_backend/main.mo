@@ -86,6 +86,10 @@ persistent actor AegisBackend {
   var stablePushSubscriptions : [(Principal, [Types.PushSubscription])] = [];
   transient var pushSubscriptions = HashMap.HashMap<Principal, [Types.PushSubscription]>(16, Principal.equal, Principal.hash);
 
+  // D2A Briefing snapshots (latest per user)
+  var stableBriefings : [(Principal, Types.D2ABriefingSnapshot)] = [];
+  transient var briefings = HashMap.HashMap<Principal, Types.D2ABriefingSnapshot>(16, Principal.equal, Principal.hash);
+
   // Owner -> evaluation IDs index for fast user queries
   transient var ownerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
 
@@ -129,6 +133,7 @@ persistent actor AegisBackend {
     };
     stableSignalVoters := Buffer.toArray(voterBuf);
     stablePushSubscriptions := Iter.toArray(pushSubscriptions.entries());
+    stableBriefings := Iter.toArray(briefings.entries());
   };
 
   system func postupgrade() {
@@ -168,6 +173,8 @@ persistent actor AegisBackend {
     stableSignalVoters := [];
     for ((p, subs) in stablePushSubscriptions.vals()) { pushSubscriptions.put(p, subs) };
     stablePushSubscriptions := [];
+    for ((p, b) in stableBriefings.vals()) { briefings.put(p, b) };
+    stableBriefings := [];
     initCertCache();
   };
 
@@ -1448,6 +1455,29 @@ persistent actor AegisBackend {
     };
 
     parseAnalysisResponse(response);
+  };
+
+  // ──────────────────────────────────────
+  // D2A Briefing Snapshots
+  // ──────────────────────────────────────
+
+  public shared(msg) func saveLatestBriefing(briefingJson : Text) : async Bool {
+    if (not requireAuth(msg.caller)) { return false };
+    if (Text.size(briefingJson) > 500_000) { return false }; // 500KB max
+    let snapshot : Types.D2ABriefingSnapshot = {
+      owner = msg.caller;
+      briefingJson = briefingJson;
+      generatedAt = Time.now();
+    };
+    briefings.put(msg.caller, snapshot);
+    true;
+  };
+
+  public query func getLatestBriefing(p : Principal) : async ?Text {
+    switch (briefings.get(p)) {
+      case (?snapshot) { ?snapshot.briefingJson };
+      case null { null };
+    };
   };
 
   // ──────────────────────────────────────

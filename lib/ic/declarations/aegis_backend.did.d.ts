@@ -168,4 +168,6 @@ export interface _SERVICE {
   getPushSubscriptions: ActorMethod<[Principal], PushSubscription[]>;
   removePushSubscriptions: ActorMethod<[Principal, string[]], boolean>;
   getPushSubscriptionCount: ActorMethod<[], bigint>;
+  saveLatestBriefing: ActorMethod<[string], boolean>;
+  getLatestBriefing: ActorMethod<[Principal], [] | [string]>;
 }

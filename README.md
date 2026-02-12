@@ -307,6 +307,69 @@ The receiving agent rejects deliveries from undiscovered peers (not in the known
 
 ---
 
+## x402 D2A Briefing API
+
+Aegis exposes a paid API for AI agents (like [Coo](https://github.com/AegisOnChain/coo-icp)) to purchase curated briefings using the [x402 protocol](https://x402.org) — HTTP-native micropayments with USDC on Base.
+
+### Endpoints
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /api/d2a/briefing` | x402 ($0.01 USDC) | Curated briefing with V/C/L scored items |
+| `GET /api/d2a/info` | None | Service metadata, pricing, scoring model |
+| `GET /api/d2a/health` | None | Health check (IC canister + x402 config) |
+
+### Payment Flow
+
+```
+AI Agent                        Aegis                        x402 Facilitator
+   │                              │                              │
+   │── GET /api/d2a/briefing ────►│                              │
+   │◄── 402 + PAYMENT-REQUIRED ──│                              │
+   │                              │                              │
+   │ [sign EIP-3009 USDC auth]   │                              │
+   │                              │                              │
+   │── GET + PAYMENT-SIGNATURE ──►│── POST /verify ─────────────►│
+   │                              │◄── valid ────────────────────│
+   │                              │                              │
+   │◄── 200 + briefing JSON ─────│── POST /settle ─────────────►│
+   │                              │◄── tx hash ─────────────────│
+```
+
+### Response Format
+
+```json
+{
+  "version": "1.0",
+  "generatedAt": "2025-01-15T12:00:00Z",
+  "source": "aegis",
+  "summary": { "totalEvaluated": 42, "totalBurned": 15, "qualityRate": 0.64 },
+  "items": [{
+    "title": "...",
+    "content": "...",
+    "scores": { "originality": 8, "insight": 9, "credibility": 7, "composite": 8.2, "vSignal": 9, "cContext": 7, "lSlop": 2 },
+    "verdict": "quality",
+    "topics": ["machine-learning"],
+    "briefingScore": 7.5
+  }],
+  "serendipityPick": { ... },
+  "meta": { "scoringModel": "aegis-vcl-v1", "nostrPubkey": "...", "topics": [...] }
+}
+```
+
+### Configuration
+
+```bash
+X402_RECEIVER_ADDRESS=0x...    # EVM address to receive USDC payments
+X402_NETWORK=eip155:84532      # Base Sepolia (testnet) or eip155:8453 (mainnet)
+X402_PRICE=$0.01               # Price per briefing in USD
+X402_FACILITATOR_URL=https://x402.org/facilitator
+```
+
+When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (free) — useful for development.
+
+---
+
 ## Features
 
 ### 3-Tier AI Scoring Pipeline
@@ -369,6 +432,7 @@ The receiving agent rejects deliveries from undiscovered peers (not in the known
 | AI (Free) | IC LLM Canister — Llama 3.1 8B (on-chain, mo:llm 2.1.0) |
 | AI (Premium) | Anthropic Claude (claude-sonnet-4-20250514) + fallback heuristics |
 | Blockchain | Internet Computer (Motoko canister, dfx 0.30.2) |
+| Payments | x402 protocol (@x402/next 2.3.0, USDC on Base) |
 | Tokens | ICP Ledger ICRC-1/2 (staking, D2A fees) |
 | Auth | Internet Identity (@dfinity/auth-client 2.1.3) |
 | Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
@@ -391,6 +455,10 @@ aegis/
 │       ├── health/route.ts              # Health check + IC canister connectivity
 │       ├── upload/image/route.ts        # Image upload proxy (nostr.build)
 │       ├── push/send/route.ts           # Web Push notification sender
+│       ├── d2a/
+│       │   ├── briefing/route.ts        # x402-gated briefing API ($0.01 USDC)
+│       │   ├── info/route.ts            # Free metadata (pricing, scoring model)
+│       │   └── health/route.ts          # D2A service health check
 │       └── fetch/
 │           ├── url/route.ts             # URL article extraction
 │           ├── rss/route.ts             # RSS feed parsing (ETag/Last-Modified conditional)
@@ -421,7 +489,13 @@ aegis/
 │   │   └── storage.ts                   # localStorage R/W
 │   ├── briefing/
 │   │   ├── ranker.ts                    # briefingScore, generateBriefing, serendipity
+│   │   ├── sync.ts                      # Sync briefing snapshot to IC canister
 │   │   └── types.ts                     # BriefingState, BriefingItem
+│   ├── d2a/
+│   │   ├── types.ts                     # D2ABriefingResponse, D2ABriefingItem
+│   │   ├── cors.ts                      # CORS headers for external AI agent access
+│   │   ├── x402Server.ts               # x402 resource server config (ExactEvmScheme)
+│   │   └── briefingProvider.ts          # Briefing data provider (IC canister fetch)
 │   ├── ingestion/
 │   │   ├── scheduler.ts                 # Background fetch cycle (adaptive intervals, enrichment)
 │   │   ├── quickFilter.ts              # Heuristic pre-filter (Tier 1)
@@ -502,6 +576,12 @@ NEXT_PUBLIC_INTERNET_IDENTITY_URL=https://identity.ic0.app
 # NEXT_PUBLIC_IC_HOST=http://127.0.0.1:4943
 # NEXT_PUBLIC_CANISTER_ID=uxrrr-q7777-77774-qaaaq-cai
 # NEXT_PUBLIC_INTERNET_IDENTITY_URL=http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai
+
+# x402 D2A Payment Gateway (optional)
+X402_RECEIVER_ADDRESS=0x...           # EVM address for USDC payments
+X402_NETWORK=eip155:84532             # Base Sepolia (or eip155:8453 for mainnet)
+X402_PRICE=$0.01                      # Per-briefing price
+X402_FACILITATOR_URL=https://x402.org/facilitator
 ```
 
 ### Canister Development
@@ -542,6 +622,10 @@ service : {
   flagSignal : (text) -> (Result);
   recordD2AMatch : (text, principal, text, nat) -> (Result);
   analyzeOnChain : (text, vec text) -> (Result);
+
+  // D2A Briefing Snapshots
+  saveLatestBriefing : (text) -> (bool);              // Save serialized briefing JSON
+  getLatestBriefing : (principal) -> (opt text) query; // Retrieve latest briefing
 
   // Treasury (non-custodial — no operator withdrawal)
   getTreasuryBalance : () -> (nat);                  // Transparency: anyone can check
