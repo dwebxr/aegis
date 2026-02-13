@@ -11,11 +11,9 @@ export async function GET(request: NextRequest) {
 
   const checks: Record<string, string> = {};
 
-  // Check x402 configuration
   checks.x402Receiver = X402_RECEIVER ? "configured" : "not configured";
   checks.x402Network = X402_NETWORK;
 
-  // Check IC canister reachability
   const icHost = (process.env.NEXT_PUBLIC_IC_HOST || "https://icp-api.io").trim();
   const canisterId = (process.env.NEXT_PUBLIC_CANISTER_ID || "rluf3-eiaaa-aaaam-qgjuq-cai").trim();
   try {

@@ -16,6 +16,16 @@ import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { errMsg } from "@/lib/utils/errors";
+import { scoreItemWithHeuristics } from "@/lib/filtering/pipeline";
+
+interface RawItem {
+  text: string;
+  author: string;
+  avatar?: string;
+  sourceUrl?: string;
+  imageUrl?: string;
+  nostrPubkey?: string;
+}
 
 const MAX_ITEMS_PER_SOURCE = 5;
 const MAX_ENRICH_PER_CYCLE = 3;
@@ -33,6 +43,7 @@ interface SchedulerCallbacks {
   onNewContent: (item: ContentItem) => void;
   getSources: () => SchedulerSource[];
   getUserContext: () => UserContext | null;
+  getSkipAI?: () => boolean;
   onSourceError?: (sourceKey: string, error: string) => void;
   onSourceAutoDisabled?: (sourceKey: string, error: string) => void;
   onCycleComplete?: (newItemCount: number, items: ContentItem[]) => void;
@@ -57,6 +68,9 @@ export class IngestionScheduler {
 
   start(): void {
     if (this.intervalId) return;
+    // runCycle() is async but fire-and-forget is safe: it has internal try/catch/finally
+    // that handles all errors and resets the `running` guard. JS single-threaded event
+    // loop guarantees no concurrent execution of the same cycle.
     this.initialTimeoutId = setTimeout(() => this.runCycle(), 5000);
     this.intervalId = setInterval(() => this.runCycle(), BASE_CYCLE_MS);
   }
@@ -178,7 +192,9 @@ export class IngestionScheduler {
         const scores: number[] = [];
 
         for (const raw of toScore) {
-          const scored = await this.scoreItem(raw, userContext, source.type);
+          const scored = this.callbacks.getSkipAI?.()
+            ? scoreItemWithHeuristics(raw, source.type)
+            : await this.scoreItem(raw, userContext, source.type);
           if (scored) {
             this.dedup.markSeen(raw.sourceUrl, raw.text);
             scores.push(scored.scores.composite);
@@ -206,9 +222,9 @@ export class IngestionScheduler {
   }
 
   private async enrichItems(
-    items: Array<{ text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string }>,
+    items: RawItem[],
     sourceType: string,
-  ): Promise<Array<{ text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string }>> {
+  ): Promise<RawItem[]> {
     if (sourceType !== "rss") return items;
 
     let enrichCount = 0;
@@ -244,7 +260,7 @@ export class IngestionScheduler {
     return result;
   }
 
-  private async fetchSource(source: SchedulerSource, key: string): Promise<Array<{ text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string }>> {
+  private async fetchSource(source: SchedulerSource, key: string): Promise<RawItem[]> {
     switch (source.type) {
       case "rss":
         return this.fetchRSS(source.config.feedUrl, key);
@@ -262,7 +278,7 @@ export class IngestionScheduler {
     }
   }
 
-  private async fetchRSS(feedUrl: string, key: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+  private async fetchRSS(feedUrl: string, key: string): Promise<RawItem[]> {
     try {
       const body: Record<string, unknown> = { feedUrl, limit: 10 };
       const cached = this.conditionalHeaders.get(key);
@@ -301,7 +317,7 @@ export class IngestionScheduler {
     }
   }
 
-  private async fetchNostr(relays: string[], pubkeys: string[] | undefined, key: string): Promise<Array<{ text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string }>> {
+  private async fetchNostr(relays: string[], pubkeys: string[] | undefined, key: string): Promise<RawItem[]> {
     try {
       const res = await fetch("/api/fetch/nostr", {
         method: "POST",
@@ -321,6 +337,7 @@ export class IngestionScheduler {
           author: profile?.name || ev.pubkey.slice(0, 12) + "...",
           avatar: profile?.picture,
           sourceUrl: `nostr:${ev.id}`,
+          nostrPubkey: ev.pubkey,
         };
       });
     } catch (err) {
@@ -331,7 +348,7 @@ export class IngestionScheduler {
     }
   }
 
-  private async fetchURL(url: string, key: string): Promise<Array<{ text: string; author: string; sourceUrl?: string; imageUrl?: string }>> {
+  private async fetchURL(url: string, key: string): Promise<RawItem[]> {
     try {
       const res = await fetch("/api/fetch/url", {
         method: "POST",
@@ -360,7 +377,7 @@ export class IngestionScheduler {
   }
 
   private async scoreItem(
-    raw: { text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string },
+    raw: RawItem,
     userContext: UserContext | null,
     sourceType: SchedulerSource["type"],
   ): Promise<ContentItem | null> {
@@ -386,6 +403,7 @@ export class IngestionScheduler {
         source: sourceType,
         sourceUrl: raw.sourceUrl,
         imageUrl: raw.imageUrl,
+        nostrPubkey: raw.nostrPubkey,
         scores: {
           originality: result.originality,
           insight: result.insight,
@@ -402,6 +420,7 @@ export class IngestionScheduler {
         vSignal: result.vSignal,
         cContext: result.cContext,
         lSlop: result.lSlop,
+        scoredByAI: true,
       };
     } catch (err) {
       console.error("[scheduler] Score item failed:", errMsg(err));

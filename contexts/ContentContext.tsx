@@ -244,6 +244,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       vSignal: result.vSignal,
       cContext: result.cContext,
       lSlop: result.lSlop,
+      scoredByAI: true,
     };
     setContent(prev => [evaluation, ...prev]);
 
@@ -292,21 +293,17 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
 
   const addContent = useCallback((item: ContentItem) => {
-    // Deduplicate by sourceUrl (URL/RSS) or by text (manual/nostr)
     const isDuplicate = contentRef.current.some(c =>
       (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
       (!item.sourceUrl && c.text === item.text),
     );
     if (isDuplicate) return;
 
-    // Set owner if authenticated and item has no owner (e.g. scheduler items)
     const owned = (!item.owner && isAuthenticated && principal)
       ? { ...item, owner: principal.toText() }
       : item;
 
     setContent(prev => [owned, ...prev]);
-
-    // Persist to IC canister (fire-and-forget)
     if (actorRef.current && isAuthenticated && principal) {
       actorRef.current.saveEvaluation(toICEvaluation(owned, principal)).catch((err: unknown) => {
         console.warn("[content] IC save (addContent) failed:", errMsg(err));
@@ -355,6 +352,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         validated: e.validated,
         flagged: e.flagged,
         timestamp: relativeTime(Number(e.createdAt) / 1_000_000),
+        // IC canister doesn't store scoredByAI — infer from reason prefix
+        scoredByAI: !e.reason.startsWith("Heuristic"),
       }));
 
       if (loaded.length > 0) {

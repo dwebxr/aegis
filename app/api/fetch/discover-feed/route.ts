@@ -100,7 +100,9 @@ export async function POST(request: NextRequest) {
           if (res.ok && (ct.includes("xml") || ct.includes("rss") || ct.includes("atom"))) {
             return { url: probeUrl, type: "rss" as const };
           }
-        } catch { }
+        } catch (err) {
+          console.debug("[discover-feed] Probe failed:", path, errMsg(err));
+        }
         return null;
       })
     );

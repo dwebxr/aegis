@@ -16,7 +16,16 @@ import { usePreferences } from "@/contexts/PreferenceContext";
 import { useSources } from "@/contexts/SourceContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { useDemo } from "@/contexts/DemoContext";
+import { useFilterMode } from "@/contexts/FilterModeContext";
 import { DEMO_SOURCES } from "@/lib/demo/sources";
+import { buildFollowGraph } from "@/lib/wot/graph";
+import { loadWoTCache, saveWoTCache } from "@/lib/wot/cache";
+import { DEFAULT_WOT_CONFIG } from "@/lib/wot/types";
+import type { WoTGraph } from "@/lib/wot/types";
+import { runFilterPipeline } from "@/lib/filtering/pipeline";
+import { detectSerendipity } from "@/lib/filtering/serendipity";
+import type { SerendipityItem } from "@/lib/filtering/serendipity";
+import { recordFilterRun } from "@/lib/filtering/costTracker";
 import { DemoBanner } from "@/components/ui/DemoBanner";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
@@ -29,6 +38,12 @@ import type { UserReputation } from "@/lib/ic/declarations";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import { errMsg } from "@/lib/utils/errors";
 
+const MS_PER_HOUR = 60 * 60 * 1000;
+const PUSH_THROTTLE: Record<string, number> = {
+  "1x_day": 24 * MS_PER_HOUR,
+  "3x_day": 8 * MS_PER_HOUR,
+};
+
 export default function AegisApp() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
@@ -38,22 +53,94 @@ export default function AegisApp() {
   const { getSchedulerSources } = useSources();
   const { agentState } = useAgent();
   const { isDemoMode } = useDemo();
+  const { filterMode } = useFilterMode();
 
   const [tab, setTab] = useState("dashboard");
   const [icpBalance, setIcpBalance] = useState<bigint | null>(null);
   const [reputation, setReputation] = useState<UserReputation | null>(null);
   const [engagementIndex, setEngagementIndex] = useState<number | null>(null);
+  const [wotGraph, setWotGraph] = useState<WoTGraph | null>(null);
+  const [wotLoading, setWotLoading] = useState(false);
 
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
   userContextRef.current = userContext;
   const ledgerRef = useRef<ICPLedgerActor | null>(null);
 
-  // Derive Nostr keypair from principal (memoized)
   const nostrKeys = useMemo(() => {
     if (!isAuthenticated || !principalText) return null;
     return deriveNostrKeypairFromText(principalText);
   }, [isAuthenticated, principalText]);
+
+  const filterModeRef = useRef(filterMode);
+  filterModeRef.current = filterMode;
+
+  useEffect(() => {
+    if (!nostrKeys?.pk) {
+      setWotGraph(null);
+      return;
+    }
+
+    const cached = loadWoTCache();
+    if (cached && cached.userPubkey === nostrKeys.pk) {
+      setWotGraph(cached);
+      return;
+    }
+
+    let cancelled = false;
+    setWotLoading(true);
+
+    buildFollowGraph(nostrKeys.pk, DEFAULT_WOT_CONFIG)
+      .then(graph => {
+        if (cancelled) return;
+        setWotGraph(graph);
+        saveWoTCache(graph, DEFAULT_WOT_CONFIG.cacheTTLMs);
+      })
+      .catch(err => {
+        console.warn("[wot] Failed to build follow graph:", errMsg(err));
+      })
+      .finally(() => {
+        if (!cancelled) setWotLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [nostrKeys?.pk]);
+
+  const pipelineResult = useMemo(() => {
+    if (content.length === 0) return null;
+    return runFilterPipeline(content, wotGraph, {
+      mode: filterMode,
+      wotEnabled: !!wotGraph,
+      qualityThreshold: profile.calibration.qualityThreshold,
+    });
+  }, [content, wotGraph, filterMode, profile.calibration.qualityThreshold]);
+
+  const wotAdjustedContent = useMemo(() => {
+    if (!pipelineResult) return content;
+    return pipelineResult.items.map(fi => ({
+      ...fi.item,
+      scores: { ...fi.item.scores, composite: fi.weightedComposite },
+    }));
+  }, [pipelineResult, content]);
+
+  // WoT serendipity discoveries (Pro mode only)
+  const discoveries = useMemo<SerendipityItem[]>(() => {
+    if (!pipelineResult || filterMode !== "pro") return [];
+    return detectSerendipity(pipelineResult);
+  }, [pipelineResult, filterMode]);
+
+  const lastRecordedRef = useRef<typeof pipelineResult>(null);
+  useEffect(() => {
+    if (!pipelineResult || pipelineResult === lastRecordedRef.current) return;
+    lastRecordedRef.current = pipelineResult;
+    recordFilterRun({
+      articlesEvaluated: pipelineResult.stats.totalInput,
+      wotScoredCount: pipelineResult.stats.wotScoredCount,
+      aiScoredCount: pipelineResult.stats.aiScoredCount,
+      discoveriesFound: discoveries.length,
+      aiCostUSD: pipelineResult.stats.estimatedAPICost,
+    });
+  }, [pipelineResult, discoveries.length]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -64,7 +151,6 @@ export default function AegisApp() {
     }
   }, [isAuthenticated, loadFromIC, addNotification]);
 
-  // Initialize ICP ledger actor + fetch balance and reputation
   useEffect(() => {
     if (!isAuthenticated || !identity || !principalText) {
       ledgerRef.current = null;
@@ -102,7 +188,6 @@ export default function AegisApp() {
     return () => { cancelled = true; };
   }, [isAuthenticated, identity, principalText, addNotification]);
 
-  // Background ingestion scheduler
   const getSchedulerSourcesRef = useRef(getSchedulerSources);
   getSchedulerSourcesRef.current = getSchedulerSources;
   const isDemoRef = useRef(isDemoMode);
@@ -128,6 +213,7 @@ export default function AegisApp() {
         return [];
       },
       getUserContext: () => userContextRef.current,
+      getSkipAI: () => filterModeRef.current === "lite",
       onSourceAutoDisabled: (key, error) => {
         addNotification(`Source auto-disabled after repeated failures: ${key} (${error})`, "error");
       },
@@ -138,12 +224,10 @@ export default function AegisApp() {
         const freq = localStorage.getItem("aegis-push-frequency") || "1x_day";
         if (freq === "off") return;
         if (freq !== "realtime") {
-          const throttleMap: Record<string, number> = { "1x_day": 24 * 60 * 60 * 1000, "3x_day": 8 * 60 * 60 * 1000 };
-          const throttleMs = throttleMap[freq] || 24 * 60 * 60 * 1000;
+          const throttleMs = PUSH_THROTTLE[freq] || PUSH_THROTTLE["1x_day"];
           const lastPush = Number(localStorage.getItem("aegis-push-last") || "0");
           if (Date.now() - lastPush < throttleMs) return;
         }
-        // Build notification body with item previews
         const quality = items.filter(i => i.verdict === "quality");
         const preview = (quality.length > 0 ? quality : items)
           .slice(0, 3)
@@ -171,7 +255,6 @@ export default function AegisApp() {
     return () => scheduler.stop();
   }, [addContent, demoSchedulerSources, addNotification]);
 
-  // Clear demo content when user logs in
   useEffect(() => {
     if (isAuthenticated) clearDemoContent();
   }, [isAuthenticated, clearDemoContent]);
@@ -310,6 +393,7 @@ export default function AegisApp() {
       vSignal: scores.vSignal,
       cContext: scores.cContext,
       lSlop: scores.lSlop,
+      scoredByAI: true,
     });
 
     if (!stakeAmount) {
@@ -330,8 +414,8 @@ export default function AegisApp() {
   return (
     <AppShell activeTab={tab} onTabChange={setTab}>
       <DemoBanner mobile={mobile} />
-      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} />}
-      {tab === "briefing" && <BriefingTab content={content} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} />}
+      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} />}
+      {tab === "briefing" && <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} />}
       {tab === "incinerator" && (
         <IncineratorTab
           isAnalyzing={isAnalyzing}
@@ -344,7 +428,7 @@ export default function AegisApp() {
         />
       )}
       {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />}
-      {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} />}
+      {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} pipelineStats={pipelineResult?.stats ?? null} />}
       {tab === "settings" && <SettingsTab mobile={mobile} />}
     </AppShell>
   );

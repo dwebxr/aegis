@@ -24,12 +24,12 @@ Browser                                  Internet Computer (Mainnet)
 │      twitter,nostr,discover-feed} │    │  - Engagement index      │
 │                                   │    │  Internet Identity auth  │
 │  Client-side:                     │    └─────────┬────────────────┘
-│    Preference learning engine     │              │
-│    Briefing ranker                │    ┌─────────▼────────────────┐
-│    Nostr identity (IC-derived)    │    │  ICP Ledger (ICRC-1/2)   │
-│    D2A agent manager              │    │  ryjl3-tyaaa-aaaaa-aaaba │
-│    ICP Ledger (deposit/approve)   │    │  Deposit hold / return / │
-│                                   │    │  forfeit / D2A fee split │
+│    WoT filter pipeline            │              │
+│    Preference learning engine     │    ┌─────────▼────────────────┐
+│    Briefing ranker                │    │  ICP Ledger (ICRC-1/2)   │
+│    Nostr identity (IC-derived)    │    │  ryjl3-tyaaa-aaaaa-aaaba │
+│    D2A agent manager              │    │  Deposit hold / return / │
+│    ICP Ledger (deposit/approve)   │    │  forfeit / D2A fee split │
 │                                   │    └──────────────────────────┘
 │                                   │
 │                                   │    Nostr Relays
@@ -46,6 +46,11 @@ Browser                                  Internet Computer (Mainnet)
    3. Heuristic fallback (client-side)
    + Per-IP API rate limiting (5-60 req/min per route)
    + Per-instance daily API budget (500 calls/day)
+
+   WoT Filter Pipeline (Pro mode):
+   Content → Quality threshold → WoT scoring (Nostr social graph)
+     → Weighted composite → Serendipity detection → Ranked output
+   Filter Modes: Lite (heuristic only) | Pro (WoT + AI scoring)
 ```
 
 ---
@@ -124,6 +129,80 @@ Every Validate/Flag action updates the user's preference profile:
 | Flag | −0.05 per topic | −0.3 | +0.1 (if AI said "quality") |
 
 Affinities are clamped to [−1.0, +1.0]. Author trust is clamped to [−1.0, +1.0]. After 3+ feedback events, the learned context is injected into Claude's prompt, making the AI scoring personalized.
+
+---
+
+## WoT Filter Pipeline
+
+Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social graph to weight content quality scores. The pipeline runs client-side and supports two modes.
+
+### Filter Modes
+
+| Mode | Scoring | WoT | Serendipity | Cost |
+|------|---------|-----|-------------|------|
+| **Lite** | Heuristic only | No | No | Free |
+| **Pro** | WoT + AI scoring | Yes | Yes | ~$0.003/article (Claude API) |
+
+Users switch between modes via the FilterModeSelector in the Dashboard.
+
+### WoT Graph Construction
+
+When the user authenticates via Internet Identity and has a Nostr identity, Aegis builds a social graph from Nostr relay data:
+
+1. Fetch the user's follow list (Kind 3 event)
+2. Fetch each followee's follow list (2-hop expansion)
+3. Count mutual follows (bidirectional connections)
+4. Cache the graph in localStorage with configurable TTL
+
+### Trust Scoring
+
+Each content author is scored based on their position in the user's social graph:
+
+```
+trustScore = (1/hopDistance) × 0.6 + (mutualFollows/maxMutual) × 0.3 + 0.1
+```
+
+- **Hop proximity (60%)**: Direct follows (hop 1) score highest. Inverse distance decay.
+- **Social proof (30%)**: Mutual (bidirectional) follows indicate network-verified trust.
+- **Base presence (10%)**: Being in the graph at all provides a minimum signal.
+
+Authors not in the graph receive `trustScore = 0, isInGraph = false`.
+
+### Weighted Composite
+
+The final content ranking combines AI quality score with WoT trust:
+
+```
+weightedComposite = composite × 0.7 + trustScore × composite × 0.3
+```
+
+This means WoT can boost high-quality content from trusted authors, but cannot elevate low-quality content regardless of trust.
+
+### Serendipity Detection
+
+Items with low trust but high quality are flagged as **WoT Serendipity** — valuable content from outside the user's social bubble:
+
+```
+isWoTSerendipity = trustScore < 0.3 AND composite > 7.0
+```
+
+In Pro mode, up to 5 serendipity items are surfaced in the Briefing tab with type-specific badges:
+
+| Type | Badge | Condition |
+|------|-------|-----------|
+| Out of Network | `OUT OF NETWORK` | Author not in graph or hop ≥ 3 |
+| Cross-Language | `CROSS-LANGUAGE` | Content has > 30% non-ASCII characters |
+| Emerging Topic | `EMERGING TOPIC` | Default (high quality, unknown author) |
+
+### Cost Tracking
+
+Daily cost records are stored in localStorage (90-day rolling window). The Analytics tab shows:
+
+- Monthly usage summary (articles evaluated, AI-scored, discoveries found)
+- Estimated API cost in USD/JPY
+- Time saved vs manual curation (3 min/article baseline)
+- Lite vs Pro feature comparison
+- Competitor cost comparison (Twitter Blue, news subscriptions, manual curation)
 
 ---
 
@@ -378,6 +457,15 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - **Tier 3**: Heuristic fallback — local, instant, no network call
 - Automatic fallback: each tier falls through to the next on failure
 
+### WoT Filter Pipeline
+- **Lite mode**: Heuristic scoring only (free, no API calls)
+- **Pro mode**: WoT social graph + AI scoring with serendipity detection
+- Trust scoring from Nostr follow graph (2-hop, mutual follows, hop proximity)
+- Weighted composite: quality × 0.7 + trust × quality × 0.3
+- Serendipity detection: low-trust + high-quality items surfaced with type badges
+- WoT graph cached in localStorage with configurable TTL
+- Cost tracking with daily records, monthly analytics, and competitor comparison
+
 ### Quality Assurance Deposits
 - Deposit 0.001–1.0 ICP when publishing signals as a quality assurance bond
 - Community validation: 3 validates (consensus) → deposit returned + trust score updated
@@ -438,9 +526,9 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
 | Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
-| CI/CD | GitHub Actions (lint → test → build on push/PR) |
-| Monitoring | Sentry (@sentry/nextjs, conditional on DSN) |
-| Test | Jest + ts-jest (1317 tests, 96 suites) |
+| CI/CD | GitHub Actions (lint → test → build → security audit on push/PR) |
+| Monitoring | Sentry (@sentry/nextjs, beforeSend scrubbing, conditional on DSN) |
+| Test | Jest + ts-jest (1525 tests, 111 suites) |
 
 ## Project Structure
 
@@ -473,9 +561,10 @@ aegis/
 │   ├── tabs/                            # Dashboard, Briefing, Incinerator, Sources, Analytics
 │   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, ShareBriefingModal
 │   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
+│   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
 │   ├── sources/                         # ManualInput
 │   ├── auth/                            # LoginButton, UserBadge
-│   └── Providers.tsx                    # Notification + Auth + Content + Preference + Source + Agent
+│   └── Providers.tsx                    # Notification + Auth + Content + Preference + Source + FilterMode + Agent
 ├── contexts/
 │   ├── NotificationContext.tsx          # Global notification system (toast) for all providers
 │   ├── AuthContext.tsx                   # Internet Identity auth state
@@ -483,6 +572,7 @@ aegis/
 │   ├── PreferenceContext.tsx            # Preference learning lifecycle
 │   ├── SourceContext.tsx                # RSS/Nostr source management + IC sync
 │   ├── AgentContext.tsx                 # D2A agent lifecycle + error notifications
+│   ├── FilterModeContext.tsx            # Lite/Pro filter mode (persisted to localStorage)
 │   └── DemoContext.tsx                  # Demo mode for unauthenticated users
 ├── lib/
 │   ├── preferences/
@@ -498,6 +588,16 @@ aegis/
 │   │   ├── cors.ts                      # CORS headers for external AI agent access
 │   │   ├── x402Server.ts               # x402 resource server config (ExactEvmScheme)
 │   │   └── briefingProvider.ts          # Briefing data provider (IC canister fetch)
+│   ├── wot/
+│   │   ├── graph.ts                     # WoT graph builder (2-hop Nostr follow expansion)
+│   │   ├── scorer.ts                    # Trust scoring (hop proximity + mutual follows)
+│   │   ├── cache.ts                     # localStorage cache with TTL
+│   │   └── types.ts                     # WoTGraph, WoTNode, WoTScore, WoTCacheEntry
+│   ├── filtering/
+│   │   ├── pipeline.ts                  # Filter pipeline (quality gate → WoT → weighted composite)
+│   │   ├── serendipity.ts              # Serendipity detection (low trust + high quality)
+│   │   ├── costTracker.ts              # Daily cost records (localStorage, 90-day window)
+│   │   └── types.ts                     # FilterConfig, FilteredItem, FilterPipelineResult
 │   ├── ingestion/
 │   │   ├── scheduler.ts                 # Background fetch cycle (adaptive intervals, enrichment)
 │   │   ├── quickFilter.ts              # Heuristic pre-filter (Tier 1)
@@ -528,17 +628,17 @@ aegis/
 │       ├── errors.ts                    # errMsg() shared error formatter
 │       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       └── csv.ts                       # CSV export (RFC-compliant escaping)
-├── __tests__/                           # 1317 tests across 96 suites
+├── __tests__/                           # 1525 tests across 111 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
 │       ├── types.mo                     # Type definitions (incl. StakeRecord, UserReputation, D2AMatchRecord)
 │       ├── ledger.mo                    # ICRC-1/2 ICP Ledger + CMC interface module
 │       └── aegis_backend.did            # Candid interface
-├── .github/workflows/ci.yml             # GitHub Actions CI (lint → test → build)
-├── sentry.client.config.ts              # Sentry client-side init (conditional on DSN)
-├── sentry.server.config.ts              # Sentry server-side init
-├── sentry.edge.config.ts                # Sentry edge runtime init
+├── .github/workflows/ci.yml             # GitHub Actions CI (lint → test → build → security audit)
+├── sentry.client.config.ts              # Sentry client-side init (breadcrumb URL scrubbing)
+├── sentry.server.config.ts              # Sentry server-side init (auth header/cookie scrubbing)
+├── sentry.edge.config.ts                # Sentry edge runtime init (auth header/cookie scrubbing)
 ├── instrumentation.ts                   # Next.js instrumentation hook (Sentry)
 ├── public/                              # Icons (apple-touch-icon, favicons, PWA)
 ├── mops.toml                            # Motoko package manager (mo:llm, mo:json)
@@ -564,7 +664,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 1317 tests
+npm test              # Run all 1525 tests
 npm run test:watch    # Watch mode
 ```
 

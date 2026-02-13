@@ -52,7 +52,7 @@ export const colors = {
     border: "rgba(248,113,113,0.15)",
   },
   blue: { 400: "#60a5fa", 500: "#3b82f6", 600: "#2563eb", 700: "#1d4ed8" },
-  purple: { 400: "#a78bfa", 500: "#8b5cf6", 600: "#7c3aed" },
+  purple: { 300: "#d8b4fe", 400: "#a78bfa", 500: "#8b5cf6", 600: "#7c3aed" },
   amber: { 400: "#fbbf24", 500: "#f59e0b" },
   sky: { 400: "#38bdf8" },
 } as const;

@@ -40,12 +40,15 @@ export function usePushNotification() {
     if (supported) {
       setPermission(Notification.permission);
       navigator.serviceWorker.ready.then(reg => {
-        reg.pushManager.getSubscription().then(setSubscription);
+        reg.pushManager.getSubscription().then(setSubscription).catch(err => {
+          console.warn("[push] Failed to get existing subscription:", errMsg(err));
+        });
+      }).catch(err => {
+        console.warn("[push] Service worker not ready:", errMsg(err));
       });
     }
   }, []);
 
-  // Create actor when identity changes
   useEffect(() => {
     if (!isAuthenticated || !identity) {
       actorRef.current = null;

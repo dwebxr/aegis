@@ -89,9 +89,13 @@ export async function POST(request: NextRequest) {
               name: meta.display_name || meta.name || undefined,
               picture: meta.picture || undefined,
             };
-          } catch { }
+          } catch (err) {
+            console.debug("[nostr] Profile JSON parse failed for", me.pubkey, errMsg(err));
+          }
         }
-      } catch { }
+      } catch (err) {
+        console.debug("[nostr] Profile metadata fetch failed:", errMsg(err));
+      }
     }
 
     return NextResponse.json({

@@ -10,6 +10,8 @@ import type { ContentItem } from "@/lib/types/content";
 import type { UserReputation } from "@/lib/ic/declarations";
 import type { AgentState } from "@/lib/agent/types";
 import { useDemo } from "@/contexts/DemoContext";
+import { CostInsights } from "@/components/filtering/CostInsights";
+import type { FilterPipelineStats } from "@/lib/filtering/types";
 
 interface AnalyticsTabProps {
   content: ContentItem[];
@@ -17,31 +19,36 @@ interface AnalyticsTabProps {
   engagementIndex?: number | null;
   agentState?: AgentState | null;
   mobile?: boolean;
+  pipelineStats?: FilterPipelineStats | null;
 }
 
-export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation, engagementIndex, agentState, mobile }) => {
+const surfaceCard = (m?: boolean): React.CSSProperties => ({
+  background: colors.bg.surface,
+  border: `1px solid ${colors.border.default}`,
+  borderRadius: radii.lg,
+  padding: m ? space[4] : space[5],
+});
+
+export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation, engagementIndex, agentState, mobile, pipelineStats }) => {
   const { isDemoMode } = useDemo();
-  const qual = content.filter(c => c.verdict === "quality");
-  const slop = content.filter(c => c.verdict === "slop");
-  const accuracy = content.length > 0 ? ((qual.length / content.length) * 100).toFixed(1) : "0.0";
 
-  const validated = content.filter(c => c.validated);
-  const flagged = content.filter(c => c.flagged);
-  const userReviewed = validated.length + flagged.length;
-  const falsePositives = content.filter(c => c.verdict === "quality" && c.flagged).length;
-  const totalPredictedQuality = qual.length;
-  const falsePositiveRate = totalPredictedQuality > 0 ? ((falsePositives / totalPredictedQuality) * 100).toFixed(1) : "--";
-
+  // Single pass over content for all aggregated stats
+  let qualCount = 0, slopCount = 0, validatedCount = 0, flaggedCount = 0, falsePositives = 0;
   const sourceDistribution: Record<string, number> = {};
-  for (const c of content) {
-    sourceDistribution[c.source] = (sourceDistribution[c.source] || 0) + 1;
-  }
-
   const scoreBuckets = Array(10).fill(0);
   for (const c of content) {
-    const idx = Math.max(0, Math.min(9, Math.floor(c.scores.composite)));
-    scoreBuckets[idx]++;
+    if (c.verdict === "quality") qualCount++;
+    if (c.verdict === "slop") slopCount++;
+    if (c.validated) validatedCount++;
+    if (c.flagged) flaggedCount++;
+    if (c.verdict === "quality" && c.flagged) falsePositives++;
+    sourceDistribution[c.source] = (sourceDistribution[c.source] || 0) + 1;
+    scoreBuckets[Math.max(0, Math.min(9, Math.floor(c.scores.composite)))]++;
   }
+
+  const accuracy = content.length > 0 ? ((qualCount / content.length) * 100).toFixed(1) : "0.0";
+  const userReviewed = validatedCount + flaggedCount;
+  const falsePositiveRate = qualCount > 0 ? ((falsePositives / qualCount) * 100).toFixed(1) : "--";
 
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
@@ -71,29 +78,29 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(3,1fr)", gap: mobile ? space[3] : space[4], marginBottom: mobile ? space[12] : space[16] }}>
-        <StatCard icon={<ShieldIcon s={16} />} label="Accuracy" value={`${accuracy}%`} sub={`${qual.length} quality / ${content.length} total`} color={colors.green[400]} mobile={mobile} />
+        <StatCard icon={<ShieldIcon s={16} />} label="Accuracy" value={`${accuracy}%`} sub={`${qualCount} quality / ${content.length} total`} color={colors.green[400]} mobile={mobile} />
         <StatCard icon={<FireIcon s={16} />} label="False Positive" value={falsePositiveRate === "--" ? "--" : `${falsePositiveRate}%`} sub={userReviewed > 0 ? `${userReviewed} user-reviewed` : "no reviews yet"} color={colors.orange[400]} mobile={mobile} />
-        <StatCard icon={<ZapIcon s={16} />} label="User Reviews" value={userReviewed} sub={`${validated.length} validated, ${flagged.length} flagged`} color={colors.purple[400]} mobile={mobile} />
+        <StatCard icon={<ZapIcon s={16} />} label="User Reviews" value={userReviewed} sub={`${validatedCount} validated, ${flaggedCount} flagged`} color={colors.purple[400]} mobile={mobile} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: mobile ? space[3] : space[4], marginBottom: mobile ? space[12] : space[16] }}>
-        <div style={{ background: colors.bg.surface, border: `1px solid ${colors.border.default}`, borderRadius: radii.lg, padding: mobile ? space[4] : space[5] }}>
+        <div style={surfaceCard(mobile)}>
           <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[4] }}>Score Distribution</div>
           <BarChart data={scoreBuckets} labels={["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]} color={colors.sky[400]} />
         </div>
-        <div style={{ background: colors.bg.surface, border: `1px solid ${colors.border.default}`, borderRadius: radii.lg, padding: mobile ? space[4] : space[5] }}>
+        <div style={surfaceCard(mobile)}>
           <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[4] }}>Content Sources</div>
           <BarChart data={Object.values(sourceDistribution)} labels={Object.keys(sourceDistribution)} color={colors.purple[400]} />
         </div>
       </div>
 
-      <div style={{ background: colors.bg.surface, border: `1px solid ${colors.border.default}`, borderRadius: radii.lg, padding: mobile ? space[4] : space[5] }}>
+      <div style={surfaceCard(mobile)}>
         <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[4] }}>Evaluation Summary</div>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: mobile ? space[2] : space[3] }}>
           {[
             ["Total Evaluated", String(content.length), colors.sky[400]],
-            ["Quality Found", String(qual.length), colors.green[400]],
-            ["Slop Caught", String(slop.length), colors.orange[400]],
+            ["Quality Found", String(qualCount), colors.green[400]],
+            ["Slop Caught", String(slopCount), colors.orange[400]],
             ["Accuracy", `${accuracy}%`, colors.amber[400]],
           ].map(([l, v, c]) => (
             <div key={l} style={{ textAlign: "center", padding: `${space[3]}px ${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
@@ -104,8 +111,14 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
         </div>
       </div>
 
+      {pipelineStats && (
+        <div style={{ marginBottom: mobile ? space[3] : space[4] }}>
+          <CostInsights stats={pipelineStats} mobile={mobile} expanded />
+        </div>
+      )}
+
       {reputation && (
-        <div style={{ background: colors.bg.surface, border: `1px solid ${colors.border.default}`, borderRadius: radii.lg, padding: mobile ? space[4] : space[5], marginTop: mobile ? space[3] : space[4] }}>
+        <div style={{ ...surfaceCard(mobile), marginTop: mobile ? space[3] : space[4] }}>
           <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.amber[400], marginBottom: space[4] }}>Trust Score</div>
 
           <div style={{ display: "flex", alignItems: "center", gap: mobile ? 16 : 24, marginBottom: space[4], flexWrap: "wrap" }}>
@@ -169,7 +182,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
       {(engagementIndex != null || agentState) && (
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: mobile ? space[3] : space[4], marginTop: mobile ? space[3] : space[4] }}>
           {engagementIndex != null && (
-            <div style={{ background: colors.bg.surface, border: `1px solid ${colors.border.default}`, borderRadius: radii.lg, padding: mobile ? space[4] : space[5] }}>
+            <div style={surfaceCard(mobile)}>
               <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.sky[400], marginBottom: space[4] }}>Engagement Index</div>
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ textAlign: "center" }}>
@@ -202,7 +215,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
           )}
 
           {agentState && (
-            <div style={{ background: colors.bg.surface, border: `1px solid ${colors.border.default}`, borderRadius: radii.lg, padding: mobile ? space[4] : space[5] }}>
+            <div style={surfaceCard(mobile)}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: space[4] }}>
                 <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.purple[400] }}>D2A Agent</div>
                 <div style={{

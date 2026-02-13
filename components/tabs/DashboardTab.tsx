@@ -7,6 +7,7 @@ import { ContentCard } from "@/components/ui/ContentCard";
 import { fonts, colors, space, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { contentToCSV } from "@/lib/utils/csv";
+import { FilterModeSelector } from "@/components/filtering/FilterModeSelector";
 
 function downloadFile(data: string, filename: string, mime: string) {
   const blob = new Blob([data], { type: mime });
@@ -24,9 +25,10 @@ interface DashboardTabProps {
   onValidate: (id: string) => void;
   onFlag: (id: string) => void;
   isLoading?: boolean;
+  wotLoading?: boolean;
 }
 
-export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading }) => {
+export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop">("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -99,6 +101,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           }}>
             Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol.
           </p>
+          <div style={{ marginTop: space[4] }}>
+            <FilterModeSelector mobile={mobile} />
+          </div>
+          {wotLoading && (
+            <div style={{
+              marginTop: space[2],
+              fontSize: t.caption.size,
+              color: colors.text.disabled,
+              display: "flex",
+              alignItems: "center",
+              gap: space[2],
+            }}>
+              <span style={{ animation: "pulse 2s infinite" }}>&#x1F310;</span>
+              Building Web of Trust graph...
+            </div>
+          )}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: mobile ? space[3] : space[4] }}>

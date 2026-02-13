@@ -1,8 +1,10 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotify } from "@/contexts/NotificationContext";
 import { colors, space, radii, shadows, transitions } from "@/styles/theme";
 import { ShieldIcon } from "@/components/icons";
+import { errMsg } from "@/lib/utils/errors";
 
 interface LoginButtonProps {
   compact?: boolean;
@@ -10,7 +12,22 @@ interface LoginButtonProps {
 
 export const LoginButton: React.FC<LoginButtonProps> = ({ compact }) => {
   const { isAuthenticated, isLoading, login, logout } = useAuth();
+  const { addNotification } = useNotify();
   const [hovered, setHovered] = useState(false);
+
+  const handleLogin = useCallback(() => {
+    login().catch(err => {
+      console.error("[auth] Login failed:", errMsg(err));
+      addNotification("Login failed. Please try again.", "error");
+    });
+  }, [login, addNotification]);
+
+  const handleLogout = useCallback(() => {
+    logout().catch(err => {
+      console.error("[auth] Logout failed:", errMsg(err));
+      addNotification("Logout failed. Please try again.", "error");
+    });
+  }, [logout, addNotification]);
 
   if (isLoading) {
     return (
@@ -23,7 +40,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({ compact }) => {
   if (isAuthenticated) {
     return (
       <button
-        onClick={logout}
+        onClick={handleLogout}
         style={{
           padding: compact ? `6px ${space[3]}px` : `${space[2]}px ${space[4]}px`,
           background: colors.red.bg,
@@ -44,7 +61,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({ compact }) => {
 
   return (
     <button
-      onClick={login}
+      onClick={handleLogin}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{

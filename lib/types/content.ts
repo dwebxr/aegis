@@ -27,9 +27,12 @@ export interface ContentEvaluation {
 }
 
 export interface ContentItem extends ContentEvaluation {
+  nostrPubkey?: string;
   timestamp: string;
   topics?: string[];
   vSignal?: number;
   cContext?: number;
   lSlop?: number;
+  /** true = scored by AI (Claude API / IC LLM), false = heuristic. Omitted on legacy items. */
+  scoredByAI?: boolean;
 }

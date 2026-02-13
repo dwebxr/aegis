@@ -27,6 +27,26 @@ jobs:
 
       - run: npm test -- --ci --forceExit
 
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Audit for critical/high vulnerabilities (non-blocking for known Next.js 14 CVE)
+      - run: npm audit --audit-level=critical || true
+        name: Security audit (critical)
+
+      - run: npm audit --audit-level=high
+        name: Security audit (high)
+        continue-on-error: true
+
   build:
     runs-on: ubuntu-latest
     needs: lint-and-test
