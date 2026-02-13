@@ -13,6 +13,7 @@ import {
   D2A_MATCH_FEE,
   D2A_APPROVE_AMOUNT,
 } from "@/lib/agent/protocol";
+import { getUserApiKey, setUserApiKey, clearUserApiKey, maskApiKey } from "@/lib/apiKey/storage";
 
 const LS_PUSH_FREQ_KEY = "aegis-push-frequency";
 
@@ -54,6 +55,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile }) => {
   const [pushFreq, setPushFreq] = useState<PushFrequency>("1x_day");
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [hasApiKey, setHasApiKey] = useState(() => {
+    const key = getUserApiKey();
+    return key !== null;
+  });
+  const [maskedKey, setMaskedKey] = useState(() => {
+    const key = getUserApiKey();
+    return key ? maskApiKey(key) : "";
+  });
 
   // Load saved frequency on mount
   useEffect(() => {
@@ -87,6 +97,34 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile }) => {
     localStorage.removeItem("aegis_source_states");
     setConfirmAction(null);
     addNotification("Content cache cleared", "success");
+  };
+
+  const handleSaveApiKey = () => {
+    if (!apiKeyInput.startsWith("sk-ant-")) {
+      addNotification("Invalid key format — must start with sk-ant-", "error");
+      return;
+    }
+    try {
+      setUserApiKey(apiKeyInput);
+      setHasApiKey(true);
+      setMaskedKey(maskApiKey(apiKeyInput));
+      setApiKeyInput("");
+      addNotification("API key saved — Pro mode ready", "success");
+    } catch {
+      addNotification("Failed to save API key", "error");
+    }
+  };
+
+  const handleClearApiKey = () => {
+    if (confirmAction !== "clearApiKey") {
+      setConfirmAction("clearApiKey");
+      return;
+    }
+    clearUserApiKey();
+    setHasApiKey(false);
+    setMaskedKey("");
+    setConfirmAction(null);
+    addNotification("API key removed", "success");
   };
 
   const handleResetPrefs = () => {
@@ -173,6 +211,77 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile }) => {
             ))}
           </div>
         )}
+      </div>
+
+      {/* AI Scoring (BYOK) */}
+      <div style={cardStyle(mobile)}>
+        <div style={sectionTitle}>AI Scoring</div>
+        <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[3] }}>
+          <div style={{
+            width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+            background: hasApiKey ? colors.green[400] : colors.text.disabled,
+          }} />
+          <span style={{ fontSize: t.caption.size, fontWeight: 600, color: hasApiKey ? colors.green[400] : colors.text.disabled }}>
+            {hasApiKey ? "API Key Set" : "Using server default"}
+          </span>
+        </div>
+
+        {hasApiKey ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+            <div style={{ display: "flex", alignItems: "center", gap: space[2], flexWrap: "wrap" }}>
+              <code style={{
+                fontSize: t.tiny.size, fontFamily: fonts.mono, color: colors.text.secondary,
+                background: colors.bg.overlay, padding: `2px ${space[2]}px`, borderRadius: radii.sm,
+              }}>
+                {maskedKey}
+              </code>
+              {confirmAction === "clearApiKey" ? (
+                <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+                  <span style={{ fontSize: t.caption.size, color: colors.amber[400], fontWeight: 600 }}>Remove key?</span>
+                  <button onClick={handleClearApiKey} style={confirmBtnStyle}>Confirm</button>
+                  <button onClick={() => setConfirmAction(null)} style={cancelBtnStyle}>Cancel</button>
+                </div>
+              ) : (
+                <button onClick={handleClearApiKey} style={actionBtnStyle}>Clear</button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+            <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={e => setApiKeyInput(e.target.value)}
+                placeholder="sk-ant-..."
+                style={{
+                  flex: 1, minWidth: 180, padding: `${space[1]}px ${space[3]}px`,
+                  background: colors.bg.overlay, border: `1px solid ${colors.border.subtle}`,
+                  borderRadius: radii.sm, color: colors.text.primary, fontSize: t.caption.size,
+                  fontFamily: fonts.mono, outline: "none",
+                }}
+              />
+              <button
+                onClick={handleSaveApiKey}
+                disabled={!apiKeyInput}
+                style={{
+                  ...actionBtnStyle,
+                  opacity: apiKeyInput ? 1 : 0.4,
+                  cursor: apiKeyInput ? "pointer" : "not-allowed",
+                  background: apiKeyInput ? `${colors.cyan[500]}18` : colors.bg.overlay,
+                  color: apiKeyInput ? colors.cyan[400] : colors.text.muted,
+                  border: `1px solid ${apiKeyInput ? `${colors.cyan[500]}33` : colors.border.subtle}`,
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
+          Enter your Anthropic API key to use Pro mode with your own quota. Key is stored in localStorage only.
+        </div>
       </div>
 
       {/* Account */}

@@ -8,6 +8,7 @@ import { useNotify } from "./NotificationContext";
 import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
+import { getUserApiKey } from "@/lib/apiKey/storage";
 import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 
@@ -196,9 +197,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (!result) {
       const body: Record<string, unknown> = { text, source: "manual" };
       if (userContext) body.userContext = userContext;
+      const hdrs: Record<string, string> = { "Content-Type": "application/json" };
+      const uak = getUserApiKey();
+      if (uak) hdrs["X-User-API-Key"] = uak;
       const res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: hdrs,
         body: JSON.stringify(body),
       });
       const data = await res.json();

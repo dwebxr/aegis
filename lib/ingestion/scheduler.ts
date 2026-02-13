@@ -16,6 +16,7 @@ import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { errMsg } from "@/lib/utils/errors";
+import { getUserApiKey } from "@/lib/apiKey/storage";
 import { scoreItemWithHeuristics } from "@/lib/filtering/pipeline";
 
 interface RawItem {
@@ -385,9 +386,12 @@ export class IngestionScheduler {
       const body: Record<string, unknown> = { text: raw.text, source: "auto" };
       if (userContext) body.userContext = userContext;
 
+      const hdrs: Record<string, string> = { "Content-Type": "application/json" };
+      const uak = getUserApiKey();
+      if (uak) hdrs["X-User-API-Key"] = uak;
       const res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: hdrs,
         body: JSON.stringify(body),
       });
       if (!res.ok) return null;

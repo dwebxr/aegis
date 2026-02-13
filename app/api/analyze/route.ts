@@ -78,12 +78,15 @@ export async function POST(request: NextRequest) {
     trustedAuthors: sanitizeTopics(rawCtx.trustedAuthors),
   } : undefined;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || !withinDailyBudget()) {
+  const userKey = request.headers.get("x-user-api-key");
+  const isUserKey = !!(userKey && userKey.startsWith("sk-ant-"));
+  const apiKey = isUserKey ? userKey : process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey || (!isUserKey && !withinDailyBudget())) {
     const fallback = heuristicScores(text);
     return NextResponse.json({ ...fallback, tier: "heuristic" });
   }
-  recordApiCall();
+  if (!isUserKey) recordApiCall();
 
   const prompt = buildPrompt(text, userContext);
 
