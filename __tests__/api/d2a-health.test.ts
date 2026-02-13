@@ -146,9 +146,9 @@ describe("GET /api/d2a/health", () => {
     expect(opts.signal).toBeDefined();
   });
 
-  it("includes CORS headers on response", async () => {
+  it("omits CORS allow-origin for unknown origin", async () => {
     const res = await GET(makeRequest());
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
   it("reflects known origin in CORS", async () => {

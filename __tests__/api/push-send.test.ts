@@ -87,6 +87,7 @@ describe("POST /api/push/send", () => {
     expect(data.sent).toBe(0);
     expect(data.failed).toBe(1);
     expect(data.expired).toBe(1);
+    expect(data.cleanupFailed).toBe(false);
     expect(mockRemovePushSubscriptions).toHaveBeenCalledTimes(1);
   });
 

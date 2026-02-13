@@ -4,10 +4,10 @@ import { HttpAgent, Actor } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { idlFactory } from "@/lib/ic/declarations/idlFactory";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { getCanisterId, getHost } from "@/lib/ic/agent";
 import type { _SERVICE, PushSubscription } from "@/lib/ic/declarations/aegis_backend.did";
 
-const CANISTER_ID = (process.env.NEXT_PUBLIC_CANISTER_ID || "rluf3-eiaaa-aaaam-qgjuq-cai").trim();
-const IC_HOST = (process.env.NEXT_PUBLIC_IC_HOST || "https://icp-api.io").trim();
+export const maxDuration = 30;
 
 if (process.env.VAPID_PRIVATE_KEY && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
   webpush.setVapidDetails(
@@ -44,10 +44,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const agent = await HttpAgent.create({ host: IC_HOST });
+    const agent = await HttpAgent.create({ host: getHost() });
     const actor = Actor.createActor<_SERVICE>(idlFactory, {
       agent,
-      canisterId: CANISTER_ID,
+      canisterId: getCanisterId(),
     });
 
     const subscriptions = await actor.getPushSubscriptions(userPrincipal);
@@ -81,18 +81,20 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    let cleanupFailed = false;
     if (expiredEndpoints.length > 0) {
       try {
         await actor.removePushSubscriptions(userPrincipal, expiredEndpoints);
       } catch (e) {
-        console.error("[push] Failed to remove expired subscriptions:", e);
+        cleanupFailed = true;
+        console.error("[push] Failed to remove expired subscriptions for %s (%d endpoints):", body.principal, expiredEndpoints.length, e);
       }
     }
 
     const sent = results.filter(r => r.status === "fulfilled").length;
     const failed = results.filter(r => r.status === "rejected").length;
 
-    return NextResponse.json({ sent, failed, expired: expiredEndpoints.length });
+    return NextResponse.json({ sent, failed, expired: expiredEndpoints.length, cleanupFailed });
   } catch (error) {
     console.error("[push] Send error:", error);
     return NextResponse.json({ error: "Failed to send" }, { status: 500 });

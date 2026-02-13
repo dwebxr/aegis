@@ -95,9 +95,9 @@ describe("GET /api/d2a/info", () => {
     expect(data.compatibility.x402Version).toBe(2);
   });
 
-  it("includes CORS headers", async () => {
+  it("omits CORS allow-origin for unknown origin", async () => {
     const res = await GET(makeRequest());
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
     expect(res.headers.get("Access-Control-Allow-Methods")).toContain("GET");
   });
 

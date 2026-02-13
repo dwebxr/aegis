@@ -32,8 +32,8 @@ export function calculateResonance(
     if (theirSet.has(topic)) overlap++;
   }
 
-  // Jaccard similarity
-  const union = new Set([...myHighTopics, ...theirProfile.interests]).size;
+  // Jaccard similarity: |intersection| / |union|
+  const union = theirSet.size + myHighTopics.length - overlap;
   return union > 0 ? overlap / union : 0;
 }
 
@@ -67,8 +67,13 @@ export async function broadcastPresence(
 
   const pool = new SimplePool();
   const promises = pool.publish(relayUrls, signed);
-  await Promise.allSettled(promises);
+  const results = await Promise.allSettled(promises);
   pool.destroy();
+
+  const succeeded = results.filter(r => r.status === "fulfilled").length;
+  if (succeeded === 0 && relayUrls.length > 0) {
+    throw new Error(`Presence broadcast failed on all ${relayUrls.length} relays`);
+  }
 }
 
 export async function discoverPeers(

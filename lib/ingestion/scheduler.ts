@@ -240,6 +240,7 @@ export class IngestionScheduler {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ url: item.sourceUrl }),
+            signal: AbortSignal.timeout(30_000),
           });
           if (res.ok) {
             const data = await res.json();
@@ -290,6 +291,7 @@ export class IngestionScheduler {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
         this.recordSourceError(key, `HTTP ${res.status}`);
@@ -324,6 +326,7 @@ export class IngestionScheduler {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ relays, pubkeys: pubkeys?.filter(Boolean).length ? pubkeys.filter(Boolean) : undefined, limit: 20 }),
+        signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
         this.recordSourceError(key, `HTTP ${res.status}`);
@@ -355,6 +358,7 @@ export class IngestionScheduler {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
+        signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
         this.recordSourceError(key, `HTTP ${res.status}`);
@@ -393,6 +397,7 @@ export class IngestionScheduler {
         method: "POST",
         headers: hdrs,
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) return null;
       const data = await res.json();

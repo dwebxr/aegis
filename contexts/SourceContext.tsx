@@ -72,10 +72,9 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
 
   function saveToIC(source: SavedSource): void {
     const actor = getActor();
-    const id = identityRef.current;
-    if (!actor || !id) return;
-    const principal = id.getPrincipal();
-    actor.saveSourceConfig(savedToIC(source, principal))
+    const ident = identityRef.current;
+    if (!actor || !ident) return;
+    actor.saveSourceConfig(savedToIC(source, ident.getPrincipal()))
       .catch((err: unknown) => {
         console.error("[sources] IC save FAILED:", err);
         setSyncStatus("error");
@@ -119,17 +118,9 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         const icSources = icConfigs.map(icToSaved).filter((s): s is SavedSource => s !== null);
         let localOnly: SavedSource[] = [];
         setSources(prev => {
-          const localMap = new Map<string, SavedSource>();
-          prev.forEach(s => localMap.set(s.id, s));
-
-          const merged: SavedSource[] = [];
-          icSources.forEach(icSource => {
-            merged.push(icSource);
-            localMap.delete(icSource.id);
-          });
-          localOnly = Array.from(localMap.values());
-          localOnly.forEach(s => merged.push(s));
-
+          const icIds = new Set(icSources.map(s => s.id));
+          localOnly = prev.filter(s => !icIds.has(s.id));
+          const merged = [...icSources, ...localOnly];
           saveSources(principalText, merged);
           return merged;
         });

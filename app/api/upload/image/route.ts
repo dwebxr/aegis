@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
     res = await fetch("https://nostr.build/api/v2/upload/files", {
       method: "POST",
       body: upstream,
+      signal: AbortSignal.timeout(25_000),
     });
   } catch (err) {
     console.error("[upload/image] nostr.build fetch failed:", err);

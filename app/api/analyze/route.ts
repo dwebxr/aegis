@@ -141,20 +141,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to parse AI response", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
   }
 
+  // Validate and clamp AI response fields to expected 0-10 range
+  const clamp0_10 = (v: unknown): number => {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? Math.max(0, Math.min(10, n)) : 5;
+  };
+  const originality = clamp0_10(parsed.originality);
+  const insight = clamp0_10(parsed.insight);
+  const credibility = clamp0_10(parsed.credibility);
+  const composite = clamp0_10(parsed.composite);
+  const verdict = parsed.verdict === "quality" || parsed.verdict === "slop"
+    ? parsed.verdict
+    : (composite >= 4 ? "quality" : "slop");
+
   const response: Record<string, unknown> = {
-    originality: parsed.originality,
-    insight: parsed.insight,
-    credibility: parsed.credibility,
-    composite: parsed.composite,
-    verdict: parsed.verdict,
-    reason: parsed.reason || "",
+    originality, insight, credibility, composite, verdict,
+    reason: typeof parsed.reason === "string" ? parsed.reason.slice(0, 500) : "",
   };
 
-  // Include V/C/L and topics if present (personalized response)
-  if (parsed.vSignal !== undefined) response.vSignal = parsed.vSignal;
-  if (parsed.cContext !== undefined) response.cContext = parsed.cContext;
-  if (parsed.lSlop !== undefined) response.lSlop = parsed.lSlop;
-  if (Array.isArray(parsed.topics)) response.topics = parsed.topics;
+  if (typeof parsed.vSignal === "number") response.vSignal = clamp0_10(parsed.vSignal);
+  if (typeof parsed.cContext === "number") response.cContext = clamp0_10(parsed.cContext);
+  if (typeof parsed.lSlop === "number") response.lSlop = clamp0_10(parsed.lSlop);
+  if (Array.isArray(parsed.topics)) {
+    response.topics = parsed.topics.filter((t: unknown): t is string => typeof t === "string").slice(0, 10);
+  }
   response.tier = "claude";
 
   return NextResponse.json(response);

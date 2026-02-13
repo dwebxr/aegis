@@ -56,10 +56,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile }) => {
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState("");
-  const [hasApiKey, setHasApiKey] = useState(() => {
-    const key = getUserApiKey();
-    return key !== null;
-  });
+  const [hasApiKey, setHasApiKey] = useState(() => getUserApiKey() !== null);
   const [maskedKey, setMaskedKey] = useState(() => {
     const key = getUserApiKey();
     return key ? maskApiKey(key) : "";

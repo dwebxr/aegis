@@ -214,8 +214,9 @@ export class AgentManager {
       const existing = this.handshakes.get(peer.nostrPubkey);
       if (existing && (existing.phase === "offered" || existing.phase === "accepted" || existing.phase === "delivering")) continue;
 
+      const peerInterests = new Set(peer.interests);
       const match = offerCandidates.find(c =>
-        c.topics?.some(t => peer.interests.includes(t))
+        c.topics?.some(t => peerInterests.has(t))
       );
 
       if (match && match.topics) {

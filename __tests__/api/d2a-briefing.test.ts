@@ -103,23 +103,23 @@ describe("GET /api/d2a/briefing (ungated)", () => {
     consoleSpy.mockRestore();
   });
 
-  it("includes CORS headers on success", async () => {
+  it("omits CORS allow-origin for unknown origin on success", async () => {
     mockGetLatestBriefing.mockResolvedValue(sampleBriefing);
     const res = await GET(makeRequest({ principal: "aaaaa-aa" }));
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
-  it("includes CORS headers on 404", async () => {
+  it("omits CORS allow-origin for unknown origin on 404", async () => {
     mockGetLatestBriefing.mockResolvedValue(null);
     const res = await GET(makeRequest());
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
-  it("includes CORS headers on 500", async () => {
+  it("omits CORS allow-origin for unknown origin on 500", async () => {
     mockGetLatestBriefing.mockRejectedValue(new Error("fail"));
     jest.spyOn(console, "error").mockImplementation();
     const res = await GET(makeRequest({ principal: "aaaaa-aa" }));
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
     jest.restoreAllMocks();
   });
 

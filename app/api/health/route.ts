@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { getCanisterId, getHost } from "@/lib/ic/config";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);
@@ -11,14 +13,13 @@ export async function GET(request: NextRequest) {
 
   checks.anthropicKey = process.env.ANTHROPIC_API_KEY ? "configured" : "missing";
 
-  const canisterId = (process.env.NEXT_PUBLIC_CANISTER_ID || "").trim();
-  checks.canisterId = canisterId ? canisterId : "missing (using default)";
+  const canisterId = getCanisterId();
+  checks.canisterId = canisterId;
 
   // Verify IC canister is reachable (lightweight status query)
-  const icHost = (process.env.NEXT_PUBLIC_IC_HOST || "https://icp-api.io").trim();
-  const effectiveCanisterId = canisterId || "rluf3-eiaaa-aaaam-qgjuq-cai";
+  const icHost = getHost();
   try {
-    const icRes = await fetch(`${icHost}/api/v2/canister/${effectiveCanisterId}/query`, {
+    const icRes = await fetch(`${icHost}/api/v2/canister/${canisterId}/query`, {
       method: "POST",
       headers: { "Content-Type": "application/cbor" },
       body: new Uint8Array(0),

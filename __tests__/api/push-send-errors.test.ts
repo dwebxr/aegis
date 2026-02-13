@@ -107,6 +107,7 @@ describe("POST /api/push/send — error paths", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.expired).toBe(1);
+    expect(data.cleanupFailed).toBe(true);
   });
 
   it("returns 500 when IC agent creation fails", async () => {

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
 import { X402_RECEIVER, X402_NETWORK } from "@/lib/d2a/x402Server";
+import { getCanisterId, getHost } from "@/lib/ic/config";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);
@@ -14,8 +16,8 @@ export async function GET(request: NextRequest) {
   checks.x402Receiver = X402_RECEIVER ? "configured" : "not configured";
   checks.x402Network = X402_NETWORK;
 
-  const icHost = (process.env.NEXT_PUBLIC_IC_HOST || "https://icp-api.io").trim();
-  const canisterId = (process.env.NEXT_PUBLIC_CANISTER_ID || "rluf3-eiaaa-aaaam-qgjuq-cai").trim();
+  const icHost = getHost();
+  const canisterId = getCanisterId();
   try {
     const icRes = await fetch(`${icHost}/api/v2/canister/${canisterId}/query`, {
       method: "POST",

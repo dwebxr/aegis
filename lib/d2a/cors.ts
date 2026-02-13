@@ -6,14 +6,19 @@ const ALLOWED_ORIGINS = [
 ];
 
 function corsHeaders(origin?: string | null): Record<string, string> {
-  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "*";
-  return {
-    "Access-Control-Allow-Origin": allowed,
+  const headers: Record<string, string> = {
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-PAYMENT, PAYMENT-SIGNATURE",
     "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-PAYMENT-REQUIRED, X-PAYMENT-RESPONSE",
     "Access-Control-Max-Age": "86400",
   };
+  // Only set Access-Control-Allow-Origin for explicitly allowed origins.
+  // Omitting the header for unknown origins causes the browser to block the request.
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+    headers["Vary"] = "Origin";
+  }
+  return headers;
 }
 
 export function corsOptionsResponse(request: NextRequest): NextResponse {

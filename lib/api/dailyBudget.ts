@@ -1,6 +1,9 @@
 /**
  * Per-instance daily budget for expensive API calls (e.g. Anthropic).
- * Prevents runaway costs if rate limiting is bypassed across serverless instances.
+ * NOTE: On Vercel serverless, state is per-instance and resets on cold start.
+ * This provides burst protection within a single warm instance only —
+ * concurrent instances each get their own budget. For stronger guarantees,
+ * migrate to Vercel KV or Redis.
  */
 
 const DAILY_BUDGET = parseInt(process.env.ANTHROPIC_DAILY_BUDGET || "500", 10);

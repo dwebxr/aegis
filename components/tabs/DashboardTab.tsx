@@ -34,7 +34,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [showAllContent, setShowAllContent] = useState(false);
 
-  const { todayContent, todayQual, todaySlop, uniqueSources, dailyQuality, dailySlop, dayLabels } = useMemo(() => {
+  const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop, dayLabels } = useMemo(() => {
     const now = Date.now();
     const dayMs = 86400000;
     const todayStart = now - dayMs;
@@ -44,6 +44,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     const todayQual = todayContent.filter(c => c.verdict === "quality");
     const todaySlop = todayContent.filter(c => c.verdict === "slop");
     const uniqueSources = new Set(content.map(c => c.source));
+    const availableSources = Array.from(uniqueSources).sort();
 
     const dailyQuality: number[] = [];
     const dailySlop: number[] = [];
@@ -58,10 +59,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       dailySlop.push(dayItems.filter(c => c.verdict === "slop").length);
       dayLabels.push(dayNames[new Date(dayEnd).getDay()]);
     }
-    return { todayContent, todayQual, todaySlop, uniqueSources, dailyQuality, dailySlop, dayLabels };
+    return { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop, dayLabels };
   }, [content]);
-
-  const availableSources = useMemo(() => Array.from(new Set(content.map(c => c.source))).sort(), [content]);
 
   const filteredContent = useMemo(() => {
     let items = content;
@@ -178,25 +177,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       {/* Export */}
       {content.length > 0 && (
         <div style={{ display: "flex", gap: space[2], marginBottom: space[5] }}>
-          <button
-            onClick={() => downloadFile(contentToCSV(content), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv")}
-            style={{
-              padding: `${space[2]}px ${space[4]}px`,
-              background: colors.bg.surface,
-              border: `1px solid ${colors.border.default}`,
-              borderRadius: radii.md,
-              color: colors.text.muted,
-              fontSize: t.bodySm.size,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              transition: transitions.fast,
-            }}
-          >
-            &#x1F4E5; Export CSV
-          </button>
-          <button
-            onClick={() => {
+          {([
+            { label: "Export CSV", onClick: () => downloadFile(contentToCSV(content), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv") },
+            { label: "Export JSON", onClick: () => {
               const data = content.map(c => ({
                 id: c.id, author: c.author, source: c.source, verdict: c.verdict,
                 scores: c.scores, vSignal: c.vSignal, cContext: c.cContext, lSlop: c.lSlop,
@@ -204,22 +187,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 createdAt: new Date(c.createdAt).toISOString(), sourceUrl: c.sourceUrl,
               }));
               downloadFile(JSON.stringify(data, null, 2), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
-            }}
-            style={{
-              padding: `${space[2]}px ${space[4]}px`,
-              background: colors.bg.surface,
-              border: `1px solid ${colors.border.default}`,
-              borderRadius: radii.md,
-              color: colors.text.muted,
-              fontSize: t.bodySm.size,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              transition: transitions.fast,
-            }}
-          >
-            &#x1F4E5; Export JSON
-          </button>
+            }},
+          ] as const).map(btn => (
+            <button key={btn.label} onClick={btn.onClick} style={exportBtnStyle}>
+              &#x1F4E5; {btn.label}
+            </button>
+          ))}
         </div>
       )}
 
@@ -339,4 +312,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       )}
     </div>
   );
+};
+
+const exportBtnStyle: React.CSSProperties = {
+  padding: `${space[2]}px ${space[4]}px`,
+  background: colors.bg.surface,
+  border: `1px solid ${colors.border.default}`,
+  borderRadius: radii.md,
+  color: colors.text.muted,
+  fontSize: t.bodySm.size,
+  fontWeight: 600,
+  cursor: "pointer",
+  fontFamily: "inherit",
+  transition: transitions.fast,
 };

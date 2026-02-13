@@ -14,14 +14,14 @@ describe("corsOptionsResponse", () => {
     expect(res.body).toBeNull();
   });
 
-  it("sets wildcard origin when no origin header", () => {
+  it("omits Access-Control-Allow-Origin when no origin header", () => {
     const res = corsOptionsResponse(makeRequest());
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
-  it("sets wildcard for unknown origins", () => {
+  it("omits Access-Control-Allow-Origin for unknown origins", () => {
     const res = corsOptionsResponse(makeRequest("https://evil.example.com"));
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
   it("reflects allowed origin: aegis.dwebxr.xyz", () => {
@@ -32,6 +32,11 @@ describe("corsOptionsResponse", () => {
   it("reflects allowed origin: ICP canister", () => {
     const res = corsOptionsResponse(makeRequest("https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io"));
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io");
+  });
+
+  it("sets Vary: Origin for allowed origins", () => {
+    const res = corsOptionsResponse(makeRequest("https://aegis.dwebxr.xyz"));
+    expect(res.headers.get("Vary")).toBe("Origin");
   });
 
   it("includes GET and OPTIONS methods", () => {
@@ -65,11 +70,17 @@ describe("corsOptionsResponse", () => {
 });
 
 describe("withCors", () => {
-  it("adds CORS headers to an existing response", () => {
+  it("adds CORS headers to an existing response for allowed origin", () => {
+    const response = NextResponse.json({ ok: true });
+    const result = withCors(response, "https://aegis.dwebxr.xyz");
+    expect(result.headers.get("Access-Control-Allow-Origin")).toBe("https://aegis.dwebxr.xyz");
+    expect(result.headers.get("Access-Control-Allow-Methods")).toContain("GET");
+  });
+
+  it("omits Access-Control-Allow-Origin for null origin", () => {
     const response = NextResponse.json({ ok: true });
     const result = withCors(response, null);
-    expect(result.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    expect(result.headers.get("Access-Control-Allow-Methods")).toContain("GET");
+    expect(result.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
   it("preserves existing response body", async () => {
@@ -91,23 +102,16 @@ describe("withCors", () => {
     expect(result.headers.get("Access-Control-Allow-Origin")).toBe("https://aegis.dwebxr.xyz");
   });
 
-  it("uses wildcard for unknown origin", () => {
+  it("omits Access-Control-Allow-Origin for unknown origin", () => {
     const response = NextResponse.json({ ok: true });
     const result = withCors(response, "https://random.example.com");
-    expect(result.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(result.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
-  it("uses wildcard when origin is undefined", () => {
+  it("omits Access-Control-Allow-Origin when origin is undefined", () => {
     const response = NextResponse.json({ ok: true });
     const result = withCors(response, undefined);
-    expect(result.headers.get("Access-Control-Allow-Origin")).toBe("*");
-  });
-
-  it("does not add duplicate origins for allowed origin", () => {
-    const response = NextResponse.json({ ok: true });
-    const result = withCors(response, "https://aegis.dwebxr.xyz");
-    // Should be exactly the origin, not "*" or duplicated
-    expect(result.headers.get("Access-Control-Allow-Origin")).toBe("https://aegis.dwebxr.xyz");
+    expect(result.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
   it("returns the same response object (mutated, not cloned)", () => {

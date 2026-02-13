@@ -204,6 +204,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         method: "POST",
         headers: hdrs,
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
       });
       const data = await res.json();
       if (!res.ok) {

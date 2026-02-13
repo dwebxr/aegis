@@ -5,8 +5,8 @@ import type { FilterConfig, FilteredItem, FilterPipelineResult, FilterPipelineSt
 import { calculateWoTScore, calculateWeightedScore, isWoTSerendipity } from "@/lib/wot/scorer";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
 
-// Anthropic Claude Haiku via /api/analyze — ~300 input tokens + ~100 output ≈ $0.003
-// Based on Haiku pricing: $0.25/MTok input + $1.25/MTok output (as of 2025-01)
+// Anthropic Claude Sonnet via /api/analyze — ~400 input tokens + ~100 output
+// Based on Sonnet 4 pricing: $3/MTok input + $15/MTok output
 const ESTIMATED_AI_COST_PER_CALL = 0.003;
 
 export function runFilterPipeline(

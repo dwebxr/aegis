@@ -152,12 +152,12 @@ describe("broadcastPresence — relay failure", () => {
     mockDestroy.mockReset();
   });
 
-  it("completes without throwing when relays fail", async () => {
+  it("throws when all relays fail", async () => {
     mockPublish.mockReturnValue([Promise.reject(new Error("Relay down"))]);
 
     await expect(
       broadcastPresence(sk, ["ai", "ml"], 5, ["wss://failing.relay"])
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow("Presence broadcast failed on all 1 relays");
 
     expect(mockDestroy).toHaveBeenCalledTimes(1);
   });

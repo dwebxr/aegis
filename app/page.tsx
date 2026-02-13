@@ -296,7 +296,6 @@ export default function AegisApp() {
 
     const tags = buildAegisTags(scores.composite, scores.vSignal, scores.topics || [], imageUrl);
 
-    // Staking is mandatory for authenticated users
     if (identity && principalText && !stakeAmount) {
       addNotification("ICP deposit is required to publish a signal", "error");
       return { eventId: null, relaysPublished: [] };
@@ -308,7 +307,6 @@ export default function AegisApp() {
 
     const signalId = uuidv4();
 
-    // Approve + publishWithStake on IC
     if (stakeAmount && identity && principalText) {
       try {
         const canisterId = getCanisterId();
@@ -368,7 +366,6 @@ export default function AegisApp() {
       }
     }
 
-    // Also save to local content state
     addContent({
       id: signalId,
       owner: principalText,

@@ -7,6 +7,19 @@ Content quality filter that learns your taste, curates a zero-noise briefing, pu
 - **Frontend**: https://aegis.dwebxr.xyz
 - **Backend Canister**: [`rluf3-eiaaa-aaaam-qgjuq-cai`](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=rluf3-eiaaa-aaaam-qgjuq-cai)
 
+## Quick Start — No Deposit Required
+
+Aegis is **free to use** for content filtering. No wallet, no deposit, no setup required.
+
+| What you want to do | Cost | Deposit needed? |
+|---------------------|------|:---:|
+| Browse & filter content (Lite mode) | Free | No |
+| AI-powered scoring (Pro mode, alpha) | Free during alpha | No |
+| Use your own API key for AI scoring | Your API cost | No |
+| Publish quality signals to Nostr | ICP deposit | Yes |
+
+**Why does Publish Signal require a deposit?** Publishing a signal stakes your reputation on-chain. If you broadcast slop, you lose your deposit. This economic mechanism ensures only quality signals enter the network. Reading, filtering, and scoring content has no such requirement.
+
 ## Architecture
 
 ```
@@ -138,12 +151,17 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 
 ### Filter Modes
 
-| Mode | Scoring | WoT | Serendipity | Cost |
-|------|---------|-----|-------------|------|
-| **Lite** | Heuristic only | No | No | Free |
-| **Pro** | WoT + AI scoring | Yes | Yes | ~$0.003/article (Claude API) |
+| Mode | Scoring | WoT | Serendipity | Cost | Deposit |
+|------|---------|-----|-------------|------|---------|
+| **Lite** | Heuristic only | No | No | Free | No |
+| **Pro** | WoT + AI scoring | Yes | Yes | Free during alpha | No |
+| **Publish Signal** | N/A (output) | N/A | N/A | ICP deposit | Yes |
 
-Users switch between modes via the FilterModeSelector in the Dashboard.
+- **Lite**: Client-side heuristic filter only. No API calls, no login required. WoT scoring disabled.
+- **Pro**: Full WoT pipeline + AI scoring (IC LLM or Claude). Discovers quality content outside your trust graph. Free during alpha; alternatively bring your own Claude API key in Settings.
+- **Publish Signal**: Broadcasts your curated content to Nostr. Requires ICP deposit as anti-spam stake — the deposit is returned if the community validates your signal quality.
+
+Users switch between Lite and Pro via the FilterModeSelector in the Dashboard.
 
 ### WoT Graph Construction
 
@@ -221,6 +239,8 @@ Aegis implements a sustainable economic model using ICP tokens (ICRC-1/2) with t
 Free-tier scoring runs entirely on the Internet Computer. Premium Claude API scoring provides higher accuracy for users who supply their own API key.
 
 ### Pillar 2: Quality Assurance Deposits (Non-Custodial)
+
+> Deposits are only required for publishing signals, not for using Aegis as a content filter. Lite and Pro modes work without any on-chain interaction.
 
 When publishing a signal, users deposit ICP (0.001–1.0 ICP) as a quality assurance bond. Community members vote to validate or flag signals through objective peer review:
 
@@ -528,7 +548,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → build → security audit on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, beforeSend scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (1525 tests, 111 suites) |
+| Test | Jest + ts-jest (1642 tests, 120 suites) |
 
 ## Project Structure
 
@@ -615,7 +635,8 @@ aegis/
 │   │   ├── manager.ts                   # AgentManager orchestrator (lifecycle + error recovery)
 │   │   └── types.ts                     # AgentProfile, HandshakeState, D2AMessage
 │   ├── ic/
-│   │   ├── agent.ts                     # HttpAgent creation + canister ID
+│   │   ├── config.ts                    # IC config getters (canister ID, host, derivation origin)
+│   │   ├── agent.ts                     # HttpAgent creation (re-exports config)
 │   │   ├── actor.ts                     # Canister actor factory (sync + async with syncTime)
 │   │   ├── icpLedger.ts                # ICP Ledger actor (ICRC-1/2 balance, approve, allowance)
 │   │   └── declarations/               # Candid types + IDL factory
@@ -628,7 +649,7 @@ aegis/
 │       ├── errors.ts                    # errMsg() shared error formatter
 │       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       └── csv.ts                       # CSV export (RFC-compliant escaping)
-├── __tests__/                           # 1525 tests across 111 suites
+├── __tests__/                           # 1642 tests across 120 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -664,7 +685,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 1525 tests
+npm test              # Run all 1642 tests
 npm run test:watch    # Watch mode
 ```
 
@@ -777,6 +798,38 @@ Aegis follows a staged decentralization roadmap to balance security with trustle
 **Why not renounce immediately?** Premature controller renunciation risks permanent fund lockup if a critical bug is discovered. The current phase prioritizes code transparency and on-chain enforcement while retaining the ability to patch vulnerabilities.
 
 > **Disclaimer**: This protocol's source code is publicly available. The operator does not exercise the authority to modify or manipulate the automatic distribution logic defined by the smart contract without individual user consent under normal operations. (本プロトコルのソースコードは公開されており、運営者はスマートコントラクトによって定義された自動分配ロジックを、ユーザーの個別の同意なく変更・操作する権限を（通常運用において）行使しません。)
+
+---
+
+## FAQ
+
+### Do I need cryptocurrency to use Aegis?
+
+**No.** Content filtering (both Lite and Pro modes) works without any crypto, wallet, or deposit. You only need ICP if you want to publish quality signals to the Nostr network.
+
+### Is Aegis expensive to run?
+
+**Lite mode costs nothing** — it runs entirely client-side using your Nostr Web of Trust.
+
+Pro mode (AI scoring) costs approximately $0.01/day per user (~50 articles/day with Claude). During alpha, this is covered by us. After alpha, you can bring your own API key (Settings > AI Scoring) — roughly $2/month for typical usage.
+
+### Why not just use a P2P small-world network?
+
+You can — that's exactly what **Lite mode** does. Nostr's Web of Trust is a small-world network, and Lite mode filters content purely through trust-graph proximity. No AI, no API calls, no cost.
+
+**Pro mode adds** what P2P alone cannot do:
+- Discover quality content *outside* your follow graph (serendipity detection)
+- Evaluate content across languages
+- Detect quality degradation trends
+- Break out of echo chambers with scored recommendations
+
+### What happens to my deposit if I publish bad signals?
+
+If your published signals are consistently rated as low-quality by the community (3+ flags reach consensus), your deposit is forfeited. This creates a direct economic incentive to only publish genuine quality signals. Deposits that receive no community verdict within 30 days are automatically returned — no verdict means no issue found.
+
+### Do I need to deposit ICP before I can use Aegis?
+
+**No.** Deposits are only for the Publish Signal feature. You can browse, filter, score, and curate content indefinitely without any deposit. The deposit exists solely as an anti-spam mechanism for the signal publishing network.
 
 ## License
 
