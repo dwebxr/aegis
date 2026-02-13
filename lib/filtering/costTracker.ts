@@ -19,8 +19,6 @@ export interface MonthlyCostSummary {
   timeSavedFormatted: string;
 }
 
-// Static JPY conversion rate — approximate, not fetched from any FX API
-export const USD_TO_JPY = 150;
 // Estimated reading/evaluation time saved per filtered article (industry avg: 2-5 min per article)
 export const SCROLL_TIME_SAVED_PER_ITEM_MIN = 3;
 

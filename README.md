@@ -199,7 +199,7 @@ In Pro mode, up to 5 serendipity items are surfaced in the Briefing tab with typ
 Daily cost records are stored in localStorage (90-day rolling window). The Analytics tab shows:
 
 - Monthly usage summary (articles evaluated, AI-scored, discoveries found)
-- Estimated API cost in USD/JPY
+- Estimated API cost in USD
 - Time saved vs manual curation (3 min/article baseline)
 - Lite vs Pro feature comparison
 - Competitor cost comparison (Twitter Blue, news subscriptions, manual curation)

@@ -2,7 +2,7 @@
 import React, { useMemo } from "react";
 import { colors, space, type as t, radii, fonts, kpiLabelStyle } from "@/styles/theme";
 import type { FilterPipelineStats } from "@/lib/filtering/types";
-import { getMonthlyCost, USD_TO_JPY } from "@/lib/filtering/costTracker";
+import { getMonthlyCost } from "@/lib/filtering/costTracker";
 
 interface CostInsightsProps {
   stats: FilterPipelineStats;
@@ -120,18 +120,17 @@ function MonthlyUsage({ mobile }: { mobile?: boolean }) {
     );
   }
 
-  const costJPY = Math.round(monthly.totalAiCostUSD * USD_TO_JPY);
   const costPerQuality = monthly.totalPassedAI > 0
-    ? (monthly.totalAiCostUSD * USD_TO_JPY / monthly.totalPassedAI).toFixed(1)
+    ? (monthly.totalAiCostUSD / monthly.totalPassedAI).toFixed(4)
     : "--";
 
   const monthlyKpis: Array<[string, string, string]> = [
     ["Evaluated", String(monthly.totalEvaluated), colors.cyan[400]],
     ["AI Scored", String(monthly.totalPassedAI), colors.orange[400]],
     ["Discoveries", String(monthly.totalDiscoveries), colors.purple[400]],
-    ["Cost", `\u00A5${costJPY} ($${monthly.totalAiCostUSD.toFixed(2)})`, colors.amber[400]],
+    ["Cost", `$${monthly.totalAiCostUSD.toFixed(2)}`, colors.amber[400]],
     ["Time Saved", monthly.timeSavedFormatted, colors.green[400]],
-    ["Per Quality", `\u00A5${costPerQuality}`, colors.sky[400]],
+    ["Per Quality", `$${costPerQuality}`, colors.sky[400]],
   ];
 
   return (
@@ -224,38 +223,36 @@ function LiteVsProTable() {
 
 function CompetitorComparison({ mobile }: { mobile?: boolean }) {
   const monthly = useMemo(() => getMonthlyCost(), []);
-  const userCostJPY = Math.round(monthly.totalAiCostUSD * USD_TO_JPY);
-
   const competitors: Array<{
     name: string;
-    costJPY: string;
+    costUSD: string;
     sub: string;
     color: string;
     highlight?: boolean;
   }> = [
     {
       name: "Aegis (Your Usage)",
-      costJPY: `\u00A5${userCostJPY.toLocaleString()}/mo`,
-      sub: `$${monthly.totalAiCostUSD.toFixed(2)}/mo | Automated`,
+      costUSD: `$${monthly.totalAiCostUSD.toFixed(2)}/mo`,
+      sub: "Automated AI + WoT filtering",
       color: colors.green[400],
       highlight: true,
     },
     {
       name: "X Premium (est.)",
-      costJPY: "~\u00A51,380/mo",
-      sub: `~$${Math.round(1380 / USD_TO_JPY)}/mo | Algorithmic feed`,
+      costUSD: "~$8/mo",
+      sub: "Algorithmic feed, no quality filter",
       color: colors.sky[400],
     },
     {
       name: "News Sub (est.)",
-      costJPY: "~\u00A51,000/mo",
-      sub: `~$${Math.round(1000 / USD_TO_JPY)}/mo | Single source`,
+      costUSD: "~$10/mo",
+      sub: "Single source, curated editorially",
       color: colors.orange[400],
     },
     {
       name: "Manual Curation",
-      costJPY: "\u00A50",
-      sub: "$0 | ~2h/day estimated",
+      costUSD: "$0",
+      sub: "~2h/day estimated time cost",
       color: colors.red[400],
     },
   ];
@@ -296,7 +293,7 @@ function CompetitorComparison({ mobile }: { mobile?: boolean }) {
               color: colors.text.primary,
               fontFamily: fonts.mono,
             }}>
-              {c.costJPY}
+              {c.costUSD}
             </div>
             <div style={{
               fontSize: t.caption.size,
