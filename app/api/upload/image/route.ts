@@ -7,7 +7,7 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/we
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 5, 60_000);
+  const limited = rateLimit(request, 10, 60_000);
   if (limited) return limited;
 
   let formData: FormData;

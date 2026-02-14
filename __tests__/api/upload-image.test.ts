@@ -216,17 +216,17 @@ describe("POST /api/upload/image", () => {
   });
 
   describe("rate limiting", () => {
-    it("allows 5 requests within window", async () => {
+    it("allows 10 requests within window", async () => {
       const file = new Blob(["img"], { type: "image/jpeg" });
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 10; i++) {
         const res = await POST(makeUploadRequest(file));
         expect(res.status).not.toBe(429);
       }
     });
 
-    it("returns 429 after exceeding 5 requests", async () => {
+    it("returns 429 after exceeding 10 requests", async () => {
       const file = new Blob(["img"], { type: "image/jpeg" });
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 10; i++) {
         await POST(makeUploadRequest(file));
       }
       const res = await POST(makeUploadRequest(file));
