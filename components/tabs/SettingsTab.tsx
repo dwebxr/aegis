@@ -86,7 +86,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
         setWebllmStatus({ available: false, loaded: false, loading: false, progress: 0 });
         return;
       }
-      setWebllmStatus(prev => ({ ...prev, available: true }));
+      // isWebGPUUsable() already set module currentStatus.available = true,
+      // so onStatusChange will immediately fire with the correct state
       unsub = onStatusChange(setWebllmStatus);
     })();
     return () => { unsub?.(); };
