@@ -31,12 +31,12 @@ describe("Tooltip", () => {
     expect(html).toContain("position:relative");
   });
 
-  it("renders hover style tag for opacity transition", () => {
+  it("renders CSS class names for hover transition (style in globals.css)", () => {
     const html = renderToStaticMarkup(
       <Tooltip text="Tip"><span>X</span></Tooltip>
     );
-    expect(html).toContain("aegis-tooltip-wrap:hover");
-    expect(html).toContain("opacity: 1");
+    expect(html).toContain("aegis-tooltip-wrap");
+    expect(html).toContain("aegis-tooltip-content");
   });
 
   it("uses bottom positioning for position=top (default)", () => {

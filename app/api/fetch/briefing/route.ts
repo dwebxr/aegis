@@ -3,6 +3,7 @@ import { decode } from "nostr-tools/nip19";
 import type { AddressPointer } from "nostr-tools/nip19";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { withTimeout } from "@/lib/utils/timeout";
 
 export const maxDuration = 30;
 
@@ -45,10 +46,7 @@ export async function GET(request: NextRequest) {
   };
 
   try {
-    const events = await Promise.race([
-      pool.querySync(relays, filter),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000)),
-    ]);
+    const events = await withTimeout(pool.querySync(relays, filter), 15000);
 
     if (events.length === 0) {
       return NextResponse.json(

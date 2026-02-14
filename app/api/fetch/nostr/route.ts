@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateRelay } from "@/lib/utils/url";
+import { withTimeout } from "@/lib/utils/timeout";
 
 export const maxDuration = 30;
 
@@ -65,10 +66,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const rawEvents = await Promise.race([
-      pool.querySync(relays, filter),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
-    ]);
+    const rawEvents = await withTimeout(pool.querySync(relays, filter), 10000);
 
     rawEvents.sort((a, b) => b.created_at - a.created_at);
 
@@ -77,10 +75,11 @@ export async function POST(request: NextRequest) {
     const profiles: Record<string, { name?: string; picture?: string }> = {};
     if (uniquePubkeys.length > 0) {
       try {
-        const metaEvents = await Promise.race([
+        const metaEvents = await withTimeout(
           pool.querySync(relays, { kinds: [0], authors: uniquePubkeys.slice(0, 50) }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("meta-timeout")), 5000)),
-        ]);
+          5000,
+          "meta-timeout",
+        );
         for (const me of metaEvents) {
           if (profiles[me.pubkey]) continue;
           try {

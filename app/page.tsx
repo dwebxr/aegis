@@ -19,7 +19,7 @@ import { useDemo } from "@/contexts/DemoContext";
 import { useFilterMode } from "@/contexts/FilterModeContext";
 import { DEMO_SOURCES } from "@/lib/demo/sources";
 import { buildFollowGraph } from "@/lib/wot/graph";
-import { loadWoTCache, saveWoTCache } from "@/lib/wot/cache";
+import { loadWoTCache, saveWoTCache, clearWoTCache } from "@/lib/wot/cache";
 import { DEFAULT_WOT_CONFIG } from "@/lib/wot/types";
 import type { WoTGraph } from "@/lib/wot/types";
 import { runFilterPipeline } from "@/lib/filtering/pipeline";
@@ -28,6 +28,9 @@ import type { SerendipityItem } from "@/lib/filtering/serendipity";
 import { recordFilterRun } from "@/lib/filtering/costTracker";
 import { DemoBanner } from "@/components/ui/DemoBanner";
 import { LandingHero } from "@/components/ui/LandingHero";
+import { WoTPromptBanner } from "@/components/ui/WoTPromptBanner";
+import { getLinkedAccount } from "@/lib/nostr/linkAccount";
+import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { publishSignalToNostr, buildAegisTags } from "@/lib/nostr/publish";
@@ -65,6 +68,11 @@ export default function AegisApp() {
   const [wotGraph, setWotGraph] = useState<WoTGraph | null>(null);
   const [wotLoading, setWotLoading] = useState(false);
   const [publishGate, setPublishGate] = useState<PublishGateDecision | null>(null);
+  const [linkedAccount, setLinkedAccount] = useState<LinkedNostrAccount | null>(() => getLinkedAccount());
+  const [wotPromptDismissed, setWotPromptDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try { return sessionStorage.getItem("aegis-wot-prompt-dismissed") === "true"; } catch { return false; }
+  });
 
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
@@ -84,14 +92,18 @@ export default function AegisApp() {
   const filterModeRef = useRef(filterMode);
   filterModeRef.current = filterMode;
 
+  const wotRootPubkey = linkedAccount?.pubkeyHex ?? nostrKeys?.pk ?? null;
+  const linkedAccountRef = useRef(linkedAccount);
+  linkedAccountRef.current = linkedAccount;
+
   useEffect(() => {
-    if (!nostrKeys?.pk) {
+    if (!wotRootPubkey) {
       setWotGraph(null);
       return;
     }
 
     const cached = loadWoTCache();
-    if (cached && cached.userPubkey === nostrKeys.pk) {
+    if (cached && cached.userPubkey === wotRootPubkey) {
       setWotGraph(cached);
       return;
     }
@@ -99,11 +111,17 @@ export default function AegisApp() {
     let cancelled = false;
     setWotLoading(true);
 
-    buildFollowGraph(nostrKeys.pk, DEFAULT_WOT_CONFIG)
+    // Cap at 1 hop for large follow lists (>500) to keep graph manageable
+    const la = linkedAccountRef.current;
+    const config = la && la.followCount > 500
+      ? { ...DEFAULT_WOT_CONFIG, maxHops: 1 }
+      : DEFAULT_WOT_CONFIG;
+
+    buildFollowGraph(wotRootPubkey, config)
       .then(graph => {
         if (cancelled) return;
         setWotGraph(graph);
-        saveWoTCache(graph, DEFAULT_WOT_CONFIG.cacheTTLMs);
+        saveWoTCache(graph, config.cacheTTLMs);
       })
       .catch(err => {
         console.warn("[wot] Failed to build follow graph:", errMsg(err));
@@ -113,12 +131,25 @@ export default function AegisApp() {
       });
 
     return () => { cancelled = true; };
-  }, [nostrKeys?.pk]);
+  }, [wotRootPubkey]);
 
-  // Push WoT graph to agent manager so trust-based fees use real social graph data
   useEffect(() => {
     pushWoTGraph(wotGraph);
   }, [wotGraph, pushWoTGraph]);
+
+  const handleLinkAccount = useCallback((account: LinkedNostrAccount | null) => {
+    setLinkedAccount(account);
+    if (!account) {
+      clearWoTCache();
+      setWotPromptDismissed(false);
+      try { sessionStorage.removeItem("aegis-wot-prompt-dismissed"); } catch { /* noop */ }
+    }
+  }, []);
+
+  const dismissWotPrompt = useCallback(() => {
+    setWotPromptDismissed(true);
+    try { sessionStorage.setItem("aegis-wot-prompt-dismissed", "true"); } catch { /* noop */ }
+  }, []);
 
   const pipelineResult = useMemo(() => {
     if (content.length === 0) return null;
@@ -319,7 +350,6 @@ export default function AegisApp() {
       return { eventId: null, relaysPublished: [] };
     }
 
-    // Publish to Nostr relays (append image URL to content — Nostr clients auto-render it)
     const publishText = imageUrl ? `${text}\n\n${imageUrl}` : text;
     const result = await publishSignalToNostr(publishText, nostrKeys.sk, tags);
 
@@ -430,20 +460,25 @@ export default function AegisApp() {
   }, [nostrKeys, identity, principalText, addContent, addNotification, publishGate]);
 
   const handleUploadImage = useCallback(async (file: File): Promise<{ url?: string; error?: string }> => {
-    const form = new FormData();
-    form.append("file", file);
-    const headers: Record<string, string> = {};
-    if (nostrKeys) {
-      headers["Authorization"] = createNIP98AuthHeader(
-        nostrKeys.sk,
-        "https://nostr.build/api/v2/upload/files",
-        "POST",
-      );
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const headers: Record<string, string> = {};
+      if (nostrKeys) {
+        headers["Authorization"] = createNIP98AuthHeader(
+          nostrKeys.sk,
+          "https://nostr.build/api/v2/upload/files",
+          "POST",
+        );
+      }
+      const res = await fetch("/api/upload/image", { method: "POST", headers, body: form });
+      const data = await res.json();
+      if (!res.ok) return { error: data.error || "Upload failed" };
+      return { url: data.url };
+    } catch (err) {
+      console.error("[upload] Image upload failed:", errMsg(err));
+      return { error: "Upload failed" };
     }
-    const res = await fetch("/api/upload/image", { method: "POST", headers, body: form });
-    const data = await res.json();
-    if (!res.ok) return { error: data.error || "Upload failed" };
-    return { url: data.url };
   }, [nostrKeys]);
 
   const showLanding = isDemoMode && !bannerDismissed;
@@ -459,6 +494,9 @@ export default function AegisApp() {
   return (
     <AppShell activeTab={tab} onTabChange={setTab}>
       <DemoBanner mobile={mobile} />
+      {isAuthenticated && !linkedAccount && !wotPromptDismissed && (
+        <WoTPromptBanner onGoToSettings={() => setTab("settings")} onDismiss={dismissWotPrompt} />
+      )}
       {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={setTab} />}
       {tab === "briefing" && <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} onTabChange={setTab} />}
       {tab === "incinerator" && (
@@ -476,7 +514,7 @@ export default function AegisApp() {
       )}
       {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />}
       {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} pipelineStats={pipelineResult?.stats ?? null} />}
-      {tab === "settings" && <SettingsTab mobile={mobile} />}
+      {tab === "settings" && <SettingsTab mobile={mobile} onLinkChange={handleLinkAccount} />}
     </AppShell>
   );
 }

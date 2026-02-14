@@ -2,6 +2,7 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { WoTGraph, WoTNode, WoTConfig } from "./types";
 import { DEFAULT_WOT_CONFIG } from "./types";
+import { withTimeout } from "@/lib/utils/timeout";
 
 const BATCH_SIZE = 50;
 
@@ -30,12 +31,11 @@ export async function buildFollowGraph(
         const filter: Filter = { kinds: [3], authors: batch };
 
         try {
-          const events = await Promise.race([
+          const events = await withTimeout(
             pool.querySync(config.relays, filter),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("hop-timeout")), config.timeoutPerHopMs),
-            ),
-          ]);
+            config.timeoutPerHopMs,
+            "hop-timeout",
+          );
 
           // Deduplicate Kind:3 by author (keep latest)
           const byAuthor = new Map<string, (typeof events)[0]>();
@@ -65,7 +65,6 @@ export async function buildFollowGraph(
         }
       }
 
-      // Discover new nodes at this hop distance
       const nextFrontier: string[] = [];
       allFollows.forEach((follows) => {
         for (const followPubkey of follows) {

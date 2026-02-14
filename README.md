@@ -166,12 +166,25 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 
 Users switch between Lite and Pro via the FilterModeSelector in the Dashboard.
 
+### Nostr Account Linking
+
+By default, Aegis derives a Nostr keypair from the user's Internet Computer principal. Since this derived key has zero followers on the Nostr network, the WoT graph starts empty.
+
+Users can link an existing Nostr account (npub) in Settings to use its follow graph as the WoT root:
+
+1. Enter an npub (bech32) or 64-char hex pubkey in **Settings > Nostr Account**
+2. Aegis fetches the account's profile (Kind 0) and follow list (Kind 3) from relays
+3. The linked pubkey replaces the IC-derived key as the WoT graph root
+4. All WoT scores, D2A trust tiers, and content filtering automatically reflect the linked account's social graph
+
+The IC-derived keypair continues to be used for signing and publishing — only the graph root changes. Unlinking reverts to the IC-derived key and rebuilds the graph.
+
 ### WoT Graph Construction
 
-When the user authenticates via Internet Identity and has a Nostr identity, Aegis builds a social graph from Nostr relay data:
+When the user authenticates via Internet Identity and has a Nostr identity (or linked account), Aegis builds a social graph from Nostr relay data:
 
-1. Fetch the user's follow list (Kind 3 event)
-2. Fetch each followee's follow list (2-hop expansion)
+1. Fetch the root user's follow list (Kind 3 event)
+2. Fetch each followee's follow list (2-hop expansion; capped at 1 hop for >500 follows)
 3. Count mutual follows (bidirectional connections)
 4. Cache the graph in localStorage with configurable TTL
 
@@ -496,6 +509,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Trust scoring from Nostr follow graph (2-hop, mutual follows, hop proximity)
 - Weighted composite: quality × 0.7 + trust × quality × 0.3
 - Serendipity detection: low-trust + high-quality items surfaced with type badges
+- Nostr account linking: use your existing npub's follow graph as WoT root
 - WoT graph cached in localStorage with configurable TTL
 - Cost tracking with daily records, monthly analytics, and competitor comparison
 
@@ -579,7 +593,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → build → security audit on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, beforeSend scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (1819 tests, 129 suites) |
+| Test | Jest + ts-jest (1902 tests, 133 suites) |
 
 ## Project Structure
 
@@ -610,7 +624,7 @@ aegis/
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
 │   ├── tabs/                            # Dashboard, Briefing, Incinerator, Sources, Analytics
-│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip
+│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner
 │   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
 │   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
 │   ├── sources/                         # ManualInput
@@ -658,6 +672,7 @@ aegis/
 │   │   └── sourceState.ts              # Source runtime state (backoff, health, adaptive timing)
 │   ├── nostr/
 │   │   ├── identity.ts                  # IC Principal -> Nostr keypair (SHA-256 derivation)
+│   │   ├── linkAccount.ts              # npub import, localStorage CRUD, relay profile fetch
 │   │   ├── publish.ts                   # Event signing + relay publish + publishAndPartition
 │   │   ├── encrypt.ts                   # NIP-44 encrypt/decrypt (XChaCha20-Poly1305)
 │   │   └── types.ts                     # Nostr kind constants + mergeRelays utility
@@ -689,8 +704,9 @@ aegis/
 │       ├── scores.ts                    # Score computation + relativeTime
 │       ├── errors.ts                    # errMsg() shared error formatter
 │       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
-│       └── csv.ts                       # CSV export (RFC-compliant escaping)
-├── __tests__/                           # 1819 tests across 129 suites
+│       ├── csv.ts                       # CSV export (RFC-compliant escaping)
+│       └── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
+├── __tests__/                           # 1902 tests across 133 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -726,7 +742,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 1776 tests
+npm test              # Run all 1902 tests
 npm run test:watch    # Watch mode
 ```
 

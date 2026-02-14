@@ -6,6 +6,7 @@ import { parseBriefingMarkdown } from "@/lib/briefing/serialize";
 import type { ParsedBriefing } from "@/lib/briefing/serialize";
 import { SharedBriefingView } from "@/components/shared/SharedBriefingView";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
+import { withTimeout } from "@/lib/utils/timeout";
 
 export const maxDuration = 30;
 
@@ -45,10 +46,7 @@ async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
   };
 
   try {
-    const events = await Promise.race([
-      pool.querySync(relays, filter),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000)),
-    ]);
+    const events = await withTimeout(pool.querySync(relays, filter), 15000);
 
     if (events.length === 0) {
       briefingCache.set(naddr, { data: null, at: Date.now() });

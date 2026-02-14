@@ -40,5 +40,7 @@ export function saveWoTCache(graph: WoTGraph, ttl: number): void {
 
 export function clearWoTCache(): void {
   if (typeof globalThis.localStorage === "undefined") return;
-  localStorage.removeItem(WOT_CACHE_KEY);
+  try {
+    localStorage.removeItem(WOT_CACHE_KEY);
+  } catch {}
 }

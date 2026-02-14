@@ -7,6 +7,7 @@ import { usePushNotification } from "@/hooks/usePushNotification";
 import { useNotify } from "@/contexts/NotificationContext";
 import { NotificationToggle } from "@/components/ui/NotificationToggle";
 import { AgentStatusBadge } from "@/components/ui/AgentStatusBadge";
+import { GitHubIcon } from "@/components/icons";
 import {
   MIN_OFFER_SCORE,
   RESONANCE_THRESHOLD,
@@ -17,6 +18,8 @@ import {
 import { getUserApiKey, setUserApiKey, clearUserApiKey, maskApiKey } from "@/lib/apiKey/storage";
 import { isWebLLMEnabled, setWebLLMEnabled } from "@/lib/webllm/storage";
 import type { WebLLMStatus } from "@/lib/webllm/types";
+import { NostrAccountLink } from "@/components/ui/NostrAccountLink";
+import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 
 const LS_PUSH_FREQ_KEY = "aegis-push-frequency";
 
@@ -31,6 +34,7 @@ type PushFrequency = typeof PUSH_FREQ_OPTIONS[number]["value"];
 
 interface SettingsTabProps {
   mobile?: boolean;
+  onLinkChange?: (account: LinkedNostrAccount | null) => void;
 }
 
 const cardStyle = (mobile?: boolean): React.CSSProperties => ({
@@ -49,7 +53,7 @@ const sectionTitle: React.CSSProperties = {
   letterSpacing: 0.3,
 };
 
-export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile }) => {
+export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }) => {
   const { isAuthenticated, principalText, login } = useAuth();
   const { isEnabled: agentEnabled } = useAgent();
   const { isSubscribed } = usePushNotification();
@@ -229,6 +233,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile }) => {
           </div>
         )}
       </div>
+
+      {/* Nostr Account */}
+      {onLinkChange && (
+        <div style={cardStyle(mobile)}>
+          <div style={sectionTitle}>Nostr Account</div>
+          <NostrAccountLink mobile={mobile} onLinkChange={onLinkChange} />
+        </div>
+      )}
 
       {/* D2A Social Agent */}
       <div style={cardStyle(mobile)}>
@@ -488,9 +500,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile }) => {
               fontSize: t.caption.size, color: colors.text.muted, textDecoration: "none",
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-            </svg>
+            <GitHubIcon s={14} />
             <span style={{ fontWeight: 600, color: colors.green[400] }}>GitHub</span>
           </a>
         </div>

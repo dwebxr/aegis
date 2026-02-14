@@ -37,8 +37,5 @@ export const Tooltip: React.FC<TooltipProps> = ({ text, children, position = "to
     >
       {text}
     </span>
-    <style>{`
-      .aegis-tooltip-wrap:hover .aegis-tooltip-content { opacity: 1 !important; }
-    `}</style>
   </span>
 );
