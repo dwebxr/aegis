@@ -11,25 +11,33 @@ Content quality filter that learns your taste, curates a zero-noise briefing, pu
 
 Aegis is **free to use** for content filtering. No wallet, no deposit, no setup required.
 
+### Getting Started
+
+1. **Open** https://aegis.dwebxr.xyz — Lite mode works immediately, no login
+2. **Login** with Internet Identity — unlocks Pro mode (AI scoring + WoT)
+3. **Add Sources** in the Sources tab — RSS feeds, Nostr pubkeys, URLs, or Twitter searches
+4. **Browse** the Dashboard — content is auto-fetched, scored, and ranked
+5. **(Optional)** Link your Nostr npub in Settings — enables WoT trust graph and free D2A with trusted peers
+
 ### Content Filtering
 
 | Mode | Scoring | Cost | Prerequisites |
 |------|---------|------|---------------|
 | **Lite** | Heuristic only (client-side) | Free | None |
-| **Pro** | AI scoring (IC LLM → Claude → heuristic fallback) + WoT | Free during alpha | None (login for WoT) |
+| **Pro** | AI scoring (IC LLM → WebLLM → Claude → heuristic fallback) + WoT | Free during alpha | Login |
 | **BYOK** | Your own Claude API key | Your API cost | API key in Settings |
-| **Browser AI** | WebLLM (Llama 3.1 8B, local) | Free | WebGPU-capable browser |
+| **Browser AI** | WebLLM (Llama 3.1 8B, local) | Free | WebGPU-capable browser, enable in Settings |
 
 ### AI Scoring Engines
 
 | Engine | Tier | Where | Cost | When used |
 |--------|------|-------|------|-----------|
 | IC LLM (Llama 3.1 8B) | 1st | On-chain (IC canister) | Free | Default for authenticated users |
-| Anthropic Claude (claude-sonnet-4-20250514) | 2nd | Off-chain (Vercel) | API key required | Fallback when IC LLM unavailable, or BYOK |
-| Heuristic filter | 3rd | Client-side | Free | Fallback when both API tiers fail |
-| WebLLM (Llama 3.1 8B q4f16) | Optional | Browser-local (WebGPU) | Free | Manual enable in Settings |
+| WebLLM (Llama 3.1 8B q4f16) | 1.5th | Browser-local (WebGPU) | Free | When IC LLM fails and WebLLM is enabled in Settings |
+| Anthropic Claude (claude-sonnet-4-20250514) | 2nd | Off-chain (Vercel) | API key required | Fallback when IC LLM and WebLLM unavailable, or BYOK |
+| Heuristic filter | 3rd | Client-side | Free | Fallback when all API/LLM tiers fail |
 
-Tiers are tried in order (1→2→3). First successful result is used.
+Tiers are tried in order (1→1.5→2→3). First successful result is used.
 
 ### Publishing & D2A
 
@@ -89,11 +97,11 @@ Browser                                  Internet Computer (Mainnet)
 └───────────┬───────────────────────┘    └──────────────────────────┘
             │
             ▼
-   3-Tier Scoring Pipeline:
-   1. IC LLM (Llama 3.1 8B, free, on-chain)
-   2. Anthropic Claude (premium, V/C/L) or BYOK
-   3. Heuristic fallback (client-side)
-   + WebLLM (optional, browser-local via WebGPU)
+   Scoring Pipeline (fallback chain):
+   1.  IC LLM (Llama 3.1 8B, free, on-chain)
+   1.5 WebLLM (browser-local via WebGPU, if enabled)
+   2.  Anthropic Claude (premium, V/C/L) or BYOK
+   3.  Heuristic fallback (client-side)
    + Per-IP API rate limiting (5-60 req/min per route)
    + Per-instance daily API budget (500 calls/day)
 
@@ -107,23 +115,29 @@ Browser                                  Internet Computer (Mainnet)
 
 ## Slop Detection: How Aegis Judges Content Quality
 
-Aegis uses a three-tier scoring pipeline with automatic fallback. The system tries each tier in order and uses the first successful result — no silent failures.
+Aegis uses a multi-tier scoring pipeline with automatic fallback. The system tries each tier in order and uses the first successful result — no silent failures.
 
 ### Tier 1: IC LLM On-Chain Scoring (Free, Decentralized)
 
 When authenticated, Aegis first calls `analyzeOnChain()` on the canister, which runs **Llama 3.1 8B** via the [IC LLM Canister](https://github.com/nickcen/ic_llm) (`w36hm-eqaaa-aaaal-qr76a-cai`). This provides free, fully on-chain scoring with no API key required. The prompt includes the user's topic affinities for personalized evaluation.
 
-If IC LLM is unavailable (e.g. local dev, not authenticated), the system falls through to Tier 2.
+If IC LLM is unavailable (e.g. local dev, not authenticated), the system falls through to Tier 1.5.
+
+### Tier 1.5: WebLLM Browser-Local Scoring (Free, Optional)
+
+When enabled in Settings, **WebLLM** (Llama 3.1 8B q4f16 via WebGPU) runs entirely in the browser — no API calls, no data leaves the device. The model downloads once on first use (~4 GB) and scores locally thereafter. Requires a WebGPU-capable browser.
+
+If WebLLM is not enabled or fails, the system falls through to Tier 2.
 
 ### Tier 2: Claude API Scoring (Premium, High Quality)
 
-For cases where IC LLM fails or for premium-tier scoring, Aegis calls the Anthropic Claude API with the full V/C/L framework and the user's preference context. This provides the highest quality analysis but requires an API key.
+For cases where IC LLM and WebLLM both fail, or for BYOK users, Aegis calls the Anthropic Claude API with the full V/C/L framework and the user's preference context. This provides the highest quality analysis but requires an API key.
 
 If the API key is missing or the call fails, the system falls through to Tier 3.
 
-### Tier 3: Heuristic Pre-Filter (Client-side, No API Call)
+### Tier 3: Heuristic Fallback (Client-side, No API Call)
 
-Before any content reaches Claude, a fast heuristic filter runs locally. This eliminates obvious slop without spending API tokens.
+When all LLM tiers are unavailable, a fast heuristic filter scores content locally using text signals. This provides instant scoring with no network calls.
 
 | Signal | Effect | Threshold |
 |--------|--------|-----------|
@@ -191,10 +205,10 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 | Mode | Scoring Engine | WoT Filtering | Serendipity | Login Required |
 |------|---------------|:---:|:---:|:---:|
 | **Lite** | Heuristic only (client-side) | No | No | No |
-| **Pro** | IC LLM → Claude → heuristic fallback | Yes | Yes | Yes |
+| **Pro** | IC LLM → WebLLM → Claude → heuristic | Yes | Yes | Yes |
 
 - **Lite**: Fast client-side heuristic scoring. No API calls, no login. WoT and serendipity disabled.
-- **Pro**: Full 3-tier AI scoring pipeline (IC LLM → Claude → heuristic fallback) + WoT social graph filtering + serendipity detection. Free during alpha; alternatively bring your own Claude API key in Settings.
+- **Pro**: Full scoring pipeline (IC LLM → WebLLM → Claude → heuristic fallback) + WoT social graph filtering + serendipity detection. Free during alpha; alternatively bring your own Claude API key in Settings.
 
 Users switch between Lite and Pro via the FilterModeSelector in the Dashboard.
 
@@ -281,21 +295,21 @@ Aegis implements a sustainable economic model using ICP tokens (ICRC-1/2) with t
 | Tier | Engine | Cost | Where |
 |------|--------|------|-------|
 | **1st (Free)** | IC LLM (Llama 3.1 8B) | 0 ICP — cycles paid by canister | On-chain (IC) |
+| **1.5th (Free)** | WebLLM (Llama 3.1 8B q4f16) | 0 — browser-local via WebGPU | Client-side |
 | **2nd (BYOK)** | Anthropic Claude (claude-sonnet-4-20250514) | User's API key | Off-chain (Vercel) |
 | **3rd (Fallback)** | Heuristic filter | 0 | Client-side |
-| **Optional** | WebLLM (Llama 3.1 8B q4f16) | 0 — browser-local via WebGPU | Client-side |
 
-Tiers are tried in order. Free-tier scoring runs entirely on the Internet Computer. Claude API scoring provides highest quality for users who supply their own API key. WebLLM runs independently as an optional browser-local scorer.
+Tiers are tried in order (1→1.5→2→3). Free-tier scoring runs entirely on the Internet Computer. WebLLM is tried next when enabled — browser-local AI via WebGPU with no API calls. Claude API scoring provides the highest quality for users who supply their own API key.
 
 ### Pillar 2: Quality Assurance Deposits (Non-Custodial)
 
-> Deposits are only required for publishing signals, not for using Aegis as a content filter. Lite and Pro modes work without any on-chain interaction.
+> Deposits are **not required** to publish signals. New users and users in good standing publish for free. A deposit is only required when your published signals are **repeatedly flagged as low-quality** by the community — as an anti-spam measure.
 
-When publishing a signal, users deposit ICP (0.001–1.0 ICP) as a quality assurance bond. Community members vote to validate or flag signals through objective peer review:
+When a deposit is required (reputation below threshold), users attach ICP (0.001–1.0 ICP) as a quality assurance bond. Community members vote to validate or flag signals through objective peer review:
 
 ```
-Publisher deposits 0.01 ICP as quality bond
-  → 3 validates (community consensus) → Deposit returned + Trust Score updated
+Publisher with low reputation deposits ICP as quality bond
+  → 3 validates (community consensus) → Deposit returned + Trust Score improved
   → 3 flags (community consensus)     → Deposit forfeited as quality assurance cost
   → 30 days with no verdict           → Deposit auto-returned (no issue found)
 ```
@@ -530,10 +544,10 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 
 ### 3-Tier AI Scoring Pipeline
 - **Tier 1**: IC LLM (Llama 3.1 8B) — free, fully on-chain, no API key
+- **Tier 1.5**: WebLLM (Llama 3.1 8B q4f16) — free, browser-local via WebGPU, no data leaves device
 - **Tier 2**: Anthropic Claude — premium V/C/L scoring with user context
 - **Tier 3**: Heuristic fallback — local, instant, no network call
-- **WebLLM** (optional): Browser-local AI scoring via WebGPU (Llama 3.1 8B q4f16) — no API calls, no data leaves the browser
-- Automatic fallback: each tier falls through to the next on failure
+- Automatic fallback: each tier falls through to the next on failure (1→1.5→2→3)
 - BYOK: Users can supply their own Anthropic API key in Settings for Pro mode
 
 ### WoT Filter Pipeline
@@ -547,7 +561,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Cost tracking with daily records, monthly analytics, and competitor comparison
 
 ### Quality Assurance Deposits
-- Deposit 0.001–1.0 ICP when publishing signals as a quality assurance bond
+- Publish signals free while in good standing; deposit 0.001–1.0 ICP required only when reputation drops (anti-spam)
 - Community validation: 3 validates (consensus) → deposit returned + trust score updated
 - Community flagging: 3 flags (consensus) → deposit forfeited as quality assurance cost
 - Auto-return: 30 days with no verdict → deposit returned automatically
