@@ -137,3 +137,66 @@ export async function linkNostrAccount(
 
   return account;
 }
+
+/**
+ * Sync the current linked Nostr account + D2A setting to the IC canister.
+ * Fire-and-forget: errors are logged, not thrown.
+ * Uses dynamic imports to avoid pulling @dfinity/agent into test bundles.
+ */
+export async function syncLinkedAccountToIC(
+  identity: import("@dfinity/agent").Identity,
+  account: LinkedNostrAccount | null,
+  d2aEnabled: boolean,
+): Promise<void> {
+  try {
+    const { createBackendActorAsync } = await import("@/lib/ic/actor");
+    const backend = await createBackendActorAsync(identity);
+    await backend.saveUserSettings({
+      linkedNostrNpub: account?.npub ? [account.npub] : [],
+      linkedNostrPubkeyHex: account?.pubkeyHex ? [account.pubkeyHex] : [],
+      d2aEnabled,
+      updatedAt: BigInt(0), // Server overrides with Time.now()
+    });
+  } catch (err) {
+    console.warn("[nostr] Failed to sync settings to IC:", err instanceof Error ? err.message : err);
+  }
+}
+
+/**
+ * Load user settings (linked Nostr account + D2A) from the IC canister.
+ * Returns null if no settings stored or on error.
+ * Uses dynamic imports to avoid pulling @dfinity/agent into test bundles.
+ */
+export async function loadSettingsFromIC(
+  identity: import("@dfinity/agent").Identity,
+  principalText: string,
+): Promise<{ account: LinkedNostrAccount | null; d2aEnabled: boolean } | null> {
+  try {
+    const { createBackendActorAsync } = await import("@/lib/ic/actor");
+    const { Principal } = await import("@dfinity/principal");
+    const backend = await createBackendActorAsync(identity);
+    const principal = Principal.fromText(principalText);
+    const result = await backend.getUserSettings(principal);
+
+    if (result.length === 0) return null;
+
+    const settings = result[0];
+    const npub = settings.linkedNostrNpub.length > 0 ? settings.linkedNostrNpub[0] : null;
+    const pubkeyHex = settings.linkedNostrPubkeyHex.length > 0 ? settings.linkedNostrPubkeyHex[0] : null;
+
+    let account: LinkedNostrAccount | null = null;
+    if (npub && pubkeyHex) {
+      account = {
+        npub,
+        pubkeyHex,
+        linkedAt: Date.now(),
+        followCount: 0, // Will be hydrated from relays
+      };
+    }
+
+    return { account, d2aEnabled: settings.d2aEnabled };
+  } catch (err) {
+    console.warn("[nostr] Failed to load settings from IC:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}

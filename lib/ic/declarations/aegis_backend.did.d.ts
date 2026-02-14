@@ -135,6 +135,13 @@ export interface OnChainAnalysis {
   lSlop: [] | [number];
 }
 
+export interface UserSettings {
+  linkedNostrNpub: [] | [string];
+  linkedNostrPubkeyHex: [] | [string];
+  d2aEnabled: boolean;
+  updatedAt: bigint;
+}
+
 export type Result<T, E> = { ok: T } | { err: E };
 
 export interface _SERVICE {
@@ -170,4 +177,6 @@ export interface _SERVICE {
   getPushSubscriptionCount: ActorMethod<[], bigint>;
   saveLatestBriefing: ActorMethod<[string], boolean>;
   getLatestBriefing: ActorMethod<[Principal], [] | [string]>;
+  getUserSettings: ActorMethod<[Principal], [] | [UserSettings]>;
+  saveUserSettings: ActorMethod<[UserSettings], boolean>;
 }

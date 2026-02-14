@@ -29,7 +29,7 @@ import { recordFilterRun } from "@/lib/filtering/costTracker";
 import { DemoBanner } from "@/components/ui/DemoBanner";
 import { LandingHero } from "@/components/ui/LandingHero";
 import { WoTPromptBanner } from "@/components/ui/WoTPromptBanner";
-import { getLinkedAccount } from "@/lib/nostr/linkAccount";
+import { getLinkedAccount, saveLinkedAccount, syncLinkedAccountToIC, fetchNostrProfile } from "@/lib/nostr/linkAccount";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
@@ -57,7 +57,7 @@ export default function AegisApp() {
   const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
-  const { agentState, setWoTGraph: pushWoTGraph } = useAgent();
+  const { agentState, isEnabled: agentIsEnabled, setD2AEnabled, setWoTGraph: pushWoTGraph } = useAgent();
   const { isDemoMode, bannerDismissed, dismissBanner } = useDemo();
   const { filterMode } = useFilterMode();
 
@@ -78,6 +78,8 @@ export default function AegisApp() {
   const userContextRef = useRef(userContext);
   userContextRef.current = userContext;
   const ledgerRef = useRef<ICPLedgerActor | null>(null);
+  const agentEnabledRef = useRef(agentIsEnabled);
+  agentEnabledRef.current = agentIsEnabled;
 
   const nostrKeys = useMemo(() => {
     if (!isAuthenticated || !principalText) return null;
@@ -144,7 +146,11 @@ export default function AegisApp() {
       setWotPromptDismissed(false);
       try { sessionStorage.removeItem("aegis-wot-prompt-dismissed"); } catch { /* noop */ }
     }
-  }, []);
+    // Sync to IC (fire-and-forget)
+    if (identity) {
+      syncLinkedAccountToIC(identity, account, agentEnabledRef.current).catch(() => {});
+    }
+  }, [identity]);
 
   const dismissWotPrompt = useCallback(() => {
     setWotPromptDismissed(true);
@@ -215,15 +221,43 @@ export default function AegisApp() {
         ledgerRef.current = ledger;
 
         const principal = Principal.fromText(principalText);
-        const [balance, rep, eIndex] = await Promise.all([
+        const [balance, rep, eIndex, icSettings] = await Promise.all([
           ledger.icrc1_balance_of({ owner: principal, subaccount: [] }),
           backend.getUserReputation(principal),
           backend.getEngagementIndex(principal),
+          backend.getUserSettings(principal),
         ]);
         if (cancelled) return;
         setIcpBalance(balance);
         setReputation(rep);
         setEngagementIndex(eIndex);
+
+        // Restore user settings from IC
+        const settings = icSettings[0];
+        if (settings) {
+          setD2AEnabled(settings.d2aEnabled);
+
+          const localAccount = getLinkedAccount();
+          const icNpub = settings.linkedNostrNpub.length > 0 ? settings.linkedNostrNpub[0] : null;
+          const icHex = settings.linkedNostrPubkeyHex.length > 0 ? settings.linkedNostrPubkeyHex[0] : null;
+
+          if (!localAccount && icNpub && icHex) {
+            // IC has linked account that localStorage doesn't — restore
+            const restored: LinkedNostrAccount = { npub: icNpub, pubkeyHex: icHex, linkedAt: Date.now(), followCount: 0 };
+            saveLinkedAccount(restored);
+            setLinkedAccount(restored);
+            // Hydrate displayName + followCount from relays in background
+            fetchNostrProfile(icHex).then(profile => {
+              if (cancelled) return;
+              const hydrated: LinkedNostrAccount = { ...restored, displayName: profile.displayName, followCount: profile.followCount };
+              saveLinkedAccount(hydrated);
+              setLinkedAccount(hydrated);
+            }).catch(() => {});
+          } else if (localAccount && !icNpub) {
+            // Local has account but IC doesn't — sync local up
+            syncLinkedAccountToIC(identity, localAccount, settings.d2aEnabled).catch(() => {});
+          }
+        }
       } catch (err) {
         console.warn("[staking] Failed to init ledger/reputation:", errMsg(err));
         addNotification("Could not load ICP balance — staking may be unavailable", "error");
@@ -231,7 +265,7 @@ export default function AegisApp() {
     })();
 
     return () => { cancelled = true; };
-  }, [isAuthenticated, identity, principalText, addNotification]);
+  }, [isAuthenticated, identity, principalText, addNotification, setD2AEnabled]);
 
   const getSchedulerSourcesRef = useRef(getSchedulerSources);
   getSchedulerSourcesRef.current = getSchedulerSources;

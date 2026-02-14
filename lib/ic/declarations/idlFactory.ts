@@ -118,6 +118,12 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     keys: PushSubscriptionKeys,
     createdAt: IDL.Int,
   });
+  const UserSettings = IDL.Record({
+    linkedNostrNpub: IDL.Opt(IDL.Text),
+    linkedNostrPubkeyHex: IDL.Opt(IDL.Text),
+    d2aEnabled: IDL.Bool,
+    updatedAt: IDL.Int,
+  });
   return IDL.Service({
     getProfile: IDL.Func([IDL.Principal], [IDL.Opt(UserProfile)], ["query"]),
     getEvaluation: IDL.Func([IDL.Text], [IDL.Opt(ContentEvaluation)], ["query"]),
@@ -151,5 +157,7 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     getPushSubscriptionCount: IDL.Func([], [IDL.Nat], ["query"]),
     saveLatestBriefing: IDL.Func([IDL.Text], [IDL.Bool], []),
     getLatestBriefing: IDL.Func([IDL.Principal], [IDL.Opt(IDL.Text)], ["query"]),
+    getUserSettings: IDL.Func([IDL.Principal], [IDL.Opt(UserSettings)], ["query"]),
+    saveUserSettings: IDL.Func([UserSettings], [IDL.Bool], []),
   });
 };

@@ -17,6 +17,15 @@ jest.mock("@/lib/wot/cache", () => ({
   clearWoTCache: jest.fn(),
 }));
 
+const mockSaveUserSettings = jest.fn().mockResolvedValue(true);
+const mockGetUserSettings = jest.fn().mockResolvedValue([]);
+jest.mock("@/lib/ic/actor", () => ({
+  createBackendActorAsync: jest.fn().mockResolvedValue({
+    saveUserSettings: (...args: unknown[]) => mockSaveUserSettings(...args),
+    getUserSettings: (...args: unknown[]) => mockGetUserSettings(...args),
+  }),
+}));
+
 import {
   resolveNostrInput,
   getLinkedAccount,
@@ -25,6 +34,8 @@ import {
   maskNpub,
   fetchNostrProfile,
   linkNostrAccount,
+  syncLinkedAccountToIC,
+  loadSettingsFromIC,
 } from "@/lib/nostr/linkAccount";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 import { decode, npubEncode } from "nostr-tools/nip19";
@@ -37,9 +48,13 @@ const mockNpubEncode = npubEncode as jest.MockedFunction<typeof npubEncode>;
 const FAKE_HEX = "a".repeat(64);
 const FAKE_NPUB = "npub1testfakenpubvalue123456789";
 
+const fakeIdentity = {} as import("@dfinity/agent").Identity;
+
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.clear();
+  mockSaveUserSettings.mockResolvedValue(true);
+  mockGetUserSettings.mockResolvedValue([]);
 });
 
 describe("resolveNostrInput", () => {
@@ -471,5 +486,82 @@ describe("linkNostrAccount", () => {
     await expect(linkNostrAccount("bad-input")).rejects.toThrow("Invalid input:");
     // SimplePool should never have been constructed
     expect(poolConstructor).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncLinkedAccountToIC", () => {
+  const account: LinkedNostrAccount = {
+    npub: FAKE_NPUB,
+    pubkeyHex: FAKE_HEX,
+    displayName: "Alice",
+    linkedAt: 1700000000000,
+    followCount: 42,
+  };
+
+  it("calls saveUserSettings with correct payload", async () => {
+    await syncLinkedAccountToIC(fakeIdentity, account, true);
+    expect(mockSaveUserSettings).toHaveBeenCalledWith({
+      linkedNostrNpub: [FAKE_NPUB],
+      linkedNostrPubkeyHex: [FAKE_HEX],
+      d2aEnabled: true,
+      updatedAt: BigInt(0),
+    });
+  });
+
+  it("sends empty arrays when account is null (unlink)", async () => {
+    await syncLinkedAccountToIC(fakeIdentity, null, false);
+    expect(mockSaveUserSettings).toHaveBeenCalledWith({
+      linkedNostrNpub: [],
+      linkedNostrPubkeyHex: [],
+      d2aEnabled: false,
+      updatedAt: BigInt(0),
+    });
+  });
+
+  it("swallows errors (logs warning, does not throw)", async () => {
+    mockSaveUserSettings.mockRejectedValue(new Error("IC unreachable"));
+    await expect(syncLinkedAccountToIC(fakeIdentity, account, true)).resolves.toBeUndefined();
+  });
+});
+
+describe("loadSettingsFromIC", () => {
+  it("returns account + d2aEnabled from IC", async () => {
+    mockGetUserSettings.mockResolvedValue([{
+      linkedNostrNpub: [FAKE_NPUB],
+      linkedNostrPubkeyHex: [FAKE_HEX],
+      d2aEnabled: true,
+      updatedAt: BigInt(1700000000000),
+    }]);
+    const result = await loadSettingsFromIC(fakeIdentity, "aaaaa-aa");
+    expect(result).not.toBeNull();
+    expect(result!.account).not.toBeNull();
+    expect(result!.account!.npub).toBe(FAKE_NPUB);
+    expect(result!.account!.pubkeyHex).toBe(FAKE_HEX);
+    expect(result!.d2aEnabled).toBe(true);
+  });
+
+  it("returns null when no settings stored", async () => {
+    mockGetUserSettings.mockResolvedValue([]);
+    const result = await loadSettingsFromIC(fakeIdentity, "aaaaa-aa");
+    expect(result).toBeNull();
+  });
+
+  it("returns null account when npub fields are empty", async () => {
+    mockGetUserSettings.mockResolvedValue([{
+      linkedNostrNpub: [],
+      linkedNostrPubkeyHex: [],
+      d2aEnabled: false,
+      updatedAt: BigInt(0),
+    }]);
+    const result = await loadSettingsFromIC(fakeIdentity, "aaaaa-aa");
+    expect(result).not.toBeNull();
+    expect(result!.account).toBeNull();
+    expect(result!.d2aEnabled).toBe(false);
+  });
+
+  it("swallows errors and returns null", async () => {
+    mockGetUserSettings.mockRejectedValue(new Error("IC unreachable"));
+    const result = await loadSettingsFromIC(fakeIdentity, "aaaaa-aa");
+    expect(result).toBeNull();
   });
 });

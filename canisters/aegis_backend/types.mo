@@ -128,6 +128,15 @@ module {
     generatedAt : Int;      // Timestamp (nanoseconds)
   };
 
+  // ── User Settings (cross-device sync) ──
+
+  public type UserSettings = {
+    linkedNostrNpub : ?Text;
+    linkedNostrPubkeyHex : ?Text;
+    d2aEnabled : Bool;
+    updatedAt : Int;
+  };
+
   public type AnalysisTier = { #free; #premium };
 
   public type OnChainAnalysis = {

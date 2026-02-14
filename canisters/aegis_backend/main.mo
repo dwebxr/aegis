@@ -90,6 +90,10 @@ persistent actor AegisBackend {
   var stableBriefings : [(Principal, Types.D2ABriefingSnapshot)] = [];
   transient var briefings = HashMap.HashMap<Principal, Types.D2ABriefingSnapshot>(16, Principal.equal, Principal.hash);
 
+  // User settings (cross-device sync)
+  var stableUserSettings : [(Principal, Types.UserSettings)] = [];
+  transient var userSettings = HashMap.HashMap<Principal, Types.UserSettings>(16, Principal.equal, Principal.hash);
+
   // Owner -> evaluation IDs index for fast user queries
   transient var ownerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
 
@@ -134,6 +138,7 @@ persistent actor AegisBackend {
     stableSignalVoters := Buffer.toArray(voterBuf);
     stablePushSubscriptions := Iter.toArray(pushSubscriptions.entries());
     stableBriefings := Iter.toArray(briefings.entries());
+    stableUserSettings := Iter.toArray(userSettings.entries());
   };
 
   system func postupgrade() {
@@ -175,6 +180,8 @@ persistent actor AegisBackend {
     stablePushSubscriptions := [];
     for ((p, b) in stableBriefings.vals()) { briefings.put(p, b) };
     stableBriefings := [];
+    for ((p, s) in stableUserSettings.vals()) { userSettings.put(p, s) };
+    stableUserSettings := [];
     initCertCache();
   };
 
@@ -1478,6 +1485,26 @@ persistent actor AegisBackend {
       case (?snapshot) { ?snapshot.briefingJson };
       case null { null };
     };
+  };
+
+  // ──────────────────────────────────────
+  // User Settings (cross-device sync)
+  // ──────────────────────────────────────
+
+  public query func getUserSettings(p : Principal) : async ?Types.UserSettings {
+    userSettings.get(p);
+  };
+
+  public shared(msg) func saveUserSettings(settings : Types.UserSettings) : async Bool {
+    let caller = msg.caller;
+    if (not requireAuth(caller)) { return false };
+    userSettings.put(caller, {
+      linkedNostrNpub = settings.linkedNostrNpub;
+      linkedNostrPubkeyHex = settings.linkedNostrPubkeyHex;
+      d2aEnabled = settings.d2aEnabled;
+      updatedAt = Time.now();
+    });
+    true;
   };
 
   // ──────────────────────────────────────

@@ -50,6 +50,13 @@ type SourceConfigEntry = record {
   createdAt : int;
 };
 
+type UserSettings = record {
+  linkedNostrNpub : opt text;
+  linkedNostrPubkeyHex : opt text;
+  d2aEnabled : bool;
+  updatedAt : int;
+};
+
 service : {
   getProfile : (principal) -> (opt UserProfile) query;
   getEvaluation : (text) -> (opt ContentEvaluation) query;
@@ -63,4 +70,7 @@ service : {
   updateDisplayName : (text) -> (bool);
   saveSourceConfig : (SourceConfigEntry) -> (text);
   deleteSourceConfig : (text) -> (bool);
+
+  getUserSettings : (principal) -> (opt UserSettings) query;
+  saveUserSettings : (UserSettings) -> (bool);
 };

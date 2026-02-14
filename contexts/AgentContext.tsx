@@ -15,11 +15,14 @@ import { Principal } from "@dfinity/principal";
 import type { AgentState } from "@/lib/agent/types";
 import type { WoTGraph } from "@/lib/wot/types";
 import { errMsg } from "@/lib/utils/errors";
+import { syncLinkedAccountToIC } from "@/lib/nostr/linkAccount";
+import { getLinkedAccount } from "@/lib/nostr/linkAccount";
 
 interface AgentContextValue {
   agentState: AgentState;
   isEnabled: boolean;
   toggleAgent: () => void;
+  setD2AEnabled: (enabled: boolean) => void;
   setWoTGraph: (graph: WoTGraph | null) => void;
   wotGraph: WoTGraph | null;
 }
@@ -39,6 +42,7 @@ const AgentContext = createContext<AgentContextValue>({
   agentState: defaultState,
   isEnabled: false,
   toggleAgent: () => {},
+  setD2AEnabled: () => {},
   setWoTGraph: () => {},
   wotGraph: null,
 });
@@ -58,7 +62,17 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   contentRef.current = content;
 
   const toggleAgent = useCallback(() => {
-    setIsEnabled(prev => !prev);
+    setIsEnabled(prev => {
+      const next = !prev;
+      if (identity) {
+        syncLinkedAccountToIC(identity, getLinkedAccount(), next).catch(() => {});
+      }
+      return next;
+    });
+  }, [identity]);
+
+  const setD2AEnabled = useCallback((enabled: boolean) => {
+    setIsEnabled(enabled);
   }, []);
 
   const setWoTGraph = useCallback((graph: WoTGraph | null) => {
@@ -166,8 +180,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, principalText, identity, isEnabled, addContent, addNotification]);
 
   const value = useMemo(() => ({
-    agentState, isEnabled, toggleAgent, setWoTGraph, wotGraph,
-  }), [agentState, isEnabled, toggleAgent, setWoTGraph, wotGraph]);
+    agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph,
+  }), [agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph]);
 
   return (
     <AgentContext.Provider value={value}>
