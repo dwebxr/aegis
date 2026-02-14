@@ -163,6 +163,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     setIsAnalyzing(true);
     try {
     let result: AnalyzeResponse | null = null;
+    const userApiKey = getUserApiKey();
 
     // Tier 1: WebLLM (browser-local AI) — when enabled, tried first for privacy
     if (isWebLLMEnabled()) {
@@ -174,11 +175,33 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         const webllmResult = await scoreWithWebLLM(text, topics);
         result = { ...webllmResult, scoredByAI: true } as AnalyzeResponse;
       } catch (err) {
-        console.warn("[analyze] WebLLM scoring failed, falling back to IC LLM:", errMsg(err));
+        console.warn("[analyze] WebLLM scoring failed, falling back:", errMsg(err));
       }
     }
 
-    // Tier 2: IC LLM via canister (free, on-chain)
+    // Tier 2: Claude API with user's own key (BYOK)
+    if (!result && userApiKey) {
+      try {
+        const body: Record<string, unknown> = { text, source: "manual" };
+        if (userContext) body.userContext = userContext;
+        const res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-User-API-Key": userApiKey },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(30_000),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          result = data;
+        } else {
+          console.warn("[analyze] BYOK Claude API failed, falling back to IC LLM");
+        }
+      } catch (err) {
+        console.warn("[analyze] BYOK Claude API failed, falling back to IC LLM:", errMsg(err));
+      }
+    }
+
+    // Tier 3: IC LLM via canister (free, on-chain)
     if (!result && actorRef.current && isAuthenticated) {
       try {
         const topics = userContext
@@ -203,42 +226,39 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
             lSlop: a.lSlop.length > 0 ? a.lSlop[0] : undefined,
           };
         } else if ("err" in icResult) {
-          console.warn("[analyze] IC LLM returned error, falling back to API:", icResult.err);
+          console.warn("[analyze] IC LLM returned error:", icResult.err);
         }
       } catch (err) {
-        console.warn("[analyze] IC LLM failed, falling back to API:", errMsg(err));
+        console.warn("[analyze] IC LLM failed:", errMsg(err));
       }
     }
 
-    // Tier 3: Claude API via /api/analyze (premium / fallback)
-    if (!result) {
-      const body: Record<string, unknown> = { text, source: "manual" };
-      if (userContext) body.userContext = userContext;
-      const hdrs: Record<string, string> = { "Content-Type": "application/json" };
-      const uak = getUserApiKey();
-      if (uak) hdrs["X-User-API-Key"] = uak;
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: hdrs,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        // API failed but may include heuristic fallback
-        if (data.fallback) {
-          console.warn(`[analyze] API returned ${res.status}, using fallback (tier: ${data.fallback.tier})`);
-          result = data.fallback;
+    // Tier 3.5: Claude API with server key (provisional — future Pro subscription)
+    if (!result && !userApiKey) {
+      try {
+        const body: Record<string, unknown> = { text, source: "manual" };
+        if (userContext) body.userContext = userContext;
+        const res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(30_000),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          result = data;
         } else {
-          throw new Error(`Analyze API returned ${res.status}: ${data.error || res.statusText}`);
+          console.warn("[analyze] Server Claude API failed, falling back to heuristic");
         }
-      } else {
-        result = data;
+      } catch (err) {
+        console.warn("[analyze] Server Claude API failed:", errMsg(err));
       }
     }
 
+    // Tier 4: Heuristic fallback (client-side, no network call)
     if (!result) {
-      throw new Error("Analysis failed: no result from IC LLM or API");
+      const { heuristicScores } = await import("@/lib/ingestion/quickFilter");
+      result = { ...heuristicScores(text), scoredByAI: false };
     }
 
     const evaluation: ContentItem = {
