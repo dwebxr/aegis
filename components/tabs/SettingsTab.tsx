@@ -95,10 +95,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
       setWebllmStatus({ available: false, loaded: false, loading: false, progress: 0 });
       addNotification("Browser AI disabled", "success");
     } else {
-      // Turning on — check WebGPU first
-      const { isWebGPUAvailable } = await import("@/lib/webllm/engine");
-      if (!isWebGPUAvailable()) {
-        addNotification("WebGPU is not available in this browser", "error");
+      // Turning on — check WebGPU + GPU adapter
+      const { isWebGPUUsable } = await import("@/lib/webllm/engine");
+      if (!(await isWebGPUUsable())) {
+        addNotification("WebGPU is not available — check chrome://gpu or try enabling chrome://flags/#enable-unsafe-webgpu", "error");
         return;
       }
       setWebLLMEnabled(true);

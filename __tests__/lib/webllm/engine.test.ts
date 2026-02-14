@@ -48,8 +48,11 @@ jest.mock("@mlc-ai/web-llm", () => ({
 beforeEach(() => {
   jest.resetModules();
   mockCreateMLCEngine?.mockReset();
-  // Simulate WebGPU availability
-  Object.defineProperty(navigator, "gpu", { value: {}, configurable: true });
+  // Simulate WebGPU availability with a working adapter
+  Object.defineProperty(navigator, "gpu", {
+    value: { requestAdapter: jest.fn().mockResolvedValue({}) },
+    configurable: true,
+  });
 });
 
 afterEach(async () => {
@@ -69,11 +72,33 @@ describe("isWebGPUAvailable", () => {
   });
 
   it("returns false when navigator.gpu is absent", () => {
-    // Remove gpu property
     Object.defineProperty(navigator, "gpu", { value: undefined, configurable: true });
     delete (navigator as unknown as Record<string, unknown>)["gpu"];
     const { isWebGPUAvailable } = require("@/lib/webllm/engine");
     expect(isWebGPUAvailable()).toBe(false);
+  });
+});
+
+describe("isWebGPUUsable", () => {
+  it("returns true when requestAdapter returns an adapter", async () => {
+    const { isWebGPUUsable } = require("@/lib/webllm/engine");
+    expect(await isWebGPUUsable()).toBe(true);
+  });
+
+  it("returns false when requestAdapter returns null", async () => {
+    Object.defineProperty(navigator, "gpu", {
+      value: { requestAdapter: jest.fn().mockResolvedValue(null) },
+      configurable: true,
+    });
+    const { isWebGPUUsable } = require("@/lib/webllm/engine");
+    expect(await isWebGPUUsable()).toBe(false);
+  });
+
+  it("returns false when navigator.gpu is absent", async () => {
+    Object.defineProperty(navigator, "gpu", { value: undefined, configurable: true });
+    delete (navigator as unknown as Record<string, unknown>)["gpu"];
+    const { isWebGPUUsable } = require("@/lib/webllm/engine");
+    expect(await isWebGPUUsable()).toBe(false);
   });
 });
 
@@ -130,16 +155,27 @@ describe("onStatusChange", () => {
 });
 
 describe("getOrCreateEngine", () => {
-  it("throws when WebGPU not available", async () => {
+  it("throws when WebGPU not available (no navigator.gpu)", async () => {
     Object.defineProperty(navigator, "gpu", { value: undefined, configurable: true });
     delete (navigator as unknown as Record<string, unknown>)["gpu"];
     const { getOrCreateEngine } = require("@/lib/webllm/engine");
     await expect(getOrCreateEngine()).rejects.toThrow("WebGPU not available");
   });
 
-  it("emits error status when WebGPU not available", async () => {
-    Object.defineProperty(navigator, "gpu", { value: undefined, configurable: true });
-    delete (navigator as unknown as Record<string, unknown>)["gpu"];
+  it("throws when GPU adapter is null", async () => {
+    Object.defineProperty(navigator, "gpu", {
+      value: { requestAdapter: jest.fn().mockResolvedValue(null) },
+      configurable: true,
+    });
+    const { getOrCreateEngine } = require("@/lib/webllm/engine");
+    await expect(getOrCreateEngine()).rejects.toThrow("WebGPU not available");
+  });
+
+  it("emits error status when WebGPU not usable", async () => {
+    Object.defineProperty(navigator, "gpu", {
+      value: { requestAdapter: jest.fn().mockResolvedValue(null) },
+      configurable: true,
+    });
     const { getOrCreateEngine, onStatusChange } = require("@/lib/webllm/engine");
     const statuses: Array<{ available: boolean; error?: string }> = [];
     onStatusChange((s: { available: boolean; error?: string }) => statuses.push({ ...s }));

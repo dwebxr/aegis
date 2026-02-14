@@ -33,19 +33,28 @@ export function isWebGPUAvailable(): boolean {
   return typeof navigator !== "undefined" && "gpu" in navigator;
 }
 
+export async function isWebGPUUsable(): Promise<boolean> {
+  if (!isWebGPUAvailable()) return false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gpu = (navigator as any).gpu;
+  const adapter = await gpu.requestAdapter();
+  return adapter !== null;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getOrCreateEngine(): Promise<any> {
   if (engine) return engine;
   if (enginePromise) return enginePromise;
 
-  if (!isWebGPUAvailable()) {
-    emitStatus({ available: false, error: "WebGPU not available in this browser" });
-    throw new Error("WebGPU not available");
-  }
-
-  emitStatus({ available: true, loading: true, progress: 0 });
-
+  // Assign immediately so concurrent callers share the same promise
   enginePromise = (async () => {
+    if (!(await isWebGPUUsable())) {
+      emitStatus({ available: false, error: "WebGPU not available — no GPU adapter found" });
+      throw new Error("WebGPU not available");
+    }
+
+    emitStatus({ available: true, loading: true, progress: 0 });
+
     const webllm = await import("@mlc-ai/web-llm");
     const created = await webllm.CreateMLCEngine(MODEL_ID, {
       initProgressCallback: (report) => {
