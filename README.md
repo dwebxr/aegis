@@ -11,14 +11,18 @@ Content quality filter that learns your taste, curates a zero-noise briefing, pu
 
 Aegis is **free to use** for content filtering. No wallet, no deposit, no setup required.
 
-| What you want to do | Cost | Deposit needed? |
-|---------------------|------|:---:|
-| Browse & filter content (Lite mode) | Free | No |
-| AI-powered scoring (Pro mode, alpha) | Free during alpha | No |
-| Use your own API key for AI scoring | Your API cost | No |
-| Publish quality signals to Nostr | Free while in good standing | No* |
+| What you want to do | Cost | Prerequisites |
+|---------------------|------|---------------|
+| Browse & filter content (Lite mode) | Free | None |
+| AI-powered scoring (Pro mode, alpha) | Free during alpha | None |
+| Use your own API key for AI scoring | Your API cost | None |
+| Publish quality signals to Nostr | Free while in good standing | None* |
+| D2A Start (trusted peers) | Free | Link Nostr npub in Settings |
+| D2A Start (unknown peers) | 0.001 ICP / item | ICRC-2 pre-approval (max 0.1 ICP) |
 
 \*Deposit required only if your published signals are repeatedly flagged as low-quality (anti-spam measure). New users and users in good standing publish for free.
+
+**Trusted peers** are users in the follow graph of the Nostr account you link in Settings. D2A exchanges between trusted peers are free; exchanges with unknown peers incur a small ICP fee via ICRC-2 allowance.
 
 **How does Publish Signal reputation work?** Every publisher starts with a neutral reputation. Signals validated by the community improve your standing; signals flagged as slop degrade it. If your reputation drops below the threshold, an ICP deposit (0.001–1.0 ICP) is required as a quality assurance bond. Reputation naturally recovers over time (+1 per week of inactivity).
 
@@ -177,7 +181,7 @@ Users can link an existing Nostr account (npub) in Settings to use its follow gr
 3. The linked pubkey replaces the IC-derived key as the WoT graph root
 4. All WoT scores, D2A trust tiers, and content filtering automatically reflect the linked account's social graph
 
-The IC-derived keypair continues to be used for signing and publishing — only the graph root changes. Unlinking reverts to the IC-derived key and rebuilds the graph.
+The IC-derived keypair continues to be used for signing and publishing — only the graph root changes. Unlinking reverts to the IC-derived key and rebuilds the graph. The linked account and D2A agent toggle are synced to the IC canister, so they persist across browsers and devices.
 
 ### WoT Graph Construction
 
@@ -593,7 +597,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → build → security audit on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, beforeSend scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (1902 tests, 133 suites) |
+| Test | Jest + ts-jest (1913 tests, 133 suites) |
 
 ## Project Structure
 
@@ -706,7 +710,7 @@ aegis/
 │       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       ├── csv.ts                       # CSV export (RFC-compliant escaping)
 │       └── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
-├── __tests__/                           # 1902 tests across 133 suites
+├── __tests__/                           # 1913 tests across 133 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -742,7 +746,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 1902 tests
+npm test              # Run all 1913 tests
 npm run test:watch    # Watch mode
 ```
 
@@ -822,6 +826,17 @@ service : {
   // D2A Briefing Snapshots
   saveLatestBriefing : (text) -> (bool);              // Save serialized briefing JSON
   getLatestBriefing : (principal) -> (opt text) query; // Retrieve latest briefing
+
+  // User Settings (Nostr link + D2A toggle — synced across devices)
+  saveUserSettings : (UserSettings) -> (bool);
+  getUserSettings : (principal) -> (opt UserSettings) query;
+
+  // Push Notifications
+  registerPushSubscription : (text, text, text) -> (bool);
+  unregisterPushSubscription : (text) -> (bool);
+  getPushSubscriptions : (principal) -> (vec PushSubscription) query;
+  removePushSubscriptions : (principal, vec text) -> (bool);
+  getPushSubscriptionCount : () -> (nat) query;
 
   // Treasury (non-custodial — no operator withdrawal)
   getTreasuryBalance : () -> (nat);                  // Transparency: anyone can check
