@@ -73,13 +73,20 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
     available: false, loaded: false, loading: false, progress: 0,
   });
 
-  // Subscribe to WebLLM status when enabled
+  // Subscribe to WebLLM status when enabled; auto-disable if WebGPU unusable
   useEffect(() => {
     if (!webllmOn) return;
     let unsub: (() => void) | null = null;
     (async () => {
-      const { onStatusChange, isWebGPUAvailable } = await import("@/lib/webllm/engine");
-      setWebllmStatus(prev => ({ ...prev, available: isWebGPUAvailable() }));
+      const { onStatusChange, isWebGPUUsable } = await import("@/lib/webllm/engine");
+      if (!(await isWebGPUUsable())) {
+        // WebGPU not actually usable — revert persisted toggle
+        setWebLLMEnabled(false);
+        setWebllmOn(false);
+        setWebllmStatus({ available: false, loaded: false, loading: false, progress: 0 });
+        return;
+      }
+      setWebllmStatus(prev => ({ ...prev, available: true }));
       unsub = onStatusChange(setWebllmStatus);
     })();
     return () => { unsub?.(); };
