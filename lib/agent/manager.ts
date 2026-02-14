@@ -3,6 +3,7 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { ContentItem } from "@/lib/types/content";
+import type { WoTGraph } from "@/lib/wot/types";
 import type { AgentProfile, AgentState, HandshakeState, D2AOfferPayload, D2ADeliverPayload } from "./types";
 import { broadcastPresence, discoverPeers, calculateResonance } from "./discovery";
 import { sendOffer, sendAccept, sendReject, deliverContent, parseD2AMessage, isHandshakeExpired } from "./handshake";
@@ -15,13 +16,22 @@ import {
 import type { SubCloser } from "nostr-tools/pool";
 import { errMsg } from "@/lib/utils/errors";
 import { DEFAULT_RELAYS } from "@/lib/nostr/types";
+import { calculateWoTScore } from "@/lib/wot/scorer";
+import {
+  isBlocked,
+  getReputation,
+  calculateEffectiveTrust,
+  getTrustTier,
+  calculateDynamicFee,
+} from "@/lib/d2a/reputation";
+import { diffManifest } from "@/lib/d2a/manifest";
 
 interface AgentManagerCallbacks {
   onNewContent: (item: ContentItem) => void;
   getContent: () => ContentItem[];
   getPrefs: () => UserPreferenceProfile;
   onStateChange: (state: AgentState) => void;
-  onD2AMatchComplete?: (senderPk: string, senderPrincipalId: string | undefined, contentHash: string) => void | Promise<void>;
+  onD2AMatchComplete?: (senderPk: string, senderPrincipalId: string | undefined, contentHash: string, fee: number) => void | Promise<void>;
 }
 
 export class AgentManager {
@@ -45,6 +55,7 @@ export class AgentManager {
   private active = false;
 
   private principalId?: string;
+  private wotGraph: WoTGraph | null = null;
 
   constructor(
     sk: Uint8Array,
@@ -52,12 +63,18 @@ export class AgentManager {
     callbacks: AgentManagerCallbacks,
     relayUrls?: string[],
     principalId?: string,
+    wotGraph?: WoTGraph | null,
   ) {
     this.sk = sk;
     this.pk = pk;
     this.callbacks = callbacks;
     this.relayUrls = relayUrls || DEFAULT_RELAYS;
     this.principalId = principalId;
+    this.wotGraph = wotGraph ?? null;
+  }
+
+  setWoTGraph(graph: WoTGraph | null): void {
+    this.wotGraph = graph;
   }
 
   /** Compute delay with exponential backoff: base * 2^(errors-1), capped at 15min */
@@ -174,7 +191,8 @@ export class AgentManager {
       .slice(0, 20)
       .map(([k]) => k);
 
-    await broadcastPresence(this.sk, interests, 5, this.relayUrls, this.principalId);
+    const content = this.callbacks.getContent();
+    await broadcastPresence(this.sk, interests, 5, this.relayUrls, this.principalId, content);
   }
 
   private cleanupStaleHandshakes(): void {
@@ -200,7 +218,6 @@ export class AgentManager {
     }
     this.emitState();
 
-    // Look for content to offer to compatible peers
     const content = this.callbacks.getContent();
     const offerCandidates = content.filter(c =>
       c.verdict === "quality" &&
@@ -210,14 +227,20 @@ export class AgentManager {
     );
 
     for (const peer of discovered) {
-      // Don't send offers to peers with active (in-progress) handshakes
       const existing = this.handshakes.get(peer.nostrPubkey);
       if (existing && (existing.phase === "offered" || existing.phase === "accepted" || existing.phase === "delivering")) continue;
-
-      const peerInterests = new Set(peer.interests);
-      const match = offerCandidates.find(c =>
-        c.topics?.some(t => peerInterests.has(t))
-      );
+      if (isBlocked(peer.nostrPubkey)) continue;
+      if (peer.capacity <= 0) continue;
+      let match: ContentItem | undefined;
+      if (peer.manifest) {
+        const diffItems = diffManifest(offerCandidates, peer.manifest);
+        match = diffItems[0];
+      } else {
+        const peerInterests = new Set(peer.interests);
+        match = offerCandidates.find(c =>
+          c.topics?.some(t => peerInterests.has(t))
+        );
+      }
 
       if (match && match.topics) {
         const offer: D2AOfferPayload = {
@@ -369,8 +392,23 @@ export class AgentManager {
     // Reject deliveries from undiscovered peers — no profile means no trust
     if (!peerProfile) return;
 
+    if (isBlocked(senderPk)) return;
+
     const resonance = calculateResonance(prefs, peerProfile);
     if (resonance < 0.1) return;
+
+    const wotScore = this.wotGraph
+      ? calculateWoTScore(senderPk, this.wotGraph).trustScore
+      : 0;
+    const repData = getReputation(senderPk);
+    const repScore = repData?.score ?? 0;
+    const effectiveTrust = calculateEffectiveTrust(wotScore, repScore);
+    const tier = getTrustTier(effectiveTrust);
+
+    // Restricted tier = reject delivery silently
+    if (tier === "restricted") return;
+
+    const fee = calculateDynamicFee(tier);
 
     const item: ContentItem = {
       id: uuidv4(),
@@ -390,6 +428,7 @@ export class AgentManager {
       vSignal: payload.vSignal,
       cContext: payload.cContext,
       lSlop: payload.lSlop,
+      nostrPubkey: senderPk,
     };
 
     this.callbacks.onNewContent(item);
@@ -401,11 +440,11 @@ export class AgentManager {
       handshake.completedAt = Date.now();
     }
 
-    if (this.callbacks.onD2AMatchComplete) {
+    if (this.callbacks.onD2AMatchComplete && fee > 0) {
       this.d2aMatchCount++;
       const contentPreview = payload.text.slice(0, 32);
       try {
-        await this.callbacks.onD2AMatchComplete(senderPk, peerProfile.principalId, contentPreview);
+        await this.callbacks.onD2AMatchComplete(senderPk, peerProfile.principalId, contentPreview, fee);
       } catch (err) {
         console.warn("[agent] onD2AMatchComplete callback failed:", errMsg(err));
       }

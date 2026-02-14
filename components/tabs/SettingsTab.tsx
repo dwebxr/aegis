@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { colors, space, type as t, radii, transitions, fonts } from "@/styles/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgent } from "@/contexts/AgentContext";
@@ -10,10 +10,13 @@ import { AgentStatusBadge } from "@/components/ui/AgentStatusBadge";
 import {
   MIN_OFFER_SCORE,
   RESONANCE_THRESHOLD,
-  D2A_MATCH_FEE,
+  D2A_FEE_TRUSTED,
+  D2A_FEE_UNKNOWN,
   D2A_APPROVE_AMOUNT,
 } from "@/lib/agent/protocol";
 import { getUserApiKey, setUserApiKey, clearUserApiKey, maskApiKey } from "@/lib/apiKey/storage";
+import { isWebLLMEnabled, setWebLLMEnabled } from "@/lib/webllm/storage";
+import type { WebLLMStatus } from "@/lib/webllm/types";
 
 const LS_PUSH_FREQ_KEY = "aegis-push-frequency";
 
@@ -61,6 +64,44 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile }) => {
     const key = getUserApiKey();
     return key ? maskApiKey(key) : "";
   });
+  const [webllmOn, setWebllmOn] = useState(() => isWebLLMEnabled());
+  const [webllmStatus, setWebllmStatus] = useState<WebLLMStatus>({
+    available: false, loaded: false, loading: false, progress: 0,
+  });
+
+  // Subscribe to WebLLM status when enabled
+  useEffect(() => {
+    if (!webllmOn) return;
+    let unsub: (() => void) | null = null;
+    (async () => {
+      const { onStatusChange, isWebGPUAvailable } = await import("@/lib/webllm/engine");
+      setWebllmStatus(prev => ({ ...prev, available: isWebGPUAvailable() }));
+      unsub = onStatusChange(setWebllmStatus);
+    })();
+    return () => { unsub?.(); };
+  }, [webllmOn]);
+
+  const handleWebLLMToggle = useCallback(async () => {
+    if (webllmOn) {
+      // Turning off — destroy engine if loaded
+      setWebLLMEnabled(false);
+      setWebllmOn(false);
+      const { destroyEngine } = await import("@/lib/webllm/engine");
+      await destroyEngine();
+      setWebllmStatus({ available: false, loaded: false, loading: false, progress: 0 });
+      addNotification("Browser AI disabled", "success");
+    } else {
+      // Turning on — check WebGPU first
+      const { isWebGPUAvailable } = await import("@/lib/webllm/engine");
+      if (!isWebGPUAvailable()) {
+        addNotification("WebGPU is not available in this browser", "error");
+        return;
+      }
+      setWebLLMEnabled(true);
+      setWebllmOn(true);
+      addNotification("Browser AI enabled — model will download on first score", "success");
+    }
+  }, [webllmOn, addNotification]);
 
   // Load saved frequency on mount
   useEffect(() => {
@@ -198,7 +239,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile }) => {
             {[
               { label: "Min Score", value: MIN_OFFER_SCORE.toFixed(1), color: colors.purple[400] },
               { label: "Resonance", value: RESONANCE_THRESHOLD.toFixed(1), color: colors.sky[400] },
-              { label: "Match Fee", value: `${(D2A_MATCH_FEE / 1e8).toFixed(3)} ICP`, color: colors.amber[400] },
+              { label: "Fee Range", value: `${(D2A_FEE_TRUSTED / 1e8).toFixed(4)}–${(D2A_FEE_UNKNOWN / 1e8).toFixed(3)} ICP`, color: colors.amber[400] },
               { label: "Approval", value: `${(D2A_APPROVE_AMOUNT / 1e8).toFixed(1)} ICP`, color: colors.text.muted },
             ].map(p => (
               <div key={p.label} style={{ minWidth: 70 }}>
@@ -278,6 +319,71 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile }) => {
 
         <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
           Enter your Anthropic API key to use Pro mode with your own quota. Key is stored in localStorage only.
+        </div>
+      </div>
+
+      {/* Browser AI (WebLLM) */}
+      <div style={cardStyle(mobile)}>
+        <div style={sectionTitle}>Browser AI</div>
+        <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[3] }}>
+          <button
+            onClick={handleWebLLMToggle}
+            style={{
+              position: "relative",
+              width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
+              background: webllmOn ? colors.cyan[500] : colors.bg.overlay,
+              transition: transitions.fast, flexShrink: 0,
+            }}
+          >
+            <div style={{
+              position: "absolute", top: 2, left: webllmOn ? 20 : 2,
+              width: 18, height: 18, borderRadius: "50%",
+              background: webllmOn ? "#fff" : colors.text.disabled,
+              transition: transitions.fast,
+            }} />
+          </button>
+          <span style={{ fontSize: t.caption.size, fontWeight: 600, color: webllmOn ? colors.cyan[400] : colors.text.disabled }}>
+            {webllmOn ? "Enabled" : "Disabled"}
+          </span>
+        </div>
+
+        {webllmOn && (
+          <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+            <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+              <div style={{
+                width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                background: webllmStatus.loaded ? colors.green[400]
+                  : webllmStatus.loading ? colors.amber[400]
+                  : webllmStatus.available ? colors.text.muted
+                  : colors.red[400],
+              }} />
+              <span style={{ fontSize: t.caption.size, color: colors.text.secondary }}>
+                {webllmStatus.error ? `Error: ${webllmStatus.error}`
+                  : webllmStatus.loaded ? "Model ready"
+                  : webllmStatus.loading ? `Downloading model... ${webllmStatus.progress}%`
+                  : webllmStatus.available ? "WebGPU available — model loads on first score"
+                  : "WebGPU not available"}
+              </span>
+            </div>
+
+            {webllmStatus.loading && (
+              <div style={{
+                height: 4, borderRadius: 2, background: colors.bg.overlay,
+                overflow: "hidden",
+              }}>
+                <div style={{
+                  height: "100%", borderRadius: 2,
+                  background: `linear-gradient(90deg, ${colors.cyan[500]}, ${colors.blue[500]})`,
+                  width: `${webllmStatus.progress}%`,
+                  transition: "width 0.3s ease",
+                }} />
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
+          Run AI scoring locally via WebGPU (Llama 3.1 8B). Requires a WebGPU-capable browser and ~4GB download. No data leaves your device.
         </div>
       </div>
 

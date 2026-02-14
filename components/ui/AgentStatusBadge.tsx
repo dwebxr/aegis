@@ -1,8 +1,10 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { fonts, colors, space, type as t, radii, transitions } from "@/styles/theme";
 import { useAgent } from "@/contexts/AgentContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { getReputation, calculateEffectiveTrust, getTrustTier, type TrustTier } from "@/lib/d2a/reputation";
+import { calculateWoTScore } from "@/lib/wot/scorer";
 
 interface AgentStatusBadgeProps {
   compact?: boolean;
@@ -10,8 +12,23 @@ interface AgentStatusBadgeProps {
 
 export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) => {
   const { isAuthenticated } = useAuth();
-  const { agentState, isEnabled, toggleAgent } = useAgent();
+  const { agentState, isEnabled, toggleAgent, wotGraph } = useAgent();
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // Must be before early returns (React hooks rules)
+  const tierCounts = useMemo(() => {
+    const counts: Record<TrustTier, number> = { trusted: 0, known: 0, unknown: 0, restricted: 0 };
+    for (const peer of agentState.peers) {
+      const wotScore = wotGraph
+        ? calculateWoTScore(peer.nostrPubkey, wotGraph).trustScore
+        : 0;
+      const rep = getReputation(peer.nostrPubkey);
+      const repScore = rep?.score ?? 0;
+      const trust = calculateEffectiveTrust(wotScore, repScore);
+      counts[getTrustTier(trust)]++;
+    }
+    return counts;
+  }, [agentState.peers, wotGraph]);
 
   if (!isAuthenticated) return null;
 
@@ -31,7 +48,6 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
     setShowConfirm(false);
   };
 
-  // Confirmation panel shown before enabling D2A agent
   if (showConfirm && !isEnabled) {
     return (
       <div style={{
@@ -50,7 +66,7 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
           </div>
           <div style={{ marginBottom: 6 }}>
             <strong style={{ color: colors.amber[400] }}>Precision Match Fee:</strong>{" "}
-            When you receive content through a successful match, a content delivery fee of <strong style={{ fontFamily: fonts.mono }}>0.001 ICP</strong> is charged to the receiver.
+            When you receive content, a trust-based fee is charged. New peers start at <strong style={{ fontFamily: fonts.mono }}>0.002 ICP</strong> (unknown). As you validate content and build your Web of Trust, fees decrease: <strong style={{ fontFamily: fonts.mono }}>0.001</strong> (known) or <strong style={{ fontFamily: fonts.mono }}>0.0005</strong> (trusted).
           </div>
           <div style={{ marginBottom: 6 }}>
             <strong style={{ color: colors.text.primary }}>Fee Distribution:</strong>{" "}
@@ -170,14 +186,29 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
         </button>
       </div>
       {isEnabled && (
-        <div style={{ display: "flex", gap: space[3], fontSize: t.caption.size, color: colors.text.tertiary }}>
-          <span><strong style={{ color: colors.purple[400], fontFamily: fonts.mono }}>{peerCount}</strong> peers</span>
-          <span><strong style={{ color: colors.sky[400], fontFamily: fonts.mono }}>{activeHS}</strong> active</span>
-          <span>
-            <strong style={{ color: colors.green[400], fontFamily: fonts.mono }}>{agentState.receivedItems}</strong>&#x2193;
-            <strong style={{ color: colors.amber[400], fontFamily: fonts.mono, marginLeft: 2 }}>{agentState.sentItems}</strong>&#x2191;
-          </span>
-        </div>
+        <>
+          <div style={{ display: "flex", gap: space[3], fontSize: t.caption.size, color: colors.text.tertiary }}>
+            <span><strong style={{ color: colors.purple[400], fontFamily: fonts.mono }}>{peerCount}</strong> peers</span>
+            <span><strong style={{ color: colors.sky[400], fontFamily: fonts.mono }}>{activeHS}</strong> active</span>
+            <span>
+              <strong style={{ color: colors.green[400], fontFamily: fonts.mono }}>{agentState.receivedItems}</strong>&#x2193;
+              <strong style={{ color: colors.amber[400], fontFamily: fonts.mono, marginLeft: 2 }}>{agentState.sentItems}</strong>&#x2191;
+            </span>
+          </div>
+          {peerCount > 0 && (
+            <div style={{ display: "flex", gap: space[2], fontSize: t.tiny.size, color: colors.text.muted, marginTop: space[1] }}>
+              {tierCounts.trusted > 0 && (
+                <span style={{ color: colors.green[400] }}>{tierCounts.trusted} trusted</span>
+              )}
+              {tierCounts.known > 0 && (
+                <span style={{ color: colors.sky[400] }}>{tierCounts.known} known</span>
+              )}
+              {tierCounts.unknown > 0 && (
+                <span style={{ color: colors.text.muted }}>{tierCounts.unknown} unknown</span>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

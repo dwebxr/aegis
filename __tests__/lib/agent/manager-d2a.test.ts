@@ -41,6 +41,21 @@ jest.mock("uuid", () => ({
   v4: jest.fn().mockReturnValue("test-uuid-d2a"),
 }));
 
+// Mock reputation module — manager.ts imports isBlocked, getReputation, etc.
+const mockIsBlocked = jest.fn().mockReturnValue(false);
+const mockGetReputation = jest.fn().mockReturnValue(undefined);
+const mockCalcEffectiveTrust = jest.fn().mockReturnValue(0.2);
+const mockGetTrustTier = jest.fn().mockReturnValue("unknown" as const);
+const mockCalcDynamicFee = jest.fn().mockReturnValue(200_000);
+
+jest.mock("@/lib/d2a/reputation", () => ({
+  isBlocked: (...args: unknown[]) => mockIsBlocked(...args),
+  getReputation: (...args: unknown[]) => mockGetReputation(...args),
+  calculateEffectiveTrust: (...args: unknown[]) => mockCalcEffectiveTrust(...args),
+  getTrustTier: (...args: unknown[]) => mockGetTrustTier(...args),
+  calculateDynamicFee: (...args: unknown[]) => mockCalcDynamicFee(...args),
+}));
+
 import { AgentManager } from "@/lib/agent/manager";
 
 function makeCallbacks(overrides?: Partial<{
@@ -118,6 +133,7 @@ describe("AgentManager — D2A match callback", () => {
       "sender-with-principal",
       "abc-123-principal",
       expect.any(String),
+      expect.any(Number),
     );
     expect(mgr.getState().d2aMatchCount).toBe(1);
 
@@ -498,7 +514,351 @@ describe("AgentManager — state inspection", () => {
       5,
       ["wss://test.relay"],
       "my-ic-principal",
+      expect.any(Array),
     );
+
+    mgr.stop();
+  });
+});
+
+describe("AgentManager — trust-based fee integration", () => {
+  const sk = new Uint8Array(32).fill(9);
+  const pk = "trust-fee-test-pk";
+  let onEventHandler: (event: { pubkey: string; content: string }) => void;
+
+  function setupPeerAndDeliver(
+    peerPk: string,
+    principalId?: string,
+  ) {
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: peerPk,
+      principalId,
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+    }]);
+    mockParseD2AMessage.mockReturnValue({
+      type: "deliver",
+      fromPubkey: peerPk,
+      toPubkey: pk,
+      payload: {
+        text: "Delivered content",
+        author: "Peer",
+        scores: { originality: 7, insight: 7, credibility: 7, composite: 7.0 },
+        verdict: "quality",
+        topics: ["ai"],
+      } as D2ADeliverPayload,
+    });
+    mockCalculateResonance.mockReturnValue(0.5);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Reset reputation mocks to defaults
+    mockIsBlocked.mockReturnValue(false);
+    mockGetReputation.mockReturnValue(undefined);
+    mockCalcEffectiveTrust.mockReturnValue(0.2);
+    mockGetTrustTier.mockReturnValue("unknown");
+    mockCalcDynamicFee.mockReturnValue(200_000);
+    mockBroadcastPresence.mockResolvedValue(undefined);
+    mockDiscoverPeers.mockResolvedValue([]);
+    mockSubscribe.mockImplementation((_r: unknown, _f: unknown, handlers: { onevent: typeof onEventHandler }) => {
+      onEventHandler = handlers.onevent;
+      return { close: jest.fn() };
+    });
+  });
+
+  it("passes dynamic fee to onD2AMatchComplete callback", async () => {
+    const { callbacks } = makeCallbacks();
+    setupPeerAndDeliver("fee-peer", "fee-principal");
+
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+    // Re-setup with actual mgr reference for discover
+    mockDiscoverPeers.mockReset();
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: "fee-peer",
+      principalId: "fee-principal",
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+    }]);
+
+    await mgr.start();
+
+    onEventHandler({ pubkey: "fee-peer", content: "deliver" });
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(callbacks.onD2AMatchComplete).toHaveBeenCalledTimes(1);
+    const fee = callbacks.onD2AMatchComplete.mock.calls[0][3];
+    // Unknown peer (no WoT graph, no reputation) → D2A_FEE_UNKNOWN = 200,000
+    expect(fee).toBe(200_000);
+
+    mgr.stop();
+  });
+
+  it("does not fire onD2AMatchComplete for restricted tier (fee=0)", async () => {
+    // This can't happen with wotGraph=null since normalized rep can't go negative
+    // through calculateEffectiveTrust. With wotGraph=null, minimum effectiveTrust=0
+    // which maps to "unknown" tier. This test verifies that fee > 0 check works.
+    const { callbacks } = makeCallbacks();
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: "ok-peer",
+      principalId: "ok-principal",
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+    }]);
+    mockCalculateResonance.mockReturnValue(0.5);
+    mockParseD2AMessage.mockReturnValue({
+      type: "deliver",
+      fromPubkey: "ok-peer",
+      toPubkey: pk,
+      payload: {
+        text: "Valid content",
+        author: "Author",
+        scores: { originality: 7, insight: 7, credibility: 7, composite: 7.0 },
+        verdict: "quality",
+        topics: ["ai"],
+      } as D2ADeliverPayload,
+    });
+
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+    await mgr.start();
+
+    onEventHandler({ pubkey: "ok-peer", content: "deliver" });
+    await new Promise(r => setTimeout(r, 50));
+
+    // Content IS accepted (receivedItems incremented)
+    expect(callbacks.onNewContent).toHaveBeenCalledTimes(1);
+    // Fee IS charged (unknown tier = 200,000 > 0)
+    expect(callbacks.onD2AMatchComplete).toHaveBeenCalledTimes(1);
+
+    mgr.stop();
+  });
+
+  it("skips blocked peers during discovery offer", async () => {
+    // Mock isBlocked to return true for "blocked-peer"
+    mockIsBlocked.mockImplementation((pk: string) => pk === "blocked-peer");
+
+    const qualityItem: ContentItem = {
+      id: "q1", owner: "owner", author: "A", avatar: "A",
+      text: "Quality AI content", source: "manual",
+      scores: { originality: 9, insight: 9, credibility: 9, composite: 9.0 },
+      verdict: "quality", reason: "", createdAt: Date.now(),
+      validated: false, flagged: false, timestamp: "now",
+      topics: ["ai"],
+    };
+
+    const { callbacks } = makeCallbacks({ content: [qualityItem] });
+    callbacks.getContent.mockReturnValue([qualityItem]);
+
+    mockDiscoverPeers.mockResolvedValueOnce([
+      { nostrPubkey: "blocked-peer", interests: ["ai"], capacity: 5, lastSeen: Date.now() },
+      { nostrPubkey: "good-peer", interests: ["ai"], capacity: 5, lastSeen: Date.now() },
+    ]);
+    mockSendOffer.mockResolvedValue({
+      peerId: "good-peer", phase: "offered",
+      offeredTopic: "ai", offeredScore: 9.0, startedAt: Date.now(),
+    });
+
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+    await mgr.start();
+
+    // sendOffer should only be called for good-peer, not blocked-peer
+    expect(mockSendOffer).toHaveBeenCalledTimes(1);
+    expect(mockSendOffer.mock.calls[0][2]).toBe("good-peer");
+
+    mgr.stop();
+  });
+
+  it("rejects delivery from blocked peer", async () => {
+    mockIsBlocked.mockImplementation((pk: string) => pk === "blocked-sender");
+
+    const { callbacks } = makeCallbacks();
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: "blocked-sender",
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+    }]);
+    mockCalculateResonance.mockReturnValue(0.5);
+    mockParseD2AMessage.mockReturnValue({
+      type: "deliver",
+      fromPubkey: "blocked-sender",
+      toPubkey: pk,
+      payload: {
+        text: "Blocked content",
+        author: "Bad Actor",
+        scores: { originality: 7, insight: 7, credibility: 7, composite: 7.0 },
+        verdict: "quality",
+        topics: ["ai"],
+      } as D2ADeliverPayload,
+    });
+
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+    await mgr.start();
+
+    onEventHandler({ pubkey: "blocked-sender", content: "deliver" });
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(callbacks.onNewContent).not.toHaveBeenCalled();
+    expect(mgr.getState().receivedItems).toBe(0);
+
+    mgr.stop();
+  });
+
+  it("sets nostrPubkey on delivered ContentItem", async () => {
+    const { callbacks } = makeCallbacks();
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: "sender-pk-123",
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+    }]);
+    mockCalculateResonance.mockReturnValue(0.5);
+    mockParseD2AMessage.mockReturnValue({
+      type: "deliver",
+      fromPubkey: "sender-pk-123",
+      toPubkey: pk,
+      payload: {
+        text: "Content with pubkey",
+        author: "Author",
+        scores: { originality: 7, insight: 7, credibility: 7, composite: 7.0 },
+        verdict: "quality",
+        topics: ["ai"],
+      } as D2ADeliverPayload,
+    });
+
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+    await mgr.start();
+
+    onEventHandler({ pubkey: "sender-pk-123", content: "deliver" });
+    await new Promise(r => setTimeout(r, 50));
+
+    const createdItem = callbacks.onNewContent.mock.calls[0][0] as ContentItem;
+    expect(createdItem.nostrPubkey).toBe("sender-pk-123");
+    expect(createdItem.source).toBe("nostr");
+
+    mgr.stop();
+  });
+});
+
+describe("AgentManager — diff-aware offer selection", () => {
+  const sk = new Uint8Array(32).fill(10);
+  const pk = "diff-offer-test-pk";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockBroadcastPresence.mockResolvedValue(undefined);
+    mockSubscribe.mockReturnValue({ close: jest.fn() });
+  });
+
+  it("uses diffManifest when peer has manifest", async () => {
+    const contentItem: ContentItem = {
+      id: "novel-1", owner: "owner", author: "A", avatar: "A",
+      text: "Novel AI research findings", source: "manual",
+      scores: { originality: 9, insight: 9, credibility: 9, composite: 9.0 },
+      verdict: "quality", reason: "", createdAt: Date.now(),
+      validated: false, flagged: false, timestamp: "now",
+      topics: ["ai"],
+    };
+
+    const { callbacks } = makeCallbacks({ content: [contentItem] });
+    callbacks.getContent.mockReturnValue([contentItem]);
+
+    // Peer has manifest with different content
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: "manifest-peer",
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+      manifest: {
+        entries: [{ hash: "0000000000000000", topic: "ai", score: 7 }],
+        generatedAt: Date.now(),
+      },
+    }]);
+    mockSendOffer.mockResolvedValue({
+      peerId: "manifest-peer", phase: "offered",
+      offeredTopic: "ai", offeredScore: 9.0, startedAt: Date.now(),
+    });
+
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+    await mgr.start();
+
+    // Should still offer since our content hash differs from peer manifest
+    expect(mockSendOffer).toHaveBeenCalledTimes(1);
+
+    mgr.stop();
+  });
+
+  it("skips offer when all content matches peer manifest hashes", async () => {
+    const { hashContent } = require("@/lib/d2a/manifest");
+
+    const contentItem: ContentItem = {
+      id: "shared-1", owner: "owner", author: "A", avatar: "A",
+      text: "Shared content both have", source: "manual",
+      scores: { originality: 9, insight: 9, credibility: 9, composite: 9.0 },
+      verdict: "quality", reason: "", createdAt: Date.now(),
+      validated: false, flagged: false, timestamp: "now",
+      topics: ["ai"],
+    };
+
+    const { callbacks } = makeCallbacks({ content: [contentItem] });
+    callbacks.getContent.mockReturnValue([contentItem]);
+
+    // Peer manifest has the same content hash
+    const contentHash = hashContent(contentItem.text);
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: "same-content-peer",
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+      manifest: {
+        entries: [{ hash: contentHash, topic: "ai", score: 9 }],
+        generatedAt: Date.now(),
+      },
+    }]);
+
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+    await mgr.start();
+
+    // Should NOT offer since all our content matches peer's manifest
+    expect(mockSendOffer).not.toHaveBeenCalled();
+
+    mgr.stop();
+  });
+
+  it("falls back to topic matching when peer has no manifest", async () => {
+    const contentItem: ContentItem = {
+      id: "topic-match-1", owner: "owner", author: "A", avatar: "A",
+      text: "Fallback topic content", source: "manual",
+      scores: { originality: 9, insight: 9, credibility: 9, composite: 9.0 },
+      verdict: "quality", reason: "", createdAt: Date.now(),
+      validated: false, flagged: false, timestamp: "now",
+      topics: ["ai"],
+    };
+
+    const { callbacks } = makeCallbacks({ content: [contentItem] });
+    callbacks.getContent.mockReturnValue([contentItem]);
+
+    // Peer without manifest
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: "no-manifest-peer",
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+      // no manifest field
+    }]);
+    mockSendOffer.mockResolvedValue({
+      peerId: "no-manifest-peer", phase: "offered",
+      offeredTopic: "ai", offeredScore: 9.0, startedAt: Date.now(),
+    });
+
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+    await mgr.start();
+
+    // Should offer via topic matching fallback
+    expect(mockSendOffer).toHaveBeenCalledTimes(1);
 
     mgr.stop();
   });

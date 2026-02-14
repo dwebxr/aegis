@@ -10,6 +10,7 @@ let mockAgentEnabled = false;
 let mockIsSubscribed = false;
 const mockAddNotification = jest.fn();
 let mockStoredKey: string | null = null;
+let mockWebLLMEnabled = false;
 
 /* ---------- Mocks ---------- */
 jest.mock("@/contexts/AuthContext", () => ({
@@ -45,6 +46,17 @@ jest.mock("@/contexts/NotificationContext", () => ({
   }),
 }));
 
+jest.mock("@/lib/webllm/storage", () => ({
+  isWebLLMEnabled: () => mockWebLLMEnabled,
+  setWebLLMEnabled: (v: boolean) => { mockWebLLMEnabled = v; },
+}));
+
+jest.mock("@/lib/webllm/engine", () => ({
+  isWebGPUAvailable: () => true,
+  onStatusChange: () => () => {},
+  destroyEngine: async () => {},
+}));
+
 jest.mock("@/lib/apiKey/storage", () => ({
   getUserApiKey: () => mockStoredKey,
   setUserApiKey: (key: string) => { mockStoredKey = key; },
@@ -60,6 +72,7 @@ describe("SettingsTab — unauthenticated state", () => {
     mockAgentEnabled = false;
     mockIsSubscribed = false;
     mockStoredKey = null;
+    mockWebLLMEnabled = false;
   });
 
   it("shows 'Not connected' and login button when unauthenticated", () => {
@@ -88,6 +101,7 @@ describe("SettingsTab — authenticated state", () => {
     mockAgentEnabled = false;
     mockIsSubscribed = false;
     mockStoredKey = null;
+    mockWebLLMEnabled = false;
   });
 
   it("shows Connected badge and principal text", () => {
@@ -124,13 +138,14 @@ describe("SettingsTab — agent enabled state", () => {
     mockAgentEnabled = true;
     mockIsSubscribed = false;
     mockStoredKey = null;
+    mockWebLLMEnabled = false;
   });
 
   it("shows protocol parameters when agent is enabled", () => {
     const html = renderToStaticMarkup(<SettingsTab />);
     expect(html).toContain("Min Score");
     expect(html).toContain("Resonance");
-    expect(html).toContain("Match Fee");
+    expect(html).toContain("Fee Range");
     expect(html).toContain("Approval");
     // Shows ICP amounts
     expect(html).toContain("ICP");
@@ -144,13 +159,14 @@ describe("SettingsTab — agent disabled state", () => {
     mockAgentEnabled = false;
     mockIsSubscribed = false;
     mockStoredKey = null;
+    mockWebLLMEnabled = false;
   });
 
   it("does not show protocol parameters when agent is disabled", () => {
     const html = renderToStaticMarkup(<SettingsTab />);
     expect(html).toContain("D2A Social Agent");
     expect(html).not.toContain("Min Score");
-    expect(html).not.toContain("Match Fee");
+    expect(html).not.toContain("Fee Range");
   });
 });
 
@@ -161,6 +177,7 @@ describe("SettingsTab — push subscribed state", () => {
     mockAgentEnabled = false;
     mockIsSubscribed = true;
     mockStoredKey = null;
+    mockWebLLMEnabled = false;
   });
 
   it("shows frequency selector when subscribed to push", () => {
@@ -185,6 +202,7 @@ describe("SettingsTab — push not subscribed", () => {
     mockAgentEnabled = false;
     mockIsSubscribed = false;
     mockStoredKey = null;
+    mockWebLLMEnabled = false;
   });
 
   it("does not show frequency selector when not subscribed", () => {
@@ -201,6 +219,7 @@ describe("SettingsTab — mobile prop", () => {
     mockAgentEnabled = false;
     mockIsSubscribed = false;
     mockStoredKey = null;
+    mockWebLLMEnabled = false;
   });
 
   it("renders without errors in mobile mode", () => {
@@ -223,6 +242,7 @@ describe("SettingsTab — Data Management section", () => {
     mockAgentEnabled = false;
     mockIsSubscribed = false;
     mockStoredKey = null;
+    mockWebLLMEnabled = false;
   });
 
   it("shows Clear Content Cache button", () => {
@@ -244,6 +264,7 @@ describe("SettingsTab — About section", () => {
     mockAgentEnabled = false;
     mockIsSubscribed = false;
     mockStoredKey = null;
+    mockWebLLMEnabled = false;
   });
 
   it("shows AEGIS branding and version", () => {
@@ -302,11 +323,93 @@ describe("SettingsTab — header", () => {
     mockAgentEnabled = false;
     mockIsSubscribed = false;
     mockStoredKey = null;
+    mockWebLLMEnabled = false;
   });
 
   it("shows Settings title and subtitle", () => {
     const html = renderToStaticMarkup(<SettingsTab />);
     expect(html).toContain("Settings");
     expect(html).toContain("Notifications, agent controls");
+  });
+});
+
+describe("SettingsTab — Browser AI (WebLLM) section", () => {
+  beforeEach(() => {
+    mockIsAuthenticated = true;
+    mockPrincipalText = "test-principal";
+    mockAgentEnabled = false;
+    mockIsSubscribed = false;
+    mockStoredKey = null;
+    mockWebLLMEnabled = false;
+  });
+
+  it("always renders Browser AI card with toggle", () => {
+    const html = renderToStaticMarkup(<SettingsTab />);
+    expect(html).toContain("Browser AI");
+    // Toggle button is always present
+    expect(html).toContain("Disabled");
+  });
+
+  it("shows Disabled label when WebLLM is off", () => {
+    mockWebLLMEnabled = false;
+    const html = renderToStaticMarkup(<SettingsTab />);
+    expect(html).toContain("Disabled");
+    expect(html).not.toContain("Enabled");
+  });
+
+  it("shows Enabled label when WebLLM is on", () => {
+    mockWebLLMEnabled = true;
+    const html = renderToStaticMarkup(<SettingsTab />);
+    expect(html).toContain("Enabled");
+  });
+
+  it("shows description text about WebGPU and Llama", () => {
+    const html = renderToStaticMarkup(<SettingsTab />);
+    expect(html).toContain("WebGPU");
+    expect(html).toContain("Llama 3.1 8B");
+    expect(html).toContain("No data leaves your device");
+  });
+
+  it("shows ~4GB download notice", () => {
+    const html = renderToStaticMarkup(<SettingsTab />);
+    expect(html).toContain("4GB");
+  });
+
+  it("renders in mobile mode without errors", () => {
+    mockWebLLMEnabled = true;
+    const html = renderToStaticMarkup(<SettingsTab mobile />);
+    expect(html).toContain("Browser AI");
+    expect(html).toContain("Enabled");
+  });
+});
+
+describe("SettingsTab — section ordering", () => {
+  beforeEach(() => {
+    mockIsAuthenticated = true;
+    mockPrincipalText = "test-principal";
+    mockAgentEnabled = false;
+    mockIsSubscribed = false;
+    mockStoredKey = null;
+    mockWebLLMEnabled = false;
+  });
+
+  it("renders all major sections", () => {
+    const html = renderToStaticMarkup(<SettingsTab />);
+    expect(html).toContain("Push Notifications");
+    expect(html).toContain("D2A Social Agent");
+    expect(html).toContain("AI Scoring");
+    expect(html).toContain("Browser AI");
+    expect(html).toContain("Account");
+    expect(html).toContain("Data Management");
+    expect(html).toContain("AEGIS");
+  });
+
+  it("Browser AI appears between AI Scoring and Account", () => {
+    const html = renderToStaticMarkup(<SettingsTab />);
+    const aiScoringIdx = html.indexOf("AI Scoring");
+    const browserAiIdx = html.indexOf("Browser AI");
+    const accountIdx = html.indexOf("Account");
+    expect(aiScoringIdx).toBeLessThan(browserAiIdx);
+    expect(browserAiIdx).toBeLessThan(accountIdx);
   });
 });

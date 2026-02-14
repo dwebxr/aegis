@@ -5,7 +5,7 @@ import { useAuth } from "./AuthContext";
 import { useDemo } from "./DemoContext";
 import { DEMO_SOURCES } from "@/lib/demo/sources";
 import { useNotify } from "./NotificationContext";
-import { createBackendActor, createBackendActorAsync } from "@/lib/ic/actor";
+import { createBackendActorAsync } from "@/lib/ic/actor";
 import { loadSources, saveSources } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
@@ -59,15 +59,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
 
   function getActor(): _SERVICE | null {
     if (!isAuthRef.current || !identityRef.current) return null;
-    if (actorRef.current) return actorRef.current;
-    try {
-      const actor = createBackendActor(identityRef.current);
-      actorRef.current = actor;
-      return actor;
-    } catch (err) {
-      console.warn("[sources] Failed to create IC actor:", err);
-      return null;
-    }
+    return actorRef.current;
   }
 
   function saveToIC(source: SavedSource): void {
@@ -151,7 +143,9 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         addNotification("Failed to load sources from IC", "error");
       }
     };
-    doSync();
+    doSync().catch(err => {
+      console.error("[sources] Unhandled doSync error:", errMsg(err));
+    });
   }, [isAuthenticated, identity, principalText]);
 
   // Seed demo sources when in demo mode

@@ -55,8 +55,9 @@ Browser                                  Internet Computer (Mainnet)
             ▼
    3-Tier Scoring Pipeline:
    1. IC LLM (Llama 3.1 8B, free, on-chain)
-   2. Anthropic Claude (premium, V/C/L)
+   2. Anthropic Claude (premium, V/C/L) or BYOK
    3. Heuristic fallback (client-side)
+   + WebLLM (optional, browser-local via WebGPU)
    + Per-IP API rate limiting (5-60 req/min per route)
    + Per-instance daily API budget (500 calls/day)
 
@@ -265,16 +266,22 @@ Publisher deposits 0.01 ICP as quality bond
 
 Double-voting is prevented by tracking voters per signal. Self-voting is blocked. Deposit records and voter lists persist across canister upgrades.
 
-### Pillar 3: D2A Content Provision Fee
+### Pillar 3: D2A Content Provision Fee (Trust-Tiered)
 
-When content is successfully delivered via the D2A protocol, a content delivery fee is collected from the receiver:
+When content is successfully delivered via the D2A protocol, a trust-based fee is collected from the receiver. The fee scales with the sender's trustworthiness — combining WoT social graph position and local behavioral reputation:
 
 ```
 Content delivered via D2A
-  → Receiver pays 0.001 ICP content delivery fee
-  → 80% (0.0008 ICP) → Content provider (content provision fee)
-  → 20% (0.0002 ICP) → Auto-distributed (cycles top-up or protocol wallet)
+  → Effective trust = WoT score × 0.6 + behavioral reputation × 0.4
+  → Trust tier determines fee:
+      Trusted (≥0.8): 0.0005 ICP — long-term validated peers
+      Known   (≥0.4): 0.001  ICP — peers with some track record
+      Unknown (≥0.0): 0.002  ICP — new peers (default)
+      Restricted (<0): rejected — blocked peers, no delivery
+  → Fee split: 80% → Content provider, 20% → auto-distributed (cycles or protocol wallet)
 ```
+
+**Behavioral reputation** is tracked locally (localStorage). Each Validate on D2A-received content improves the sender's reputation; each Flag degrades it. Peers automatically upgrade from Unknown → Known → Trusted as the user validates their content. Peers scoring below −5 are auto-blocked.
 
 **Non-custodial**: The 20% protocol share is immediately distributed — either converted to cycles (if canister cycles are below threshold) or sent to the hardcoded protocol wallet. No funds accumulate in the canister beyond active deposits.
 
@@ -314,11 +321,11 @@ Every 5 minutes, each agent publishes a **NIP-78 replaceable event** (Kind 30078
     ["interest", "rust"],
     ["interest", "cryptography"]
   ],
-  "content": ""
+  "content": "{\"entries\":[{\"hash\":\"a1b2c3...\",\"topic\":\"ml\",\"score\":8.5},...],\"generatedAt\":1700000000000}"
 }
 ```
 
-Topics are drawn from the user's top 20 high-affinity topics (affinity ≥ 0.2). `capacity` indicates how many items the agent can accept per cycle. `principal` is the agent's IC principal (used for D2A fee settlement). Being a replaceable event, only the latest version persists on relays.
+Topics are drawn from the user's top 20 high-affinity topics (affinity ≥ 0.2). `capacity` indicates how many items the agent can accept per cycle. `principal` is the agent's IC principal (used for D2A fee settlement). The `content` field carries a JSON manifest of the agent's top 50 quality items (SHA-256 truncated hashes), enabling peers to diff and offer only novel content. Being a replaceable event, only the latest version persists on relays.
 
 ### Phase 2: Peer Discovery
 
@@ -346,9 +353,9 @@ Agent A                          Relay                          Agent B
    │                               │                               │
 ```
 
-1. **OFFER**: Agent A has quality content (composite ≥ 7.0) matching Agent B's topics. Sends topic, score, and 100-char preview.
-2. **ACCEPT/REJECT**: Agent B checks topic affinity (> 0) and score (≥ 6). Accepts if both pass.
-3. **DELIVER**: Agent A sends the full content with all scores, topics, and V/C/L signals.
+1. **OFFER**: Agent A diffs its content against Agent B's manifest, selects a novel quality item (composite ≥ 7.0) matching Agent B's topics. Sends topic, score, and 100-char preview.
+2. **ACCEPT/REJECT**: Agent B checks topic affinity (> 0), score (≥ 6), and sender reputation (not blocked). Accepts if all pass.
+3. **DELIVER**: Agent A sends the full content with all scores, topics, and V/C/L signals. A trust-tiered fee is charged to the receiver.
 
 Each handshake has a 30-second timeout. Failed deliveries mark the handshake as `rejected` (not `offered`), preventing deadlock loops.
 
@@ -403,6 +410,8 @@ The receiving agent rejects deliveries from undiscovered peers (not in the known
 | **Identity binding** | Keypair derived from IC Principal — tied to Internet Identity |
 | **No persistence** | Kind 21078 is ephemeral — relays are not required to store events |
 | **No central authority** | Any Nostr relay works — no single point of failure or censorship |
+| **Sybil resistance** | Trust-tiered D2A fees — unknown peers pay 4× more than trusted ones |
+| **Reputation isolation** | Behavioral reputation is local — peers cannot manipulate their own score |
 
 ---
 
@@ -475,7 +484,9 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - **Tier 1**: IC LLM (Llama 3.1 8B) — free, fully on-chain, no API key
 - **Tier 2**: Anthropic Claude — premium V/C/L scoring with user context
 - **Tier 3**: Heuristic fallback — local, instant, no network call
+- **WebLLM** (optional): Browser-local AI scoring via WebGPU (Llama 3.1 8B q4f16) — no API calls, no data leaves the browser
 - Automatic fallback: each tier falls through to the next on failure
+- BYOK: Users can supply their own Anthropic API key in Settings for Pro mode
 
 ### WoT Filter Pipeline
 - **Lite mode**: Heuristic scoring only (free, no API calls)
@@ -495,11 +506,19 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Non-custodial: forfeited deposits auto-distributed, no operator withdrawal
 - ICRC-2 approve/transfer_from pattern with pre-debit rollback safety
 
-### D2A Content Provision Fee
-- Automatic content delivery fee (0.001 ICP) on successful D2A delivery
+### D2A Content Provision Fee (Trust-Tiered)
+- Dynamic trust-based fees: 0.0005 ICP (trusted) / 0.001 ICP (known) / 0.002 ICP (unknown)
+- Effective trust = WoT score × 0.6 + local behavioral reputation × 0.4
+- Validate/Flag on D2A content adjusts sender's local reputation → tier upgrades/downgrades
+- Auto-block at reputation score ≤ −5 (restricted tier, deliveries rejected)
 - 80/20 split: 80% to content provider, 20% auto-distributed (cycles or protocol wallet)
 - Blanket ICRC-2 pre-approval on agent start (0.1 ICP ≈ 100 matches)
-- IC principal included in presence broadcast for on-chain fee settlement
+
+### Content Manifest Diff Streaming
+- Presence events carry SHA-256 content manifests (top 50 quality items, 32-char truncated hashes)
+- Before offering content, agents diff their items against the peer's manifest
+- Only novel content (not already in peer's manifest) is offered — eliminates redundant delivery
+- Backward-compatible: peers without manifests fall back to topic-matching
 
 ### Personalization Engine
 - Learns from Validate/Flag feedback — topic affinities, author trust, quality threshold calibration
@@ -538,7 +557,8 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Styling | CSS-in-JS (inline styles), dark theme |
 | Backend API | Next.js API Routes (Vercel Serverless) |
 | AI (Free) | IC LLM Canister — Llama 3.1 8B (on-chain, mo:llm 2.1.0) |
-| AI (Premium) | Anthropic Claude (claude-sonnet-4-20250514) + fallback heuristics |
+| AI (Premium) | Anthropic Claude (claude-sonnet-4-20250514) + BYOK + fallback heuristics |
+| AI (Local) | WebLLM (@mlc-ai/web-llm, Llama 3.1 8B q4f16 via WebGPU, optional) |
 | Blockchain | Internet Computer (Motoko canister, dfx 0.30.2) |
 | Payments | x402 protocol (@x402/next 2.3.0, USDC on Base) |
 | Tokens | ICP Ledger ICRC-1/2 (staking, D2A fees) |
@@ -548,7 +568,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → build → security audit on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, beforeSend scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (1642 tests, 120 suites) |
+| Test | Jest + ts-jest (1776 tests, 125 suites) |
 
 ## Project Structure
 
@@ -604,6 +624,8 @@ aegis/
 │   │   ├── sync.ts                      # Sync briefing snapshot to IC canister
 │   │   └── types.ts                     # BriefingState, BriefingItem
 │   ├── d2a/
+│   │   ├── manifest.ts                  # Content manifest + SHA-256 hashing + diff logic
+│   │   ├── reputation.ts               # Local peer reputation tracker (behavioral trust)
 │   │   ├── types.ts                     # D2ABriefingResponse, D2ABriefingItem
 │   │   ├── cors.ts                      # CORS headers for external AI agent access
 │   │   ├── x402Server.ts               # x402 resource server config (ExactEvmScheme)
@@ -643,13 +665,18 @@ aegis/
 │   ├── api/
 │   │   ├── rateLimit.ts                 # Per-IP rate limiter for API routes (30 req/min)
 │   │   └── dailyBudget.ts              # Per-instance daily API budget (500 calls/day)
+│   ├── webllm/
+│   │   ├── engine.ts                    # Browser-local AI scoring (WebGPU, Llama 3.1 8B)
+│   │   └── types.ts                     # WebLLMStatus type
+│   ├── apiKey/
+│   │   └── storage.ts                   # BYOK API key storage (localStorage, never sent to server)
 │   ├── types/                           # ContentItem, API response types, source types
 │   └── utils/
 │       ├── scores.ts                    # Score computation + relativeTime
 │       ├── errors.ts                    # errMsg() shared error formatter
 │       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       └── csv.ts                       # CSV export (RFC-compliant escaping)
-├── __tests__/                           # 1642 tests across 120 suites
+├── __tests__/                           # 1776 tests across 125 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -685,7 +712,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 1642 tests
+npm test              # Run all 1776 tests
 npm run test:watch    # Watch mode
 ```
 

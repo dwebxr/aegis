@@ -51,7 +51,7 @@ export default function AegisApp() {
   const { isAuthenticated, identity, principalText } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
-  const { agentState } = useAgent();
+  const { agentState, setWoTGraph: pushWoTGraph } = useAgent();
   const { isDemoMode } = useDemo();
   const { filterMode } = useFilterMode();
 
@@ -105,6 +105,11 @@ export default function AegisApp() {
 
     return () => { cancelled = true; };
   }, [nostrKeys?.pk]);
+
+  // Push WoT graph to agent manager so trust-based fees use real social graph data
+  useEffect(() => {
+    pushWoTGraph(wotGraph);
+  }, [wotGraph, pushWoTGraph]);
 
   const pipelineResult = useMemo(() => {
     if (content.length === 0) return null;

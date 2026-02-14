@@ -11,6 +11,8 @@ import type { UserContext } from "@/lib/preferences/types";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
+import { recordUseful, recordSlop } from "@/lib/d2a/reputation";
+import { isWebLLMEnabled } from "@/lib/webllm/storage";
 
 const CONTENT_CACHE_KEY = "aegis-content-cache";
 const MAX_CACHED_ITEMS = 200;
@@ -193,6 +195,20 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       }
     }
 
+    // Tier 1.5: WebLLM (browser-local AI, if enabled)
+    if (!result && isWebLLMEnabled()) {
+      try {
+        const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
+        const topics = userContext
+          ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
+          : [];
+        const webllmResult = await scoreWithWebLLM(text, topics);
+        result = { ...webllmResult, scoredByAI: true } as AnalyzeResponse;
+      } catch (err) {
+        console.warn("[analyze] WebLLM scoring failed, falling back to API:", errMsg(err));
+      }
+    }
+
     // Tier 2: Claude API via /api/analyze (premium / fallback)
     if (!result) {
       const body: Record<string, unknown> = { text, source: "manual" };
@@ -271,6 +287,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (item && preferenceCallbacks?.onValidate) {
       preferenceCallbacks.onValidate(item.topics || [], item.author, item.scores.composite, item.verdict);
     }
+    if (item && item.source === "nostr" && item.nostrPubkey) {
+      recordUseful(item.nostrPubkey);
+    }
     if (item && actorRef.current && isAuthenticated) {
       actorRef.current.updateEvaluation(id, true, item.flagged)
         .catch((err: unknown) => {
@@ -286,6 +305,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     setContent(prev => prev.map(c => c.id === id ? { ...c, flagged: true } : c));
     if (item && preferenceCallbacks?.onFlag) {
       preferenceCallbacks.onFlag(item.topics || [], item.author, item.scores.composite, item.verdict);
+    }
+    if (item && item.source === "nostr" && item.nostrPubkey) {
+      recordSlop(item.nostrPubkey);
     }
     if (item && actorRef.current && isAuthenticated) {
       actorRef.current.updateEvaluation(id, item.validated, true)

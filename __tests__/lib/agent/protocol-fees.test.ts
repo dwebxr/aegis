@@ -2,7 +2,9 @@
 jest.mock("@dfinity/agent", () => ({}));
 
 import {
-  D2A_MATCH_FEE,
+  D2A_FEE_TRUSTED,
+  D2A_FEE_KNOWN,
+  D2A_FEE_UNKNOWN,
   D2A_APPROVE_AMOUNT,
   RESONANCE_THRESHOLD,
   MIN_OFFER_SCORE,
@@ -13,37 +15,38 @@ import {
 } from "@/lib/agent/protocol";
 import { ICP_FEE, MIN_STAKE, MAX_STAKE } from "@/lib/ic/icpLedger";
 
-describe("D2A match fee economics", () => {
-  it("D2A_MATCH_FEE is 100,000 e8s (0.001 ICP)", () => {
-    expect(D2A_MATCH_FEE).toBe(100_000);
+describe("D2A trust-tier fee economics", () => {
+  it("trusted fee is lowest, unknown is highest", () => {
+    expect(D2A_FEE_TRUSTED).toBeLessThan(D2A_FEE_KNOWN);
+    expect(D2A_FEE_KNOWN).toBeLessThan(D2A_FEE_UNKNOWN);
   });
 
-  it("D2A_APPROVE_AMOUNT covers ~100 matches", () => {
-    const matchesCovered = D2A_APPROVE_AMOUNT / D2A_MATCH_FEE;
-    expect(matchesCovered).toBe(100);
+  it("D2A_APPROVE_AMOUNT covers >= 50 matches at highest tier", () => {
+    const matchesCovered = D2A_APPROVE_AMOUNT / D2A_FEE_UNKNOWN;
+    expect(matchesCovered).toBeGreaterThanOrEqual(50);
   });
 
-  it("match fee exceeds 3x ICP transfer fee (minimum viable)", () => {
-    // The canister requires feeAmount >= ICP_FEE * 3
-    expect(BigInt(D2A_MATCH_FEE)).toBeGreaterThanOrEqual(ICP_FEE * BigInt(3));
+  it("all fee tiers exceed 3x ICP transfer fee (minimum viable)", () => {
+    const minFee = ICP_FEE * BigInt(3);
+    expect(BigInt(D2A_FEE_TRUSTED)).toBeGreaterThanOrEqual(minFee);
+    expect(BigInt(D2A_FEE_KNOWN)).toBeGreaterThanOrEqual(minFee);
+    expect(BigInt(D2A_FEE_UNKNOWN)).toBeGreaterThanOrEqual(minFee);
   });
 
-  it("80/20 fee split leaves sender with positive payout after transfer fee", () => {
-    const senderPayout = Math.floor((D2A_MATCH_FEE * 80) / 100);
-    const senderNet = senderPayout - Number(ICP_FEE);
-    expect(senderNet).toBeGreaterThan(0);
-  });
-
-  it("protocol receives 20% of match fee", () => {
-    const senderPayout = Math.floor((D2A_MATCH_FEE * 80) / 100);
-    const protocolPayout = D2A_MATCH_FEE - senderPayout;
-    expect(protocolPayout).toBe(20_000); // 20% of 100,000
+  it("80/20 fee split leaves sender with positive payout at every tier", () => {
+    for (const fee of [D2A_FEE_TRUSTED, D2A_FEE_KNOWN, D2A_FEE_UNKNOWN]) {
+      const senderPayout = Math.floor((fee * 80) / 100);
+      const senderNet = senderPayout - Number(ICP_FEE);
+      expect(senderNet).toBeGreaterThan(0);
+    }
   });
 
   it("sender payout + protocol payout == total fee (no rounding loss)", () => {
-    const senderPayout = Math.floor((D2A_MATCH_FEE * 80) / 100);
-    const protocolPayout = D2A_MATCH_FEE - senderPayout;
-    expect(senderPayout + protocolPayout).toBe(D2A_MATCH_FEE);
+    for (const fee of [D2A_FEE_TRUSTED, D2A_FEE_KNOWN, D2A_FEE_UNKNOWN]) {
+      const senderPayout = Math.floor((fee * 80) / 100);
+      const protocolPayout = fee - senderPayout;
+      expect(senderPayout + protocolPayout).toBe(fee);
+    }
   });
 });
 
@@ -64,8 +67,6 @@ describe("staking boundaries", () => {
   });
 
   it("MIN_STAKE covers fee overhead for stake return", () => {
-    // When stake is returned, ICP_FEE is deducted
-    // MIN_STAKE must be > ICP_FEE so owner receives something
     expect(MIN_STAKE - ICP_FEE).toBeGreaterThan(BigInt(0));
   });
 });

@@ -119,10 +119,10 @@ describe("calculateWoTScores — edge cases", () => {
     const pubkeys = Array.from({ length: 1000 }, (_, i) => `pk-${i}`);
     const scores = calculateWoTScores(pubkeys, graph);
     expect(scores.size).toBe(1000);
-    for (const [, score] of scores) {
+    Array.from(scores.values()).forEach(score => {
       expect(score.trustScore).toBeGreaterThan(0);
       expect(score.isInGraph).toBe(true);
-    }
+    });
   });
 });
 

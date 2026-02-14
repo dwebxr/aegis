@@ -10,6 +10,7 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
     id: "pub-item-1",
     owner: "owner-1",
     author: "Author",
+    avatar: "\uD83D\uDCDD",
     text: "Test briefing content.",
     source: "manual",
     scores: { originality: 7, insight: 8, credibility: 7, composite: 7.3 },

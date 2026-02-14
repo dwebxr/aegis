@@ -12,6 +12,7 @@ export interface AnalyzeResponse {
   cContext?: number;
   lSlop?: number;
   topics?: string[];
+  scoredByAI?: boolean;
 }
 
 export interface FetchURLResponse {

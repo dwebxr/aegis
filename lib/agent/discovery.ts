@@ -4,6 +4,7 @@ import type { Filter } from "nostr-tools/filter";
 import { SimplePool } from "nostr-tools/pool";
 import type { AgentProfile } from "./types";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
+import type { ContentItem } from "@/lib/types/content";
 import {
   KIND_AGENT_PROFILE,
   TAG_D2A_PROFILE,
@@ -14,6 +15,7 @@ import {
   PEER_EXPIRY_MS,
 } from "./protocol";
 import { errMsg } from "@/lib/utils/errors";
+import { buildManifest, encodeManifest, decodeManifest } from "@/lib/d2a/manifest";
 
 /** Returns 0-1 Jaccard similarity of high-affinity topics vs peer interests. */
 export function calculateResonance(
@@ -44,6 +46,7 @@ export async function broadcastPresence(
   capacity: number,
   relayUrls: string[],
   principalId?: string,
+  contentItems?: ContentItem[],
 ): Promise<void> {
   const tags: string[][] = [
     ["d", TAG_D2A_PROFILE],
@@ -56,11 +59,15 @@ export async function broadcastPresence(
     tags.push([TAG_D2A_INTEREST, interest]);
   }
 
+  const manifestContent = contentItems && contentItems.length > 0
+    ? encodeManifest(buildManifest(contentItems))
+    : "";
+
   const template: EventTemplate = {
     kind: KIND_AGENT_PROFILE,
     created_at: Math.floor(Date.now() / 1000),
     tags,
-    content: "",
+    content: manifestContent,
   };
 
   const signed = finalizeEvent(template, sk);
@@ -124,19 +131,28 @@ export async function discoverPeers(
       }
     }
 
+    let manifest;
+    if (ev.content && ev.content.length > 0) {
+      try {
+        manifest = decodeManifest(ev.content) || undefined;
+      } catch {
+        // Malformed manifest — ignore, peer may be running older version
+      }
+    }
+
     const profile: AgentProfile = {
       nostrPubkey: ev.pubkey,
       principalId,
       interests,
       capacity,
       lastSeen: ev.created_at * 1000,
+      manifest,
     };
 
     profile.resonance = calculateResonance(myPrefs, profile);
     peers.push(profile);
   }
 
-  // Deduplicate by pubkey (keep latest)
   const byPubkey = new Map<string, AgentProfile>();
   for (const peer of peers) {
     const existing = byPubkey.get(peer.nostrPubkey);

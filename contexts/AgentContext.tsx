@@ -7,18 +7,21 @@ import { useContent } from "./ContentContext";
 import { useNotify } from "./NotificationContext";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { AgentManager } from "@/lib/agent/manager";
-import { D2A_MATCH_FEE, D2A_APPROVE_AMOUNT } from "@/lib/agent/protocol";
+import { D2A_APPROVE_AMOUNT } from "@/lib/agent/protocol";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { createICPLedgerActorAsync, ICP_FEE } from "@/lib/ic/icpLedger";
 import { getCanisterId } from "@/lib/ic/agent";
 import { Principal } from "@dfinity/principal";
 import type { AgentState } from "@/lib/agent/types";
+import type { WoTGraph } from "@/lib/wot/types";
 import { errMsg } from "@/lib/utils/errors";
 
 interface AgentContextValue {
   agentState: AgentState;
   isEnabled: boolean;
   toggleAgent: () => void;
+  setWoTGraph: (graph: WoTGraph | null) => void;
+  wotGraph: WoTGraph | null;
 }
 
 const defaultState: AgentState = {
@@ -36,6 +39,8 @@ const AgentContext = createContext<AgentContextValue>({
   agentState: defaultState,
   isEnabled: false,
   toggleAgent: () => {},
+  setWoTGraph: () => {},
+  wotGraph: null,
 });
 
 export function AgentProvider({ children }: { children: React.ReactNode }) {
@@ -45,6 +50,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const { content, addContent } = useContent();
   const [agentState, setAgentState] = useState<AgentState>(defaultState);
   const [isEnabled, setIsEnabled] = useState(false);
+  const [wotGraph, setWotGraphState] = useState<WoTGraph | null>(null);
   const managerRef = useRef<AgentManager | null>(null);
   const profileRef = useRef(profile);
   profileRef.current = profile;
@@ -53,6 +59,13 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
 
   const toggleAgent = useCallback(() => {
     setIsEnabled(prev => !prev);
+  }, []);
+
+  const setWoTGraph = useCallback((graph: WoTGraph | null) => {
+    setWotGraphState(graph);
+    if (managerRef.current) {
+      managerRef.current.setWoTGraph(graph);
+    }
   }, []);
 
   useEffect(() => {
@@ -70,7 +83,6 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     const capturedIdentity = identity;
 
     const startAgent = async () => {
-      // Step 1: Pre-approve canister for D2A match fees (ICRC-2)
       const canisterId = getCanisterId();
       try {
         const ledger = await createICPLedgerActorAsync(capturedIdentity);
@@ -94,7 +106,6 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       }
       if (cancelled) return;
 
-      // Step 2: Create and start agent manager (after approval completes)
       const manager = new AgentManager(
         keys.sk,
         keys.pk,
@@ -103,7 +114,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
           getContent: () => contentRef.current,
           getPrefs: () => profileRef.current,
           onStateChange: (state) => setAgentState(state),
-          onD2AMatchComplete: async (_senderPk, senderPrincipalId, contentHash) => {
+          onD2AMatchComplete: async (_senderPk, senderPrincipalId, contentHash, fee) => {
             if (!senderPrincipalId) {
               console.warn("[agent] D2A match: sender has no IC principal, skipping fee");
               return;
@@ -116,7 +127,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                 matchId,
                 senderPrincipal,
                 contentHash,
-                BigInt(D2A_MATCH_FEE),
+                BigInt(fee),
               );
               if (!("ok" in result)) {
                 console.warn("[agent] D2A match recording failed:", result.err);
@@ -128,8 +139,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
             }
           },
         },
-        undefined, // relayUrls (use default)
-        principalText, // IC principal for presence broadcast
+        undefined,
+        principalText,
       );
 
       if (cancelled) {
@@ -141,7 +152,9 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       manager.start();
     };
 
-    startAgent();
+    startAgent().catch(err => {
+      console.error("[agent] Unhandled startAgent error:", errMsg(err));
+    });
 
     return () => {
       cancelled = true;
@@ -153,8 +166,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, principalText, identity, isEnabled, addContent, addNotification]);
 
   const value = useMemo(() => ({
-    agentState, isEnabled, toggleAgent,
-  }), [agentState, isEnabled, toggleAgent]);
+    agentState, isEnabled, toggleAgent, setWoTGraph, wotGraph,
+  }), [agentState, isEnabled, toggleAgent, setWoTGraph, wotGraph]);
 
   return (
     <AgentContext.Provider value={value}>

@@ -1,16 +1,19 @@
+import type { ContentManifest } from "@/lib/d2a/manifest";
+
 export interface AgentProfile {
   nostrPubkey: string;
-  principalId?: string; // IC principal text, included in presence broadcast
+  principalId?: string;
   interests: string[];
-  capacity: number; // how many items this agent can accept per cycle
+  capacity: number;
   lastSeen: number;
-  resonance?: number; // computed locally against our profile
+  resonance?: number;
+  manifest?: ContentManifest;
 }
 
 export type HandshakePhase = "offered" | "accepted" | "delivering" | "completed" | "rejected";
 
 export interface HandshakeState {
-  peerId: string; // nostr pubkey of peer
+  peerId: string;
   phase: HandshakePhase;
   offeredTopic: string;
   offeredScore: number;
@@ -28,7 +31,7 @@ export interface D2AMessage {
 export interface D2AOfferPayload {
   topic: string;
   score: number;
-  contentPreview: string; // first 100 chars
+  contentPreview: string;
 }
 
 export interface D2ADeliverPayload {
@@ -55,6 +58,6 @@ export interface AgentState {
   receivedItems: number;
   sentItems: number;
   d2aMatchCount: number;
-  consecutiveErrors: number; // relay/discovery failures since last success
-  lastError?: string;        // most recent error message
+  consecutiveErrors: number;
+  lastError?: string;
 }

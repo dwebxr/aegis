@@ -53,6 +53,7 @@ function makeCallbacks() {
       getContent: jest.fn().mockReturnValue([]),
       getPrefs: jest.fn().mockReturnValue(prefs),
       onStateChange: jest.fn(),
+      onD2AMatchComplete: jest.fn(),
     },
   };
 }

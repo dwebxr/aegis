@@ -73,6 +73,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     if (!url.trim()) return;
     setDiscoverLoading(true);
     setDiscoveredFeeds([]);
+    setRssError("");
     try {
       const res = await fetch("/api/fetch/discover-feed", {
         method: "POST",
@@ -81,10 +82,15 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
       });
       if (res.ok) {
         const data = await res.json();
-        setDiscoveredFeeds(data.feeds || []);
+        const feeds = data.feeds || [];
+        setDiscoveredFeeds(feeds);
+        if (feeds.length === 0) setRssError("No feeds found at this URL");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setRssError(data.error || "Feed discovery failed");
       }
-    } catch (err) {
-      console.warn("[sources] Feed discovery failed:", err);
+    } catch {
+      setRssError("Network error — could not discover feeds");
     } finally {
       setDiscoverLoading(false);
     }

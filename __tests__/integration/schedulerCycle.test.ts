@@ -24,14 +24,15 @@ function makeFetchResponse(data: unknown, ok = true, status = 200): Response {
   } as unknown as Response;
 }
 
-function makeScheduler(overrides: Partial<Parameters<typeof IngestionScheduler.prototype.constructor>[0]> = {}) {
+type SchedulerOpts = ConstructorParameters<typeof IngestionScheduler>[0];
+
+function makeScheduler(overrides: Partial<SchedulerOpts> = {}) {
   const collected: ContentItem[] = [];
   const errors: Array<{ key: string; error: string }> = [];
-  const sources = overrides.getSources?.() || [];
 
   const scheduler = new IngestionScheduler({
     onNewContent: (item) => collected.push(item),
-    getSources: () => sources as ReturnType<Parameters<typeof IngestionScheduler.prototype.constructor>[0]["getSources"]>,
+    getSources: () => [],
     getUserContext: () => null,
     onSourceError: (key, error) => errors.push({ key, error }),
     ...overrides,

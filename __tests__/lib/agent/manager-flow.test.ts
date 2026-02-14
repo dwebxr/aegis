@@ -417,6 +417,7 @@ describe("AgentManager — error tracking and recovery", () => {
       5,
       expect.arrayContaining(["wss://relay.damus.io"]),
       undefined,
+      expect.any(Array),
     );
 
     mgr.stop();

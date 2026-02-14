@@ -1,7 +1,7 @@
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { encryptMessage, decryptMessage } from "@/lib/nostr/encrypt";
 import { parseD2AMessage } from "@/lib/agent/handshake";
-import { calculateResonance, broadcastPresence } from "@/lib/agent/discovery";
+import { calculateResonance } from "@/lib/agent/discovery";
 import { createEmptyProfile } from "@/lib/preferences/types";
 import { learn } from "@/lib/preferences/engine";
 import type { D2AMessage, AgentProfile } from "@/lib/agent/types";
@@ -112,14 +112,14 @@ describe("D2A resonance calculation — preference-driven matching", () => {
     const compatiblePeer: AgentProfile = {
       nostrPubkey: "peer1",
       interests: ["ai", "crypto", "web3"],
-      capacitySlots: 5,
+      capacity: 5,
       lastSeen: Date.now(),
     };
 
     const incompatiblePeer: AgentProfile = {
       nostrPubkey: "peer2",
       interests: ["cooking", "gardening", "sports"],
-      capacitySlots: 5,
+      capacity: 5,
       lastSeen: Date.now(),
     };
 
@@ -134,7 +134,7 @@ describe("D2A resonance calculation — preference-driven matching", () => {
     const peer: AgentProfile = {
       nostrPubkey: "peer3",
       interests: [],
-      capacitySlots: 5,
+      capacity: 5,
       lastSeen: Date.now(),
     };
 
@@ -146,7 +146,7 @@ describe("D2A resonance calculation — preference-driven matching", () => {
     const peer: AgentProfile = {
       nostrPubkey: "peer4",
       interests: ["ai"],
-      capacitySlots: 5,
+      capacity: 5,
       lastSeen: Date.now(),
     };
 

@@ -29,8 +29,6 @@ export function runFilterPipeline(
     if (item.scores.composite < config.qualityThreshold) continue;
 
     let wotScore = null;
-    // Note: page.tsx sets wotEnabled=!!wotGraph, so the wotGraph null check is redundant
-    // in practice. Both gates are kept so the pipeline is independently correct.
     if (config.wotEnabled && wotGraph && item.nostrPubkey) {
       wotScore = calculateWoTScore(item.nostrPubkey, wotGraph);
       stats.wotScoredCount++;
