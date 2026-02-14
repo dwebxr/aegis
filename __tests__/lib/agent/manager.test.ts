@@ -99,6 +99,44 @@ describe("AgentManager — start() error handling", () => {
     mgr.stop();
   });
 
+  it("ignores second start() call while already active", async () => {
+    mockBroadcastPresence.mockResolvedValue(undefined);
+    mockDiscoverPeers.mockResolvedValue([]);
+
+    const { callbacks } = makeCallbacks();
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+
+    await mgr.start();
+    const callCountAfterFirst = mockBroadcastPresence.mock.calls.length;
+
+    await mgr.start();
+    expect(mockBroadcastPresence.mock.calls.length).toBe(callCountAfterFirst);
+
+    mgr.stop();
+  });
+
+  it("allows restart after stop()", async () => {
+    mockBroadcastPresence.mockResolvedValue(undefined);
+    mockDiscoverPeers.mockResolvedValue([]);
+    mockSubscribe.mockReturnValue({ close: jest.fn() });
+
+    const { callbacks } = makeCallbacks();
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+
+    await mgr.start();
+    expect(mgr.getState().isActive).toBe(true);
+
+    mgr.stop();
+    expect(mgr.getState().isActive).toBe(false);
+
+    const callsBefore = mockBroadcastPresence.mock.calls.length;
+    await mgr.start();
+    expect(mgr.getState().isActive).toBe(true);
+    expect(mockBroadcastPresence.mock.calls.length).toBeGreaterThan(callsBefore);
+
+    mgr.stop();
+  });
+
   it("cleans up timers and subscriptions on stop()", async () => {
     mockBroadcastPresence.mockResolvedValue(undefined);
     mockDiscoverPeers.mockResolvedValue([]);

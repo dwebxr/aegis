@@ -165,6 +165,14 @@ export class IngestionScheduler {
       const now = Date.now();
       const cycleItems: ContentItem[] = [];
 
+      // Purge conditionalHeaders for sources no longer in the active list
+      const activeKeys = new Set(sources.map(s => getSourceKey(s.type, s.config)));
+      const staleKeys: string[] = [];
+      this.conditionalHeaders.forEach((_, key) => {
+        if (!activeKeys.has(key)) staleKeys.push(key);
+      });
+      for (const key of staleKeys) this.conditionalHeaders.delete(key);
+
       for (const source of sources) {
         if (!source.enabled) continue;
 

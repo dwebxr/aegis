@@ -49,10 +49,6 @@ function saveRecords(records: Record<string, DailyCostRecord>): void {
   }
 }
 
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export function recordFilterRun(data: {
   articlesEvaluated: number;
   wotScoredCount: number;
@@ -61,7 +57,7 @@ export function recordFilterRun(data: {
   aiCostUSD: number;
 }): void {
   const records = loadRecords();
-  const key = todayKey();
+  const key = new Date().toISOString().slice(0, 10);
   const existing = records[key] || {
     date: key,
     articlesEvaluated: 0,
@@ -83,7 +79,7 @@ export function recordFilterRun(data: {
 
 export function getDailyCost(date?: string): DailyCostRecord | null {
   const records = loadRecords();
-  const key = date || todayKey();
+  const key = date || new Date().toISOString().slice(0, 10);
   return records[key] || null;
 }
 

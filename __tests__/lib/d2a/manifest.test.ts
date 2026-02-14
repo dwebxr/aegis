@@ -1,7 +1,6 @@
 import {
   hashContent,
   buildManifest,
-  encodeManifest,
   decodeManifest,
   diffManifest,
 } from "@/lib/d2a/manifest";
@@ -106,11 +105,11 @@ describe("buildManifest", () => {
   });
 });
 
-describe("encodeManifest / decodeManifest", () => {
+describe("JSON.stringify / decodeManifest round-trip", () => {
   it("round-trips a manifest", () => {
     const items = [makeItem({ id: "1", text: "Test" })];
     const manifest = buildManifest(items);
-    const encoded = encodeManifest(manifest);
+    const encoded = JSON.stringify(manifest);
     const decoded = decodeManifest(encoded);
     expect(decoded).toEqual(manifest);
   });

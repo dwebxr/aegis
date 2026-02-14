@@ -384,7 +384,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                         <div style={{ marginBottom: space[3] }}>
                           <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Relays ({editRelays.length})</label>
                           {editRelays.map((relay, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
+                            <div key={relay} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
                               <span style={{ flex: 1, fontSize: t.bodySm.size, color: colors.text.tertiary, fontFamily: fonts.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{relay}</span>
                               <button
                                 onClick={() => setEditRelays(prev => prev.filter((_, idx) => idx !== i))}
@@ -424,7 +424,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                         <div style={{ marginBottom: space[3] }}>
                           <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Public Keys ({editPubkeys.length})</label>
                           {editPubkeys.map((pk, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
+                            <div key={pk} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
                               <span style={{ flex: 1, fontSize: t.bodySm.size, color: colors.text.tertiary, fontFamily: fonts.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pk}</span>
                               <button
                                 onClick={() => setEditPubkeys(prev => prev.filter((_, idx) => idx !== i))}

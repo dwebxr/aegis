@@ -17,12 +17,6 @@ describe("GET /api/d2a/info", () => {
     const res = await GET(makeRequest());
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data).toBeDefined();
-  });
-
-  it("contains service name and description", async () => {
-    const res = await GET(makeRequest());
-    const data = await res.json();
     expect(data.name).toBe("Aegis");
     expect(data.description).toContain("D2A");
   });
@@ -42,7 +36,6 @@ describe("GET /api/d2a/info", () => {
   it("lists briefing endpoint with x402 auth", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.endpoints.briefing).toBeDefined();
     expect(data.endpoints.briefing.url).toBe("/api/d2a/briefing");
     expect(data.endpoints.briefing.method).toBe("GET");
     expect(data.endpoints.briefing.auth).toBe("x402");
@@ -74,18 +67,18 @@ describe("GET /api/d2a/info", () => {
     const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.scoring.model).toBe("aegis-vcl-v1");
-    expect(data.scoring.axes.V_signal).toBeDefined();
-    expect(data.scoring.axes.C_context).toBeDefined();
-    expect(data.scoring.axes.L_slop).toBeDefined();
+    expect(typeof data.scoring.axes.V_signal).toBe("string");
+    expect(typeof data.scoring.axes.C_context).toBe("string");
+    expect(typeof data.scoring.axes.L_slop).toBe("string");
   });
 
   it("includes legacy scoring axes", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.scoring.legacy.originality).toBeDefined();
-    expect(data.scoring.legacy.insight).toBeDefined();
-    expect(data.scoring.legacy.credibility).toBeDefined();
-    expect(data.scoring.legacy.composite).toBeDefined();
+    expect(typeof data.scoring.legacy.originality).toBe("string");
+    expect(typeof data.scoring.legacy.insight).toBe("string");
+    expect(typeof data.scoring.legacy.credibility).toBe("string");
+    expect(typeof data.scoring.legacy.composite).toBe("string");
   });
 
   it("includes compatibility info", async () => {

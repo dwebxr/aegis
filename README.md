@@ -658,7 +658,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → build → security audit on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, beforeSend scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (1915 tests, 133 suites) |
+| Test | Jest + ts-jest (1920 tests, 133 suites) |
 
 ## Project Structure
 
@@ -771,7 +771,7 @@ aegis/
 │       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       ├── csv.ts                       # CSV export (RFC-compliant escaping)
 │       └── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
-├── __tests__/                           # 1915 tests across 133 suites
+├── __tests__/                           # 1920 tests across 133 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -807,7 +807,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 1915 tests
+npm test              # Run all 1920 tests
 npm run test:watch    # Watch mode
 ```
 

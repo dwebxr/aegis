@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { extract } from "@extractus/article-extractor";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { blockPrivateUrl } from "@/lib/utils/url";
+import { withTimeout } from "@/lib/utils/timeout";
 
 export const maxDuration = 30;
 
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
 
   let article;
   try {
-    article = await extract(url);
+    article = await withTimeout(extract(url), 15_000, "Article extraction timed out");
   } catch (err) {
     console.error("[fetch/url] Extract failed:", url, err);
     return NextResponse.json({ error: "Could not reach this URL. Please verify it is accessible." }, { status: 502 });

@@ -125,7 +125,7 @@ describe("POST /api/analyze", () => {
       expect(res.status).toBe(200);
       // Still uses fallback since no API key
       const data = await res.json();
-      expect(data.originality).toBeDefined();
+      expect(data.originality).toBeGreaterThanOrEqual(0);
     });
 
     it("handles null userContext gracefully", async () => {

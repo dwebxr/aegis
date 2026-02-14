@@ -1,3 +1,5 @@
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
 import { v4 as uuidv4 } from "uuid";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
@@ -11,6 +13,7 @@ import {
   KIND_EPHEMERAL,
   PRESENCE_BROADCAST_INTERVAL_MS,
   DISCOVERY_POLL_INTERVAL_MS,
+  PEER_EXPIRY_MS,
   MIN_OFFER_SCORE,
 } from "./protocol";
 import type { SubCloser } from "nostr-tools/pool";
@@ -112,6 +115,7 @@ export class AgentManager {
   }
 
   async start(): Promise<void> {
+    if (this.active) return;
     this.active = true;
     this.emitState();
 
@@ -148,6 +152,8 @@ export class AgentManager {
     this.listenerSub = null;
     this.listenerPool?.destroy();
     this.listenerPool = null;
+    this.peers.clear();
+    this.handshakes.clear();
     this.emitState();
   }
 
@@ -207,8 +213,22 @@ export class AgentManager {
     }
   }
 
+  private cleanupStalePeers(): void {
+    const now = Date.now();
+    const toDelete: string[] = [];
+    this.peers.forEach((peer, pk) => {
+      if (now - peer.lastSeen > PEER_EXPIRY_MS) {
+        toDelete.push(pk);
+      }
+    });
+    for (const pk of toDelete) {
+      this.peers.delete(pk);
+    }
+  }
+
   private async discoverAndNegotiate(): Promise<void> {
     this.cleanupStaleHandshakes();
+    this.cleanupStalePeers();
 
     const prefs = this.callbacks.getPrefs();
     const discovered = await discoverPeers(this.pk, prefs, this.relayUrls);
@@ -280,7 +300,6 @@ export class AgentManager {
   }
 
   private async handleIncomingMessage(senderPk: string, encryptedContent: string): Promise<void> {
-    // parseD2AMessage catches decrypt/parse failures internally and returns null
     const message = parseD2AMessage(encryptedContent, this.sk, senderPk);
     if (!message) return;
 
@@ -441,10 +460,10 @@ export class AgentManager {
     }
 
     if (this.callbacks.onD2AMatchComplete && fee > 0) {
-      this.d2aMatchCount++;
-      const contentPreview = payload.text.slice(0, 32);
+      const contentHash = bytesToHex(sha256(new TextEncoder().encode(payload.text)));
       try {
-        await this.callbacks.onD2AMatchComplete(senderPk, peerProfile.principalId, contentPreview, fee);
+        await this.callbacks.onD2AMatchComplete(senderPk, peerProfile.principalId, contentHash, fee);
+        this.d2aMatchCount++;
       } catch (err) {
         console.warn("[agent] onD2AMatchComplete callback failed:", errMsg(err));
       }

@@ -38,10 +38,6 @@ export function buildManifest(items: ContentItem[]): ContentManifest {
   return { entries, generatedAt: Date.now() };
 }
 
-export function encodeManifest(manifest: ContentManifest): string {
-  return JSON.stringify(manifest);
-}
-
 export function decodeManifest(raw: string): ContentManifest | null {
   if (!raw) return null;
   const parsed = JSON.parse(raw);

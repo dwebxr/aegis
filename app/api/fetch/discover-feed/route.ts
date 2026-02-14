@@ -48,31 +48,37 @@ export async function POST(request: NextRequest) {
     });
 
     if (res.ok) {
-      const html = await res.text();
-      const linkRegex = /<link[^>]+rel=["']alternate["'][^>]*>/gi;
-      let match;
-      let iters = 0;
-      while ((match = linkRegex.exec(html)) !== null && iters++ < 100) {
-        const tag = match[0];
-        const typeMatch = tag.match(/type=["']([^"']+)["']/);
-        const hrefMatch = tag.match(/href=["']([^"']+)["']/);
-        const titleMatch = tag.match(/title=["']([^"']+)["']/);
+      const cl = parseInt(res.headers?.get("content-length") || "0", 10);
+      if (cl > 5_000_000) {
+        console.warn("[discover-feed] Skipping oversized response:", cl);
+      } else {
+        const raw = await res.text();
+        const html = raw.length > 2_000_000 ? raw.slice(0, 2_000_000) : raw;
+        const linkRegex = /<link[^>]+rel=["']alternate["'][^>]*>/gi;
+        let match;
+        let iters = 0;
+        while ((match = linkRegex.exec(html)) !== null && iters++ < 100) {
+          const tag = match[0];
+          const typeMatch = tag.match(/type=["']([^"']+)["']/);
+          const hrefMatch = tag.match(/href=["']([^"']+)["']/);
+          const titleMatch = tag.match(/title=["']([^"']+)["']/);
 
-        if (hrefMatch && typeMatch) {
-          const type = typeMatch[1].toLowerCase();
-          if (type.includes("rss") || type.includes("atom") || type.includes("xml")) {
-            let feedUrl = hrefMatch[1];
-            // Resolve relative URLs
-            if (feedUrl.startsWith("/")) {
-              feedUrl = `${parsedUrl.origin}${feedUrl}`;
-            } else if (!feedUrl.startsWith("http")) {
-              feedUrl = new URL(feedUrl, url).href;
+          if (hrefMatch && typeMatch) {
+            const type = typeMatch[1].toLowerCase();
+            if (type.includes("rss") || type.includes("atom") || type.includes("xml")) {
+              let feedUrl = hrefMatch[1];
+              // Resolve relative URLs
+              if (feedUrl.startsWith("/")) {
+                feedUrl = `${parsedUrl.origin}${feedUrl}`;
+              } else if (!feedUrl.startsWith("http")) {
+                feedUrl = new URL(feedUrl, url).href;
+              }
+              feeds.push({
+                url: feedUrl,
+                title: titleMatch?.[1],
+                type: type.includes("atom") ? "atom" : "rss",
+              });
             }
-            feeds.push({
-              url: feedUrl,
-              title: titleMatch?.[1],
-              type: type.includes("atom") ? "atom" : "rss",
-            });
           }
         }
       }

@@ -208,7 +208,8 @@ export function parseBriefingMarkdown(
     // Score line
     const scoreMatch = line.match(/\*\*Score:\s*([\d.]+)\/10\*\*\s*\|\s*(?:Verdict:\s*(\w+)|Novelty)/);
     if (scoreMatch) {
-      currentItem.composite = parseFloat(scoreMatch[1]);
+      const parsed = parseFloat(scoreMatch[1]);
+      currentItem.composite = Number.isNaN(parsed) ? 0 : parsed;
       if (scoreMatch[2]) currentItem.verdict = scoreMatch[2];
       continue;
     }

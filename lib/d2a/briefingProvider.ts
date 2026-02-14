@@ -16,7 +16,8 @@ export async function getLatestBriefing(principalText?: string): Promise<D2ABrie
   if (result.length === 0) return null;
   try {
     return JSON.parse(result[0]) as D2ABriefingResponse;
-  } catch {
+  } catch (err) {
+    console.warn("[briefingProvider] Failed to parse briefing JSON:", err);
     return null;
   }
 }

@@ -15,7 +15,6 @@ export function calculateWoTScore(
     return { pubkey, trustScore: 1.0, hopDistance: 0, mutualFollows: node.mutualFollows, isInGraph: true };
   }
 
-  // Find max mutual follows across all nodes for normalization
   let maxMutual = 0;
   graph.nodes.forEach((n) => {
     if (n.mutualFollows > maxMutual) maxMutual = n.mutualFollows;

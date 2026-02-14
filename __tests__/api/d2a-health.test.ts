@@ -29,19 +29,12 @@ describe("GET /api/d2a/health", () => {
     const res = await GET(makeRequest());
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data).toBeDefined();
-  });
-
-  it("includes status field", async () => {
-    const res = await GET(makeRequest());
-    const data = await res.json();
     expect(["ok", "degraded"]).toContain(data.status);
   });
 
   it("includes valid ISO timestamp", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.timestamp).toBeDefined();
     expect(isNaN(Date.parse(data.timestamp))).toBe(false);
   });
 
@@ -67,7 +60,6 @@ describe("GET /api/d2a/health", () => {
   it("checks x402 receiver configuration", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.checks.x402Receiver).toBeDefined();
     // In test env, X402_RECEIVER_ADDRESS is not set
     expect(data.checks.x402Receiver).toBe("not configured");
   });
@@ -75,7 +67,7 @@ describe("GET /api/d2a/health", () => {
   it("checks x402 network", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.checks.x402Network).toBeDefined();
+    expect(typeof data.checks.x402Network).toBe("string");
   });
 
   it("reports IC canister as reachable when fetch returns 400", async () => {

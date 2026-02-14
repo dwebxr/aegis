@@ -39,7 +39,7 @@ export function clearLinkedAccount(): void {
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.removeItem(STORAGE_KEY);
-  } catch {}
+  } catch { /* localStorage unavailable */ }
 }
 
 export function maskNpub(npub: string): string {
@@ -99,7 +99,7 @@ export async function fetchNostrProfile(
         try {
           const meta = JSON.parse(ev.content);
           displayName = meta.display_name || meta.name || undefined;
-        } catch {}
+        } catch { /* malformed profile JSON */ }
       }
       if (ev.kind === 3) {
         followCount = ev.tags.filter((t: string[]) => t[0] === "p").length;

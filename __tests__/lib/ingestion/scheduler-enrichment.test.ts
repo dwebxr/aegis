@@ -183,6 +183,113 @@ describe("IngestionScheduler — enrichment flow", () => {
     expect(urlCalls.length).toBe(1); // Just the source fetch, not enrichment
   });
 
+  it("picks up imageUrl from enrichment response when original has none", async () => {
+    const onNewContent = jest.fn();
+    const callbacks = makeCallbacks({
+      onNewContent,
+      getSources: jest.fn().mockReturnValue([
+        { type: "rss", config: { feedUrl: "https://example.com/feed" }, enabled: true },
+      ]),
+    });
+
+    // RSS returns short item without imageUrl
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          feedTitle: "Tech Blog",
+          items: [{
+            title: "Short Post",
+            content: "Brief summary only.",
+            author: "Author",
+            link: "https://example.com/article-img",
+            // no imageUrl
+          }],
+        }),
+      })
+      // Enrichment returns full article with imageUrl
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          title: "Full Article",
+          content: "Detailed research with benchmark data showing 40% improvement in model accuracy. " +
+            "The methodology uses a novel approach combining attention mechanisms with retrieval augmentation. " +
+            "Experiments were conducted across multiple datasets to validate the findings comprehensively.",
+          imageUrl: "https://example.com/enriched-og-image.jpg",
+        }),
+      })
+      // Analyze call
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          originality: 7, insight: 7, credibility: 7, composite: 7.0,
+          verdict: "quality", reason: "Good", topics: ["research"],
+          vSignal: 7, cContext: 5, lSlop: 2,
+        }),
+      });
+
+    const scheduler = new IngestionScheduler(callbacks);
+    const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
+    await runCycle();
+
+    expect(onNewContent).toHaveBeenCalledTimes(1);
+    const item = onNewContent.mock.calls[0][0];
+    expect(item.imageUrl).toBe("https://example.com/enriched-og-image.jpg");
+  });
+
+  it("preserves original imageUrl when enrichment also has one", async () => {
+    const onNewContent = jest.fn();
+    const callbacks = makeCallbacks({
+      onNewContent,
+      getSources: jest.fn().mockReturnValue([
+        { type: "rss", config: { feedUrl: "https://example.com/feed" }, enabled: true },
+      ]),
+    });
+
+    // RSS returns short item WITH imageUrl
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          feedTitle: "Tech Blog",
+          items: [{
+            title: "Short Post",
+            content: "Brief summary only.",
+            author: "Author",
+            link: "https://example.com/article-orig-img",
+            imageUrl: "https://example.com/original-thumb.jpg",
+          }],
+        }),
+      })
+      // Enrichment returns full article with different imageUrl
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          title: "Full Article",
+          content: "Detailed research with benchmark data showing 35% improvement across evaluation datasets. " +
+            "The methodology demonstrates consistent gains across five model architectures with reproducible results.",
+          imageUrl: "https://example.com/enriched-different-img.jpg",
+        }),
+      })
+      // Analyze call
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          originality: 7, insight: 7, credibility: 7, composite: 7.0,
+          verdict: "quality", reason: "Good", topics: ["ml"],
+        }),
+      });
+
+    const scheduler = new IngestionScheduler(callbacks);
+    const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
+    await runCycle();
+
+    expect(onNewContent).toHaveBeenCalledTimes(1);
+    const item = onNewContent.mock.calls[0][0];
+    // Original imageUrl takes precedence (item.imageUrl || data.imageUrl)
+    expect(item.imageUrl).toBe("https://example.com/original-thumb.jpg");
+  });
+
   it("caps enrichment at MAX_ENRICH_PER_CYCLE (3)", async () => {
     const callbacks = makeCallbacks({
       getSources: jest.fn().mockReturnValue([

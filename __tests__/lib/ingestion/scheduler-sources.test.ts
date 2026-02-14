@@ -168,6 +168,118 @@ describe("IngestionScheduler — Nostr source", () => {
 
     expect(onNewContent).not.toHaveBeenCalled();
   });
+
+  it("maps Nostr profile name and avatar from profiles record", async () => {
+    const onNewContent = jest.fn();
+    const callbacks = makeCallbacks({
+      onNewContent,
+      getSources: jest.fn().mockReturnValue([{
+        type: "nostr",
+        config: { relays: "wss://relay.damus.io" },
+        enabled: true,
+      }]),
+    });
+
+    const pubkey = "abcdef1234567890abcdef1234567890";
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          events: [{
+            content: "Detailed analysis of protocol design with concrete data: 30% throughput improvement validated across multiple benchmarks with source references to published papers.",
+            pubkey,
+            id: "event-profile-test",
+          }],
+          profiles: {
+            [pubkey]: {
+              name: "Alice Satoshi",
+              picture: "https://example.com/alice.jpg",
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          originality: 7, insight: 7, credibility: 7, composite: 7.0,
+          verdict: "quality", reason: "Good", topics: ["protocol"],
+        }),
+      });
+
+    const scheduler = new IngestionScheduler(callbacks);
+    const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
+    await runCycle();
+
+    expect(onNewContent).toHaveBeenCalledTimes(1);
+    const item = onNewContent.mock.calls[0][0];
+    expect(item.author).toBe("Alice Satoshi");
+    expect(item.avatar).toBe("https://example.com/alice.jpg");
+    expect(item.nostrPubkey).toBe(pubkey);
+    expect(item.sourceUrl).toBe("nostr:event-profile-test");
+  });
+
+  it("falls back to truncated pubkey when no profile exists", async () => {
+    const onNewContent = jest.fn();
+    const callbacks = makeCallbacks({
+      onNewContent,
+      getSources: jest.fn().mockReturnValue([{
+        type: "nostr",
+        config: { relays: "wss://relay.damus.io" },
+        enabled: true,
+      }]),
+    });
+
+    const pubkey = "ff00112233445566778899aabbccddee";
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          events: [{
+            content: "Comprehensive research with benchmark data showing 25% improvement in latency measurements across distributed systems with reproducible results.",
+            pubkey,
+            id: "event-no-profile",
+          }],
+          profiles: {},
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          originality: 6, insight: 6, credibility: 6, composite: 6.0,
+          verdict: "quality", reason: "ok",
+        }),
+      });
+
+    const scheduler = new IngestionScheduler(callbacks);
+    const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
+    await runCycle();
+
+    expect(onNewContent).toHaveBeenCalledTimes(1);
+    const item = onNewContent.mock.calls[0][0];
+    expect(item.author).toBe("ff0011223344...");
+  });
+
+  it("omits pubkeys from Nostr fetch body when config has no pubkeys", async () => {
+    const callbacks = makeCallbacks({
+      getSources: jest.fn().mockReturnValue([{
+        type: "nostr",
+        config: { relays: "wss://relay.damus.io" },
+        enabled: true,
+      }]),
+    });
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    const scheduler = new IngestionScheduler(callbacks);
+    const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
+    await runCycle();
+
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(body.pubkeys).toBeUndefined();
+  });
 });
 
 describe("IngestionScheduler — URL source", () => {

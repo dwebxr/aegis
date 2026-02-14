@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { TwitterApi } from "twitter-api-v2";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
+import { withTimeout } from "@/lib/utils/timeout";
 
 export const maxDuration = 30;
 
@@ -30,12 +31,12 @@ export async function POST(request: NextRequest) {
 
   let result;
   try {
-    result = await readOnlyClient.v2.search(query, {
+    result = await withTimeout(readOnlyClient.v2.search(query, {
       max_results: Math.min(Math.max(maxResults, 10), 100),
       "tweet.fields": ["created_at", "author_id"],
       expansions: ["author_id"],
       "user.fields": ["name", "username"],
-    });
+    }), 15_000, "X API request timed out");
   } catch (err: unknown) {
     console.error("[fetch/twitter] X API error:", err);
     const msg = errMsg(err);

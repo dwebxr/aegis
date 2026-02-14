@@ -27,14 +27,15 @@ describe("GET /api/health", () => {
     const res = await GET(makeRequest());
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.status).toBeDefined();
-    expect(data.checks).toBeDefined();
+    expect(["ok", "degraded"]).toContain(data.status);
+    expect(typeof data.checks).toBe("object");
+    expect(data.checks).not.toBeNull();
   });
 
   it("returns valid ISO timestamp", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.timestamp).toBeDefined();
+    expect(typeof data.timestamp).toBe("string");
     const parsed = Date.parse(data.timestamp);
     expect(isNaN(parsed)).toBe(false);
   });

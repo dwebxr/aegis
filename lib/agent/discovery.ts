@@ -15,7 +15,7 @@ import {
   PEER_EXPIRY_MS,
 } from "./protocol";
 import { errMsg } from "@/lib/utils/errors";
-import { buildManifest, encodeManifest, decodeManifest } from "@/lib/d2a/manifest";
+import { buildManifest, decodeManifest } from "@/lib/d2a/manifest";
 
 /** Returns 0-1 Jaccard similarity of high-affinity topics vs peer interests. */
 export function calculateResonance(
@@ -60,7 +60,7 @@ export async function broadcastPresence(
   }
 
   const manifestContent = contentItems && contentItems.length > 0
-    ? encodeManifest(buildManifest(contentItems))
+    ? JSON.stringify(buildManifest(contentItems))
     : "";
 
   const template: EventTemplate = {

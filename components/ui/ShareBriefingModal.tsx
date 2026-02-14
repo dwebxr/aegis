@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { colors, space, type as t, radii, transitions, shadows } from "@/styles/theme";
 import { ShareIcon } from "@/components/icons";
 import { serializeBriefing } from "@/lib/briefing/serialize";
@@ -26,6 +26,11 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
   const [naddr, setNaddr] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); };
+  }, []);
 
   const insightCount = briefing.priority.length + (briefing.serendipity ? 1 : 0);
 
@@ -52,10 +57,14 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
   };
 
   const handleCopy = async () => {
+    const resetCopied = () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+      setCopied(true);
+      copiedTimer.current = setTimeout(() => setCopied(false), 2000);
+    };
     try {
       await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      resetCopied();
     } catch {
       // Fallback for older browsers
       const input = document.createElement("input");
@@ -64,8 +73,7 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
       input.select();
       document.execCommand("copy");
       document.body.removeChild(input);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      resetCopied();
     }
   };
 

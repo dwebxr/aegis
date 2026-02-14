@@ -55,7 +55,6 @@ export function generateBriefing(
   const priorityItems = scored.slice(0, PRIORITY_COUNT);
   const priorityIds = new Set(priorityItems.map(s => s.item.id));
 
-  // Find best serendipity candidate from remaining items
   const remainingQuality = scored.filter(s => !priorityIds.has(s.item.id));
   let serendipity: BriefingItem | null = null;
 

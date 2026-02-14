@@ -42,5 +42,5 @@ export function clearWoTCache(): void {
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.removeItem(WOT_CACHE_KEY);
-  } catch {}
+  } catch { /* localStorage unavailable */ }
 }

@@ -282,12 +282,12 @@ describe("AgentManager — D2A match callback", () => {
     mgr.stop();
   });
 
-  it("uses content preview (first 32 chars of text) for match callback", async () => {
+  it("passes SHA-256 content hash (not text preview) to match callback", async () => {
     const { callbacks } = makeCallbacks();
     mockCalculateResonance.mockReturnValue(0.5);
 
     mockDiscoverPeers.mockResolvedValueOnce([{
-      nostrPubkey: "peer-preview",
+      nostrPubkey: "peer-hash",
       interests: ["ai"],
       capacity: 5,
       lastSeen: Date.now(),
@@ -299,7 +299,7 @@ describe("AgentManager — D2A match callback", () => {
     const longText = "A".repeat(100);
     mockParseD2AMessage.mockReturnValue({
       type: "deliver",
-      fromPubkey: "peer-preview",
+      fromPubkey: "peer-hash",
       toPubkey: pk,
       payload: {
         text: longText,
@@ -310,12 +310,18 @@ describe("AgentManager — D2A match callback", () => {
       } as D2ADeliverPayload,
     });
 
-    onEventHandler({ pubkey: "peer-preview", content: "deliver" });
+    onEventHandler({ pubkey: "peer-hash", content: "deliver" });
     await new Promise(r => setTimeout(r, 50));
 
-    const contentPreview = callbacks.onD2AMatchComplete.mock.calls[0][2];
-    expect(contentPreview).toBe("A".repeat(32));
-    expect(contentPreview.length).toBe(32);
+    const contentHash = callbacks.onD2AMatchComplete.mock.calls[0][2];
+    // SHA-256 hex = 64 chars
+    expect(contentHash.length).toBe(64);
+    expect(contentHash).toMatch(/^[0-9a-f]{64}$/);
+    // Same input → same hash (deterministic)
+    const { sha256 } = require("@noble/hashes/sha2.js");
+    const { bytesToHex } = require("@noble/hashes/utils.js");
+    const expected = bytesToHex(sha256(new TextEncoder().encode(longText)));
+    expect(contentHash).toBe(expected);
 
     mgr.stop();
   });

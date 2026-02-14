@@ -129,7 +129,7 @@ describe("POST /api/analyze — BYOK (user API key)", () => {
     expect(res.status).toBe(502);
     const data = await res.json();
     expect(data.error).toContain("Request failed");
-    expect(data.fallback).toBeDefined();
+    expect(data.fallback.tier).toBe("heuristic");
   });
 
   it("returns 502 when Anthropic returns non-JSON response with user key", async () => {
@@ -146,7 +146,7 @@ describe("POST /api/analyze — BYOK (user API key)", () => {
     expect(res.status).toBe(502);
     const data = await res.json();
     expect(data.error).toContain("parse");
-    expect(data.fallback).toBeDefined();
+    expect(data.fallback.tier).toBe("heuristic");
   });
 
   it("returns 502 when AI response is not valid JSON", async () => {
@@ -165,7 +165,7 @@ describe("POST /api/analyze — BYOK (user API key)", () => {
     expect(res.status).toBe(502);
     const data = await res.json();
     expect(data.error).toContain("parse AI response");
-    expect(data.fallback).toBeDefined();
+    expect(data.fallback.tier).toBe("heuristic");
   });
 
   it("strips markdown code fences from AI response", async () => {

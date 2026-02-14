@@ -144,10 +144,9 @@ describe("Content → Briefing generation flow", () => {
     expect(briefing.totalItems).toBe(4);
 
     // AI content should rank higher due to topic affinity
-    if (briefing.priority.length >= 2) {
-      const firstTopic = briefing.priority[0].item.topics?.[0];
-      expect(firstTopic).toBe("ai");
-    }
+    expect(briefing.priority.length).toBeGreaterThanOrEqual(2);
+    const firstTopic = briefing.priority[0].item.topics?.[0];
+    expect(firstTopic).toBe("ai");
 
     // Slop should be filtered out
     const slopInPriority = briefing.priority.find(p => p.item.verdict === "slop");
@@ -188,9 +187,8 @@ describe("Content → Briefing generation flow", () => {
     const briefing = generateBriefing(items, profile);
 
     // Should have a serendipity pick
-    if (briefing.serendipity) {
-      expect(briefing.serendipity.isSerendipity).toBe(true);
-    }
+    expect(briefing.serendipity).toBeDefined();
+    expect(briefing.serendipity!.isSerendipity).toBe(true);
   });
 });
 

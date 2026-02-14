@@ -441,8 +441,8 @@ describe("AgentManager — onD2AMatchComplete callback failure", () => {
     // Content should still have been received despite callback failure
     expect(callbacks.onNewContent).toHaveBeenCalledTimes(1);
     expect(mgr.getState().receivedItems).toBe(1);
-    // d2aMatchCount still increments (counted before callback)
-    expect(mgr.getState().d2aMatchCount).toBe(1);
+    // d2aMatchCount does NOT increment when callback fails (counted after success)
+    expect(mgr.getState().d2aMatchCount).toBe(0);
 
     mgr.stop();
   });
