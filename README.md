@@ -24,7 +24,7 @@ Aegis is **free to use** for content filtering. No wallet, no deposit, no setup 
 | Mode | Scoring | Cost | Prerequisites |
 |------|---------|------|---------------|
 | **Lite** | Heuristic only (client-side) | Free | None |
-| **Pro** | AI scoring (IC LLM → WebLLM → Claude → heuristic fallback) + WoT | Free during alpha | Login |
+| **Pro** | AI scoring (WebLLM → IC LLM → Claude → heuristic fallback) + WoT | Free during alpha | Login |
 | **BYOK** | Your own Claude API key | Your API cost | API key in Settings |
 | **Browser AI** | WebLLM (Llama 3.1 8B, local) | Free | WebGPU-capable browser, enable in Settings |
 
@@ -32,12 +32,12 @@ Aegis is **free to use** for content filtering. No wallet, no deposit, no setup 
 
 | Engine | Tier | Where | Cost | When used |
 |--------|------|-------|------|-----------|
-| IC LLM (Llama 3.1 8B) | 1st | On-chain (IC canister) | Free | Default for authenticated users |
-| WebLLM (Llama 3.1 8B q4f16) | 1.5th | Browser-local (WebGPU) | Free | When IC LLM fails and WebLLM is enabled in Settings |
-| Anthropic Claude (claude-sonnet-4-20250514) | 2nd | Off-chain (Vercel) | API key required | Fallback when IC LLM and WebLLM unavailable, or BYOK |
-| Heuristic filter | 3rd | Client-side | Free | Fallback when all API/LLM tiers fail |
+| WebLLM (Llama 3.1 8B q4f16) | 1st | Browser-local (WebGPU) | Free | When enabled in Settings — tried first for privacy |
+| IC LLM (Llama 3.1 8B) | 2nd | On-chain (IC canister) | Free | Default for authenticated users (1st when WebLLM disabled) |
+| Anthropic Claude (claude-sonnet-4-20250514) | 3rd | Off-chain (Vercel) | API key required | Fallback when WebLLM and IC LLM unavailable, or BYOK |
+| Heuristic filter | 4th | Client-side | Free | Fallback when all API/LLM tiers fail |
 
-Tiers are tried in order (1→1.5→2→3). First successful result is used.
+When WebLLM is enabled: WebLLM → IC LLM → Claude → Heuristic. When disabled: IC LLM → Claude → Heuristic.
 
 ### Publishing & D2A
 
@@ -117,25 +117,25 @@ Browser                                  Internet Computer (Mainnet)
 
 Aegis uses a multi-tier scoring pipeline with automatic fallback. The system tries each tier in order and uses the first successful result — no silent failures.
 
-### Tier 1: IC LLM On-Chain Scoring (Free, Decentralized)
+### Tier 1: WebLLM Browser-Local Scoring (Free, Privacy-First)
 
-When authenticated, Aegis first calls `analyzeOnChain()` on the canister, which runs **Llama 3.1 8B** via the [IC LLM Canister](https://github.com/nickcen/ic_llm) (`w36hm-eqaaa-aaaal-qr76a-cai`). This provides free, fully on-chain scoring with no API key required. The prompt includes the user's topic affinities for personalized evaluation.
-
-If IC LLM is unavailable (e.g. local dev, not authenticated), the system falls through to Tier 1.5.
-
-### Tier 1.5: WebLLM Browser-Local Scoring (Free, Optional)
-
-When enabled in Settings, **WebLLM** (Llama 3.1 8B q4f16 via WebGPU) runs entirely in the browser — no API calls, no data leaves the device. The model downloads once on first use (~4 GB) and scores locally thereafter. Requires a WebGPU-capable browser.
+When enabled in Settings, **WebLLM** (Llama 3.1 8B q4f16 via WebGPU) is tried **first** — before any network call. It runs entirely in the browser: no API calls, no data leaves the device. The model downloads once on first use (~4 GB) and scores locally thereafter. Requires a WebGPU-capable browser.
 
 If WebLLM is not enabled or fails, the system falls through to Tier 2.
 
-### Tier 2: Claude API Scoring (Premium, High Quality)
+### Tier 2: IC LLM On-Chain Scoring (Free, Decentralized)
 
-For cases where IC LLM and WebLLM both fail, or for BYOK users, Aegis calls the Anthropic Claude API with the full V/C/L framework and the user's preference context. This provides the highest quality analysis but requires an API key.
+When authenticated, Aegis calls `analyzeOnChain()` on the canister, which runs **Llama 3.1 8B** via the [IC LLM Canister](https://github.com/nickcen/ic_llm) (`w36hm-eqaaa-aaaal-qr76a-cai`). This provides free, fully on-chain scoring with no API key required. The prompt includes the user's topic affinities for personalized evaluation. When WebLLM is disabled, this is the first tier tried.
 
-If the API key is missing or the call fails, the system falls through to Tier 3.
+If IC LLM is unavailable (e.g. local dev, not authenticated), the system falls through to Tier 3.
 
-### Tier 3: Heuristic Fallback (Client-side, No API Call)
+### Tier 3: Claude API Scoring (Premium, High Quality)
+
+For cases where WebLLM and IC LLM both fail, or for BYOK users, Aegis calls the Anthropic Claude API with the full V/C/L framework and the user's preference context. This provides the highest quality analysis but requires an API key.
+
+If the API key is missing or the call fails, the system falls through to Tier 4.
+
+### Tier 4: Heuristic Fallback (Client-side, No API Call)
 
 When all LLM tiers are unavailable, a fast heuristic filter scores content locally using text signals. This provides instant scoring with no network calls.
 
@@ -151,7 +151,7 @@ When all LLM tiers are unavailable, a fast heuristic filter scores content local
 
 Base scores start at 5. Composite = `0.4 × Originality + 0.35 × Insight + 0.25 × Credibility`.
 
-### V/C/L Scoring Axes (Used by Tier 1 and Tier 2)
+### V/C/L Scoring Axes (Used by Tier 1, 2, and 3)
 
 Both IC LLM and Claude evaluate three orthogonal axes:
 
@@ -205,10 +205,10 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 | Mode | Scoring Engine | WoT Filtering | Serendipity | Login Required |
 |------|---------------|:---:|:---:|:---:|
 | **Lite** | Heuristic only (client-side) | No | No | No |
-| **Pro** | IC LLM → WebLLM → Claude → heuristic | Yes | Yes | Yes |
+| **Pro** | WebLLM → IC LLM → Claude → heuristic | Yes | Yes | Yes |
 
 - **Lite**: Fast client-side heuristic scoring. No API calls, no login. WoT and serendipity disabled.
-- **Pro**: Full scoring pipeline (IC LLM → WebLLM → Claude → heuristic fallback) + WoT social graph filtering + serendipity detection. Free during alpha; alternatively bring your own Claude API key in Settings.
+- **Pro**: Full scoring pipeline (WebLLM → IC LLM → Claude → heuristic fallback) + WoT social graph filtering + serendipity detection. Free during alpha; alternatively bring your own Claude API key in Settings.
 
 Users switch between Lite and Pro via the FilterModeSelector in the Dashboard.
 
@@ -294,12 +294,12 @@ Aegis implements a sustainable economic model using ICP tokens (ICRC-1/2) with t
 
 | Tier | Engine | Cost | Where |
 |------|--------|------|-------|
-| **1st (Free)** | IC LLM (Llama 3.1 8B) | 0 ICP — cycles paid by canister | On-chain (IC) |
-| **1.5th (Free)** | WebLLM (Llama 3.1 8B q4f16) | 0 — browser-local via WebGPU | Client-side |
-| **2nd (BYOK)** | Anthropic Claude (claude-sonnet-4-20250514) | User's API key | Off-chain (Vercel) |
-| **3rd (Fallback)** | Heuristic filter | 0 | Client-side |
+| **1st (Free)** | WebLLM (Llama 3.1 8B q4f16) | 0 — browser-local via WebGPU | Client-side |
+| **2nd (Free)** | IC LLM (Llama 3.1 8B) | 0 ICP — cycles paid by canister | On-chain (IC) |
+| **3rd (BYOK)** | Anthropic Claude (claude-sonnet-4-20250514) | User's API key | Off-chain (Vercel) |
+| **4th (Fallback)** | Heuristic filter | 0 | Client-side |
 
-Tiers are tried in order (1→1.5→2→3). Free-tier scoring runs entirely on the Internet Computer. WebLLM is tried next when enabled — browser-local AI via WebGPU with no API calls. Claude API scoring provides the highest quality for users who supply their own API key.
+When WebLLM is enabled, it is tried first — browser-local AI via WebGPU with no API calls and no data leaving the device. IC LLM on-chain scoring is tried next (or first when WebLLM is disabled). Claude API scoring provides the highest quality for users who supply their own API key.
 
 ### Pillar 2: Quality Assurance Deposits (Non-Custodial)
 
@@ -542,12 +542,12 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 
 ## Features
 
-### 3-Tier AI Scoring Pipeline
-- **Tier 1**: IC LLM (Llama 3.1 8B) — free, fully on-chain, no API key
-- **Tier 1.5**: WebLLM (Llama 3.1 8B q4f16) — free, browser-local via WebGPU, no data leaves device
-- **Tier 2**: Anthropic Claude — premium V/C/L scoring with user context
-- **Tier 3**: Heuristic fallback — local, instant, no network call
-- Automatic fallback: each tier falls through to the next on failure (1→1.5→2→3)
+### 4-Tier AI Scoring Pipeline
+- **Tier 1**: WebLLM (Llama 3.1 8B q4f16) — free, browser-local via WebGPU, no data leaves device (when enabled)
+- **Tier 2**: IC LLM (Llama 3.1 8B) — free, fully on-chain, no API key
+- **Tier 3**: Anthropic Claude — premium V/C/L scoring with user context
+- **Tier 4**: Heuristic fallback — local, instant, no network call
+- Automatic fallback: each tier falls through to the next on failure (1→2→3→4)
 - BYOK: Users can supply their own Anthropic API key in Settings for Pro mode
 
 ### WoT Filter Pipeline
@@ -714,7 +714,7 @@ aegis/
 │   │   └── types.ts                     # FilterConfig, FilteredItem, FilterPipelineResult
 │   ├── ingestion/
 │   │   ├── scheduler.ts                 # Background fetch cycle (adaptive intervals, enrichment)
-│   │   ├── quickFilter.ts              # Heuristic pre-filter (Tier 1)
+│   │   ├── quickFilter.ts              # Heuristic pre-filter (Tier 4 fallback)
 │   │   ├── dedup.ts                     # Article-level dedup (URL + SHA-256 fingerprint)
 │   │   └── sourceState.ts              # Source runtime state (backoff, health, adaptive timing)
 │   ├── nostr/
@@ -926,7 +926,7 @@ Aegis follows a staged decentralization roadmap to balance security with trustle
 
 **Lite mode costs nothing** — it runs entirely client-side with heuristic scoring (no API calls).
 
-Pro mode uses the 3-tier AI scoring pipeline. IC LLM (Tier 1) is free. Claude API scoring costs approximately $0.01/day per user (~50 articles/day). During alpha, this is covered by us. After alpha, you can bring your own API key (Settings > AI Scoring) — roughly $2/month for typical usage.
+Pro mode uses the 4-tier AI scoring pipeline. WebLLM (Tier 1, when enabled) and IC LLM (Tier 2) are both free. Claude API scoring costs approximately $0.01/day per user (~50 articles/day). During alpha, this is covered by us. After alpha, you can bring your own API key (Settings > AI Scoring) — roughly $2/month for typical usage.
 
 ### Why not just use a P2P small-world network?
 

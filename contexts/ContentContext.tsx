@@ -164,8 +164,22 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     try {
     let result: AnalyzeResponse | null = null;
 
-    // Tier 1: IC LLM via canister (free, on-chain)
-    if (actorRef.current && isAuthenticated) {
+    // Tier 1: WebLLM (browser-local AI) — when enabled, tried first for privacy
+    if (isWebLLMEnabled()) {
+      try {
+        const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
+        const topics = userContext
+          ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
+          : [];
+        const webllmResult = await scoreWithWebLLM(text, topics);
+        result = { ...webllmResult, scoredByAI: true } as AnalyzeResponse;
+      } catch (err) {
+        console.warn("[analyze] WebLLM scoring failed, falling back to IC LLM:", errMsg(err));
+      }
+    }
+
+    // Tier 2: IC LLM via canister (free, on-chain)
+    if (!result && actorRef.current && isAuthenticated) {
       try {
         const topics = userContext
           ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
@@ -196,21 +210,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       }
     }
 
-    // Tier 1.5: WebLLM (browser-local AI, if enabled)
-    if (!result && isWebLLMEnabled()) {
-      try {
-        const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
-        const topics = userContext
-          ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
-          : [];
-        const webllmResult = await scoreWithWebLLM(text, topics);
-        result = { ...webllmResult, scoredByAI: true } as AnalyzeResponse;
-      } catch (err) {
-        console.warn("[analyze] WebLLM scoring failed, falling back to API:", errMsg(err));
-      }
-    }
-
-    // Tier 2: Claude API via /api/analyze (premium / fallback)
+    // Tier 3: Claude API via /api/analyze (premium / fallback)
     if (!result) {
       const body: Record<string, unknown> = { text, source: "manual" };
       if (userContext) body.userContext = userContext;
