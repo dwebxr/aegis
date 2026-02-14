@@ -11,20 +11,50 @@ Content quality filter that learns your taste, curates a zero-noise briefing, pu
 
 Aegis is **free to use** for content filtering. No wallet, no deposit, no setup required.
 
+### Content Filtering
+
+| Mode | Scoring | Cost | Prerequisites |
+|------|---------|------|---------------|
+| **Lite** | Heuristic only (client-side) | Free | None |
+| **Pro** | AI scoring (IC LLM → Claude → heuristic fallback) + WoT | Free during alpha | None (login for WoT) |
+| **BYOK** | Your own Claude API key | Your API cost | API key in Settings |
+| **Browser AI** | WebLLM (Llama 3.1 8B, local) | Free | WebGPU-capable browser |
+
+### AI Scoring Engines
+
+| Engine | Tier | Where | Cost | When used |
+|--------|------|-------|------|-----------|
+| IC LLM (Llama 3.1 8B) | 1st | On-chain (IC canister) | Free | Default for authenticated users |
+| Anthropic Claude (claude-sonnet-4-20250514) | 2nd | Off-chain (Vercel) | API key required | Fallback when IC LLM unavailable, or BYOK |
+| Heuristic filter | 3rd | Client-side | Free | Fallback when both API tiers fail |
+| WebLLM (Llama 3.1 8B q4f16) | Optional | Browser-local (WebGPU) | Free | Manual enable in Settings |
+
+Tiers are tried in order (1→2→3). First successful result is used.
+
+### Publishing & D2A
+
 | What you want to do | Cost | Prerequisites |
 |---------------------|------|---------------|
-| Browse & filter content (Lite mode) | Free | None |
-| AI-powered scoring (Pro mode, alpha) | Free during alpha | None |
-| Use your own API key for AI scoring | Your API cost | None |
-| Publish quality signals to Nostr | Free while in good standing | None* |
-| D2A Start (trusted peers) | Free | Link Nostr npub in Settings |
-| D2A Start (unknown peers) | 0.001 ICP / item | ICRC-2 pre-approval (max 0.1 ICP) |
+| Publish quality signals to Nostr | Free while in good standing | Login (Internet Identity) |
+| D2A exchange (trusted peers) | Free | Link Nostr npub in Settings |
+| D2A exchange (known peers) | 0.001 ICP / item | ICRC-2 pre-approval (0.1 ICP) |
+| D2A exchange (unknown peers) | 0.002 ICP / item | ICRC-2 pre-approval (0.1 ICP) |
 
 \*Deposit required only if your published signals are repeatedly flagged as low-quality (anti-spam measure). New users and users in good standing publish for free.
 
-**Trusted peers** are users in the follow graph of the Nostr account you link in Settings. D2A exchanges between trusted peers are free; exchanges with unknown peers incur a small ICP fee via ICRC-2 allowance.
+**Trusted peers** are users in the follow graph of the Nostr account you link in Settings. D2A exchanges between trusted peers are free — no ICP needed. The agent starts in **trusted-only mode** when the wallet has insufficient funds.
 
 **How does Publish Signal reputation work?** Every publisher starts with a neutral reputation. Signals validated by the community improve your standing; signals flagged as slop degrade it. If your reputation drops below the threshold, an ICP deposit (0.001–1.0 ICP) is required as a quality assurance bond. Reputation naturally recovers over time (+1 per week of inactivity).
+
+### Settings Persistence
+
+| Setting | Storage | Synced across devices? |
+|---------|---------|:---:|
+| Nostr Account (npub) | IC canister + localStorage cache | Yes |
+| D2A Agent toggle | IC canister + localStorage cache | Yes |
+| API Key (BYOK) | localStorage only | No (secret) |
+| Push Notifications | IC canister + browser | No (browser-specific) |
+| Browser AI (WebLLM) | localStorage only | No (browser-specific) |
 
 ## Architecture
 
@@ -158,15 +188,13 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 
 ### Filter Modes
 
-| Mode | Scoring | WoT | Serendipity | Cost | Deposit |
-|------|---------|-----|-------------|------|---------|
-| **Lite** | Heuristic only | No | No | Free | No |
-| **Pro** | WoT + AI scoring | Yes | Yes | Free during alpha | No |
-| **Publish Signal** | N/A (output) | N/A | N/A | Free* / ICP deposit | No* |
+| Mode | Scoring Engine | WoT Filtering | Serendipity | Login Required |
+|------|---------------|:---:|:---:|:---:|
+| **Lite** | Heuristic only (client-side) | No | No | No |
+| **Pro** | IC LLM → Claude → heuristic fallback | Yes | Yes | Yes |
 
-- **Lite**: Client-side heuristic filter only. No API calls, no login required. WoT scoring disabled.
-- **Pro**: Full WoT pipeline + AI scoring (IC LLM or Claude). Discovers quality content outside your trust graph. Free during alpha; alternatively bring your own Claude API key in Settings.
-- **Publish Signal**: Broadcasts your curated content to Nostr. Free while in good standing. ICP deposit required only if your signals are repeatedly flagged — the deposit is returned if the community validates your signal quality.
+- **Lite**: Fast client-side heuristic scoring. No API calls, no login. WoT and serendipity disabled.
+- **Pro**: Full 3-tier AI scoring pipeline (IC LLM → Claude → heuristic fallback) + WoT social graph filtering + serendipity detection. Free during alpha; alternatively bring your own Claude API key in Settings.
 
 Users switch between Lite and Pro via the FilterModeSelector in the Dashboard.
 
@@ -248,15 +276,16 @@ Daily cost records are stored in localStorage (90-day rolling window). The Analy
 
 Aegis implements a sustainable economic model using ICP tokens (ICRC-1/2) with three revenue pillars:
 
-### Pillar 1: Compute & Intelligence Subscription
+### Pillar 1: Compute & Intelligence
 
 | Tier | Engine | Cost | Where |
 |------|--------|------|-------|
-| **Free** | IC LLM (Llama 3.1 8B) | 0 ICP — cycles paid by canister | On-chain (IC) |
-| **Premium** | Anthropic Claude | API key required | Off-chain (Vercel) |
-| **Fallback** | Heuristic filter | 0 | Client-side |
+| **1st (Free)** | IC LLM (Llama 3.1 8B) | 0 ICP — cycles paid by canister | On-chain (IC) |
+| **2nd (BYOK)** | Anthropic Claude (claude-sonnet-4-20250514) | User's API key | Off-chain (Vercel) |
+| **3rd (Fallback)** | Heuristic filter | 0 | Client-side |
+| **Optional** | WebLLM (Llama 3.1 8B q4f16) | 0 — browser-local via WebGPU | Client-side |
 
-Free-tier scoring runs entirely on the Internet Computer. Premium Claude API scoring provides higher accuracy for users who supply their own API key.
+Tiers are tried in order. Free-tier scoring runs entirely on the Internet Computer. Claude API scoring provides highest quality for users who supply their own API key. WebLLM runs independently as an optional browser-local scorer.
 
 ### Pillar 2: Quality Assurance Deposits (Non-Custodial)
 
@@ -293,18 +322,18 @@ When content is successfully delivered via the D2A protocol, a trust-based fee i
 Content delivered via D2A
   → Effective trust = WoT score × 0.6 + behavioral reputation × 0.4
   → Trust tier determines fee:
-      Trusted (≥0.8): 0.0005 ICP — long-term validated peers
+      Trusted (≥0.8): Free    — WoT-backed peers exchange for free
       Known   (≥0.4): 0.001  ICP — peers with some track record
       Unknown (≥0.0): 0.002  ICP — new peers (default)
       Restricted (<0): rejected — blocked peers, no delivery
-  → Fee split: 80% → Content provider, 20% → auto-distributed (cycles or protocol wallet)
+  → Fee split (paid tiers): 80% → Content provider, 20% → auto-distributed (cycles or protocol wallet)
 ```
 
 **Behavioral reputation** is tracked locally (localStorage). Each Validate on D2A-received content improves the sender's reputation; each Flag degrades it. Peers automatically upgrade from Unknown → Known → Trusted as the user validates their content. Peers scoring below −5 are auto-blocked.
 
 **Non-custodial**: The 20% protocol share is immediately distributed — either converted to cycles (if canister cycles are below threshold) or sent to the hardcoded protocol wallet. No funds accumulate in the canister beyond active deposits.
 
-The receiver pre-approves the canister for a blanket allowance (0.1 ICP ≈ 100 matches) when the agent starts. Fees are collected automatically via `icrc2_transfer_from` and distributed via `icrc1_transfer`.
+When the D2A agent starts, it attempts to pre-approve the canister for a 0.1 ICP allowance via ICRC-2. If the wallet has insufficient funds, the agent starts in **trusted-only mode** — free exchanges with WoT-backed peers still work. Fees for paid tiers are collected automatically via `icrc2_transfer_from` and distributed via `icrc1_transfer`.
 
 Fee collection only occurs when both peers include their IC principal in their presence broadcast. Peers without principals can still exchange content — just without the fee mechanism.
 
@@ -429,7 +458,7 @@ The receiving agent rejects deliveries from undiscovered peers (not in the known
 | **Identity binding** | Keypair derived from IC Principal — tied to Internet Identity |
 | **No persistence** | Kind 21078 is ephemeral — relays are not required to store events |
 | **No central authority** | Any Nostr relay works — no single point of failure or censorship |
-| **Sybil resistance** | Trust-tiered D2A fees — unknown peers pay 4× more than trusted ones |
+| **Sybil resistance** | Trust-tiered D2A fees — trusted peers (WoT-backed) exchange free, unknown peers pay ICP |
 | **Reputation isolation** | Behavioral reputation is local — peers cannot manipulate their own score |
 
 ---
@@ -527,12 +556,12 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - ICRC-2 approve/transfer_from pattern with pre-debit rollback safety
 
 ### D2A Content Provision Fee (Trust-Tiered)
-- Dynamic trust-based fees: 0.0005 ICP (trusted) / 0.001 ICP (known) / 0.002 ICP (unknown)
+- Dynamic trust-based fees: Free (trusted) / 0.001 ICP (known) / 0.002 ICP (unknown)
 - Effective trust = WoT score × 0.6 + local behavioral reputation × 0.4
 - Validate/Flag on D2A content adjusts sender's local reputation → tier upgrades/downgrades
 - Auto-block at reputation score ≤ −5 (restricted tier, deliveries rejected)
 - 80/20 split: 80% to content provider, 20% auto-distributed (cycles or protocol wallet)
-- Blanket ICRC-2 pre-approval on agent start (0.1 ICP ≈ 100 matches)
+- ICRC-2 pre-approval on agent start (0.1 ICP) — optional; agent starts in trusted-only mode without ICP
 
 ### Content Manifest Diff Streaming
 - Presence events carry SHA-256 content manifests (top 50 quality items, 32-char truncated hashes)
@@ -693,7 +722,7 @@ aegis/
 │   │   ├── icpLedger.ts                # ICP Ledger actor (ICRC-1/2 balance, approve, allowance)
 │   │   └── declarations/               # Candid types + IDL factory
 │   ├── api/
-│   │   ├── rateLimit.ts                 # Per-IP rate limiter for API routes (30 req/min)
+│   │   ├── rateLimit.ts                 # Per-IP rate limiter for API routes (5-60 req/min per route)
 │   │   └── dailyBudget.ts              # Per-instance daily API budget (500 calls/day)
 │   ├── webllm/
 │   │   ├── engine.ts                    # Browser-local AI scoring (WebGPU, Llama 3.1 8B)
@@ -877,13 +906,13 @@ Aegis follows a staged decentralization roadmap to balance security with trustle
 
 ### Do I need cryptocurrency to use Aegis?
 
-**No.** Content filtering (both Lite and Pro modes) works without any crypto, wallet, or deposit. You only need ICP if you want to publish quality signals to the Nostr network.
+**No.** Content filtering (both Lite and Pro modes) works without any crypto, wallet, or deposit. D2A exchanges between trusted peers (Nostr follow graph) are also free. You only need ICP for publishing quality signals or D2A exchanges with unknown peers.
 
 ### Is Aegis expensive to run?
 
-**Lite mode costs nothing** — it runs entirely client-side using your Nostr Web of Trust.
+**Lite mode costs nothing** — it runs entirely client-side with heuristic scoring (no API calls).
 
-Pro mode (AI scoring) costs approximately $0.01/day per user (~50 articles/day with Claude). During alpha, this is covered by us. After alpha, you can bring your own API key (Settings > AI Scoring) — roughly $2/month for typical usage.
+Pro mode uses the 3-tier AI scoring pipeline. IC LLM (Tier 1) is free. Claude API scoring costs approximately $0.01/day per user (~50 articles/day). During alpha, this is covered by us. After alpha, you can bring your own API key (Settings > AI Scoring) — roughly $2/month for typical usage.
 
 ### Why not just use a P2P small-world network?
 
