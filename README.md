@@ -13,20 +13,27 @@ Aegis is **free to use** for content filtering. No wallet, no deposit, no setup 
 
 ### Getting Started
 
-1. **Open** https://aegis.dwebxr.xyz — Lite mode works immediately, no login
-2. **Login** with Internet Identity — unlocks Pro mode (AI scoring + WoT)
-3. **Add Sources** in the Sources tab — RSS feeds, Nostr pubkeys, URLs, or Twitter searches
-4. **Browse** the Dashboard — content is auto-fetched, scored, and ranked
+1. **Open** https://aegis.dwebxr.xyz — Demo mode starts immediately with preset feeds
+2. **Browse** the Dashboard — 3 preset RSS feeds (Hacker News, CoinDesk, The Verge) are auto-fetched and scored
+3. **Login** with Internet Identity — unlocks custom sources, Pro mode, and publishing
+4. **Add Sources** in the Sources tab — RSS feeds, Nostr pubkeys, URLs, or Twitter searches
 5. **(Optional)** Link your Nostr npub in Settings — enables WoT trust graph and free D2A with trusted peers
 
-### Content Filtering
+### Three Modes: Demo → Lite → Pro
 
-| Mode | Scoring | Cost | Prerequisites |
-|------|---------|------|---------------|
-| **Lite** | Heuristic only (client-side) | Free | None |
-| **Pro** | AI scoring (WebLLM → BYOK → IC LLM → heuristic fallback) + WoT | Free during alpha | Login |
-| **BYOK** | Your own Claude API key | Your API cost | API key in Settings |
-| **Browser AI** | WebLLM (Llama 3.1 8B, local) | Free | WebGPU-capable browser, enable in Settings |
+Aegis has two independent axes: **authentication state** (Demo vs Logged-in) and **filter mode** (Lite vs Pro).
+
+| Mode | Authentication | Sources | Scoring | WoT + Serendipity | Cost |
+|------|---------------|---------|---------|:--:|------|
+| **Demo** | Not logged in | 3 preset feeds (read-only) | Heuristic (Lite) | No | Free |
+| **Lite** | Logged in | Custom (add/edit/remove) | Heuristic only | No | Free |
+| **Pro** | Logged in | Custom (add/edit/remove) | AI pipeline + heuristic fallback | Yes | Free during alpha |
+
+- **Demo**: Open the app without logging in. You get 3 preset RSS feeds scored with heuristic filters. Source management is disabled. Great for trying Aegis without commitment. Pro mode selector is locked.
+- **Lite**: Login and select "Lite" in the filter mode selector. Full source management with heuristic-only scoring. No API calls, $0 cost. WoT and serendipity disabled.
+- **Pro**: Login and select "Pro" in the filter mode selector. Full AI scoring pipeline (WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
+
+Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. Demo mode is automatic when not logged in — logging in clears demo content and enables full source management.
 
 ### AI Scoring Engines
 
@@ -211,13 +218,15 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 
 | Mode | Scoring Engine | WoT Filtering | Serendipity | Login Required |
 |------|---------------|:---:|:---:|:---:|
-| **Lite** | Heuristic only (client-side) | No | No | No |
+| **Demo** | Heuristic only (Lite locked) | No | No | No |
+| **Lite** | Heuristic only (client-side) | No | No | Yes |
 | **Pro** | WebLLM → BYOK → IC LLM → heuristic | Yes | Yes | Yes |
 
-- **Lite**: Fast client-side heuristic scoring. No API calls, no login. WoT and serendipity disabled.
-- **Pro**: Full scoring pipeline (WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity detection. Free during alpha; alternatively bring your own Claude API key in Settings.
+- **Demo**: Unauthenticated state. 3 preset RSS feeds, heuristic scoring, Pro selector locked. Source management disabled.
+- **Lite**: Authenticated, heuristic-only scoring. Full source management but no API calls, no WoT, no serendipity. $0 cost.
+- **Pro**: Authenticated, full AI scoring pipeline + WoT social graph filtering + serendipity discovery (up to 5 per cycle). Free during alpha; alternatively bring your own Claude API key in Settings.
 
-Users switch between Lite and Pro via the FilterModeSelector in the Dashboard.
+Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. Demo mode is automatic when not logged in.
 
 ### Nostr Account Linking
 
@@ -559,7 +568,8 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Automatic fallback: BYOK users (1→2→3→4), non-BYOK users (1→3→3.5→4)
 
 ### WoT Filter Pipeline
-- **Lite mode**: Heuristic scoring only (free, no API calls)
+- **Demo mode**: Preset feeds, heuristic scoring, Pro locked (no login)
+- **Lite mode**: Heuristic scoring only (free, no API calls, login required)
 - **Pro mode**: WoT social graph + AI scoring with serendipity detection
 - Trust scoring from Nostr follow graph (2-hop, mutual follows, hop proximity)
 - Weighted composite: quality × 0.7 + trust × quality × 0.3
