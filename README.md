@@ -39,13 +39,15 @@ Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. D
 
 | Engine | Tier | Where | Cost | When used |
 |--------|------|-------|------|-----------|
-| WebLLM (Llama 3.1 8B q4f16) | 1st | Browser-local (WebGPU) | Free | When enabled in Settings — tried first for privacy |
+| WebLLM (Llama 3.1 8B q4f16) | 1st\* | Browser-local (WebGPU) | Free | **Opt-in** — enable in Settings; tried first when active |
 | Anthropic Claude (BYOK) | 2nd | Off-chain (Vercel) | User's API key | When user sets own API key in Settings |
 | IC LLM (Llama 3.1 8B) | 3rd | On-chain (IC canister) | Free | Default for authenticated users |
 | Anthropic Claude (server key) | 3.5th | Off-chain (Vercel) | Free during alpha | Non-BYOK users when IC LLM fails (future Pro subscription) |
 | Heuristic filter | 4th | Client-side | Free | Fallback when all LLM tiers fail |
 
-BYOK users: WebLLM → BYOK Claude → IC LLM → Heuristic. Non-BYOK users: WebLLM → IC LLM → Server Claude → Heuristic.
+\*WebLLM is **off by default**. When not enabled, the chain starts at Tier 2 (BYOK) or Tier 3 (IC LLM).
+
+BYOK users: WebLLM\* → BYOK Claude → IC LLM → Heuristic. Non-BYOK users: WebLLM\* → IC LLM → Server Claude → Heuristic.
 
 ### Publishing & D2A
 
