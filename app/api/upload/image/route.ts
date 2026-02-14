@@ -33,10 +33,17 @@ export async function POST(request: NextRequest) {
   const upstream = new FormData();
   upstream.append("file", file);
 
+  const headers: Record<string, string> = {};
+  const authHeader = request.headers.get("authorization");
+  if (authHeader) {
+    headers["Authorization"] = authHeader;
+  }
+
   let res: Response;
   try {
     res = await fetch("https://nostr.build/api/v2/upload/files", {
       method: "POST",
+      headers,
       body: upstream,
       signal: AbortSignal.timeout(25_000),
     });

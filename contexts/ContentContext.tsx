@@ -12,6 +12,7 @@ import { getUserApiKey } from "@/lib/apiKey/storage";
 import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 import { recordUseful, recordSlop } from "@/lib/d2a/reputation";
+import { recordPublishValidation, recordPublishFlag } from "@/lib/reputation/publishGate";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 
 const CONTENT_CACHE_KEY = "aegis-content-cache";
@@ -290,6 +291,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (item && item.source === "nostr" && item.nostrPubkey) {
       recordUseful(item.nostrPubkey);
     }
+    if (item && item.source === "manual" && item.nostrPubkey) {
+      recordPublishValidation(item.nostrPubkey);
+    }
     if (item && actorRef.current && isAuthenticated) {
       actorRef.current.updateEvaluation(id, true, item.flagged)
         .catch((err: unknown) => {
@@ -308,6 +312,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     }
     if (item && item.source === "nostr" && item.nostrPubkey) {
       recordSlop(item.nostrPubkey);
+    }
+    if (item && item.source === "manual" && item.nostrPubkey) {
+      recordPublishFlag(item.nostrPubkey);
     }
     if (item && actorRef.current && isAuthenticated) {
       actorRef.current.updateEvaluation(id, item.validated, true)

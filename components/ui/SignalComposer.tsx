@@ -5,6 +5,7 @@ import { ScoreRing } from "./ScoreRing";
 import { scoreColor } from "@/lib/utils/scores";
 import { formatICP, MIN_STAKE, MAX_STAKE } from "@/lib/ic/icpLedger";
 import type { AnalyzeResponse } from "@/lib/types/api";
+import type { PublishGateDecision } from "@/lib/reputation/publishGate";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -12,14 +13,16 @@ const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "im
 interface SignalComposerProps {
   onPublish: (text: string, scores: AnalyzeResponse, stakeAmount?: bigint, imageUrl?: string) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
   onAnalyze: (text: string) => Promise<AnalyzeResponse>;
+  onUploadImage?: (file: File) => Promise<{ url?: string; error?: string }>;
   isAnalyzing: boolean;
   nostrPubkey: string | null;
   icpBalance?: bigint | null;
   stakingEnabled?: boolean;
+  publishGate?: PublishGateDecision | null;
   mobile?: boolean;
 }
 
-export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAnalyze, isAnalyzing, nostrPubkey, icpBalance, stakingEnabled, mobile }) => {
+export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAnalyze, onUploadImage, isAnalyzing, nostrPubkey, icpBalance, stakingEnabled, publishGate, mobile }) => {
   const [text, setText] = useState("");
   const [selfScore, setSelfScore] = useState<AnalyzeResponse | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -57,6 +60,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
     : Number(MAX_STAKE);
   const maxStakeE8s = Math.max(rawMax, Number(MIN_STAKE));
   const hasBalance = icpBalance != null && icpBalance >= MIN_STAKE;
+  const isGateBlocked = publishGate != null && !publishGate.canPublish;
 
   useEffect(() => {
     if (stakeE8s > maxStakeE8s) {
@@ -86,16 +90,27 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
 
     setIsUploading(true);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/upload/image", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) {
-        setImageError(data.error || "Upload failed");
-        setImagePreview(null);
-        URL.revokeObjectURL(preview);
+      if (onUploadImage) {
+        const result = await onUploadImage(file);
+        if (result.error) {
+          setImageError(result.error);
+          setImagePreview(null);
+          URL.revokeObjectURL(preview);
+        } else if (result.url) {
+          setImageUrl(result.url);
+        }
       } else {
-        setImageUrl(data.url);
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch("/api/upload/image", { method: "POST", body: form });
+        const data = await res.json();
+        if (!res.ok) {
+          setImageError(data.error || "Upload failed");
+          setImagePreview(null);
+          URL.revokeObjectURL(preview);
+        } else {
+          setImageUrl(data.url);
+        }
       }
     } catch {
       setImageError("Upload failed — check connection");
@@ -275,10 +290,10 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
               </div>
               <button
                 onClick={handlePublish}
-                disabled={isPublishing || (stakingEnabled && !hasBalance)}
+                disabled={isPublishing || isGateBlocked || (stakingEnabled && !hasBalance)}
                 style={{
                   padding: mobile ? "10px 16px" : "10px 24px",
-                  background: isPublishing || (stakingEnabled && !hasBalance)
+                  background: isPublishing || isGateBlocked || (stakingEnabled && !hasBalance)
                     ? "rgba(255,255,255,0.05)"
                     : stakingEnabled
                       ? "linear-gradient(135deg, #f59e0b, #ef4444)"
@@ -288,13 +303,28 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                   color: "#fff",
                   fontSize: 13,
                   fontWeight: 700,
-                  cursor: isPublishing || (stakingEnabled && !hasBalance) ? "not-allowed" : "pointer",
+                  cursor: isPublishing || isGateBlocked || (stakingEnabled && !hasBalance) ? "not-allowed" : "pointer",
                   marginLeft: "auto",
                 }}
               >
-                {isPublishing ? "Publishing..." : stakingEnabled ? `Deposit & Publish` : "Publish Signal"}
+                {isPublishing ? "Publishing..." : isGateBlocked ? "Publishing Suspended" : stakingEnabled ? `Deposit & Publish` : "Publish Signal"}
               </button>
             </div>
+
+            {isGateBlocked && (
+              <div style={{
+                fontSize: 11, color: "#f87171", marginTop: 4, padding: "8px 12px",
+                background: "rgba(248,113,113,0.08)", borderRadius: 8, fontWeight: 600, lineHeight: 1.5,
+              }}>
+                Publishing is suspended. Your published signals have been repeatedly flagged. Reputation recovers +1 per week of inactivity.
+              </div>
+            )}
+
+            {publishGate && !publishGate.requiresDeposit && publishGate.canPublish && publishGate.reason && (
+              <div style={{ fontSize: 10, color: "#64748b", marginTop: 4, fontStyle: "italic" }}>
+                {publishGate.reason}
+              </div>
+            )}
 
             {stakingEnabled && (
               <div style={{

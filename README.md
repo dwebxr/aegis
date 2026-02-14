@@ -16,9 +16,11 @@ Aegis is **free to use** for content filtering. No wallet, no deposit, no setup 
 | Browse & filter content (Lite mode) | Free | No |
 | AI-powered scoring (Pro mode, alpha) | Free during alpha | No |
 | Use your own API key for AI scoring | Your API cost | No |
-| Publish quality signals to Nostr | ICP deposit | Yes |
+| Publish quality signals to Nostr | Free while in good standing | No* |
 
-**Why does Publish Signal require a deposit?** Publishing a signal stakes your reputation on-chain. If you broadcast slop, you lose your deposit. This economic mechanism ensures only quality signals enter the network. Reading, filtering, and scoring content has no such requirement.
+\*Deposit required only if your published signals are repeatedly flagged as low-quality (anti-spam measure). New users and users in good standing publish for free.
+
+**How does Publish Signal reputation work?** Every publisher starts with a neutral reputation. Signals validated by the community improve your standing; signals flagged as slop degrade it. If your reputation drops below the threshold, an ICP deposit (0.001–1.0 ICP) is required as a quality assurance bond. Reputation naturally recovers over time (+1 per week of inactivity).
 
 ## Architecture
 
@@ -156,11 +158,11 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 |------|---------|-----|-------------|------|---------|
 | **Lite** | Heuristic only | No | No | Free | No |
 | **Pro** | WoT + AI scoring | Yes | Yes | Free during alpha | No |
-| **Publish Signal** | N/A (output) | N/A | N/A | ICP deposit | Yes |
+| **Publish Signal** | N/A (output) | N/A | N/A | Free* / ICP deposit | No* |
 
 - **Lite**: Client-side heuristic filter only. No API calls, no login required. WoT scoring disabled.
 - **Pro**: Full WoT pipeline + AI scoring (IC LLM or Claude). Discovers quality content outside your trust graph. Free during alpha; alternatively bring your own Claude API key in Settings.
-- **Publish Signal**: Broadcasts your curated content to Nostr. Requires ICP deposit as anti-spam stake — the deposit is returned if the community validates your signal quality.
+- **Publish Signal**: Broadcasts your curated content to Nostr. Free while in good standing. ICP deposit required only if your signals are repeatedly flagged — the deposit is returned if the community validates your signal quality.
 
 Users switch between Lite and Pro via the FilterModeSelector in the Dashboard.
 
@@ -668,6 +670,8 @@ aegis/
 │   ├── webllm/
 │   │   ├── engine.ts                    # Browser-local AI scoring (WebGPU, Llama 3.1 8B)
 │   │   └── types.ts                     # WebLLMStatus type
+│   ├── reputation/
+│   │   └── publishGate.ts               # Publish Signal reputation gating (localStorage)
 │   ├── apiKey/
 │   │   └── storage.ts                   # BYOK API key storage (localStorage, never sent to server)
 │   ├── types/                           # ContentItem, API response types, source types
@@ -854,9 +858,13 @@ You can — that's exactly what **Lite mode** does. Nostr's Web of Trust is a sm
 
 If your published signals are consistently rated as low-quality by the community (3+ flags reach consensus), your deposit is forfeited. This creates a direct economic incentive to only publish genuine quality signals. Deposits that receive no community verdict within 30 days are automatically returned — no verdict means no issue found.
 
+### Do I need a deposit to publish signals?
+
+**Not initially.** New users can publish signals freely. A deposit is only required if your signals are repeatedly rated as low-quality by the network. Think of it as a spam prevention measure — good publishers never need to deposit. Reputation recovers naturally over time (+1 per week of inactivity).
+
 ### Do I need to deposit ICP before I can use Aegis?
 
-**No.** Deposits are only for the Publish Signal feature. You can browse, filter, score, and curate content indefinitely without any deposit. The deposit exists solely as an anti-spam mechanism for the signal publishing network.
+**No.** You can browse, filter, score, curate content, and publish signals indefinitely without any deposit. Deposits are only triggered as an anti-spam measure for publishers whose signals are consistently flagged.
 
 ## License
 

@@ -30,6 +30,7 @@ import { DemoBanner } from "@/components/ui/DemoBanner";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { publishSignalToNostr, buildAegisTags } from "@/lib/nostr/publish";
+import { createNIP98AuthHeader } from "@/lib/nostr/nip98";
 import { createICPLedgerActorAsync, ICP_FEE, type ICPLedgerActor } from "@/lib/ic/icpLedger";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { Principal } from "@dfinity/principal";
@@ -37,6 +38,7 @@ import { getCanisterId } from "@/lib/ic/agent";
 import type { UserReputation } from "@/lib/ic/declarations";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import { errMsg } from "@/lib/utils/errors";
+import { checkPublishGate, type PublishGateDecision } from "@/lib/reputation/publishGate";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 const PUSH_THROTTLE: Record<string, number> = {
@@ -61,6 +63,7 @@ export default function AegisApp() {
   const [engagementIndex, setEngagementIndex] = useState<number | null>(null);
   const [wotGraph, setWotGraph] = useState<WoTGraph | null>(null);
   const [wotLoading, setWotLoading] = useState(false);
+  const [publishGate, setPublishGate] = useState<PublishGateDecision | null>(null);
 
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
@@ -71,6 +74,11 @@ export default function AegisApp() {
     if (!isAuthenticated || !principalText) return null;
     return deriveNostrKeypairFromText(principalText);
   }, [isAuthenticated, principalText]);
+
+  useEffect(() => {
+    if (!nostrKeys?.pk) { setPublishGate(null); return; }
+    setPublishGate(checkPublishGate(nostrKeys.pk));
+  }, [nostrKeys?.pk]);
 
   const filterModeRef = useRef(filterMode);
   filterModeRef.current = filterMode;
@@ -301,8 +309,12 @@ export default function AegisApp() {
 
     const tags = buildAegisTags(scores.composite, scores.vSignal, scores.topics || [], imageUrl);
 
-    if (identity && principalText && !stakeAmount) {
-      addNotification("ICP deposit is required to publish a signal", "error");
+    if (publishGate && !publishGate.canPublish) {
+      addNotification(publishGate.reason, "error");
+      return { eventId: null, relaysPublished: [] };
+    }
+    if (publishGate?.requiresDeposit && !stakeAmount) {
+      addNotification("Quality deposit required \u2014 your recent signals received low ratings", "error");
       return { eventId: null, relaysPublished: [] };
     }
 
@@ -395,8 +407,11 @@ export default function AegisApp() {
       vSignal: scores.vSignal,
       cContext: scores.cContext,
       lSlop: scores.lSlop,
+      nostrPubkey: nostrKeys.pk,
       scoredByAI: true,
     });
+
+    if (nostrKeys?.pk) setPublishGate(checkPublishGate(nostrKeys.pk));
 
     if (!stakeAmount) {
       addNotification(
@@ -411,7 +426,24 @@ export default function AegisApp() {
       eventId: result.eventId,
       relaysPublished: result.relaysPublished,
     };
-  }, [nostrKeys, identity, principalText, addContent, addNotification]);
+  }, [nostrKeys, identity, principalText, addContent, addNotification, publishGate]);
+
+  const handleUploadImage = useCallback(async (file: File): Promise<{ url?: string; error?: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const headers: Record<string, string> = {};
+    if (nostrKeys) {
+      headers["Authorization"] = createNIP98AuthHeader(
+        nostrKeys.sk,
+        "https://nostr.build/api/v2/upload/files",
+        "POST",
+      );
+    }
+    const res = await fetch("/api/upload/image", { method: "POST", headers, body: form });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error || "Upload failed" };
+    return { url: data.url };
+  }, [nostrKeys]);
 
   return (
     <AppShell activeTab={tab} onTabChange={setTab}>
@@ -423,9 +455,11 @@ export default function AegisApp() {
           isAnalyzing={isAnalyzing}
           onAnalyze={handleAnalyze}
           onPublishSignal={isAuthenticated ? handlePublishSignal : undefined}
+          onUploadImage={isAuthenticated ? handleUploadImage : undefined}
           nostrPubkey={nostrKeys?.pk || null}
           icpBalance={icpBalance}
-          stakingEnabled={isAuthenticated}
+          stakingEnabled={isAuthenticated && (publishGate?.requiresDeposit ?? false)}
+          publishGate={publishGate}
           mobile={mobile}
         />
       )}

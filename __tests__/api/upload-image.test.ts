@@ -129,6 +129,39 @@ describe("POST /api/upload/image", () => {
       expect(data.url).toBe("https://nostr.build/i/abc123.jpg");
     });
 
+    it("forwards Authorization header to nostr.build", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: "success", data: [{ url: "https://nostr.build/i/authed.jpg" }] }),
+      });
+      const file = new Blob(["fake-jpeg"], { type: "image/jpeg" });
+      const formData = new FormData();
+      formData.append("file", file);
+      const req = new NextRequest("http://localhost:3000/api/upload/image", {
+        method: "POST",
+        headers: { Authorization: "Nostr eyJraW5kIjoyNzIzNX0=" },
+        body: formData,
+      });
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+
+      const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+      expect(fetchCall[1].headers).toHaveProperty("Authorization", "Nostr eyJraW5kIjoyNzIzNX0=");
+    });
+
+    it("does not send Authorization header when none provided", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: "success", data: [{ url: "https://nostr.build/i/noauth.jpg" }] }),
+      });
+      const file = new Blob(["fake-jpeg"], { type: "image/jpeg" });
+      const res = await POST(makeUploadRequest(file));
+      expect(res.status).toBe(200);
+
+      const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+      expect(fetchCall[1].headers).not.toHaveProperty("Authorization");
+    });
+
     it("returns 502 when nostr.build returns non-OK", async () => {
       (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 500 });
       const file = new Blob(["fake-png"], { type: "image/png" });

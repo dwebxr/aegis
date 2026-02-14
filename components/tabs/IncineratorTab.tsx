@@ -5,14 +5,17 @@ import { ManualInput } from "@/components/sources/ManualInput";
 import { SignalComposer } from "@/components/ui/SignalComposer";
 import { colors, space, type as t, radii, kpiLabelStyle } from "@/styles/theme";
 import type { AnalyzeResponse } from "@/lib/types/api";
+import type { PublishGateDecision } from "@/lib/reputation/publishGate";
 
 interface IncineratorTabProps {
   isAnalyzing: boolean;
   onAnalyze: (text: string) => Promise<AnalyzeResponse>;
   onPublishSignal?: (text: string, scores: AnalyzeResponse, stakeAmount?: bigint, imageUrl?: string) => Promise<{ eventId: string | null; relaysPublished: string[] }>;
+  onUploadImage?: (file: File) => Promise<{ url?: string; error?: string }>;
   nostrPubkey?: string | null;
   icpBalance?: bigint | null;
   stakingEnabled?: boolean;
+  publishGate?: PublishGateDecision | null;
   mobile?: boolean;
 }
 
@@ -23,7 +26,7 @@ const STAGES = [
   { id: "S4", name: "Cross-Valid", activatable: false, color: colors.text.tertiary },
 ] as const;
 
-export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, nostrPubkey, icpBalance, stakingEnabled, mobile }) => {
+export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, onUploadImage, nostrPubkey, icpBalance, stakingEnabled, publishGate, mobile }) => {
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
       <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
@@ -96,10 +99,12 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onA
           <SignalComposer
             onPublish={onPublishSignal}
             onAnalyze={onAnalyze}
+            onUploadImage={onUploadImage}
             isAnalyzing={isAnalyzing}
             nostrPubkey={nostrPubkey || null}
             icpBalance={icpBalance}
             stakingEnabled={stakingEnabled}
+            publishGate={publishGate}
             mobile={mobile}
           />
         </div>
