@@ -68,7 +68,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     if (!actor || !ident) return;
     actor.saveSourceConfig(savedToIC(source, ident.getPrincipal()))
       .catch((err: unknown) => {
-        console.error("[sources] IC save FAILED:", err);
+        console.error("[sources] IC save FAILED:", errMsg(err));
         setSyncStatus("error");
         setSyncError("Failed to save source to IC");
         addNotification("Source saved locally but IC sync failed", "error");
@@ -122,7 +122,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           localOnly.map(localSource =>
             actor.saveSourceConfig(savedToIC(localSource, principal))
               .catch((e: unknown) => {
-                console.error("[sources] push local→IC failed:", e);
+                console.error("[sources] push local→IC failed:", errMsg(e));
                 pushFailed = true;
               })
           )

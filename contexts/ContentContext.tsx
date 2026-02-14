@@ -164,14 +164,14 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     try {
     let result: AnalyzeResponse | null = null;
     const userApiKey = getUserApiKey();
+    const topics = userContext
+      ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
+      : [];
 
     // Tier 1: WebLLM (browser-local AI) — when enabled, tried first for privacy
     if (isWebLLMEnabled()) {
       try {
         const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
-        const topics = userContext
-          ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
-          : [];
         const webllmResult = await scoreWithWebLLM(text, topics);
         result = { ...webllmResult, scoredByAI: true } as AnalyzeResponse;
       } catch (err) {
@@ -204,9 +204,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     // Tier 3: IC LLM via canister (free, on-chain)
     if (!result && actorRef.current && isAuthenticated) {
       try {
-        const topics = userContext
-          ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
-          : [];
         const icResult = await Promise.race([
           actorRef.current.analyzeOnChain(text.slice(0, 3000), topics),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error("IC LLM timeout (30s)")), 30_000)),
@@ -286,7 +283,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       vSignal: result.vSignal,
       cContext: result.cContext,
       lSlop: result.lSlop,
-      scoredByAI: true,
+      scoredByAI: result.scoredByAI ?? true,
     };
     setContent(prev => [evaluation, ...prev]);
 
@@ -304,17 +301,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const validateItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
+    if (!item) return;
     setContent(prev => prev.map(c => c.id === id ? { ...c, validated: true } : c));
-    if (item && preferenceCallbacks?.onValidate) {
-      preferenceCallbacks.onValidate(item.topics || [], item.author, item.scores.composite, item.verdict);
-    }
-    if (item && item.source === "nostr" && item.nostrPubkey) {
-      recordUseful(item.nostrPubkey);
-    }
-    if (item && item.source === "manual" && item.nostrPubkey) {
-      recordPublishValidation(item.nostrPubkey);
-    }
-    if (item && actorRef.current && isAuthenticated) {
+    preferenceCallbacks?.onValidate?.(item.topics || [], item.author, item.scores.composite, item.verdict);
+    if (item.source === "nostr" && item.nostrPubkey) recordUseful(item.nostrPubkey);
+    if (item.source === "manual" && item.nostrPubkey) recordPublishValidation(item.nostrPubkey);
+    if (actorRef.current && isAuthenticated) {
       actorRef.current.updateEvaluation(id, true, item.flagged)
         .catch((err: unknown) => {
           console.warn("[content] IC updateEvaluation (validate) failed:", errMsg(err));
@@ -326,17 +318,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const flagItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
+    if (!item) return;
     setContent(prev => prev.map(c => c.id === id ? { ...c, flagged: true } : c));
-    if (item && preferenceCallbacks?.onFlag) {
-      preferenceCallbacks.onFlag(item.topics || [], item.author, item.scores.composite, item.verdict);
-    }
-    if (item && item.source === "nostr" && item.nostrPubkey) {
-      recordSlop(item.nostrPubkey);
-    }
-    if (item && item.source === "manual" && item.nostrPubkey) {
-      recordPublishFlag(item.nostrPubkey);
-    }
-    if (item && actorRef.current && isAuthenticated) {
+    preferenceCallbacks?.onFlag?.(item.topics || [], item.author, item.scores.composite, item.verdict);
+    if (item.source === "nostr" && item.nostrPubkey) recordSlop(item.nostrPubkey);
+    if (item.source === "manual" && item.nostrPubkey) recordPublishFlag(item.nostrPubkey);
+    if (actorRef.current && isAuthenticated) {
       actorRef.current.updateEvaluation(id, item.validated, true)
         .catch((err: unknown) => {
           console.warn("[content] IC updateEvaluation (flag) failed:", errMsg(err));

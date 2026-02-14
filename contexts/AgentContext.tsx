@@ -15,8 +15,7 @@ import { Principal } from "@dfinity/principal";
 import type { AgentState } from "@/lib/agent/types";
 import type { WoTGraph } from "@/lib/wot/types";
 import { errMsg } from "@/lib/utils/errors";
-import { syncLinkedAccountToIC } from "@/lib/nostr/linkAccount";
-import { getLinkedAccount } from "@/lib/nostr/linkAccount";
+import { syncLinkedAccountToIC, getLinkedAccount } from "@/lib/nostr/linkAccount";
 
 interface AgentContextValue {
   agentState: AgentState;
@@ -65,7 +64,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     setIsEnabled(prev => {
       const next = !prev;
       if (identity) {
-        syncLinkedAccountToIC(identity, getLinkedAccount(), next).catch(() => {});
+        syncLinkedAccountToIC(identity, getLinkedAccount(), next).catch(e => console.warn("[agent] IC sync failed:", errMsg(e)));
       }
       return next;
     });
