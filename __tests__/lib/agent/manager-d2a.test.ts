@@ -636,6 +636,49 @@ describe("AgentManager — trust-based fee integration", () => {
     mgr.stop();
   });
 
+  it("does not charge fee for trusted tier (free exchange)", async () => {
+    mockCalcEffectiveTrust.mockReturnValue(0.9);
+    mockGetTrustTier.mockReturnValue("trusted");
+    mockCalcDynamicFee.mockReturnValue(0); // Trusted = free
+
+    const { callbacks } = makeCallbacks();
+    mockDiscoverPeers.mockResolvedValueOnce([{
+      nostrPubkey: "trusted-peer",
+      principalId: "trusted-principal",
+      interests: ["ai"],
+      capacity: 5,
+      lastSeen: Date.now(),
+    }]);
+    mockCalculateResonance.mockReturnValue(0.5);
+    mockParseD2AMessage.mockReturnValue({
+      type: "deliver",
+      fromPubkey: "trusted-peer",
+      toPubkey: pk,
+      payload: {
+        text: "Trusted content",
+        author: "Trusted Author",
+        scores: { originality: 8, insight: 8, credibility: 8, composite: 8.0 },
+        verdict: "quality",
+        topics: ["ai"],
+      } as D2ADeliverPayload,
+    });
+
+    const mgr = new AgentManager(sk, pk, callbacks, ["wss://test.relay"]);
+    await mgr.start();
+
+    onEventHandler({ pubkey: "trusted-peer", content: "deliver" });
+    await new Promise(r => setTimeout(r, 50));
+
+    // Content IS accepted
+    expect(callbacks.onNewContent).toHaveBeenCalledTimes(1);
+    expect(mgr.getState().receivedItems).toBe(1);
+    // Fee NOT charged (trusted = free)
+    expect(callbacks.onD2AMatchComplete).not.toHaveBeenCalled();
+    expect(mgr.getState().d2aMatchCount).toBe(0);
+
+    mgr.stop();
+  });
+
   it("skips blocked peers during discovery offer", async () => {
     // Mock isBlocked to return true for "blocked-peer"
     mockIsBlocked.mockImplementation((pk: string) => pk === "blocked-peer");

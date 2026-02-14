@@ -16,9 +16,13 @@ import {
 import { ICP_FEE, MIN_STAKE, MAX_STAKE } from "@/lib/ic/icpLedger";
 
 describe("D2A trust-tier fee economics", () => {
-  it("trusted fee is lowest, unknown is highest", () => {
-    expect(D2A_FEE_TRUSTED).toBeLessThan(D2A_FEE_KNOWN);
+  it("trusted tier is free", () => {
+    expect(D2A_FEE_TRUSTED).toBe(0);
+  });
+
+  it("paid tiers: known < unknown", () => {
     expect(D2A_FEE_KNOWN).toBeLessThan(D2A_FEE_UNKNOWN);
+    expect(D2A_FEE_KNOWN).toBeGreaterThan(0);
   });
 
   it("D2A_APPROVE_AMOUNT covers >= 50 matches at highest tier", () => {
@@ -26,15 +30,14 @@ describe("D2A trust-tier fee economics", () => {
     expect(matchesCovered).toBeGreaterThanOrEqual(50);
   });
 
-  it("all fee tiers exceed 3x ICP transfer fee (minimum viable)", () => {
+  it("paid fee tiers exceed 3x ICP transfer fee (minimum viable)", () => {
     const minFee = ICP_FEE * BigInt(3);
-    expect(BigInt(D2A_FEE_TRUSTED)).toBeGreaterThanOrEqual(minFee);
     expect(BigInt(D2A_FEE_KNOWN)).toBeGreaterThanOrEqual(minFee);
     expect(BigInt(D2A_FEE_UNKNOWN)).toBeGreaterThanOrEqual(minFee);
   });
 
-  it("80/20 fee split leaves sender with positive payout at every tier", () => {
-    for (const fee of [D2A_FEE_TRUSTED, D2A_FEE_KNOWN, D2A_FEE_UNKNOWN]) {
+  it("80/20 fee split leaves sender with positive payout at paid tiers", () => {
+    for (const fee of [D2A_FEE_KNOWN, D2A_FEE_UNKNOWN]) {
       const senderPayout = Math.floor((fee * 80) / 100);
       const senderNet = senderPayout - Number(ICP_FEE);
       expect(senderNet).toBeGreaterThan(0);

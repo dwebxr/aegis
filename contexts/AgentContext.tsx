@@ -113,10 +113,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
           created_at_time: [],
         });
       } catch (err) {
-        console.warn("[agent] D2A fee pre-approve failed:", errMsg(err));
-        addNotification("D2A agent could not start — ICP fee approval failed. Check your balance.", "error");
-        setIsEnabled(false);
-        return;
+        console.warn("[agent] D2A fee pre-approve failed (trusted-only mode):", errMsg(err));
+        addNotification("D2A started in trusted-only mode. Fund wallet to exchange with unknown peers.", "info");
       }
       if (cancelled) return;
 
