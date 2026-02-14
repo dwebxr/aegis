@@ -540,6 +540,15 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Client-side signing — private key never leaves the browser
 - Optional PoQ stake attachment with range slider UI
 
+### Onboarding & UX
+- Landing hero for new visitors with feature overview and "Explore Demo" / "Login" CTAs
+- Terminology tooltips on hover for domain-specific terms (V-Signal, C-Context, L-Slop, WoT, D2A, Serendipity, etc.)
+- Centralized glossary of 12 terms — importable from `lib/glossary.ts`
+- Actionable empty states: Dashboard and Briefing link to Sources / Incinerator when no content exists
+- Sidebar navigation descriptions updated for clarity; active state with stronger visual indicator
+- Mobile touch targets meet 48px accessibility minimum
+- Settings gear icon visible in collapsed sidebar mode
+
 ### Multi-Source Ingestion
 - RSS/Atom feeds (YouTube, note.com, blogs — with thumbnail extraction, ETag conditional fetch)
 - Feed auto-discovery from any blog/site URL
@@ -570,7 +579,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → build → security audit on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, beforeSend scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (1776 tests, 125 suites) |
+| Test | Jest + ts-jest (1819 tests, 129 suites) |
 
 ## Project Structure
 
@@ -601,7 +610,7 @@ aegis/
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
 │   ├── tabs/                            # Dashboard, Briefing, Incinerator, Sources, Analytics
-│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, ShareBriefingModal
+│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip
 │   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
 │   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
 │   ├── sources/                         # ManualInput
@@ -672,6 +681,7 @@ aegis/
 │   │   └── types.ts                     # WebLLMStatus type
 │   ├── reputation/
 │   │   └── publishGate.ts               # Publish Signal reputation gating (localStorage)
+│   ├── glossary.ts                        # Domain term definitions (V-Signal, WoT, D2A, etc.)
 │   ├── apiKey/
 │   │   └── storage.ts                   # BYOK API key storage (localStorage, never sent to server)
 │   ├── types/                           # ContentItem, API response types, source types
@@ -680,7 +690,7 @@ aegis/
 │       ├── errors.ts                    # errMsg() shared error formatter
 │       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       └── csv.ts                       # CSV export (RFC-compliant escaping)
-├── __tests__/                           # 1776 tests across 125 suites
+├── __tests__/                           # 1819 tests across 129 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)

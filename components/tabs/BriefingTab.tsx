@@ -19,9 +19,10 @@ interface BriefingTabProps {
   nostrKeys?: { sk: Uint8Array; pk: string } | null;
   isLoading?: boolean;
   discoveries?: SerendipityItem[];
+  onTabChange?: (tab: string) => void;
 }
 
-export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys, isLoading, discoveries = [] }) => {
+export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys, isLoading, discoveries = [], onTabChange }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showFiltered, setShowFiltered] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -123,7 +124,19 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         }}>
           <div style={{ fontSize: 32, marginBottom: space[3] }}>&#x1F50D;</div>
           <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>No priority items yet</div>
-          <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Add sources and evaluate content to build your briefing</div>
+          <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Evaluate content and validate quality items to build your personalized briefing</div>
+          {onTabChange && (
+            <div style={{ marginTop: space[4] }}>
+              <button onClick={() => onTabChange("incinerator")} style={{
+                padding: `${space[2]}px ${space[4]}px`, background: colors.bg.raised,
+                border: `1px solid ${colors.border.emphasis}`, borderRadius: radii.md,
+                color: colors.purple[400], fontSize: t.bodySm.size, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
+              }}>
+                Go to Incinerator &rarr;
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -14,11 +14,11 @@ interface AppShellProps {
 }
 
 const NAV_CONFIG = [
-  { id: "dashboard", Icon: ShieldIcon, label: "Home", description: "Overview & key metrics" },
-  { id: "briefing", Icon: SearchIcon, label: "Briefing", description: "Top picks curated for you" },
-  { id: "incinerator", Icon: FireIcon, label: "Burn", description: "Evaluate & incinerate slop" },
-  { id: "sources", Icon: RSSIcon, label: "Sources", description: "Manage feeds & inputs" },
-  { id: "analytics", Icon: ChartIcon, label: "Stats", description: "Accuracy & performance" },
+  { id: "dashboard", Icon: ShieldIcon, label: "Home", description: "Dashboard & content feed" },
+  { id: "briefing", Icon: SearchIcon, label: "Briefing", description: "AI-curated priority reading" },
+  { id: "incinerator", Icon: FireIcon, label: "Burn", description: "Analyze & publish signals" },
+  { id: "sources", Icon: RSSIcon, label: "Sources", description: "RSS, Nostr & URL sources" },
+  { id: "analytics", Icon: ChartIcon, label: "Stats", description: "Filter accuracy & analytics" },
 ] as const;
 
 function buildNavItems(size: number): NavItem[] {

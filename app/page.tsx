@@ -27,6 +27,7 @@ import { detectSerendipity } from "@/lib/filtering/serendipity";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
 import { recordFilterRun } from "@/lib/filtering/costTracker";
 import { DemoBanner } from "@/components/ui/DemoBanner";
+import { LandingHero } from "@/components/ui/LandingHero";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { publishSignalToNostr, buildAegisTags } from "@/lib/nostr/publish";
@@ -50,11 +51,11 @@ export default function AegisApp() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
   const { content, isAnalyzing, syncStatus, analyze, validateItem, flagItem, addContent, clearDemoContent, loadFromIC } = useContent();
-  const { isAuthenticated, identity, principalText } = useAuth();
+  const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
   const { agentState, setWoTGraph: pushWoTGraph } = useAgent();
-  const { isDemoMode } = useDemo();
+  const { isDemoMode, bannerDismissed, dismissBanner } = useDemo();
   const { filterMode } = useFilterMode();
 
   const [tab, setTab] = useState("dashboard");
@@ -445,11 +446,21 @@ export default function AegisApp() {
     return { url: data.url };
   }, [nostrKeys]);
 
+  const showLanding = isDemoMode && !bannerDismissed;
+
+  if (showLanding) {
+    return (
+      <AppShell activeTab={tab} onTabChange={setTab}>
+        <LandingHero onTryDemo={dismissBanner} onLogin={login} mobile={mobile} />
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell activeTab={tab} onTabChange={setTab}>
       <DemoBanner mobile={mobile} />
-      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} />}
-      {tab === "briefing" && <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} />}
+      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={setTab} />}
+      {tab === "briefing" && <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} onTabChange={setTab} />}
       {tab === "incinerator" && (
         <IncineratorTab
           isAnalyzing={isAnalyzing}

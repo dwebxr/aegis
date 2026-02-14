@@ -36,7 +36,7 @@ describe("DashboardTab — empty state", () => {
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     expect(html).toContain("No content yet");
-    expect(html).toContain("Add sources or analyze content");
+    expect(html).toContain("Add sources to start filtering");
   });
 
   it("shows zero stats when content is empty", () => {

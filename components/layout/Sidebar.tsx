@@ -65,12 +65,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
           marginBottom: space[1],
           background: active ? "rgba(37,99,235,0.12)" : "transparent",
           border: active ? `1px solid rgba(37,99,235,0.2)` : "1px solid transparent",
-          borderLeft: active ? `3px solid ${colors.blue[400]}` : "3px solid transparent",
+          borderLeft: active ? `4px solid ${colors.blue[400]}` : "4px solid transparent",
           borderRadius: radii.sm, cursor: "pointer", transition: transitions.fast, width: "100%",
           color: active ? colors.blue[400] : colors.text.disabled,
           justifyContent: collapsed ? "center" : "flex-start",
           fontFamily: "inherit",
-          boxShadow: active ? "inset 0 0 12px rgba(37,99,235,0.06)" : "none",
+          boxShadow: active ? "inset 0 0 20px rgba(37,99,235,0.08)" : "none",
         }}>
           {it.icon}
           {!collapsed && (
@@ -93,18 +93,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
       </div>
     )}
 
-    {!collapsed && isAuthenticated && (
+    {isAuthenticated && (
       <button onClick={() => onTabChange("settings")} style={{
         display: "flex", alignItems: "center", gap: space[2],
-        padding: `${space[2]}px ${space[3]}px`, marginBottom: space[3],
+        padding: collapsed ? `${space[2]}px 0` : `${space[2]}px ${space[3]}px`,
+        marginBottom: space[3],
         background: activeTab === "settings" ? "rgba(37,99,235,0.12)" : "transparent",
         border: activeTab === "settings" ? `1px solid rgba(37,99,235,0.2)` : "1px solid transparent",
         borderRadius: radii.sm, cursor: "pointer", transition: transitions.fast, width: "100%",
         color: activeTab === "settings" ? colors.blue[400] : colors.text.disabled,
         fontFamily: "inherit",
+        justifyContent: collapsed ? "center" : "flex-start",
       }}>
         <GearIcon s={16} />
-        <span style={{ fontSize: t.caption.size, fontWeight: activeTab === "settings" ? 700 : 500 }}>Settings</span>
+        {!collapsed && <span style={{ fontSize: t.caption.size, fontWeight: activeTab === "settings" ? 700 : 500 }}>Settings</span>}
       </button>
     )}
 

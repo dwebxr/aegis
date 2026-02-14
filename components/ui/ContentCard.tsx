@@ -2,6 +2,8 @@
 import React, { useState } from "react";
 import { fonts, colors, space, type as t, shadows, radii, transitions, scoreGrade } from "@/styles/theme";
 import { ScoreBar } from "./ScoreBar";
+import { Tooltip } from "./Tooltip";
+import { GLOSSARY } from "@/lib/glossary";
 import { CheckIcon, XCloseIcon } from "@/components/icons";
 import type { ContentItem } from "@/lib/types/content";
 
@@ -39,9 +41,9 @@ function ScoreGrid({ item }: { item: ContentItem }) {
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: space[3], marginBottom: space[4] }}>
       {hasVCL ? (
         <>
-          <ScoreBar label="V Signal" score={item.vSignal!} color={colors.purple[400]} />
-          <ScoreBar label="C Context" score={item.cContext!} color={colors.sky[400]} />
-          <ScoreBar label="L Slop" score={item.lSlop!} color={colors.red[400]} />
+          <Tooltip text={GLOSSARY["V-Signal"]} position="bottom"><ScoreBar label="V Signal" score={item.vSignal!} color={colors.purple[400]} /></Tooltip>
+          <Tooltip text={GLOSSARY["C-Context"]} position="bottom"><ScoreBar label="C Context" score={item.cContext!} color={colors.sky[400]} /></Tooltip>
+          <Tooltip text={GLOSSARY["L-Slop"]} position="bottom"><ScoreBar label="L Slop" score={item.lSlop!} color={colors.red[400]} /></Tooltip>
         </>
       ) : (
         <>
@@ -201,14 +203,16 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
       )}
 
       {variant === "serendipity" && (
-        <div style={{
-          position: "absolute", top: 0, right: 0,
-          background: `linear-gradient(135deg, ${colors.purple[600]}, ${colors.blue[600]})`,
-          padding: `${space[1]}px ${space[4]}px ${space[1]}px 18px`, borderBottomLeftRadius: radii.md,
-          fontSize: t.caption.size, fontWeight: 700, color: "#fff", letterSpacing: 0.5,
-        }}>
-          SERENDIPITY
-        </div>
+        <Tooltip text={GLOSSARY["Serendipity"]} position="bottom">
+          <div style={{
+            position: "absolute", top: 0, right: 0,
+            background: `linear-gradient(135deg, ${colors.purple[600]}, ${colors.blue[600]})`,
+            padding: `${space[1]}px ${space[4]}px ${space[1]}px 18px`, borderBottomLeftRadius: radii.md,
+            fontSize: t.caption.size, fontWeight: 700, color: "#fff", letterSpacing: 0.5,
+          }}>
+            SERENDIPITY
+          </div>
+        </Tooltip>
       )}
 
       <div style={{

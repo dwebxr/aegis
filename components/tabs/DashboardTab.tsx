@@ -4,6 +4,8 @@ import { ShieldIcon, FireIcon, ZapIcon, RSSIcon } from "@/components/icons";
 import { StatCard } from "@/components/ui/StatCard";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard } from "@/components/ui/ContentCard";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { GLOSSARY } from "@/lib/glossary";
 import { fonts, colors, space, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { contentToCSV } from "@/lib/utils/csv";
@@ -26,9 +28,10 @@ interface DashboardTabProps {
   onFlag: (id: string) => void;
   isLoading?: boolean;
   wotLoading?: boolean;
+  onTabChange?: (tab: string) => void;
 }
 
-export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading }) => {
+export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop">("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -148,9 +151,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               marginBottom: space[3],
             }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: space[2] }}>
-                <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
-                  {ch.title}
-                </span>
+                <Tooltip text={GLOSSARY[ch.title] || ch.title}>
+                  <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, cursor: "help" }}>
+                    {ch.title}
+                  </span>
+                </Tooltip>
                 <span style={{ fontSize: t.h2.size, fontWeight: 700, color: ch.c, fontFamily: fonts.mono }}>
                   {ch.d.length > 0 ? ch.d[ch.d.length - 1] : 0}{ch.unit === "%" ? "%" : ""}
                 </span>
@@ -270,8 +275,28 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             {hasActiveFilter ? "No matching content" : "No content yet"}
           </div>
           <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>
-            {hasActiveFilter ? "Try adjusting your filters" : "Add sources or analyze content to get started"}
+            {hasActiveFilter ? "Try adjusting your filters" : "Add sources to start filtering, or try the incinerator for manual evaluation"}
           </div>
+          {!hasActiveFilter && onTabChange && (
+            <div style={{ display: "flex", gap: space[2], justifyContent: "center", marginTop: space[4], flexWrap: "wrap" }}>
+              <button onClick={() => onTabChange("sources")} style={{
+                padding: `${space[2]}px ${space[4]}px`, background: colors.bg.raised,
+                border: `1px solid ${colors.border.emphasis}`, borderRadius: radii.md,
+                color: colors.blue[400], fontSize: t.bodySm.size, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
+              }}>
+                Add Sources &rarr;
+              </button>
+              <button onClick={() => onTabChange("incinerator")} style={{
+                padding: `${space[2]}px ${space[4]}px`, background: colors.bg.raised,
+                border: `1px solid ${colors.border.emphasis}`, borderRadius: radii.md,
+                color: colors.purple[400], fontSize: t.bodySm.size, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
+              }}>
+                Try Incinerator &rarr;
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <>
