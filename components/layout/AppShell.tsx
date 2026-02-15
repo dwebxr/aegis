@@ -14,7 +14,7 @@ interface AppShellProps {
 }
 
 const NAV_CONFIG = [
-  { id: "dashboard", Icon: ShieldIcon, label: "Home", description: "Dashboard & content feed" },
+  { id: "dashboard", Icon: ShieldIcon, label: "Home", description: "Your Agent's Report" },
   { id: "briefing", Icon: SearchIcon, label: "Briefing", description: "AI-curated priority reading" },
   { id: "incinerator", Icon: FireIcon, label: "Burn", description: "Analyze & publish signals" },
   { id: "sources", Icon: RSSIcon, label: "Sources", description: "RSS, Nostr & URL sources" },

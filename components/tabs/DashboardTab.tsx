@@ -203,7 +203,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       {/* Content filters */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3], flexWrap: "wrap", gap: space[2] }}>
         <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
-          Content {hasActiveFilter && <span style={{ fontSize: t.bodySm.size, color: colors.text.disabled }}>({filteredContent.length})</span>}
+          Filtered Signal {hasActiveFilter && <span style={{ fontSize: t.bodySm.size, color: colors.text.disabled }}>({filteredContent.length})</span>}
         </div>
         <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
           {(["quality", "all", "slop"] as const).map(v => (
