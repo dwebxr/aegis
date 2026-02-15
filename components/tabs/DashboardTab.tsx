@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard } from "@/components/ui/ContentCard";
 import { fonts, colors, space, type as t, radii, transitions } from "@/styles/theme";
@@ -8,6 +8,7 @@ import { contentToCSV } from "@/lib/utils/csv";
 import { FilterModeSelector } from "@/components/filtering/FilterModeSelector";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { getContext, hasEnoughData } from "@/lib/preferences/engine";
+import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
 
 function downloadFile(data: string, filename: string, mime: string) {
   const blob = new Blob([data], { type: mime });
@@ -75,6 +76,51 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     if (!hasEnoughData(profile)) return null;
     return getContext(profile);
   }, [profile]);
+
+  // Signal feedback loop
+  const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; key: number } | null>(null);
+  const [agentKnowsHighlight, setAgentKnowsHighlight] = useState(false);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const showFeedback = useCallback((text: string) => {
+    clearTimeout(feedbackTimerRef.current);
+    setFeedbackMsg({ text, key: Date.now() });
+    setAgentKnowsHighlight(true);
+    feedbackTimerRef.current = setTimeout(() => {
+      setFeedbackMsg(null);
+      setAgentKnowsHighlight(false);
+    }, 3500);
+  }, []);
+
+  const handleValidateWithFeedback = useCallback((id: string) => {
+    const item = content.find(c => c.id === id);
+    onValidate(id);
+    if (item) {
+      const parts: string[] = [];
+      const topic = item.topics?.[0];
+      if (topic) parts.push(`[${topic}] \u2191`);
+      if (item.author && item.author !== "You") parts.push(`Trust in ${item.author} \u2191`);
+      if (item.scores.composite >= 3.5 && item.scores.composite <= 4.5) parts.push("Threshold relaxed");
+      if (parts.length > 0) showFeedback(parts.join("  \u00B7  "));
+    }
+  }, [content, onValidate, showFeedback]);
+
+  const handleFlagWithFeedback = useCallback((id: string) => {
+    const item = content.find(c => c.id === id);
+    onFlag(id);
+    if (item) {
+      const parts: string[] = [];
+      const topic = item.topics?.[0];
+      if (topic) parts.push(`[${topic}] \u2193`);
+      if (item.author && item.author !== "You") parts.push(`${item.author} trust \u2193`);
+      if (item.verdict === "quality") parts.push("Threshold tightened");
+      if (parts.length > 0) showFeedback(parts.join("  \u00B7  "));
+    }
+  }, [content, onFlag, showFeedback]);
+
+  useEffect(() => {
+    return () => { clearTimeout(feedbackTimerRef.current); };
+  }, []);
 
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
@@ -260,8 +306,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 item={it}
                 expanded={expanded === it.id}
                 onToggle={() => setExpanded(expanded === it.id ? null : it.id)}
-                onValidate={onValidate}
-                onFlag={onFlag}
+                onValidate={handleValidateWithFeedback}
+                onFlag={handleFlagWithFeedback}
                 mobile={mobile}
               />
             </div>
@@ -290,14 +336,38 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         </>
       )}
 
+      {/* Signal feedback loop message */}
+      {feedbackMsg && (
+        <div
+          key={feedbackMsg.key}
+          style={{
+            marginTop: space[2],
+            marginBottom: space[2],
+            padding: `${space[2]}px ${space[4]}px`,
+            background: "rgba(139,92,246,0.06)",
+            border: "1px solid rgba(139,92,246,0.15)",
+            borderRadius: radii.md,
+            fontSize: t.bodySm.size,
+            color: colors.purple[400],
+            fontWeight: 600,
+            textAlign: "center",
+            animation: "fadeIn .3s ease",
+          }}
+        >
+          &#x1F4E1; Agent learned: {feedbackMsg.text}
+        </div>
+      )}
+
       {/* Agent Knowledge — interest profile */}
       {agentContext && (
         <div style={{
           marginTop: space[4],
           padding: `${space[3]}px ${space[4]}px`,
           background: colors.bg.surface,
-          border: `1px solid ${colors.border.default}`,
+          border: `1px solid ${agentKnowsHighlight ? "rgba(139,92,246,0.3)" : colors.border.default}`,
           borderRadius: radii.md,
+          transition: "border-color 0.5s ease, box-shadow 0.5s ease",
+          boxShadow: agentKnowsHighlight ? "0 0 12px rgba(139,92,246,0.1)" : "none",
         }}>
           <div style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary, marginBottom: space[2] }}>
             Your Agent Knows
@@ -344,6 +414,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           </div>
         </div>
       )}
+
+      {/* D2A Network visualization */}
+      <D2ANetworkMini mobile={mobile} />
 
       {/* Export (below content list) */}
       {content.length > 0 && (

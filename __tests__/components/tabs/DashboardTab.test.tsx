@@ -20,6 +20,10 @@ jest.mock("@/contexts/PreferenceContext", () => ({
   }),
 }));
 
+jest.mock("@/components/ui/D2ANetworkMini", () => ({
+  D2ANetworkMini: () => null,
+}));
+
 const now = Date.now();
 const dayMs = 86400000;
 
