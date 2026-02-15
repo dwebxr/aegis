@@ -1,11 +1,7 @@
 "use client";
 import React, { useState, useMemo } from "react";
-import { ShieldIcon, FireIcon, ZapIcon, RSSIcon } from "@/components/icons";
-import { StatCard } from "@/components/ui/StatCard";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard } from "@/components/ui/ContentCard";
-import { Tooltip } from "@/components/ui/Tooltip";
-import { GLOSSARY } from "@/lib/glossary";
 import { fonts, colors, space, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { contentToCSV } from "@/lib/utils/csv";
@@ -33,15 +29,14 @@ interface DashboardTabProps {
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop">("all");
+  const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop">("quality");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [showAllContent, setShowAllContent] = useState(false);
 
-  const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop, dayLabels } = useMemo(() => {
+  const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {
     const now = Date.now();
     const dayMs = 86400000;
     const todayStart = now - dayMs;
-    const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
 
     const todayContent = content.filter(c => c.createdAt >= todayStart);
     const todayQual = todayContent.filter(c => c.verdict === "quality");
@@ -51,7 +46,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
     const dailyQuality: number[] = [];
     const dailySlop: number[] = [];
-    const dayLabels: string[] = [];
     for (let i = 6; i >= 0; i--) {
       const dayStart = now - (i + 1) * dayMs;
       const dayEnd = now - i * dayMs;
@@ -60,9 +54,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       const dayTotal = dayItems.length;
       dailyQuality.push(dayTotal > 0 ? Math.round((dayQual / dayTotal) * 100) : 0);
       dailySlop.push(dayItems.filter(c => c.verdict === "slop").length);
-      dayLabels.push(dayNames[new Date(dayEnd).getDay()]);
     }
-    return { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop, dayLabels };
+    return { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop };
   }, [content]);
 
   const filteredContent = useMemo(() => {
@@ -76,138 +69,72 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
-      {/* Hero */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: mobile ? "1fr" : "5fr 7fr",
-        gap: mobile ? space[6] : space[8],
-        marginBottom: mobile ? space[12] : space[16],
-        alignItems: "start",
-      }}>
-        <div>
-          <h1 style={{
-            fontSize: mobile ? t.display.mobileSz : t.display.size,
-            fontWeight: t.display.weight,
-            lineHeight: t.display.lineHeight,
-            letterSpacing: t.display.letterSpacing,
-            color: colors.text.primary,
-            margin: 0,
-          }}>
-            Aegis Dashboard
-          </h1>
-          <p style={{
-            fontSize: t.bodySm.size,
-            lineHeight: t.body.lineHeight,
-            color: colors.text.muted,
-            marginTop: space[4],
-          }}>
-            Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol.
-          </p>
-          <div style={{ marginTop: space[4] }}>
-            <FilterModeSelector mobile={mobile} />
-          </div>
+      {/* Compact header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[4], flexWrap: "wrap", gap: space[2] }}>
+        <h1 style={{ fontSize: mobile ? t.h1.mobileSz : t.h1.size, fontWeight: t.h1.weight, color: colors.text.primary, margin: 0 }}>
+          Home
+        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
+          <FilterModeSelector mobile={mobile} />
           {wotLoading && (
-            <div style={{
-              marginTop: space[2],
-              fontSize: t.caption.size,
-              color: colors.text.disabled,
-              display: "flex",
-              alignItems: "center",
-              gap: space[2],
-            }}>
-              <span style={{ animation: "pulse 2s infinite" }}>&#x1F310;</span>
-              Building Web of Trust graph...
-            </div>
+            <span style={{ fontSize: t.caption.size, color: colors.text.disabled, animation: "pulse 2s infinite" }}>
+              &#x1F310; WoT...
+            </span>
           )}
         </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: mobile ? space[3] : space[4] }}>
-          <StatCard icon={<ShieldIcon s={16} />} label="Quality" value={todayQual.length} sub={`of ${todayContent.length} in last 24h`} color={colors.cyan[400]} mobile={mobile} />
-          <StatCard icon={<FireIcon s={16} />} label="Burned" value={todaySlop.length} sub="slop filtered in last 24h" color={colors.orange[400]} mobile={mobile} />
-          <StatCard icon={<ZapIcon s={16} />} label="Evaluated" value={todayContent.length} sub="items in last 24h" color={colors.purple[400]} mobile={mobile} />
-          <StatCard icon={<RSSIcon s={16} />} label="Sources" value={uniqueSources.size} sub="active feeds" color={colors.sky[400]} mobile={mobile} />
-        </div>
       </div>
 
-      {/* Charts */}
+      {/* Compact metrics summary */}
       <div style={{
-        display: "grid",
-        gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
+        display: "flex", flexWrap: "wrap", alignItems: "center",
         gap: mobile ? space[3] : space[4],
-        marginBottom: mobile ? space[12] : space[16],
+        marginBottom: space[3],
+        padding: `${space[2]}px ${space[4]}px`,
+        background: colors.bg.surface,
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: radii.md,
       }}>
-        {[
-          { title: "Filter Accuracy", d: dailyQuality, c: colors.cyan[400], unit: "%" },
-          { title: "Slop Volume", d: dailySlop, c: colors.orange[500], unit: "items" },
-        ].map(ch => (
-          <div key={ch.title} style={{
-            background: colors.bg.surface,
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: radii.lg,
-            padding: mobile ? space[4] : space[5],
-          }}>
-            <div style={{
-              display: "flex", justifyContent: "space-between", alignItems: "baseline",
-              marginBottom: space[3],
-            }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: space[2] }}>
-                <Tooltip text={GLOSSARY[ch.title] || ch.title}>
-                  <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, cursor: "help" }}>
-                    {ch.title}
-                  </span>
-                </Tooltip>
-                <span style={{ fontSize: t.h2.size, fontWeight: 700, color: ch.c, fontFamily: fonts.mono }}>
-                  {ch.d.length > 0 ? ch.d[ch.d.length - 1] : 0}{ch.unit === "%" ? "%" : ""}
-                </span>
-              </div>
-              <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>
-                7-day {ch.unit === "%" ? "(%)" : "(count)"}
-              </span>
-            </div>
-            <MiniChart data={ch.d} color={ch.c} h={mobile ? 40 : 50} />
-            <div style={{
-              display: "flex", justifyContent: "space-between",
-              fontSize: t.tiny.size, color: colors.text.disabled, marginTop: 2,
-            }}>
-              <span>{Math.min(...ch.d)}{ch.unit === "%" ? "%" : ""}</span>
-              <span>{Math.max(...ch.d)}{ch.unit === "%" ? "%" : ""}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: space[1], fontSize: t.tiny.size, color: colors.text.muted }}>
-              {dayLabels.map((d, i) => <span key={i}>{d}</span>)}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Export */}
-      {content.length > 0 && (
-        <div style={{ display: "flex", gap: space[2], marginBottom: space[5] }}>
-          {([
-            { label: "Export CSV", onClick: () => downloadFile(contentToCSV(content), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv") },
-            { label: "Export JSON", onClick: () => {
-              const data = content.map(c => ({
-                id: c.id, author: c.author, source: c.source, verdict: c.verdict,
-                scores: c.scores, vSignal: c.vSignal, cContext: c.cContext, lSlop: c.lSlop,
-                topics: c.topics, text: c.text, reason: c.reason,
-                createdAt: new Date(c.createdAt).toISOString(), sourceUrl: c.sourceUrl,
-              }));
-              downloadFile(JSON.stringify(data, null, 2), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
-            }},
-          ] as const).map(btn => (
-            <button key={btn.label} onClick={btn.onClick} style={exportBtnStyle}>
-              &#x1F4E5; {btn.label}
-            </button>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: space[3], flex: 1 }}>
+          {[
+            { icon: "\u{1F6E1}", value: todayQual.length, label: "quality", color: colors.cyan[400] },
+            { icon: "\u{1F525}", value: todaySlop.length, label: "burned", color: colors.orange[400] },
+            { icon: "\u26A1", value: todayContent.length, label: "eval", color: colors.purple[400] },
+            { icon: "\u{1F4E1}", value: uniqueSources.size, label: "sources", color: colors.sky[400] },
+          ].map(m => (
+            <span key={m.label} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: t.bodySm.size, color: colors.text.muted }}>
+              <span>{m.icon}</span>
+              <span style={{ fontWeight: 700, color: m.color, fontFamily: fonts.mono }}>{m.value}</span>
+              <span>{m.label}</span>
+            </span>
           ))}
         </div>
-      )}
+        <div style={{ display: "flex", gap: space[3], alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ width: 60 }}>
+              <MiniChart data={dailyQuality} color={colors.cyan[400]} h={20} />
+            </div>
+            <span style={{ fontSize: t.tiny.size, color: colors.cyan[400], fontFamily: fonts.mono }}>
+              {dailyQuality.length > 0 ? dailyQuality[dailyQuality.length - 1] : 0}%
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ width: 60 }}>
+              <MiniChart data={dailySlop} color={colors.orange[500]} h={20} />
+            </div>
+            <span style={{ fontSize: t.tiny.size, color: colors.orange[500], fontFamily: fonts.mono }}>
+              {dailySlop.length > 0 ? dailySlop[dailySlop.length - 1] : 0}
+            </span>
+          </div>
+        </div>
+      </div>
 
-      {/* Content with filters */}
+      {/* Content filters */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3], flexWrap: "wrap", gap: space[2] }}>
         <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
           Content {hasActiveFilter && <span style={{ fontSize: t.bodySm.size, color: colors.text.disabled }}>({filteredContent.length})</span>}
         </div>
         <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
-          {(["all", "quality", "slop"] as const).map(v => (
+          {(["quality", "all", "slop"] as const).map(v => (
             <button
               key={v}
               onClick={() => setVerdictFilter(v)}
@@ -252,6 +179,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         </div>
       </div>
 
+      {/* Content list */}
       {isLoading ? (
         <div style={{
           textAlign: "center", padding: space[10],
@@ -334,6 +262,28 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </button>
           )}
         </>
+      )}
+
+      {/* Export (below content list) */}
+      {content.length > 0 && (
+        <div style={{ display: "flex", gap: space[2], marginTop: space[4] }}>
+          {([
+            { label: "Export CSV", onClick: () => downloadFile(contentToCSV(content), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv") },
+            { label: "Export JSON", onClick: () => {
+              const data = content.map(c => ({
+                id: c.id, author: c.author, source: c.source, verdict: c.verdict,
+                scores: c.scores, vSignal: c.vSignal, cContext: c.cContext, lSlop: c.lSlop,
+                topics: c.topics, text: c.text, reason: c.reason,
+                createdAt: new Date(c.createdAt).toISOString(), sourceUrl: c.sourceUrl,
+              }));
+              downloadFile(JSON.stringify(data, null, 2), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
+            }},
+          ] as const).map(btn => (
+            <button key={btn.label} onClick={btn.onClick} style={exportBtnStyle}>
+              &#x1F4E5; {btn.label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

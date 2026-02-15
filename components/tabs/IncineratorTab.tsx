@@ -45,50 +45,13 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onA
         </p>
       </div>
 
-      <div style={{
-        background: colors.bg.surface,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: radii.xl,
-        padding: mobile ? space[5] : space[8],
-        marginBottom: mobile ? space[8] : space[12],
-        animation: isAnalyzing ? "glowPulse 2s infinite" : "none",
-      }}>
-        <IncineratorViz active={isAnalyzing} mobile={mobile} />
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: space[2], marginTop: space[4] }}>
-          {STAGES.map(({ id, name, activatable, color }) => {
-            const active = activatable && isAnalyzing;
-            return (
-              <div key={id} style={{ textAlign: "center", padding: `${space[3]}px ${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
-                <div style={{ ...kpiLabelStyle, letterSpacing: 1 }}>{id}</div>
-                <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, fontWeight: 600, marginTop: space[1] }}>{name}</div>
-                <div style={{ fontSize: t.tiny.size, fontWeight: 700, color, marginTop: space[1], textTransform: "uppercase", animation: active ? "pulse 1.5s infinite" : "none" }}>
-                  &#x25CF; {active ? "ACTIVE" : "IDLE"}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {!onPublishSignal && (
-        <div style={{
-          background: colors.bg.surface,
-          border: `1px solid ${colors.border.default}`,
-          borderRadius: radii.xl,
-          padding: mobile ? space[5] : space[8],
-          marginBottom: mobile ? space[8] : space[12],
-        }}>
-          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.secondary, marginBottom: space[4] }}>Manual Analysis</div>
-          <ManualInput onAnalyze={onAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />
-        </div>
-      )}
-
       {onPublishSignal && (
         <div style={{
           background: `linear-gradient(135deg, rgba(124,58,237,0.04), rgba(37,99,235,0.04))`,
           border: `1px solid rgba(124,58,237,0.15)`,
           borderRadius: radii.xl,
           padding: mobile ? space[5] : space[8],
+          marginBottom: mobile ? space[8] : space[12],
         }}>
           <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.purple[400], marginBottom: space[1] }}>
             Publish Signal
@@ -109,6 +72,43 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onA
           />
         </div>
       )}
+
+      {!onPublishSignal && (
+        <div style={{
+          background: colors.bg.surface,
+          border: `1px solid ${colors.border.default}`,
+          borderRadius: radii.xl,
+          padding: mobile ? space[5] : space[8],
+          marginBottom: mobile ? space[8] : space[12],
+        }}>
+          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.secondary, marginBottom: space[4] }}>Manual Analysis</div>
+          <ManualInput onAnalyze={onAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />
+        </div>
+      )}
+
+      <div style={{
+        background: colors.bg.surface,
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: radii.xl,
+        padding: mobile ? space[5] : space[8],
+        animation: isAnalyzing ? "glowPulse 2s infinite" : "none",
+      }}>
+        <IncineratorViz active={isAnalyzing} mobile={mobile} />
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: space[2], marginTop: space[4] }}>
+          {STAGES.map(({ id, name, activatable, color }) => {
+            const active = activatable && isAnalyzing;
+            return (
+              <div key={id} style={{ textAlign: "center", padding: `${space[3]}px ${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
+                <div style={{ ...kpiLabelStyle, letterSpacing: 1 }}>{id}</div>
+                <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, fontWeight: 600, marginTop: space[1] }}>{name}</div>
+                <div style={{ fontSize: t.tiny.size, fontWeight: 700, color, marginTop: space[1], textTransform: "uppercase", animation: active ? "pulse 1.5s infinite" : "none" }}>
+                  &#x25CF; {active ? "ACTIVE" : "IDLE"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 };

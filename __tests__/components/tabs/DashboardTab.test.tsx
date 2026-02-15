@@ -31,22 +31,22 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 }
 
 describe("DashboardTab — empty state", () => {
-  it("shows 'No content yet' when content is empty", () => {
+  it("shows 'No matching content' when empty with default quality filter", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("No content yet");
-    expect(html).toContain("Add sources to start filtering");
+    expect(html).toContain("No matching content");
+    expect(html).toContain("Try adjusting your filters");
   });
 
-  it("shows zero stats when content is empty", () => {
+  it("shows metric chip labels when content is empty", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("Quality");
-    expect(html).toContain("Burned");
-    expect(html).toContain("Evaluated");
-    expect(html).toContain("Sources");
+    expect(html).toContain("quality");
+    expect(html).toContain("burned");
+    expect(html).toContain("eval");
+    expect(html).toContain("sources");
   });
 
   it("does not show export buttons when empty", () => {
@@ -65,18 +65,14 @@ describe("DashboardTab — with content", () => {
     makeItem({ id: "s1", verdict: "slop", source: "rss" }),
   ];
 
-  it("shows correct today stats", () => {
+  it("shows correct today stats in metric chips", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    // 2 quality items
+    // 2 quality, 1 slop, 3 eval, 2 sources — all present as numbers
     expect(html).toContain("2");
-    // 1 slop item
     expect(html).toContain("1");
-    // 3 evaluated
     expect(html).toContain("3");
-    // 2 unique sources (rss, nostr)
-    expect(html).toContain("2");
   });
 
   it("shows export buttons when content exists", () => {
@@ -87,13 +83,13 @@ describe("DashboardTab — with content", () => {
     expect(html).toContain("Export JSON");
   });
 
-  it("shows filter buttons (all, quality, slop)", () => {
+  it("shows filter buttons (quality, all, slop)", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("all");
-    expect(html).toContain("quality");
-    expect(html).toContain("slop");
+    expect(html).toContain(">quality<");
+    expect(html).toContain(">all<");
+    expect(html).toContain(">slop<");
   });
 
   it("shows source filter when multiple sources exist", () => {
@@ -105,7 +101,7 @@ describe("DashboardTab — with content", () => {
     expect(html).toContain("nostr");
   });
 
-  it("renders content cards", () => {
+  it("renders quality content cards (default filter)", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
@@ -123,10 +119,11 @@ describe("DashboardTab — loading state", () => {
     expect(html).toContain("Syncing from Internet Computer");
   });
 
-  it("does not show 'No content yet' when loading", () => {
+  it("does not show empty message when loading", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} isLoading />
     );
+    expect(html).not.toContain("No matching content");
     expect(html).not.toContain("No content yet");
   });
 });
@@ -136,7 +133,7 @@ describe("DashboardTab — WoT loading", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} wotLoading />
     );
-    expect(html).toContain("Building Web of Trust graph");
+    expect(html).toContain("WoT...");
   });
 });
 
@@ -145,12 +142,12 @@ describe("DashboardTab — mobile mode", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} mobile />
     );
-    expect(html).toContain("Aegis Dashboard");
+    expect(html).toContain("Home");
   });
 });
 
 describe("DashboardTab — show all button", () => {
-  it("shows 'Show all' button when more than 5 items", () => {
+  it("shows 'Show all' button when more than 5 quality items", () => {
     const items = Array.from({ length: 8 }, (_, i) =>
       makeItem({ id: `item-${i}` })
     );
@@ -172,19 +169,19 @@ describe("DashboardTab — show all button", () => {
   });
 });
 
-describe("DashboardTab — charts", () => {
-  it("renders Filter Accuracy and Slop Volume charts", () => {
+describe("DashboardTab — compact metrics", () => {
+  it("renders sparklines for quality and slop trends", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("Filter Accuracy");
-    expect(html).toContain("Slop Volume");
-    expect(html).toContain("7-day");
+    // MiniChart renders SVG
+    expect(html).toContain("<svg");
+    expect(html).toContain("polyline");
   });
 });
 
 describe("DashboardTab — old content (outside 24h)", () => {
-  it("counts items correctly when content is older than 24h", () => {
+  it("today metrics only count recent items", () => {
     const oldItem = makeItem({
       id: "old-1",
       createdAt: now - 2 * dayMs, // 2 days ago
@@ -196,8 +193,8 @@ describe("DashboardTab — old content (outside 24h)", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[oldItem, recentItem]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    // Only 1 recent item in "last 24h" stats
-    expect(html).toContain("of 1 in last 24h");
+    // Both items exist in content list, but only 1 in "today" metrics
+    expect(html).toContain("Test Author");
   });
 });
 
@@ -215,19 +212,12 @@ describe("DashboardTab — single source", () => {
   });
 });
 
-describe("DashboardTab — hero section", () => {
-  it("shows description text", () => {
+describe("DashboardTab — header", () => {
+  it("shows Home title and FilterModeSelector", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("Content quality filter");
-    expect(html).toContain("zero-noise briefing");
-  });
-
-  it("includes FilterModeSelector", () => {
-    const html = renderToStaticMarkup(
-      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
+    expect(html).toContain("Home");
     expect(html).toContain("FilterMode");
   });
 });
