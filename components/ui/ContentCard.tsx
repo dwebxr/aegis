@@ -236,15 +236,6 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
           }}>
             {item.text}
           </p>
-          {item.reason && (
-            <div style={{
-              fontSize: t.bodySm.size, color: colors.text.tertiary, lineHeight: 1.5, fontStyle: "italic",
-              background: colors.bg.raised, padding: `${space[2]}px ${space[3]}px`, borderRadius: radii.md,
-              marginTop: space[2],
-            }}>
-              {item.reason}
-            </div>
-          )}
           {variant === "serendipity" && (
             <div style={{ marginTop: space[2], fontSize: t.caption.size, color: colors.purple[400], fontStyle: "italic" }}>
               Outside your usual topics — expanding your perspective
@@ -285,6 +276,14 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
           borderTop: `1px solid ${variant === "serendipity" ? "rgba(124,58,237,0.15)" : colors.border.default}`,
         }}>
           <ScoreGrid item={item} />
+          {item.reason && (
+            <div style={{
+              fontSize: t.bodySm.size, color: colors.text.tertiary, lineHeight: 1.5, fontStyle: "italic",
+              background: colors.bg.raised, padding: `${space[3]}px ${space[4]}px`, borderRadius: radii.md, marginBottom: space[3],
+            }}>
+              {item.reason}
+            </div>
+          )}
           <div style={{ display: "flex", gap: space[2] }}>
             {item.sourceUrl && !item.sourceUrl.startsWith("nostr:") && (
               <a
