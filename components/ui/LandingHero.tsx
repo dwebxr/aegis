@@ -44,6 +44,12 @@ const FEATURES = [
   },
 ] as const;
 
+const MANIFESTO = [
+  "Every feed-based social network is being consumed by the content it was designed to distribute. The flood of AI-generated noise isn\u2019t a bug to fix \u2014 it\u2019s the endgame of an architecture that rewards volume over value.",
+  "What replaces it won\u2019t look like a feed at all. Agents will aggregate sources, score quality, and route content directly to people who\u2019d actually want it. No algorithmic middleman. No engagement farming. Just signal, delivered peer to peer.",
+  "We\u2019re building that layer.",
+];
+
 export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mobile }) => (
   <div style={{
     display: "flex",
@@ -80,7 +86,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
       margin: 0,
       maxWidth: 600,
     }}>
-      Content Intelligence for the Open Web
+      Feeds Won&rsquo;t Survive What&rsquo;s Coming
     </h1>
 
     <p style={{
@@ -90,8 +96,31 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
       marginTop: space[4],
       maxWidth: 520,
     }}>
-      Aegis filters noise, curates quality, and publishes your insights to the decentralized web &mdash; powered by AI and the Internet Computer.
+      Social networks are drowning in AI-generated noise &mdash; and no algorithm can save them. Aegis is the infrastructure that comes after: agents that filter, curate, and deliver signal peer to peer.
     </p>
+
+    {/* Manifesto */}
+    <div style={{
+      marginTop: mobile ? space[6] : space[8],
+      maxWidth: 560,
+      width: "100%",
+      textAlign: "left",
+      borderLeft: `2px solid ${colors.cyan[500]}30`,
+      paddingLeft: mobile ? space[4] : space[5],
+    }}>
+      {MANIFESTO.map((para, i) => (
+        <p key={i} style={{
+          fontSize: mobile ? t.bodySm.size : t.body.size,
+          lineHeight: 1.75,
+          margin: 0,
+          marginTop: i > 0 ? space[3] : 0,
+          fontWeight: i === MANIFESTO.length - 1 ? 600 : 400,
+          color: i === MANIFESTO.length - 1 ? colors.text.secondary : colors.text.muted,
+        }}>
+          {para}
+        </p>
+      ))}
+    </div>
 
     {/* Feature cards */}
     <div style={{

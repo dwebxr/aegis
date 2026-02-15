@@ -9,7 +9,8 @@ describe("LandingHero", () => {
     const html = renderToStaticMarkup(
       <LandingHero onTryDemo={noop} onLogin={noop} />
     );
-    expect(html).toContain("Content Intelligence for the Open Web");
+    expect(html).toContain("Survive What");
+    expect(html).toContain("Coming");
   });
 
   it("renders all 4 feature cards", () => {
