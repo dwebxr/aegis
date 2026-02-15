@@ -93,13 +93,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         </div>
       </div>
 
-      {/* Agent summary line */}
-      {content.length > 0 && (
-        <p style={{ fontSize: t.bodySm.size, color: colors.text.muted, margin: 0, marginBottom: space[3] }}>
-          Your agent evaluated {todayContent.length} items today, burned {todaySlop.length} slop, and surfaced {todayQual.length} quality signals.
-        </p>
-      )}
-
       {/* Compact metrics summary */}
       <div style={{
         display: "flex", flexWrap: "wrap", alignItems: "center",
