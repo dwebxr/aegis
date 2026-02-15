@@ -46,7 +46,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
     if (c.flagged) flaggedCount++;
     if (c.verdict === "quality" && c.flagged) falsePositives++;
     sourceDistribution[c.source] = (sourceDistribution[c.source] || 0) + 1;
-    const eng = c.scoringEngine || (c.scoredByAI ? "ai" : "heuristic");
+    const eng = c.scoringEngine || (c.scoredByAI ? "claude-server" : "heuristic");
     engineDistribution[eng] = (engineDistribution[eng] || 0) + 1;
     scoreBuckets[Math.max(0, Math.min(9, Math.floor(c.scores.composite)))]++;
   }
