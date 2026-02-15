@@ -7,6 +7,19 @@ jest.mock("@/components/filtering/FilterModeSelector", () => ({
   FilterModeSelector: () => React.createElement("div", { "data-testid": "filter-mode-selector" }, "FilterMode"),
 }));
 
+jest.mock("@/contexts/PreferenceContext", () => ({
+  usePreferences: () => ({
+    profile: {
+      topicAffinities: {},
+      authorTrust: {},
+      recentTopics: [],
+      totalValidated: 0,
+      totalFlagged: 0,
+      calibration: { qualityThreshold: 5.5 },
+    },
+  }),
+}));
+
 const now = Date.now();
 const dayMs = 86400000;
 

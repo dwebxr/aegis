@@ -6,6 +6,8 @@ import { fonts, colors, space, type as t, radii, transitions } from "@/styles/th
 import type { ContentItem } from "@/lib/types/content";
 import { contentToCSV } from "@/lib/utils/csv";
 import { FilterModeSelector } from "@/components/filtering/FilterModeSelector";
+import { usePreferences } from "@/contexts/PreferenceContext";
+import { getContext, hasEnoughData } from "@/lib/preferences/engine";
 
 function downloadFile(data: string, filename: string, mime: string) {
   const blob = new Blob([data], { type: mime });
@@ -32,8 +34,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop">("quality");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [showAllContent, setShowAllContent] = useState(false);
+  const { profile } = usePreferences();
 
-  const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {
+  const { todayContent, todayQual, todaySlop, totalSlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {
     const now = Date.now();
     const dayMs = 86400000;
     const todayStart = now - dayMs;
@@ -41,6 +44,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     const todayContent = content.filter(c => c.createdAt >= todayStart);
     const todayQual = todayContent.filter(c => c.verdict === "quality");
     const todaySlop = todayContent.filter(c => c.verdict === "slop");
+    const totalSlop = content.filter(c => c.verdict === "slop").length;
     const uniqueSources = new Set(content.map(c => c.source));
     const availableSources = Array.from(uniqueSources).sort();
 
@@ -55,7 +59,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       dailyQuality.push(dayTotal > 0 ? Math.round((dayQual / dayTotal) * 100) : 0);
       dailySlop.push(dayItems.filter(c => c.verdict === "slop").length);
     }
-    return { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop };
+    return { todayContent, todayQual, todaySlop, totalSlop, uniqueSources, availableSources, dailyQuality, dailySlop };
   }, [content]);
 
   const filteredContent = useMemo(() => {
@@ -67,10 +71,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
 
+  const agentContext = useMemo(() => {
+    if (!hasEnoughData(profile)) return null;
+    return getContext(profile);
+  }, [profile]);
+
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
       {/* Compact header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[4], flexWrap: "wrap", gap: space[2] }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[2], flexWrap: "wrap", gap: space[2] }}>
         <h1 style={{ fontSize: mobile ? t.h1.mobileSz : t.h1.size, fontWeight: t.h1.weight, color: colors.text.primary, margin: 0 }}>
           Home
         </h1>
@@ -83,6 +92,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           )}
         </div>
       </div>
+
+      {/* Agent summary line */}
+      {content.length > 0 && (
+        <p style={{ fontSize: t.bodySm.size, color: colors.text.muted, margin: 0, marginBottom: space[3] }}>
+          Your agent evaluated {todayContent.length} items today, burned {todaySlop.length} slop, and surfaced {todayQual.length} quality signals.
+        </p>
+      )}
 
       {/* Compact metrics summary */}
       <div style={{
@@ -127,6 +143,23 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           </div>
         </div>
       </div>
+
+      {/* Slop defense counter */}
+      {totalSlop > 0 && (
+        <div style={{
+          marginBottom: space[3],
+          padding: `${space[2]}px ${space[4]}px`,
+          background: "rgba(251,146,60,0.04)",
+          border: `1px solid rgba(251,146,60,0.12)`,
+          borderRadius: radii.md,
+          fontSize: t.bodySm.size,
+          color: colors.text.muted,
+          textAlign: "center",
+        }}>
+          <span style={{ fontWeight: 700, color: colors.orange[400], fontFamily: fonts.mono }}>{totalSlop}</span>
+          {" "}slop items burned total &mdash; you never saw any of them.
+        </div>
+      )}
 
       {/* Content filters */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3], flexWrap: "wrap", gap: space[2] }}>
@@ -262,6 +295,61 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </button>
           )}
         </>
+      )}
+
+      {/* Agent Knowledge — interest profile */}
+      {agentContext && (
+        <div style={{
+          marginTop: space[4],
+          padding: `${space[3]}px ${space[4]}px`,
+          background: colors.bg.surface,
+          border: `1px solid ${colors.border.default}`,
+          borderRadius: radii.md,
+        }}>
+          <div style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary, marginBottom: space[2] }}>
+            Your Agent Knows
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: space[2] }}>
+            {agentContext.highAffinityTopics.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>Interests:</span>
+                {agentContext.highAffinityTopics.slice(0, 6).map(topic => (
+                  <span key={topic} style={{
+                    fontSize: t.caption.size,
+                    padding: `1px ${space[2]}px`,
+                    background: `${colors.cyan[400]}10`,
+                    border: `1px solid ${colors.cyan[400]}20`,
+                    borderRadius: radii.pill,
+                    color: colors.cyan[400],
+                  }}>{topic}</span>
+                ))}
+              </div>
+            )}
+            {agentContext.trustedAuthors.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>Trusted:</span>
+                {agentContext.trustedAuthors.slice(0, 4).map(author => (
+                  <span key={author} style={{
+                    fontSize: t.caption.size,
+                    padding: `1px ${space[2]}px`,
+                    background: `${colors.green[400]}10`,
+                    border: `1px solid ${colors.green[400]}20`,
+                    borderRadius: radii.pill,
+                    color: colors.green[400],
+                  }}>{author}</span>
+                ))}
+              </div>
+            )}
+            {agentContext.highAffinityTopics.length === 0 && agentContext.trustedAuthors.length === 0 && (
+              <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>
+                Learning your preferences... validate or flag more content.
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2] }}>
+            Threshold: {profile.calibration.qualityThreshold.toFixed(1)} &middot; Reviews: {profile.totalValidated + profile.totalFlagged}
+          </div>
+        </div>
       )}
 
       {/* Export (below content list) */}
