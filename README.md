@@ -48,7 +48,8 @@ Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. D
 
 \*Ollama and WebLLM are **off by default**. When neither is enabled, the chain starts at Tier 2 (BYOK) or Tier 3 (IC LLM).
 
-BYOK users: Ollama\* → WebLLM\* → BYOK Claude → IC LLM → Heuristic. Non-BYOK users: Ollama\* → WebLLM\* → IC LLM → Server Claude → Heuristic.
+BYOK users: Ollama\* → WebLLM\* → BYOK Claude → IC LLM → Heuristic. 
+Non-BYOK users: Ollama\* → WebLLM\* → IC LLM → Server Claude → Heuristic.
 
 ### Publishing & D2A
 
