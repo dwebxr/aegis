@@ -171,9 +171,9 @@ function MonthlyUsage({ mobile }: { mobile?: boolean }) {
 
 function LiteVsProTable() {
   const rows: Array<{ feature: string; lite: string; pro: string }> = [
-    { feature: "Scoring", lite: "Heuristic", pro: "AI (Claude)" },
+    { feature: "Scoring", lite: "Heuristic", pro: "AI (IC LLM default)" },
     { feature: "WoT Filter", lite: "\u2705", pro: "\u2705" },
-    { feature: "Cost/Article", lite: "~$0", pro: "~$0.003" },
+    { feature: "Cost/Article", lite: "~$0", pro: "~$0.003 est." },
     { feature: "Serendipity", lite: "Topic", pro: "Topic + WoT" },
     { feature: "Discoveries", lite: "\u2014", pro: "Up to 5" },
     { feature: "Accuracy", lite: "Good", pro: "Best" },
@@ -233,7 +233,7 @@ function CompetitorComparison({ mobile }: { mobile?: boolean }) {
     {
       name: "Aegis (Your Usage)",
       costUSD: `$${monthly.totalAiCostUSD.toFixed(2)}/mo`,
-      sub: "Automated AI + WoT filtering",
+      sub: "Estimated AI API cost + WoT filtering",
       color: colors.green[400],
       highlight: true,
     },

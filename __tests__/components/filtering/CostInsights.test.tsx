@@ -76,7 +76,7 @@ describe("CostInsights", () => {
       const html = renderToStaticMarkup(<CostInsights stats={makeStats()} expanded />);
       expect(html).toContain("Lite vs Pro");
       expect(html).toContain("Heuristic");
-      expect(html).toContain("AI (Claude)");
+      expect(html).toContain("AI (IC LLM default)");
     });
 
     it("renders CompetitorComparison section", () => {
