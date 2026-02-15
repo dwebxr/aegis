@@ -132,10 +132,10 @@ describe("GET /api/d2a/health", () => {
     expect(opts.headers["Content-Type"]).toBe("application/cbor");
   });
 
-  it("uses 5-second timeout for IC check", async () => {
+  it("uses AbortSignal timeout for IC check", async () => {
     await GET(makeRequest());
     const [, opts] = fetchMock.mock.calls[0];
-    expect(opts.signal).toBeDefined();
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("omits CORS allow-origin for unknown origin", async () => {

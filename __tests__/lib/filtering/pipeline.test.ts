@@ -143,6 +143,131 @@ describe("runFilterPipeline", () => {
     const result2 = runFilterPipeline([], null, proConfig);
     expect(result2.stats.mode).toBe("pro");
   });
+
+  describe("scoringEngine cost attribution", () => {
+    it("counts ollama as AI-scored but NOT paid", () => {
+      const items = [
+        makeItem({ scoredByAI: true, scoringEngine: "ollama" as ContentItem["scoringEngine"], reason: "Ollama scored" }),
+      ];
+      const result = runFilterPipeline(items, null, liteConfig);
+      expect(result.stats.aiScoredCount).toBe(1);
+      expect(result.stats.estimatedAPICost).toBe(0);
+    });
+
+    it("counts webllm as AI-scored but NOT paid", () => {
+      const items = [
+        makeItem({ scoredByAI: true, scoringEngine: "webllm" as ContentItem["scoringEngine"], reason: "WebLLM scored" }),
+      ];
+      const result = runFilterPipeline(items, null, liteConfig);
+      expect(result.stats.aiScoredCount).toBe(1);
+      expect(result.stats.estimatedAPICost).toBe(0);
+    });
+
+    it("counts heuristic engine as NOT AI-scored", () => {
+      const items = [
+        makeItem({ scoredByAI: false, scoringEngine: "heuristic" as ContentItem["scoringEngine"], reason: "Heuristic: short" }),
+      ];
+      const result = runFilterPipeline(items, null, liteConfig);
+      expect(result.stats.aiScoredCount).toBe(0);
+      expect(result.stats.estimatedAPICost).toBe(0);
+    });
+
+    it("counts claude-byok as paid", () => {
+      const items = [
+        makeItem({ scoredByAI: true, scoringEngine: "claude-byok" as ContentItem["scoringEngine"], reason: "Claude BYOK" }),
+      ];
+      const result = runFilterPipeline(items, null, liteConfig);
+      expect(result.stats.aiScoredCount).toBe(1);
+      expect(result.stats.estimatedAPICost).toBeCloseTo(0.003, 5);
+    });
+
+    it("counts claude-server as paid", () => {
+      const items = [
+        makeItem({ scoredByAI: true, scoringEngine: "claude-server" as ContentItem["scoringEngine"], reason: "Server" }),
+      ];
+      const result = runFilterPipeline(items, null, liteConfig);
+      expect(result.stats.estimatedAPICost).toBeCloseTo(0.003, 5);
+    });
+
+    it("counts claude-ic as paid", () => {
+      const items = [
+        makeItem({ scoredByAI: true, scoringEngine: "claude-ic" as ContentItem["scoringEngine"], reason: "IC scored" }),
+      ];
+      const result = runFilterPipeline(items, null, liteConfig);
+      expect(result.stats.estimatedAPICost).toBeCloseTo(0.003, 5);
+    });
+
+    it("accumulates cost for multiple paid items", () => {
+      const items = [
+        makeItem({ scoredByAI: true, scoringEngine: "claude-byok" as ContentItem["scoringEngine"], reason: "BYOK" }),
+        makeItem({ scoredByAI: true, scoringEngine: "claude-server" as ContentItem["scoringEngine"], reason: "Server" }),
+        makeItem({ scoredByAI: true, scoringEngine: "ollama" as ContentItem["scoringEngine"], reason: "Free" }),
+      ];
+      const result = runFilterPipeline(items, null, liteConfig);
+      expect(result.stats.aiScoredCount).toBe(3);
+      expect(result.stats.estimatedAPICost).toBeCloseTo(0.006, 5); // 2 paid * 0.003
+    });
+  });
+
+  describe("legacy AI detection", () => {
+    it("scoredByAI=null with non-Heuristic reason → AI-scored (legacy)", () => {
+      const items = [makeItem({ scoredByAI: undefined, scoringEngine: undefined, reason: "Claude analysis" })];
+      const result = runFilterPipeline(items, null, liteConfig);
+      expect(result.stats.aiScoredCount).toBe(1);
+      expect(result.stats.estimatedAPICost).toBeCloseTo(0.003, 5);
+    });
+
+    it("scoredByAI=null with reason=null → AI-scored (legacy)", () => {
+      const items = [makeItem({ scoredByAI: undefined, scoringEngine: undefined, reason: undefined as unknown as string })];
+      const result = runFilterPipeline(items, null, liteConfig);
+      // reason?.startsWith("Heuristic") → undefined → !undefined → true → legacyAI
+      expect(result.stats.aiScoredCount).toBe(1);
+    });
+
+    it("scoredByAI=true always counts as AI-scored regardless of reason", () => {
+      const items = [makeItem({ scoredByAI: true, scoringEngine: undefined, reason: "Heuristic: blah" })];
+      const result = runFilterPipeline(items, null, liteConfig);
+      expect(result.stats.aiScoredCount).toBe(1);
+    });
+
+    it("scoredByAI=false with Heuristic reason → NOT AI-scored", () => {
+      const items = [makeItem({ scoredByAI: false, reason: "Heuristic (AI unavailable): short" })];
+      const result = runFilterPipeline(items, null, liteConfig);
+      expect(result.stats.aiScoredCount).toBe(0);
+      expect(result.stats.estimatedAPICost).toBe(0);
+    });
+  });
+
+  describe("qualityThreshold filtering", () => {
+    it("filters items below threshold", () => {
+      const items = [
+        makeItem({ scores: { originality: 2, insight: 2, credibility: 2, composite: 2 } }),
+        makeItem({ scores: { originality: 8, insight: 8, credibility: 8, composite: 8 } }),
+      ];
+      const config: FilterConfig = { mode: "pro", wotEnabled: false, qualityThreshold: 5 };
+      const result = runFilterPipeline(items, null, config);
+      expect(result.items.length).toBe(1);
+      expect(result.items[0].item.scores.composite).toBe(8);
+    });
+
+    it("includes items at exactly the threshold", () => {
+      const items = [
+        makeItem({ scores: { originality: 5, insight: 5, credibility: 5, composite: 5 } }),
+      ];
+      const config: FilterConfig = { mode: "pro", wotEnabled: false, qualityThreshold: 5 };
+      const result = runFilterPipeline(items, null, config);
+      expect(result.items.length).toBe(1);
+    });
+
+    it("excludes items just below threshold", () => {
+      const items = [
+        makeItem({ scores: { originality: 5, insight: 5, credibility: 5, composite: 4.9 } }),
+      ];
+      const config: FilterConfig = { mode: "pro", wotEnabled: false, qualityThreshold: 5 };
+      const result = runFilterPipeline(items, null, config);
+      expect(result.items.length).toBe(0);
+    });
+  });
 });
 
 describe("scoreItemWithHeuristics", () => {

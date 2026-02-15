@@ -20,9 +20,11 @@ jest.mock("@/lib/ic/declarations", () => ({
 import { createBackendActorAsync, createBackendActor } from "@/lib/ic/actor";
 
 describe("createBackendActor", () => {
-  it("creates actor synchronously without syncTime", () => {
+  it("creates actor synchronously with correct canisterId", () => {
     const actor = createBackendActor();
     expect(mockCreateActor).toHaveBeenCalledTimes(1);
+    const [, opts] = mockCreateActor.mock.calls[0];
+    expect(opts.canisterId).toBe("test-canister-id");
     expect(actor).toBeDefined();
   });
 });

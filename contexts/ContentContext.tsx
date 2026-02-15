@@ -14,9 +14,38 @@ import { errMsg } from "@/lib/utils/errors";
 import { recordUseful, recordSlop } from "@/lib/d2a/reputation";
 import { recordPublishValidation, recordPublishFlag } from "@/lib/reputation/publishGate";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
+import { isOllamaEnabled } from "@/lib/ollama/storage";
 
 const CONTENT_CACHE_KEY = "aegis-content-cache";
 const MAX_CACHED_ITEMS = 200;
+
+async function fetchAnalyze(
+  text: string,
+  userContext?: UserContext | null,
+  apiKey?: string,
+): Promise<AnalyzeResponse | null> {
+  try {
+    const body: Record<string, unknown> = { text };
+    if (userContext) body.userContext = userContext;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey) headers["X-User-API-Key"] = apiKey;
+    const res = await fetch("/api/analyze", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.warn("[analyze] API returned", res.status, data?.error || "");
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.warn("[analyze] fetch failed:", errMsg(err));
+    return null;
+  }
+}
 
 function loadCachedContent(): ContentItem[] {
   if (typeof globalThis.localStorage === "undefined") return [];
@@ -168,12 +197,23 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
       : [];
 
+    // Tier 0: Ollama (local LLM server) — when enabled, tried first
+    if (isOllamaEnabled()) {
+      try {
+        const { scoreWithOllama } = await import("@/lib/ollama/engine");
+        const ollamaResult = await scoreWithOllama(text, topics);
+        result = { ...ollamaResult, scoredByAI: true, scoringEngine: "ollama" as const } as AnalyzeResponse;
+      } catch (err) {
+        console.warn("[analyze] Ollama scoring failed, falling back:", errMsg(err));
+      }
+    }
+
     // Tier 1: WebLLM (browser-local AI) — when enabled, tried first for privacy
-    if (isWebLLMEnabled()) {
+    if (!result && isWebLLMEnabled()) {
       try {
         const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
         const webllmResult = await scoreWithWebLLM(text, topics);
-        result = { ...webllmResult, scoredByAI: true } as AnalyzeResponse;
+        result = { ...webllmResult, scoredByAI: true, scoringEngine: "webllm" as const } as AnalyzeResponse;
       } catch (err) {
         console.warn("[analyze] WebLLM scoring failed, falling back:", errMsg(err));
       }
@@ -181,23 +221,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
     // Tier 2: Claude API with user's own key (BYOK)
     if (!result && userApiKey) {
-      try {
-        const body: Record<string, unknown> = { text, source: "manual" };
-        if (userContext) body.userContext = userContext;
-        const res = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-User-API-Key": userApiKey },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(30_000),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          result = data;
-        } else {
-          console.warn("[analyze] BYOK Claude API failed, falling back to IC LLM");
-        }
-      } catch (err) {
-        console.warn("[analyze] BYOK Claude API failed, falling back to IC LLM:", errMsg(err));
+      const data = await fetchAnalyze(text, userContext, userApiKey);
+      if (data) {
+        result = { ...data, scoringEngine: "claude-byok" as const };
+      } else {
+        console.warn("[analyze] BYOK Claude API failed, falling back to IC LLM");
       }
     }
 
@@ -221,6 +249,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
             vSignal: a.vSignal.length > 0 ? a.vSignal[0] : undefined,
             cContext: a.cContext.length > 0 ? a.cContext[0] : undefined,
             lSlop: a.lSlop.length > 0 ? a.lSlop[0] : undefined,
+            scoringEngine: "claude-ic" as const,
           };
         } else if ("err" in icResult) {
           console.warn("[analyze] IC LLM returned error:", icResult.err);
@@ -232,30 +261,18 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
     // Tier 3.5: Claude API with server key (provisional — future Pro subscription)
     if (!result && !userApiKey) {
-      try {
-        const body: Record<string, unknown> = { text, source: "manual" };
-        if (userContext) body.userContext = userContext;
-        const res = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(30_000),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          result = data;
-        } else {
-          console.warn("[analyze] Server Claude API failed, falling back to heuristic");
-        }
-      } catch (err) {
-        console.warn("[analyze] Server Claude API failed:", errMsg(err));
+      const data = await fetchAnalyze(text, userContext);
+      if (data) {
+        result = { ...data, scoringEngine: "claude-server" as const };
+      } else {
+        console.warn("[analyze] Server Claude API failed, falling back to heuristic");
       }
     }
 
     // Tier 4: Heuristic fallback (client-side, no network call)
     if (!result) {
       const { heuristicScores } = await import("@/lib/ingestion/quickFilter");
-      result = { ...heuristicScores(text), scoredByAI: false };
+      result = { ...heuristicScores(text), scoredByAI: false, scoringEngine: "heuristic" as const };
     }
 
     const evaluation: ContentItem = {
@@ -284,6 +301,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       cContext: result.cContext,
       lSlop: result.lSlop,
       scoredByAI: result.scoredByAI ?? true,
+      scoringEngine: result.scoringEngine,
     };
     setContent(prev => [evaluation, ...prev]);
 

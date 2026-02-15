@@ -4,51 +4,10 @@ import { heuristicScores } from "@/lib/ingestion/quickFilter";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
+import { buildScoringPrompt } from "@/lib/scoring/prompt";
+import { parseScoreResponse } from "@/lib/scoring/parseResponse";
 
 export const maxDuration = 30;
-
-function buildPrompt(text: string, userContext?: UserContext): string {
-  const contentSlice = text.slice(0, 5000);
-
-  if (userContext && (userContext.recentTopics.length > 0 || userContext.highAffinityTopics.length > 0)) {
-    return `You are the Aegis Slop Incinerator AI. Evaluate this content using the V/C/L framework.
-
-User's current interests: ${userContext.recentTopics.join(", ") || "general"}
-User's high-affinity topics: ${userContext.highAffinityTopics.join(", ") || "none yet"}
-User's low-affinity topics: ${userContext.lowAffinityTopics.join(", ") || "none yet"}
-
-Score each dimension 0-10:
-- V_signal: Information density & novelty. Does this contain genuinely new information, data, or analysis?
-- C_context: Relevance to this specific user's interests listed above. How well does this match what they care about?
-- L_slop: Clickbait, engagement farming, rehashed content, empty opinions. Higher = more slop.
-
-Also score the legacy axes (for backward compatibility):
-- Originality (0-10): Novel or rehashed?
-- Insight (0-10): Deep analysis or surface-level?
-- Credibility (0-10): Reliable sourcing?
-
-Extract 1-3 topic tags from the content (lowercase, single words or short phrases).
-
-Composite score: S = (V_signal * C_context) / (L_slop + 0.5), then normalize to 0-10 scale.
-Verdict: "quality" if composite >= 4, else "slop".
-
-Content: "${contentSlice}"
-
-Respond ONLY in this exact JSON format:
-{"vSignal":N,"cContext":N,"lSlop":N,"originality":N,"insight":N,"credibility":N,"composite":N.N,"verdict":"quality"|"slop","reason":"brief explanation","topics":["tag1","tag2"]}`;
-  }
-
-  // Legacy prompt (no personalization)
-  return `You are the Aegis Slop Incinerator AI. Evaluate this content for quality. Score each axis 0-10:
-- Originality (40%): Novel or rehashed?
-- Insight (35%): Deep analysis?
-- Credibility (25%): Reliable sources?
-
-Content: "${contentSlice}"
-
-Respond ONLY in this exact JSON format:
-{"originality":N,"insight":N,"credibility":N,"composite":N.N,"verdict":"quality"|"slop","reason":"brief"}`;
-}
 
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 20, 60_000);
@@ -70,7 +29,9 @@ export async function POST(request: NextRequest) {
 
   // Sanitize userContext: only allow short string arrays for topic fields
   const sanitizeTopics = (arr: unknown): string[] =>
-    Array.isArray(arr) ? arr.filter((t): t is string => typeof t === "string" && t.length < 80).slice(0, 20) : [];
+    Array.isArray(arr)
+      ? arr.map((t) => (typeof t === "string" ? t.trim() : "")).filter((t): t is string => t.length > 0 && t.length < 80).slice(0, 20)
+      : [];
   const userContext: UserContext | undefined = rawCtx ? {
     recentTopics: sanitizeTopics(rawCtx.recentTopics),
     highAffinityTopics: sanitizeTopics(rawCtx.highAffinityTopics),
@@ -88,7 +49,11 @@ export async function POST(request: NextRequest) {
   }
   if (!isUserKey) recordApiCall();
 
-  const prompt = buildPrompt(text, userContext);
+  // Build prompt: merge all user topic types into a single list for the shared prompt
+  const allTopics = userContext
+    ? [...userContext.recentTopics, ...userContext.highAffinityTopics].filter(Boolean)
+    : [];
+  const prompt = buildScoringPrompt(text, allTopics.length > 0 ? allTopics : undefined, 5000);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
@@ -130,42 +95,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to parse Anthropic response", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
   }
   const rawText = data.content?.[0]?.text || "";
-  const clean = rawText.replace(/```json|```/g, "").trim();
+  const parsed = parseScoreResponse(rawText);
 
-  let parsed;
-  try {
-    parsed = JSON.parse(clean);
-  } catch {
-    console.warn("[analyze] AI returned non-JSON (length:", clean.length, "), falling back to heuristic");
+  if (!parsed) {
+    console.warn("[analyze] AI returned non-JSON, falling back to heuristic");
     const fallback = heuristicScores(text);
     return NextResponse.json({ error: "Failed to parse AI response", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
   }
 
-  // Validate and clamp AI response fields to expected 0-10 range
-  const clamp0_10 = (v: unknown): number => {
-    const n = typeof v === "number" ? v : Number(v);
-    return Number.isFinite(n) ? Math.max(0, Math.min(10, n)) : 5;
-  };
-  const originality = clamp0_10(parsed.originality);
-  const insight = clamp0_10(parsed.insight);
-  const credibility = clamp0_10(parsed.credibility);
-  const composite = clamp0_10(parsed.composite);
-  const verdict = parsed.verdict === "quality" || parsed.verdict === "slop"
-    ? parsed.verdict
-    : (composite >= 4 ? "quality" : "slop");
-
-  const response: Record<string, unknown> = {
-    originality, insight, credibility, composite, verdict,
-    reason: typeof parsed.reason === "string" ? parsed.reason.slice(0, 500) : "",
-  };
-
-  if (typeof parsed.vSignal === "number") response.vSignal = clamp0_10(parsed.vSignal);
-  if (typeof parsed.cContext === "number") response.cContext = clamp0_10(parsed.cContext);
-  if (typeof parsed.lSlop === "number") response.lSlop = clamp0_10(parsed.lSlop);
-  if (Array.isArray(parsed.topics)) {
-    response.topics = parsed.topics.filter((t: unknown): t is string => typeof t === "string").slice(0, 10);
-  }
-  response.tier = "claude";
-
-  return NextResponse.json(response);
+  return NextResponse.json({ ...parsed, tier: "claude" });
 }

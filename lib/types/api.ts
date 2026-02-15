@@ -13,6 +13,8 @@ export interface AnalyzeResponse {
   lSlop?: number;
   topics?: string[];
   scoredByAI?: boolean;
+  /** Which scoring engine produced the scores */
+  scoringEngine?: import("@/lib/scoring/types").ScoringEngine;
 }
 
 export interface FetchURLResponse {

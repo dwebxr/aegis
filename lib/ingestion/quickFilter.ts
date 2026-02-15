@@ -2,6 +2,7 @@
  * Heuristic text-quality scoring (no API call needed).
  * Used as fallback in /api/analyze and as pre-filter in ingestion.
  */
+import { clamp } from "@/lib/utils/math";
 
 export interface HeuristicScores {
   originality: number;
@@ -49,9 +50,9 @@ export function heuristicScores(text: string): HeuristicScores {
     credibility += 2; signals.push("attribution present");
   }
 
-  originality = Math.max(0, Math.min(10, originality));
-  insight = Math.max(0, Math.min(10, insight));
-  credibility = Math.max(0, Math.min(10, credibility));
+  originality = clamp(originality, 0, 10);
+  insight = clamp(insight, 0, 10);
+  credibility = clamp(credibility, 0, 10);
 
   const composite = parseFloat((originality * 0.4 + insight * 0.35 + credibility * 0.25).toFixed(1));
   const reason = signals.length > 0

@@ -99,7 +99,7 @@ export async function fetchNostrProfile(
         try {
           const meta = JSON.parse(ev.content);
           displayName = meta.display_name || meta.name || undefined;
-        } catch { /* malformed profile JSON */ }
+        } catch { /* malformed profile JSON — common on Nostr, safe to skip */ }
       }
       if (ev.kind === 3) {
         followCount = ev.tags.filter((t: string[]) => t[0] === "p").length;

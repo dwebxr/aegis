@@ -31,7 +31,7 @@ Aegis has two independent axes: **authentication state** (Demo vs Logged-in) and
 
 - **Demo**: Open the app without logging in. You get 3 preset RSS feeds scored with heuristic filters. Source management is disabled. Great for trying Aegis without commitment. Pro mode selector is locked.
 - **Lite**: Login and select "Lite" in the filter mode selector. Full source management with heuristic-only scoring. No API calls, $0 cost. WoT and serendipity disabled.
-- **Pro**: Login and select "Pro" in the filter mode selector. Full AI scoring pipeline (WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
+- **Pro**: Login and select "Pro" in the filter mode selector. Full AI scoring pipeline (Ollama → WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
 
 Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. Demo mode is automatic when not logged in — logging in clears demo content and enables full source management.
 
@@ -39,15 +39,16 @@ Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. D
 
 | Engine | Tier | Where | Cost | When used |
 |--------|------|-------|------|-----------|
-| WebLLM (Llama 3.1 8B q4f16) | 1st\* | Browser-local (WebGPU) | Free | **Opt-in** — enable in Settings; tried first when active |
+| Ollama / OpenAI-compatible | 0th\* | Local server (user-hosted) | Free | **Opt-in** — enable in Settings; tried first when active |
+| WebLLM (Llama 3.1 8B q4f16) | 1st\* | Browser-local (WebGPU) | Free | **Opt-in** — enable in Settings; tried when Ollama inactive/fails |
 | Anthropic Claude (BYOK) | 2nd | Off-chain (Vercel) | User's API key | When user sets own API key in Settings |
 | IC LLM (Llama 3.1 8B) | 3rd | On-chain (IC canister) | Free | Default for authenticated users |
 | Anthropic Claude (server key) | 3.5th | Off-chain (Vercel) | Free during alpha | Non-BYOK users when IC LLM fails (future Pro subscription) |
 | Heuristic filter | 4th | Client-side | Free | Fallback when all LLM tiers fail |
 
-\*WebLLM is **off by default**. When not enabled, the chain starts at Tier 2 (BYOK) or Tier 3 (IC LLM).
+\*Ollama and WebLLM are **off by default**. When neither is enabled, the chain starts at Tier 2 (BYOK) or Tier 3 (IC LLM).
 
-BYOK users: WebLLM\* → BYOK Claude → IC LLM → Heuristic. Non-BYOK users: WebLLM\* → IC LLM → Server Claude → Heuristic.
+BYOK users: Ollama\* → WebLLM\* → BYOK Claude → IC LLM → Heuristic. Non-BYOK users: Ollama\* → WebLLM\* → IC LLM → Server Claude → Heuristic.
 
 ### Publishing & D2A
 
@@ -72,6 +73,7 @@ BYOK users: WebLLM\* → BYOK Claude → IC LLM → Heuristic. Non-BYOK users: W
 | D2A Agent toggle | IC canister + localStorage cache | Yes |
 | API Key (BYOK) | localStorage only | No (secret) |
 | Push Notifications | IC canister + browser | No (browser-specific) |
+| Local LLM (Ollama) | localStorage only | No (browser-specific) |
 | Browser AI (WebLLM) | localStorage only | No (browser-specific) |
 
 ## Architecture
@@ -108,8 +110,9 @@ Browser                                  Internet Computer (Mainnet)
             │
             ▼
    Scoring Pipeline (fallback chain):
-   1.  IC LLM (Llama 3.1 8B, free, on-chain)
-   1.5 WebLLM (browser-local via WebGPU, if enabled)
+   0.  Ollama / OpenAI-compatible (local server, if enabled)
+   1.  WebLLM (browser-local via WebGPU, if enabled)
+   1.5 IC LLM (Llama 3.1 8B, free, on-chain)
    2.  Anthropic Claude (premium, V/C/L) or BYOK
    3.  Heuristic fallback (client-side)
    + Per-IP API rate limiting (5-60 req/min per route)
@@ -127,9 +130,17 @@ Browser                                  Internet Computer (Mainnet)
 
 Aegis uses a multi-tier scoring pipeline with automatic fallback. The system tries each tier in order and uses the first successful result — no silent failures.
 
+### Tier 0: Ollama / OpenAI-Compatible Local LLM (Free, Zero-Latency)
+
+When enabled in Settings, **Ollama** (or any OpenAI-compatible local LLM server) is tried **first** — before any other tier. It calls `POST /v1/chat/completions` on your local server (default `http://localhost:11434`). Zero cost, zero latency, fully private — no data leaves your machine. Configure the endpoint and model in Settings > Local LLM (Ollama).
+
+**Setup**: Install [Ollama](https://ollama.ai), pull a model (`ollama pull llama3.2`), and start the server. Set `OLLAMA_ORIGINS=*` (or `OLLAMA_ORIGINS=https://aegis.dwebxr.xyz`) to allow cross-origin requests from the browser. Any OpenAI-compatible server (LM Studio, llama.cpp server, vLLM, etc.) works — just set the endpoint in Settings.
+
+If Ollama is not enabled or fails, the system falls through to Tier 1.
+
 ### Tier 1: WebLLM Browser-Local Scoring (Free, Privacy-First)
 
-When enabled in Settings, **WebLLM** (Llama 3.1 8B q4f16 via WebGPU) is tried **first** — before any network call. It runs entirely in the browser: no API calls, no data leaves the device. The model downloads once on first use (~4 GB) and scores locally thereafter. Requires a WebGPU-capable browser.
+When enabled in Settings, **WebLLM** (Llama 3.1 8B q4f16 via WebGPU) is tried next. It runs entirely in the browser: no API calls, no data leaves the device. The model downloads once on first use (~4 GB) and scores locally thereafter. Requires a WebGPU-capable browser.
 
 If WebLLM is not enabled or fails, the system falls through to Tier 2.
 
@@ -167,9 +178,9 @@ When all LLM tiers are unavailable, a fast heuristic filter scores content local
 
 Base scores start at 5. Composite = `0.4 × Originality + 0.35 × Insight + 0.25 × Credibility`.
 
-### V/C/L Scoring Axes (Used by Tier 1, 2, 3, and 3.5)
+### V/C/L Scoring Axes (Used by Tier 0, 1, 2, 3, and 3.5)
 
-WebLLM, Claude, and IC LLM all evaluate three orthogonal axes:
+Ollama, WebLLM, Claude, and IC LLM all evaluate three orthogonal axes:
 
 - **V (Signal)**: Information density and novelty. Does this contain genuinely new information, data, or analysis? (0–10)
 - **C (Context)**: Relevance to *this specific user's* interests, calibrated from their learned topic affinities. (0–10)
@@ -222,7 +233,7 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 |------|---------------|:---:|:---:|:---:|
 | **Demo** | Heuristic only (Lite locked) | No | No | No |
 | **Lite** | Heuristic only (client-side) | No | No | Yes |
-| **Pro** | WebLLM → BYOK → IC LLM → heuristic | Yes | Yes | Yes |
+| **Pro** | Ollama → WebLLM → BYOK → IC LLM → heuristic | Yes | Yes | Yes |
 
 - **Demo**: Unauthenticated state. 3 preset RSS feeds, heuristic scoring, Pro selector locked. Source management disabled.
 - **Lite**: Authenticated, heuristic-only scoring. Full source management but no API calls, no WoT, no serendipity. $0 cost.
@@ -312,13 +323,14 @@ Aegis implements a sustainable economic model using ICP tokens (ICRC-1/2) with t
 
 | Tier | Engine | Cost | Where |
 |------|--------|------|-------|
+| **0th (Free)** | Ollama / OpenAI-compatible | 0 — local server | User-hosted |
 | **1st (Free)** | WebLLM (Llama 3.1 8B q4f16) | 0 — browser-local via WebGPU | Client-side |
 | **2nd (BYOK)** | Anthropic Claude (claude-sonnet-4-20250514) | User's API key | Off-chain (Vercel) |
 | **3rd (Free)** | IC LLM (Llama 3.1 8B) | 0 ICP — cycles paid by canister | On-chain (IC) |
 | **3.5th (Alpha)** | Anthropic Claude (server key) | Free during alpha | Off-chain (Vercel) |
 | **4th (Fallback)** | Heuristic filter | 0 | Client-side |
 
-When WebLLM is enabled, it is tried first — browser-local AI via WebGPU with no API calls. BYOK users get Claude API next (highest quality). IC LLM on-chain scoring provides free decentralized fallback. The server-side Claude key (Tier 3.5) is free during alpha and will move to a Pro subscription plan.
+When Ollama is enabled, it is tried first — local LLM server with zero cost and zero latency. When WebLLM is enabled, it is tried next — browser-local AI via WebGPU with no API calls. BYOK users get Claude API next (highest quality). IC LLM on-chain scoring provides free decentralized fallback. The server-side Claude key (Tier 3.5) is free during alpha and will move to a Pro subscription plan.
 
 ### Pillar 2: Quality Assurance Deposits (Non-Custodial)
 
@@ -562,12 +574,13 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 ## Features
 
 ### Multi-Tier AI Scoring Pipeline
+- **Tier 0**: Ollama / OpenAI-compatible — free, local server, zero latency (when enabled)
 - **Tier 1**: WebLLM (Llama 3.1 8B q4f16) — free, browser-local via WebGPU, no data leaves device (when enabled)
 - **Tier 2**: Claude API BYOK — premium V/C/L scoring with user's own API key
 - **Tier 3**: IC LLM (Llama 3.1 8B) — free, fully on-chain, no API key
 - **Tier 3.5**: Claude API server key — free during alpha (future Pro subscription)
 - **Tier 4**: Heuristic fallback — local, instant, no network call
-- Automatic fallback: BYOK users (1→2→3→4), non-BYOK users (1→3→3.5→4)
+- Automatic fallback: BYOK users (0→1→2→3→4), non-BYOK users (0→1→3→3.5→4)
 
 ### WoT Filter Pipeline
 - **Demo mode**: Preset feeds, heuristic scoring, Pro locked (no login)
@@ -650,7 +663,8 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Backend API | Next.js API Routes (Vercel Serverless) |
 | AI (Free) | IC LLM Canister — Llama 3.1 8B (on-chain, mo:llm 2.1.0) |
 | AI (Premium) | Anthropic Claude (claude-sonnet-4-20250514) + BYOK + fallback heuristics |
-| AI (Local) | WebLLM (@mlc-ai/web-llm, Llama 3.1 8B q4f16 via WebGPU, optional) |
+| AI (Local Server) | Ollama / OpenAI-compatible API (any local LLM, optional) |
+| AI (Local Browser) | WebLLM (@mlc-ai/web-llm, Llama 3.1 8B q4f16 via WebGPU, optional) |
 | Blockchain | Internet Computer (Motoko canister, dfx 0.30.2) |
 | Payments | x402 protocol (@x402/next 2.3.0, USDC on Base) |
 | Tokens | ICP Ledger ICRC-1/2 (staking, D2A fees) |
@@ -658,9 +672,9 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
 | Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
-| CI/CD | GitHub Actions (lint → test → build → security audit on push/PR) |
+| CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, beforeSend scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (1920 tests, 133 suites) |
+| Test | Jest + ts-jest (2018 tests, 139 suites) |
 
 ## Project Structure
 
@@ -758,6 +772,14 @@ aegis/
 │   ├── api/
 │   │   ├── rateLimit.ts                 # Per-IP rate limiter for API routes (5-60 req/min per route)
 │   │   └── dailyBudget.ts              # Per-instance daily API budget (500 calls/day)
+│   ├── scoring/
+│   │   ├── types.ts                     # ScoringEngine type + ScoreParseResult interface
+│   │   ├── prompt.ts                    # Shared V/C/L scoring prompt (used by all AI tiers)
+│   │   └── parseResponse.ts            # Shared JSON response parser (fence strip, clamp, composite)
+│   ├── ollama/
+│   │   ├── types.ts                     # OllamaConfig, OllamaStatus, defaults
+│   │   ├── storage.ts                   # localStorage persistence for Ollama config
+│   │   └── engine.ts                    # Ollama/OpenAI-compatible scoring engine
 │   ├── webllm/
 │   │   ├── engine.ts                    # Browser-local AI scoring (WebGPU, Llama 3.1 8B)
 │   │   └── types.ts                     # WebLLMStatus type
@@ -772,15 +794,17 @@ aegis/
 │       ├── errors.ts                    # errMsg() shared error formatter
 │       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       ├── csv.ts                       # CSV export (RFC-compliant escaping)
-│       └── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
-├── __tests__/                           # 1920 tests across 133 suites
+│       ├── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
+│       ├── math.ts                      # Shared clamp() utility
+│       └── statusEmitter.ts            # Generic status emitter factory (used by Ollama/WebLLM engines)
+├── __tests__/                           # 2018 tests across 139 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
 │       ├── types.mo                     # Type definitions (incl. StakeRecord, UserReputation, D2AMatchRecord)
 │       ├── ledger.mo                    # ICRC-1/2 ICP Ledger + CMC interface module
 │       └── aegis_backend.did            # Candid interface
-├── .github/workflows/ci.yml             # GitHub Actions CI (lint → test → build → security audit)
+├── .github/workflows/ci.yml             # GitHub Actions CI (lint → test → security audit → build)
 ├── sentry.client.config.ts              # Sentry client-side init (breadcrumb URL scrubbing)
 ├── sentry.server.config.ts              # Sentry server-side init (auth header/cookie scrubbing)
 ├── sentry.edge.config.ts                # Sentry edge runtime init (auth header/cookie scrubbing)
@@ -809,7 +833,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 1920 tests
+npm test              # Run all 2018 tests
 npm run test:watch    # Watch mode
 ```
 
@@ -946,7 +970,7 @@ Aegis follows a staged decentralization roadmap to balance security with trustle
 
 **Lite mode costs nothing** — it runs entirely client-side with heuristic scoring (no API calls).
 
-Pro mode uses the multi-tier AI scoring pipeline. WebLLM (Tier 1, when enabled) and IC LLM (Tier 3) are both free. BYOK users (Tier 2) pay their own Claude API costs (~$0.01/day, ~50 articles/day). The server-side Claude key (Tier 3.5) is free during alpha; after alpha, it will move to a Pro subscription plan. You can also bring your own API key (Settings > AI Scoring) — roughly $2/month for typical usage.
+Pro mode uses the multi-tier AI scoring pipeline. Ollama (Tier 0, when enabled), WebLLM (Tier 1, when enabled), and IC LLM (Tier 3) are all free. BYOK users (Tier 2) pay their own Claude API costs (~$0.01/day, ~50 articles/day). The server-side Claude key (Tier 3.5) is free during alpha; after alpha, it will move to a Pro subscription plan. You can also bring your own API key (Settings > AI Scoring) — roughly $2/month for typical usage.
 
 ### Why not just use a P2P small-world network?
 

@@ -7,13 +7,17 @@ describe("withTimeout", () => {
   });
 
   it("rejects with timeout error when promise exceeds timeout", async () => {
-    const slow = new Promise<string>((resolve) => setTimeout(() => resolve("late"), 5000));
+    let timer: ReturnType<typeof setTimeout>;
+    const slow = new Promise<string>((resolve) => { timer = setTimeout(() => resolve("late"), 5000); });
     await expect(withTimeout(slow, 50)).rejects.toThrow("timeout");
+    clearTimeout(timer!);
   });
 
   it("uses custom error message", async () => {
-    const slow = new Promise<string>((resolve) => setTimeout(() => resolve("late"), 5000));
+    let timer: ReturnType<typeof setTimeout>;
+    const slow = new Promise<string>((resolve) => { timer = setTimeout(() => resolve("late"), 5000); });
     await expect(withTimeout(slow, 50, "custom-msg")).rejects.toThrow("custom-msg");
+    clearTimeout(timer!);
   });
 
   it("rejects with promise error if promise rejects before timeout", async () => {

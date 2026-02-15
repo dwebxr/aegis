@@ -151,13 +151,15 @@ describe("POST /api/analyze — Anthropic API path", () => {
 
       const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
       const prompt = body.messages[0].content;
-      expect(prompt).toContain("V/C/L");
-      expect(prompt).toContain("ai, ml");
+      // Shared prompt includes V/C/L dimensions and user topics
+      expect(prompt).toContain("vSignal");
+      expect(prompt).toContain("cContext");
+      expect(prompt).toContain("lSlop");
+      expect(prompt).toContain("ai");
       expect(prompt).toContain("transformers");
-      expect(prompt).toContain("crypto");
     });
 
-    it("uses legacy prompt when userContext has no topics", async () => {
+    it("uses general topics when userContext has no topics", async () => {
       mockClaudeResponse(JSON.stringify({
         originality: 5, insight: 5, credibility: 5, composite: 5, verdict: "quality", reason: "ok",
       }));
@@ -169,8 +171,9 @@ describe("POST /api/analyze — Anthropic API path", () => {
 
       const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
       const prompt = body.messages[0].content;
-      expect(prompt).not.toContain("V/C/L");
-      expect(prompt).toContain("Originality (40%)");
+      // Shared prompt always uses V/C/L format; defaults to "general" when no topics
+      expect(prompt).toContain("User interests: general");
+      expect(prompt).toContain("vSignal");
     });
 
     it("truncates input text to 5000 chars in prompt", async () => {

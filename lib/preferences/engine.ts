@@ -10,6 +10,7 @@ import {
   AUTHOR_TRUST_CAP,
   AUTHOR_TRUST_FLOOR,
 } from "./types";
+import { clamp } from "@/lib/utils/math";
 
 interface LearnEvent {
   action: "validate" | "flag";
@@ -27,10 +28,6 @@ const THRESHOLD_LOWER = -0.05; // borderline validate → lower threshold
 const THRESHOLD_RAISE = 0.1;   // quality-judged item flagged → raise threshold
 const BORDERLINE_LOW = 3.5;
 const BORDERLINE_HIGH = 4.5;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPreferenceProfile {
   const next = structuredClone(profile);

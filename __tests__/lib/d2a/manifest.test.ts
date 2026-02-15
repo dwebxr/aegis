@@ -119,7 +119,7 @@ describe("JSON.stringify / decodeManifest round-trip", () => {
   });
 
   it("returns null for invalid JSON", () => {
-    expect(() => decodeManifest("{invalid")).toThrow();
+    expect(decodeManifest("{invalid")).toBeNull();
   });
 
   it("returns null for missing entries array", () => {

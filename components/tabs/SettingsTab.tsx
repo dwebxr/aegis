@@ -18,6 +18,9 @@ import {
 import { getUserApiKey, setUserApiKey, clearUserApiKey, maskApiKey } from "@/lib/apiKey/storage";
 import { isWebLLMEnabled, setWebLLMEnabled } from "@/lib/webllm/storage";
 import type { WebLLMStatus } from "@/lib/webllm/types";
+import { getOllamaConfig, setOllamaConfig } from "@/lib/ollama/storage";
+import type { OllamaConfig, OllamaStatus } from "@/lib/ollama/types";
+import { DEFAULT_OLLAMA_CONFIG } from "@/lib/ollama/types";
 import { NostrAccountLink } from "@/components/ui/NostrAccountLink";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 
@@ -73,6 +76,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
     available: false, loaded: false, loading: false, progress: 0,
   });
 
+  // Ollama state
+  const [ollamaConfig, setOllamaConfigState] = useState<OllamaConfig>(() => getOllamaConfig());
+  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus>({
+    connected: false, loading: false, models: [],
+  });
+  const [ollamaModelInput, setOllamaModelInput] = useState("");
+
   // Subscribe to WebLLM status when enabled; auto-disable if WebGPU unusable
   useEffect(() => {
     if (!webllmOn) return;
@@ -114,6 +124,58 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
       addNotification("Browser AI enabled — model will download on first score", "success");
     }
   }, [webllmOn, addNotification]);
+
+  const handleOllamaToggle = useCallback(async () => {
+    const newEnabled = !ollamaConfig.enabled;
+    const updated = { ...ollamaConfig, enabled: newEnabled };
+    setOllamaConfig(updated);
+    setOllamaConfigState(updated);
+    if (newEnabled) {
+      addNotification("Local LLM enabled — testing connection...", "success");
+      try {
+        const { testOllamaConnection } = await import("@/lib/ollama/engine");
+        const result = await testOllamaConnection(updated.endpoint);
+        setOllamaStatus({ connected: result.ok, loading: false, models: result.models, error: result.error });
+        if (!result.ok) {
+          addNotification(`Cannot reach Ollama at ${updated.endpoint}`, "error");
+        }
+      } catch {
+        setOllamaStatus(prev => ({ ...prev, connected: false, error: "Connection test failed" }));
+      }
+    } else {
+      setOllamaStatus({ connected: false, loading: false, models: [] });
+      addNotification("Local LLM disabled", "success");
+    }
+  }, [ollamaConfig, addNotification]);
+
+  const handleOllamaEndpointChange = useCallback((endpoint: string) => {
+    const updated = { ...ollamaConfig, endpoint };
+    setOllamaConfig(updated);
+    setOllamaConfigState(updated);
+    setOllamaStatus(prev => ({ ...prev, connected: false, models: [] }));
+  }, [ollamaConfig]);
+
+  const handleOllamaModelChange = useCallback((model: string) => {
+    const updated = { ...ollamaConfig, model };
+    setOllamaConfig(updated);
+    setOllamaConfigState(updated);
+  }, [ollamaConfig]);
+
+  const handleOllamaTest = useCallback(async () => {
+    setOllamaStatus(prev => ({ ...prev, loading: true, error: undefined }));
+    try {
+      const { testOllamaConnection } = await import("@/lib/ollama/engine");
+      const result = await testOllamaConnection(ollamaConfig.endpoint);
+      setOllamaStatus({ connected: result.ok, loading: false, models: result.models, error: result.error });
+      if (result.ok) {
+        addNotification(`Connected — ${result.models.length} model(s) available`, "success");
+      } else {
+        addNotification(`Connection failed: ${result.error || "Unknown error"}`, "error");
+      }
+    } catch (err) {
+      setOllamaStatus(prev => ({ ...prev, loading: false, connected: false, error: String(err) }));
+    }
+  }, [ollamaConfig.endpoint, addNotification]);
 
   // Load saved frequency on mount
   useEffect(() => {
@@ -339,6 +401,143 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
 
         <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
           Enter your Anthropic API key to use Pro mode with your own quota. Key is stored in localStorage only.
+        </div>
+      </div>
+
+      {/* Local LLM (Ollama) */}
+      <div style={cardStyle(mobile)}>
+        <div style={sectionTitle}>Local LLM (Ollama)</div>
+        <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[3] }}>
+          <button
+            onClick={handleOllamaToggle}
+            style={{
+              position: "relative",
+              width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
+              background: ollamaConfig.enabled ? colors.cyan[500] : colors.bg.overlay,
+              transition: transitions.fast, flexShrink: 0,
+            }}
+          >
+            <div style={{
+              position: "absolute", top: 2, left: ollamaConfig.enabled ? 20 : 2,
+              width: 18, height: 18, borderRadius: "50%",
+              background: ollamaConfig.enabled ? "#fff" : colors.text.disabled,
+              transition: transitions.fast,
+            }} />
+          </button>
+          <span style={{ fontSize: t.caption.size, fontWeight: 600, color: ollamaConfig.enabled ? colors.cyan[400] : colors.text.disabled }}>
+            {ollamaConfig.enabled ? "Enabled" : "Disabled"}
+          </span>
+          {ollamaConfig.enabled && (
+            <div style={{
+              width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+              background: ollamaStatus.connected ? colors.green[400]
+                : ollamaStatus.loading ? colors.amber[400]
+                : ollamaStatus.error ? colors.red[400]
+                : colors.text.disabled,
+            }} />
+          )}
+        </div>
+
+        {ollamaConfig.enabled && (
+          <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
+            {/* Endpoint */}
+            <div>
+              <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginBottom: space[1] }}>Endpoint</div>
+              <div style={{ display: "flex", gap: space[2] }}>
+                <input
+                  type="text"
+                  value={ollamaConfig.endpoint}
+                  onChange={e => handleOllamaEndpointChange(e.target.value)}
+                  placeholder={DEFAULT_OLLAMA_CONFIG.endpoint}
+                  style={{
+                    flex: 1, minWidth: 180, padding: `${space[1]}px ${space[3]}px`,
+                    background: colors.bg.overlay, border: `1px solid ${colors.border.subtle}`,
+                    borderRadius: radii.sm, color: colors.text.primary, fontSize: t.caption.size,
+                    fontFamily: fonts.mono, outline: "none",
+                  }}
+                />
+                <button
+                  onClick={handleOllamaTest}
+                  disabled={ollamaStatus.loading}
+                  style={{
+                    ...actionBtnStyle,
+                    opacity: ollamaStatus.loading ? 0.5 : 1,
+                    cursor: ollamaStatus.loading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {ollamaStatus.loading ? "Testing..." : "Test"}
+                </button>
+              </div>
+            </div>
+
+            {/* Model */}
+            <div>
+              <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginBottom: space[1] }}>Model</div>
+              {ollamaStatus.models.length > 0 ? (
+                <select
+                  value={ollamaConfig.model}
+                  onChange={e => handleOllamaModelChange(e.target.value)}
+                  style={{
+                    width: "100%", padding: `${space[1]}px ${space[3]}px`,
+                    background: colors.bg.overlay, border: `1px solid ${colors.border.subtle}`,
+                    borderRadius: radii.sm, color: colors.text.primary, fontSize: t.caption.size,
+                    fontFamily: fonts.mono, outline: "none",
+                  }}
+                >
+                  {ollamaStatus.models.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ display: "flex", gap: space[2] }}>
+                  <input
+                    type="text"
+                    value={ollamaModelInput || ollamaConfig.model}
+                    onChange={e => {
+                      setOllamaModelInput(e.target.value);
+                      handleOllamaModelChange(e.target.value);
+                    }}
+                    placeholder={DEFAULT_OLLAMA_CONFIG.model}
+                    style={{
+                      flex: 1, minWidth: 120, padding: `${space[1]}px ${space[3]}px`,
+                      background: colors.bg.overlay, border: `1px solid ${colors.border.subtle}`,
+                      borderRadius: radii.sm, color: colors.text.primary, fontSize: t.caption.size,
+                      fontFamily: fonts.mono, outline: "none",
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Status */}
+            {ollamaStatus.connected && (
+              <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: colors.green[400], flexShrink: 0 }} />
+                <span style={{ fontSize: t.caption.size, color: colors.green[400] }}>
+                  Connected — using {ollamaConfig.model}
+                </span>
+              </div>
+            )}
+
+            {/* CORS hint on error */}
+            {ollamaStatus.error && (
+              <div style={{
+                fontSize: t.tiny.size, color: colors.amber[400], lineHeight: t.tiny.lineHeight,
+                background: `${colors.amber[400]}0D`, padding: space[2], borderRadius: radii.sm,
+                border: `1px solid ${colors.amber[400]}1A`,
+              }}>
+                {ollamaStatus.error.includes("fetch") || ollamaStatus.error.includes("Failed") ? (
+                  <>Cannot reach server. If Ollama is running, set <code style={{ fontFamily: fonts.mono }}>OLLAMA_ORIGINS=*</code> or restart with <code style={{ fontFamily: fonts.mono }}>OLLAMA_ORIGINS=https://aegis.dwebxr.xyz</code></>
+                ) : (
+                  ollamaStatus.error
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
+          Connect to Ollama or any OpenAI-compatible local LLM server. Tried first when enabled — zero cost, fully private.
         </div>
       </div>
 

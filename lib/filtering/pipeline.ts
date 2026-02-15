@@ -45,11 +45,20 @@ export function runFilterPipeline(
     items.push({ item, wotScore, weightedComposite, isWoTSerendipity: serendipity });
   }
 
-  // Count AI-scored items: use explicit scoredByAI field, fall back to reason prefix for legacy items
-  stats.aiScoredCount = content.filter(c =>
-    c.scoredByAI === true || (c.scoredByAI == null && !c.reason?.startsWith("Heuristic")),
-  ).length;
-  stats.estimatedAPICost = stats.aiScoredCount * ESTIMATED_AI_COST_PER_CALL;
+  // Single pass: count AI-scored items and paid (Claude) tiers for cost estimation
+  let aiScoredCount = 0;
+  let paidCount = 0;
+  for (const c of content) {
+    const legacyAI = c.scoredByAI === true || (c.scoredByAI == null && !c.reason?.startsWith("Heuristic"));
+    if (legacyAI) aiScoredCount++;
+    if (c.scoringEngine) {
+      if (c.scoringEngine === "claude-byok" || c.scoringEngine === "claude-ic" || c.scoringEngine === "claude-server") paidCount++;
+    } else if (legacyAI) {
+      paidCount++;
+    }
+  }
+  stats.aiScoredCount = aiScoredCount;
+  stats.estimatedAPICost = paidCount * ESTIMATED_AI_COST_PER_CALL;
 
   items.sort((a, b) => b.weightedComposite - a.weightedComposite);
 
@@ -85,5 +94,6 @@ export function scoreItemWithHeuristics(
     flagged: false,
     timestamp: "just now",
     scoredByAI: false,
+    scoringEngine: "heuristic",
   };
 }

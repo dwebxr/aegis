@@ -40,7 +40,12 @@ export function buildManifest(items: ContentItem[]): ContentManifest {
 
 export function decodeManifest(raw: string): ContentManifest | null {
   if (!raw) return null;
-  const parsed = JSON.parse(raw);
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
   if (
     !parsed ||
     typeof parsed !== "object" ||

@@ -39,17 +39,19 @@ jobs:
 
       - run: npm ci
 
-      # Audit for critical/high vulnerabilities (non-blocking for known Next.js 14 CVE)
-      - run: npm audit --audit-level=critical || true
-        name: Security audit (critical)
+      - run: npm audit --audit-level=critical
+        name: Security audit (critical — blocks deployment)
 
+      # Known HIGH: Next.js 14 GHSA-9g9p-9gw9-jx7f + GHSA-h25m-26qc-wcjf
+      # Not exploitable: no remotePatterns configured, no "use server" directives.
+      # Will resolve when migrating to Next.js 15+.
       - run: npm audit --audit-level=high
-        name: Security audit (high)
+        name: Security audit (high — advisory)
         continue-on-error: true
 
   build:
     runs-on: ubuntu-latest
-    needs: lint-and-test
+    needs: [lint-and-test, security-audit]
     steps:
       - uses: actions/checkout@v4
 

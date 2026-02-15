@@ -35,6 +35,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
   // Single pass over content for all aggregated stats
   let qualCount = 0, slopCount = 0, validatedCount = 0, flaggedCount = 0, falsePositives = 0;
   const sourceDistribution: Record<string, number> = {};
+  const engineDistribution: Record<string, number> = {};
   const scoreBuckets = Array(10).fill(0);
   for (const c of content) {
     if (c.verdict === "quality") qualCount++;
@@ -43,6 +44,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
     if (c.flagged) flaggedCount++;
     if (c.verdict === "quality" && c.flagged) falsePositives++;
     sourceDistribution[c.source] = (sourceDistribution[c.source] || 0) + 1;
+    const eng = c.scoringEngine || (c.scoredByAI ? "claude" : "heuristic");
+    engineDistribution[eng] = (engineDistribution[eng] || 0) + 1;
     scoreBuckets[Math.max(0, Math.min(9, Math.floor(c.scores.composite)))]++;
   }
 
@@ -93,6 +96,15 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
           <BarChart data={Object.values(sourceDistribution)} labels={Object.keys(sourceDistribution)} color={colors.purple[400]} />
         </div>
       </div>
+
+      {Object.keys(engineDistribution).length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: mobile ? space[3] : space[4], marginBottom: mobile ? space[12] : space[16] }}>
+          <div style={surfaceCard(mobile)}>
+            <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[4] }}>Scoring Engines</div>
+            <BarChart data={Object.values(engineDistribution)} labels={Object.keys(engineDistribution)} color={colors.cyan[400]} />
+          </div>
+        </div>
+      )}
 
       <div style={surfaceCard(mobile)}>
         <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[4] }}>Evaluation Summary</div>

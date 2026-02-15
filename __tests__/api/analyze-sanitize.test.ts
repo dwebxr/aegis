@@ -120,6 +120,50 @@ describe("POST /api/analyze — userContext sanitization", () => {
     // Should succeed — the injection attempt is just treated as a (long) string
     expect(res.status).toBe(200);
   });
+
+  it("trims whitespace-only topics (rejects them after trim)", async () => {
+    const res = await POST(makeRequest({
+      text: "Content for analysis testing whitespace topic trimming behavior.",
+      userContext: {
+        recentTopics: ["   ", "\t", "  valid-topic  ", ""],
+        highAffinityTopics: [],
+        lowAffinityTopics: [],
+        trustedAuthors: [],
+      },
+    }));
+    expect(res.status).toBe(200);
+    // "   " and "\t" and "" are trimmed to "" → filtered out
+    // "  valid-topic  " → trimmed to "valid-topic" → kept
+  });
+
+  it("accepts topic at exactly 79 chars (boundary: < 80)", async () => {
+    const topic79 = "a".repeat(79);
+    const res = await POST(makeRequest({
+      text: "Content for analysis testing boundary of topic length at seventy nine chars.",
+      userContext: {
+        recentTopics: [topic79],
+        highAffinityTopics: [],
+        lowAffinityTopics: [],
+        trustedAuthors: [],
+      },
+    }));
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects topic at exactly 80 chars (boundary: not < 80)", async () => {
+    const topic80 = "a".repeat(80);
+    const res = await POST(makeRequest({
+      text: "Content for analysis testing boundary of topic length at exactly eighty chars.",
+      userContext: {
+        recentTopics: [topic80, "valid"],
+        highAffinityTopics: [],
+        lowAffinityTopics: [],
+        trustedAuthors: [],
+      },
+    }));
+    // topic80 filtered out (length not < 80), "valid" kept
+    expect(res.status).toBe(200);
+  });
 });
 
 describe("POST /api/analyze — text validation edge cases", () => {

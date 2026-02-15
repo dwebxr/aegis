@@ -314,8 +314,8 @@ describe("scoreWithWebLLM — parseScoreResponse integration", () => {
     expect(result.originality).toBe(5);
     expect(result.insight).toBe(5);
     expect(result.credibility).toBe(5);
-    // composite fallback: originality*0.4 + insight*0.35 + credibility*0.25 = 5*0.4 + 5*0.35 + 5*0.25 = 5
-    expect(result.composite).toBe(5);
+    // composite fallback: (vSignal * cContext) / (lSlop + 0.5) = (5*5)/(5+0.5) ≈ 4.545
+    expect(result.composite).toBeCloseTo(4.545, 2);
     expect(result.verdict).toBe("slop");
     expect(result.topics).toEqual([]);
   });
@@ -367,7 +367,8 @@ describe("scoreWithWebLLM — parseScoreResponse integration", () => {
     mockCreateMLCEngine.mockResolvedValue(mockEngine);
     const { scoreWithWebLLM } = require("@/lib/webllm/engine");
     const result = await scoreWithWebLLM("Test content", []);
-    expect(result.topics).toEqual(["a", "b", "c", "d", "e"]);
+    // Shared parser limits to 10 topics (not 5)
+    expect(result.topics).toEqual(["a", "b", "c", "d", "e", "f"]);
   });
 
   it("provides default reason when reason is not a string", async () => {
@@ -375,7 +376,8 @@ describe("scoreWithWebLLM — parseScoreResponse integration", () => {
     mockCreateMLCEngine.mockResolvedValue(mockEngine);
     const { scoreWithWebLLM } = require("@/lib/webllm/engine");
     const result = await scoreWithWebLLM("Test content", []);
-    expect(result.reason).toBe("Scored by WebLLM (local)");
+    // Shared parser uses empty string for non-string reason
+    expect(result.reason).toBe("");
   });
 
   it("truncates content to 3000 chars in prompt", async () => {
