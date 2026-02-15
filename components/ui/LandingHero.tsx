@@ -122,52 +122,12 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
       ))}
     </div>
 
-    {/* Feature cards */}
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
-      gap: mobile ? space[3] : space[4],
-      marginTop: mobile ? space[8] : space[10],
-      maxWidth: 640,
-      width: "100%",
-    }}>
-      {FEATURES.map(f => (
-        <div key={f.title} style={{
-          background: f.gradient,
-          border: `1px solid ${f.border}`,
-          borderRadius: radii.lg,
-          padding: mobile ? `${space[4]}px` : `${space[5]}px ${space[5]}px`,
-          textAlign: "left",
-          transition: transitions.normal,
-        }}>
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: space[2],
-            marginBottom: space[2],
-            color: f.color,
-          }}>
-            {f.icon}
-            <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: f.color }}>{f.title}</span>
-          </div>
-          <p style={{
-            fontSize: t.bodySm.size,
-            color: colors.text.muted,
-            lineHeight: 1.5,
-            margin: 0,
-          }}>
-            {f.desc}
-          </p>
-        </div>
-      ))}
-    </div>
-
-    {/* CTAs */}
+    {/* CTAs — directly after manifesto */}
     <div style={{
       display: "flex",
       flexDirection: mobile ? "column" : "row",
       gap: space[3],
-      marginTop: mobile ? space[8] : space[10],
+      marginTop: mobile ? space[6] : space[8],
       width: mobile ? "100%" : "auto",
     }}>
       <button
@@ -207,6 +167,46 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
       >
         Login with Internet Identity
       </button>
+    </div>
+
+    {/* Feature cards */}
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
+      gap: mobile ? space[3] : space[4],
+      marginTop: mobile ? space[8] : space[10],
+      maxWidth: 640,
+      width: "100%",
+    }}>
+      {FEATURES.map(f => (
+        <div key={f.title} style={{
+          background: f.gradient,
+          border: `1px solid ${f.border}`,
+          borderRadius: radii.lg,
+          padding: mobile ? `${space[4]}px` : `${space[5]}px ${space[5]}px`,
+          textAlign: "left",
+          transition: transitions.normal,
+        }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: space[2],
+            marginBottom: space[2],
+            color: f.color,
+          }}>
+            {f.icon}
+            <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: f.color }}>{f.title}</span>
+          </div>
+          <p style={{
+            fontSize: t.bodySm.size,
+            color: colors.text.muted,
+            lineHeight: 1.5,
+            margin: 0,
+          }}>
+            {f.desc}
+          </p>
+        </div>
+      ))}
     </div>
 
     {/* Footer note */}
