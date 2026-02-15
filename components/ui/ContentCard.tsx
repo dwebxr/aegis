@@ -70,20 +70,6 @@ function TopicTags({ topics }: { topics: string[] }) {
   );
 }
 
-function RestoreButton({ item, onValidate }: { item: ContentItem; onValidate: (id: string) => void }) {
-  return (
-    <button onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
-      width: "100%", padding: `${space[2]}px ${space[3]}px`, background: colors.green.bg,
-      border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
-      color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
-      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-      transition: transitions.fast, fontFamily: "inherit",
-    }}>
-      <CheckIcon /> Not Slop
-    </button>
-  );
-}
-
 function deriveScoreTags(item: ContentItem): Array<{ label: string; color: string }> {
   const tags: Array<{ label: string; color: string }> = [];
   const hasVCL = item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
@@ -119,31 +105,6 @@ function ScoreTags({ item }: { item: ContentItem }) {
           {tag.label}
         </span>
       ))}
-    </div>
-  );
-}
-
-function ActionButtons({ item, onValidate, onFlag }: { item: ContentItem; onValidate: (id: string) => void; onFlag: (id: string) => void }) {
-  return (
-    <div style={{ display: "flex", gap: space[2] }}>
-      <button onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
-        flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.green.bg,
-        border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
-        color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-        transition: transitions.fast, fontFamily: "inherit",
-      }}>
-        <CheckIcon /> Validate
-      </button>
-      <button onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
-        flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.red.bg,
-        border: `1px solid ${colors.red.border}`, borderRadius: radii.md,
-        color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-        transition: transitions.fast, fontFamily: "inherit",
-      }}>
-        <XCloseIcon /> Flag Slop
-      </button>
     </div>
   );
 }
@@ -275,26 +236,14 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
           }}>
             {item.text}
           </p>
-          {item.sourceUrl && !item.sourceUrl.startsWith("nostr:") && (
-            <a
-              href={item.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                display: "inline-block",
-                marginTop: space[1],
-                fontSize: t.bodySm.size,
-                color: colors.blue[400],
-                textDecoration: "none",
-                fontWeight: 600,
-                transition: transitions.fast,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
-            >
-              Read more &rarr;
-            </a>
+          {item.reason && (
+            <div style={{
+              fontSize: t.bodySm.size, color: colors.text.tertiary, lineHeight: 1.5, fontStyle: "italic",
+              background: colors.bg.raised, padding: `${space[2]}px ${space[3]}px`, borderRadius: radii.md,
+              marginTop: space[2],
+            }}>
+              {item.reason}
+            </div>
           )}
           {variant === "serendipity" && (
             <div style={{ marginTop: space[2], fontSize: t.caption.size, color: colors.purple[400], fontStyle: "italic" }}>
@@ -336,16 +285,60 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
           borderTop: `1px solid ${variant === "serendipity" ? "rgba(124,58,237,0.15)" : colors.border.default}`,
         }}>
           <ScoreGrid item={item} />
-          {item.reason && (
-            <div style={{
-              fontSize: t.bodySm.size, color: colors.text.tertiary, lineHeight: 1.5, fontStyle: "italic",
-              background: colors.bg.raised, padding: `${space[3]}px ${space[4]}px`, borderRadius: radii.md, marginBottom: space[3],
-            }}>
-              {item.reason}
-            </div>
-          )}
-          {isSlop && !isLarge && <RestoreButton item={item} onValidate={onValidate} />}
-          {(!isSlop || isLarge) && <ActionButtons item={item} onValidate={onValidate} onFlag={onFlag} />}
+          <div style={{ display: "flex", gap: space[2] }}>
+            {item.sourceUrl && !item.sourceUrl.startsWith("nostr:") && (
+              <a
+                href={item.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  padding: `${space[2]}px ${space[3]}px`,
+                  background: `${colors.blue[400]}10`,
+                  border: `1px solid ${colors.blue[400]}30`,
+                  borderRadius: radii.md,
+                  color: colors.blue[400], fontSize: t.bodySm.size, fontWeight: 600,
+                  textDecoration: "none", whiteSpace: "nowrap",
+                  transition: transitions.fast, fontFamily: "inherit",
+                }}
+              >
+                Read more &rarr;
+              </a>
+            )}
+            {isSlop && !isLarge ? (
+              <button onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
+                flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.green.bg,
+                border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
+                color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                transition: transitions.fast, fontFamily: "inherit",
+              }}>
+                <CheckIcon /> Not Slop
+              </button>
+            ) : (
+              <>
+                <button onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
+                  flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.green.bg,
+                  border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
+                  color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  transition: transitions.fast, fontFamily: "inherit",
+                }}>
+                  <CheckIcon /> Validate
+                </button>
+                <button onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
+                  flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.red.bg,
+                  border: `1px solid ${colors.red.border}`, borderRadius: radii.md,
+                  color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  transition: transitions.fast, fontFamily: "inherit",
+                }}>
+                  <XCloseIcon /> Flag Slop
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
