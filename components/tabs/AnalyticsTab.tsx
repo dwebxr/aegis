@@ -12,6 +12,8 @@ import type { AgentState } from "@/lib/agent/types";
 import { useDemo } from "@/contexts/DemoContext";
 import { CostInsights } from "@/components/filtering/CostInsights";
 import type { FilterPipelineStats } from "@/lib/filtering/types";
+import { ENGINE_LABELS } from "@/lib/scoring/types";
+import type { ScoringEngine } from "@/lib/scoring/types";
 
 interface AnalyticsTabProps {
   content: ContentItem[];
@@ -44,7 +46,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
     if (c.flagged) flaggedCount++;
     if (c.verdict === "quality" && c.flagged) falsePositives++;
     sourceDistribution[c.source] = (sourceDistribution[c.source] || 0) + 1;
-    const eng = c.scoringEngine || (c.scoredByAI ? "claude" : "heuristic");
+    const eng = c.scoringEngine || (c.scoredByAI ? "ai" : "heuristic");
     engineDistribution[eng] = (engineDistribution[eng] || 0) + 1;
     scoreBuckets[Math.max(0, Math.min(9, Math.floor(c.scores.composite)))]++;
   }
@@ -101,7 +103,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: mobile ? space[3] : space[4], marginBottom: mobile ? space[12] : space[16] }}>
           <div style={surfaceCard(mobile)}>
             <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[4] }}>Scoring Engines</div>
-            <BarChart data={Object.values(engineDistribution)} labels={Object.keys(engineDistribution)} color={colors.cyan[400]} />
+            <BarChart data={Object.values(engineDistribution)} labels={Object.keys(engineDistribution).map(k => ENGINE_LABELS[k as ScoringEngine] || k)} color={colors.cyan[400]} />
           </div>
         </div>
       )}

@@ -15,6 +15,7 @@ import { recordUseful, recordSlop } from "@/lib/d2a/reputation";
 import { recordPublishValidation, recordPublishFlag } from "@/lib/reputation/publishGate";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
+import { encodeEngineInReason, decodeEngineFromReason } from "@/lib/scoring/types";
 
 const CONTENT_CACHE_KEY = "aegis-content-cache";
 const MAX_CACHED_ITEMS = 200;
@@ -130,7 +131,7 @@ function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal").Prin
       compositeScore: c.scores.composite,
     },
     verdict: c.verdict === "quality" ? { quality: null } : { slop: null },
-    reason: c.reason,
+    reason: c.scoringEngine ? encodeEngineInReason(c.scoringEngine, c.reason) : c.reason,
     createdAt: BigInt(c.createdAt * 1_000_000),
     validated: c.validated,
     flagged: c.flagged,
@@ -391,29 +392,32 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         offset += PAGE_SIZE;
       }
 
-      const loaded: ContentItem[] = allEvals.map(e => ({
-        id: e.id,
-        owner: e.owner.toText(),
-        author: e.author,
-        avatar: e.avatar,
-        text: e.text,
-        source: mapSourceBack(e.source) as ContentItem["source"],
-        sourceUrl: e.sourceUrl.length > 0 ? e.sourceUrl[0] : undefined,
-        scores: {
-          originality: e.scores.originality,
-          insight: e.scores.insight,
-          credibility: e.scores.credibility,
-          composite: e.scores.compositeScore,
-        },
-        verdict: ("quality" in e.verdict ? "quality" : "slop") as ContentItem["verdict"],
-        reason: e.reason,
-        createdAt: Number(e.createdAt) / 1_000_000,
-        validated: e.validated,
-        flagged: e.flagged,
-        timestamp: relativeTime(Number(e.createdAt) / 1_000_000),
-        // IC canister doesn't store scoredByAI — infer from reason prefix
-        scoredByAI: !e.reason.startsWith("Heuristic"),
-      }));
+      const loaded: ContentItem[] = allEvals.map(e => {
+        const { engine, cleanReason } = decodeEngineFromReason(e.reason);
+        return {
+          id: e.id,
+          owner: e.owner.toText(),
+          author: e.author,
+          avatar: e.avatar,
+          text: e.text,
+          source: mapSourceBack(e.source) as ContentItem["source"],
+          sourceUrl: e.sourceUrl.length > 0 ? e.sourceUrl[0] : undefined,
+          scores: {
+            originality: e.scores.originality,
+            insight: e.scores.insight,
+            credibility: e.scores.credibility,
+            composite: e.scores.compositeScore,
+          },
+          verdict: ("quality" in e.verdict ? "quality" : "slop") as ContentItem["verdict"],
+          reason: cleanReason,
+          createdAt: Number(e.createdAt) / 1_000_000,
+          validated: e.validated,
+          flagged: e.flagged,
+          timestamp: relativeTime(Number(e.createdAt) / 1_000_000),
+          scoredByAI: engine ? engine !== "heuristic" : !e.reason.startsWith("Heuristic"),
+          scoringEngine: engine,
+        };
+      });
 
       if (loaded.length > 0) {
         setContent(prev => {
