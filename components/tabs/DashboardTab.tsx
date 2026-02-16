@@ -819,7 +819,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             )}
           </div>
 
-          {/* Saved for Later */}
+          {/* Validated */}
           <div style={{
             background: "transparent",
             border: `1px solid ${colors.border.subtle}`,
@@ -831,7 +831,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               color: colors.text.tertiary, marginBottom: space[3],
               display: "flex", alignItems: "center", gap: space[2],
             }}>
-              <span>&#x2713;</span> Saved for Later
+              <span>&#x2713;</span> Validated
             </div>
             {dashboardValidated.length === 0 ? (
               <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
@@ -843,23 +843,33 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   const gr = scoreGrade(item.scores.composite);
                   const tag = deriveScoreTags(item)[0] ?? null;
                   const isExp = expanded === item.id;
+                  const showThumb = item.imageUrl && !failedImages.has(item.id);
                   return (
                     <div key={item.id} style={{
                       background: colors.bg.surface,
                       border: `1px solid ${isExp ? colors.border.emphasis : colors.border.default}`,
-                      borderRadius: radii.md, padding: `${space[3]}px ${space[4]}px`,
+                      borderRadius: radii.md,
                       overflow: "hidden", transition: transitions.fast,
                     }}>
-                      <div style={{ display: "flex", gap: space[3], alignItems: "flex-start" }}>
+                      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+                        {/* Compact thumbnail — 80px wide, aspect 16:9 */}
                         <div style={{
-                          width: 36, height: 36, borderRadius: radii.sm, flexShrink: 0,
-                          background: gr.bg, border: `2px solid ${gr.color}40`,
+                          width: 80, minHeight: 60, flexShrink: 0,
+                          overflow: "hidden",
+                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          boxShadow: `0 0 10px ${gr.color}20`,
+                          flexDirection: "column", gap: 2,
                         }}>
-                          <span style={{ fontSize: 16, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
+                          {showThumb ? (
+                            /* eslint-disable-next-line @next/next/no-img-element -- validated card thumbnail */
+                            <img src={item.imageUrl!} alt=""
+                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              onError={() => markImgFailed(item.id)} />
+                          ) : (
+                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
+                          )}
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
                           <div style={{
                             fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
                             overflow: "hidden", display: "-webkit-box",
@@ -873,9 +883,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             marginBottom: space[2],
                           }}>
-                            {item.author} &middot; {item.source} &middot; {item.timestamp}
+                            {item.author} &middot; {item.source}
                             {item.validatedAt && (
-                              <> &middot; saved {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</>
+                              <> &middot; {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</>
                             )}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
