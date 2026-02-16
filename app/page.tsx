@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { AppShell } from "@/components/layout/AppShell";
 import { DashboardTab } from "@/components/tabs/DashboardTab";
@@ -50,7 +51,18 @@ const PUSH_THROTTLE: Record<string, number> = {
   "3x_day": 8 * MS_PER_HOUR,
 };
 
-export default function AegisApp() {
+function extractUrl(text: string | null): string | null {
+  if (!text) return null;
+  const trimmed = text.trim();
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol === "http:" || u.protocol === "https:") return trimmed;
+  } catch { /* not a bare URL */ }
+  const match = trimmed.match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/i);
+  return match ? match[0] : null;
+}
+
+function AegisAppInner() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
   const { content, isAnalyzing, syncStatus, analyze, validateItem, flagItem, addContent, clearDemoContent, loadFromIC } = useContent();
@@ -73,6 +85,21 @@ export default function AegisApp() {
     if (typeof window === "undefined") return false;
     try { return sessionStorage.getItem("aegis-wot-prompt-dismissed") === "true"; } catch { return false; }
   });
+
+  // Web Share Target
+  const searchParams = useSearchParams();
+  const sharedUrl = useMemo(() => {
+    return extractUrl(searchParams.get("share_url"))
+        || extractUrl(searchParams.get("share_text"))
+        || extractUrl(searchParams.get("share_title"))
+        || null;
+  }, [searchParams]);
+  const shareConsumedRef = useRef(false);
+  const [shareState, setShareState] = useState<{
+    url: string;
+    status: "fetching" | "analyzing" | "done" | "error";
+    error?: string;
+  } | null>(null);
 
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
@@ -363,6 +390,41 @@ export default function AegisApp() {
     }
   };
 
+  // Web Share Target: auto-process shared URL
+  useEffect(() => {
+    if (!sharedUrl || shareConsumedRef.current) return;
+    shareConsumedRef.current = true;
+    if (isDemoMode && !bannerDismissed) dismissBanner();
+    setTab("incinerator");
+    window.history.replaceState({}, "", "/");
+    setShareState({ url: sharedUrl, status: "fetching" });
+    (async () => {
+      try {
+        const res = await fetch("/api/fetch/url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: sharedUrl }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setShareState(s => s ? { ...s, status: "error", error: data.error } : null);
+          addNotification("Share: " + (data.error || "Could not fetch URL"), "error");
+          return;
+        }
+        setShareState(s => s ? { ...s, status: "analyzing" } : null);
+        await handleAnalyze(data.content || data.description || "", {
+          sourceUrl: sharedUrl,
+          imageUrl: data.imageUrl,
+        });
+        setShareState(s => s ? { ...s, status: "done" } : null);
+      } catch {
+        setShareState(s => s ? { ...s, status: "error", error: "Analysis failed" } : null);
+        addNotification("Shared URL analysis failed", "error");
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedUrl]);
+
   const handlePublishSignal = useCallback(async (
     text: string,
     scores: AnalyzeResponse,
@@ -544,11 +606,20 @@ export default function AegisApp() {
           stakingEnabled={isAuthenticated && (publishGate?.requiresDeposit ?? false)}
           publishGate={publishGate}
           mobile={mobile}
+          shareState={shareState}
         />
       )}
       {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />}
       {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} pipelineStats={pipelineResult?.stats ?? null} />}
       {tab === "settings" && <SettingsTab mobile={mobile} onLinkChange={handleLinkAccount} />}
     </AppShell>
+  );
+}
+
+export default function AegisApp() {
+  return (
+    <Suspense fallback={null}>
+      <AegisAppInner />
+    </Suspense>
   );
 }
