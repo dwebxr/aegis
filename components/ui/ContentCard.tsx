@@ -70,7 +70,7 @@ function TopicTags({ topics }: { topics: string[] }) {
   );
 }
 
-function deriveScoreTags(item: ContentItem): Array<{ label: string; color: string }> {
+export function deriveScoreTags(item: ContentItem): Array<{ label: string; color: string }> {
   const tags: Array<{ label: string; color: string }> = [];
   const hasVCL = item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
 

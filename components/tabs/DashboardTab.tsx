@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { MiniChart } from "@/components/ui/MiniChart";
-import { ContentCard } from "@/components/ui/ContentCard";
+import { ContentCard, deriveScoreTags } from "@/components/ui/ContentCard";
 import { fonts, colors, space, type as t, radii, transitions, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { contentToCSV } from "@/lib/utils/csv";
@@ -523,14 +523,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           gap: space[4],
           marginTop: space[3],
         }}>
-          {/* Today's Top 3 */}
-          <div style={{
-            gridColumn: mobile ? undefined : "1 / -1",
-            background: colors.bg.surface,
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: radii.lg,
-            padding: mobile ? `${space[4]}px` : `${space[4]}px ${space[5]}px`,
-          }}>
+          {/* Today's Top 3 — Hero Cards */}
+          <div style={{ gridColumn: mobile ? undefined : "1 / -1" }}>
             <div style={{
               fontSize: t.h3.size, fontWeight: t.h3.weight,
               color: colors.text.tertiary, marginBottom: space[3],
@@ -539,38 +533,174 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               <span>&#x2B50;</span> Today&#39;s Top 3
             </div>
             {dashboardTop3.length === 0 ? (
-              <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
+              <div style={{
+                fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center",
+                padding: space[4], background: colors.bg.surface,
+                border: `1px solid ${colors.border.default}`, borderRadius: radii.lg,
+              }}>
                 No quality items scored yet &#x2014; check back after your next ingestion cycle.
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
-                {dashboardTop3.map((bi, i) => (
-                  <div key={bi.item.id} style={{ animation: `slideUp .3s ease ${i * 0.06}s both` }}>
-                    <ContentCard
-                      item={bi.item}
-                      expanded={expanded === bi.item.id}
-                      onToggle={() => setExpanded(expanded === bi.item.id ? null : bi.item.id)}
-                      onValidate={handleValidateWithFeedback}
-                      onFlag={handleFlagWithFeedback}
-                      mobile={mobile}
-                      variant="priority"
-                      rank={i + 1}
-                    />
-                  </div>
-                ))}
+              <div style={mobile
+                ? { display: "flex", overflowX: "auto", gap: space[3], scrollSnapType: "x mandatory" as const, paddingBottom: space[2] }
+                : { display: "grid", gridTemplateColumns: `repeat(${Math.min(dashboardTop3.length, 3)}, 1fr)`, gap: space[3] }
+              }>
+                {dashboardTop3.map((bi, i) => {
+                  const item = bi.item;
+                  const gr = scoreGrade(item.scores.composite);
+                  const tags = deriveScoreTags(item);
+                  const isExpanded = expanded === item.id;
+                  return (
+                    <div key={item.id} style={{
+                      ...(mobile ? { minWidth: 280, flex: "0 0 85%", scrollSnapAlign: "start" as const } : {}),
+                      animation: `slideUp .3s ease ${i * 0.08}s both`,
+                    }}>
+                      <div
+                        onClick={() => setExpanded(isExpanded ? null : item.id)}
+                        style={{
+                          position: "relative",
+                          background: colors.bg.surface,
+                          border: `1px solid ${colors.border.default}`,
+                          borderRadius: radii.lg,
+                          padding: `${space[4]}px`,
+                          cursor: "pointer",
+                          transition: transitions.normal,
+                        }}
+                      >
+                        {/* Rank badge — top left */}
+                        <div style={{
+                          position: "absolute", top: space[2], left: space[2],
+                          width: 28, height: 28, borderRadius: "50%",
+                          background: `linear-gradient(135deg, ${colors.blue[600]}, ${colors.purple[600]})`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: t.bodySm.size, fontWeight: 800, color: "#fff",
+                          zIndex: 1,
+                        }}>
+                          {i + 1}
+                        </div>
+
+                        {/* Score tag — top right */}
+                        {tags.length > 0 && (
+                          <div style={{
+                            position: "absolute", top: space[2], right: space[2],
+                            fontSize: 9, fontWeight: 700, textTransform: "uppercase" as const,
+                            letterSpacing: 1,
+                            padding: `2px ${space[2]}px`, borderRadius: radii.sm,
+                            background: `${tags[0].color}15`, color: tags[0].color,
+                            border: `1px solid ${tags[0].color}25`,
+                            zIndex: 1,
+                          }}>
+                            {tags[0].label}
+                          </div>
+                        )}
+
+                        {/* Image / Grade fallback */}
+                        <div style={{
+                          width: "100%", aspectRatio: "16/9",
+                          borderRadius: radii.md, overflow: "hidden",
+                          marginBottom: space[3], marginTop: space[1],
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          background: item.imageUrl ? "transparent" : gr.bg,
+                        }}>
+                          {item.imageUrl ? (
+                            /* eslint-disable-next-line @next/next/no-img-element -- hero card thumbnail */
+                            <img
+                              src={item.imageUrl}
+                              alt=""
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              onError={(e) => {
+                                const el = e.target as HTMLImageElement;
+                                el.style.display = "none";
+                                if (el.parentElement) {
+                                  el.parentElement.style.background = gr.bg;
+                                  const span = document.createElement("span");
+                                  span.textContent = gr.grade;
+                                  span.style.cssText = `font-size:48px;font-weight:800;color:${gr.color};font-family:${fonts.mono}`;
+                                  el.parentElement.appendChild(span);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span style={{ fontSize: 48, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>
+                              {gr.grade}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Title text */}
+                        <div style={{
+                          fontSize: t.body.size, fontWeight: 700,
+                          color: colors.text.secondary,
+                          overflow: "hidden",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical" as const,
+                          lineHeight: 1.4,
+                          marginBottom: space[1],
+                        }}>
+                          {item.text.slice(0, 120)}
+                        </div>
+
+                        {/* Reason summary */}
+                        {item.reason && (
+                          <div style={{
+                            fontSize: t.caption.size, color: colors.text.muted,
+                            overflow: "hidden", textOverflow: "ellipsis",
+                            whiteSpace: "nowrap", marginBottom: space[2],
+                          }}>
+                            {item.reason.slice(0, 80)}
+                          </div>
+                        )}
+
+                        {/* Topic pills */}
+                        {item.topics && item.topics.length > 0 && (
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: space[2] }}>
+                            {item.topics.slice(0, 3).map(tp => (
+                              <span key={tp} style={{
+                                fontSize: t.caption.size, padding: "2px 8px", borderRadius: radii.pill,
+                                background: `${colors.cyan[400]}12`, color: colors.cyan[400], fontWeight: 600,
+                              }}>{tp}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Meta: author · source · timestamp */}
+                        <div style={{
+                          fontSize: t.caption.size, color: colors.text.disabled,
+                        }}>
+                          {item.author} &middot; {item.source} &middot; {item.timestamp}
+                        </div>
+                      </div>
+
+                      {/* Expanded: full ContentCard inline */}
+                      {isExpanded && (
+                        <div style={{ marginTop: space[2] }}>
+                          <ContentCard
+                            item={item}
+                            expanded
+                            onToggle={() => setExpanded(null)}
+                            onValidate={handleValidateWithFeedback}
+                            onFlag={handleFlagWithFeedback}
+                            mobile={mobile}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
 
           {/* Topic Spotlight */}
           <div style={{
-            background: colors.bg.surface,
-            border: `1px solid ${colors.border.default}`,
+            background: "transparent",
+            border: `1px solid ${colors.border.subtle}`,
             borderRadius: radii.lg,
-            padding: mobile ? `${space[4]}px` : `${space[4]}px ${space[5]}px`,
+            padding: `${space[3]}px ${space[4]}px`,
           }}>
             <div style={{
-              fontSize: t.h3.size, fontWeight: t.h3.weight,
+              fontSize: t.bodySm.size, fontWeight: 600,
               color: colors.text.tertiary, marginBottom: space[3],
               display: "flex", alignItems: "center", gap: space[2],
             }}>
@@ -641,13 +771,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
           {/* Saved for Later */}
           <div style={{
-            background: colors.bg.surface,
-            border: `1px solid ${colors.border.default}`,
+            background: "transparent",
+            border: `1px solid ${colors.border.subtle}`,
             borderRadius: radii.lg,
-            padding: mobile ? `${space[4]}px` : `${space[4]}px ${space[5]}px`,
+            padding: `${space[3]}px ${space[4]}px`,
           }}>
             <div style={{
-              fontSize: t.h3.size, fontWeight: t.h3.weight,
+              fontSize: t.bodySm.size, fontWeight: 600,
               color: colors.text.tertiary, marginBottom: space[3],
               display: "flex", alignItems: "center", gap: space[2],
             }}>
@@ -690,13 +820,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           {/* Recent Activity */}
           <div style={{
             gridColumn: mobile ? undefined : "1 / -1",
-            background: colors.bg.surface,
-            border: `1px solid ${colors.border.default}`,
+            background: "transparent",
+            border: `1px solid ${colors.border.subtle}`,
             borderRadius: radii.lg,
-            padding: mobile ? `${space[4]}px` : `${space[4]}px ${space[5]}px`,
+            padding: `${space[3]}px ${space[4]}px`,
           }}>
             <div style={{
-              fontSize: t.h3.size, fontWeight: t.h3.weight,
+              fontSize: t.bodySm.size, fontWeight: 600,
               color: colors.text.tertiary, marginBottom: space[3],
               display: "flex", alignItems: "center", gap: space[2],
             }}>
