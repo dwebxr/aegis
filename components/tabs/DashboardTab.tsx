@@ -37,7 +37,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [showAllContent, setShowAllContent] = useState(false);
   const { profile } = usePreferences();
 
-  const { todayContent, todayQual, todaySlop, totalSlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {
+  const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {
     const now = Date.now();
     const dayMs = 86400000;
     const todayStart = now - dayMs;
@@ -45,7 +45,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     const todayContent = content.filter(c => c.createdAt >= todayStart);
     const todayQual = todayContent.filter(c => c.verdict === "quality");
     const todaySlop = todayContent.filter(c => c.verdict === "slop");
-    const totalSlop = content.filter(c => c.verdict === "slop").length;
     const uniqueSources = new Set(content.map(c => c.source));
     const availableSources = Array.from(uniqueSources).sort();
 
@@ -60,7 +59,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       dailyQuality.push(dayTotal > 0 ? Math.round((dayQual / dayTotal) * 100) : 0);
       dailySlop.push(dayItems.filter(c => c.verdict === "slop").length);
     }
-    return { todayContent, todayQual, todaySlop, totalSlop, uniqueSources, availableSources, dailyQuality, dailySlop };
+    return { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop };
   }, [content]);
 
   const filteredContent = useMemo(() => {
@@ -182,23 +181,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           </div>
         </div>
       </div>
-
-      {/* Slop defense counter */}
-      {totalSlop > 0 && (
-        <div style={{
-          marginBottom: space[3],
-          padding: `${space[2]}px ${space[4]}px`,
-          background: "rgba(251,146,60,0.04)",
-          border: `1px solid rgba(251,146,60,0.12)`,
-          borderRadius: radii.md,
-          fontSize: t.bodySm.size,
-          color: colors.text.muted,
-          textAlign: "center",
-        }}>
-          <span style={{ fontWeight: 700, color: colors.orange[400], fontFamily: fonts.mono }}>{totalSlop}</span>
-          {" "}slop items burned total &mdash; you never saw any of them.
-        </div>
-      )}
 
       {/* Content filters */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3], flexWrap: "wrap", gap: space[2] }}>
