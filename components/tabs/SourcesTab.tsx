@@ -1,21 +1,38 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { fonts, colors, space, type as t, radii, transitions, kpiLabelStyle } from "@/styles/theme";
-import { RSSIcon, GlobeIcon, LinkIcon } from "@/components/icons";
+import { RSSIcon, GlobeIcon, LinkIcon, GitHubIcon } from "@/components/icons";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { FetchURLResponse, FetchRSSResponse, FetchTwitterResponse, FetchNostrResponse } from "@/lib/types/api";
 
 import { useSources } from "@/contexts/SourceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemo } from "@/contexts/DemoContext";
+import { parseGitHubRepo, parseBlueskyHandle, buildTopicFeedUrl } from "@/lib/sources/platformFeed";
 import { loadSourceStates, type SourceRuntimeState, getSourceHealth, getSourceKey } from "@/lib/ingestion/sourceState";
 import { relativeTime } from "@/lib/utils/scores";
+
+function isTimeout(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "TimeoutError";
+}
 
 interface SourcesTabProps {
   onAnalyze: (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
   isAnalyzing: boolean;
   mobile?: boolean;
 }
+
+type QuickAddId = "youtube" | "topic" | "github" | "bluesky";
+
+const QUICK_ADD_PRESETS: ReadonlyArray<{
+  id: QuickAddId; icon: string; label: string; color: string;
+  formLabel: string; placeholder: string; hint: string;
+}> = [
+  { id: "youtube", icon: "\u25B6", label: "YouTube", color: colors.red[400], formLabel: "YouTube Channel URL", placeholder: "https://youtube.com/@channelname", hint: "Paste a channel URL \u2014 we\u2019ll find the RSS feed automatically" },
+  { id: "topic", icon: "\uD83D\uDCF0", label: "Topic", color: colors.amber[400], formLabel: "Search Keywords", placeholder: "AI safety, machine learning", hint: "Creates a Google News RSS feed for these keywords" },
+  { id: "github", icon: "", label: "GitHub", color: colors.text.secondary, formLabel: "GitHub Repository", placeholder: "owner/repo or https://github.com/owner/repo", hint: "Subscribes to release notifications for this repository" },
+  { id: "bluesky", icon: "\uD83E\uDD8B", label: "Bluesky", color: colors.sky[400], formLabel: "Bluesky Handle", placeholder: "@handle.bsky.social", hint: "Subscribes to this account\u2019s posts via RSS bridge" },
+];
 
 const HEALTH_COLORS: Record<string, string> = {
   healthy: colors.green[400],
@@ -56,7 +73,12 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const [nostrError, setNostrError] = useState("");
   const [analyzedUrls, setAnalyzedUrls] = useState<Set<string>>(new Set());
 
-  // Source runtime state polling
+  // Quick Add presets
+  const [quickAddMode, setQuickAddMode] = useState<"" | QuickAddId>("");
+  const [quickAddInput, setQuickAddInput] = useState("");
+  const [quickAddLoading, setQuickAddLoading] = useState(false);
+  const [quickAddError, setQuickAddError] = useState("");
+
   const [sourceStates, setSourceStates] = useState<Record<string, SourceRuntimeState>>({});
   useEffect(() => {
     const refresh = () => setSourceStates(loadSourceStates());
@@ -79,6 +101,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
+        signal: AbortSignal.timeout(15_000),
       });
       if (res.ok) {
         const data = await res.json();
@@ -89,8 +112,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         const data = await res.json().catch(() => ({}));
         setRssError(data.error || "Feed discovery failed");
       }
-    } catch {
-      setRssError("Network error — could not discover feeds");
+    } catch (err) {
+      setRssError(isTimeout(err) ? "Request timed out — try again" : "Network error — could not discover feeds");
     } finally {
       setDiscoverLoading(false);
     }
@@ -100,33 +123,33 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     if (!urlInput.trim()) return;
     setUrlLoading(true); setUrlError(""); setUrlResult(null);
     try {
-      const res = await fetch("/api/fetch/url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: urlInput }) });
+      const res = await fetch("/api/fetch/url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: urlInput }), signal: AbortSignal.timeout(20_000) });
       const data = await res.json();
       if (!res.ok) { setUrlError(data.error || "Failed to extract"); return; }
       setUrlResult(data);
-    } catch { setUrlError("Network error — check connection"); } finally { setUrlLoading(false); }
+    } catch (err) { setUrlError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setUrlLoading(false); }
   };
 
   const fetchRss = async () => {
     if (!rssInput.trim()) return;
     setRssLoading(true); setRssError(""); setRssResult(null);
     try {
-      const res = await fetch("/api/fetch/rss", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ feedUrl: rssInput, limit: 10 }) });
+      const res = await fetch("/api/fetch/rss", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ feedUrl: rssInput, limit: 10 }), signal: AbortSignal.timeout(15_000) });
       const data = await res.json();
       if (!res.ok) { setRssError(data.error || "Failed to parse feed"); return; }
       setRssResult(data);
-    } catch { setRssError("Network error — check connection"); } finally { setRssLoading(false); }
+    } catch (err) { setRssError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setRssLoading(false); }
   };
 
   const fetchTwitter = async () => {
     if (!twitterToken.trim() || !twitterQuery.trim()) return;
     setTwitterLoading(true); setTwitterError(""); setTwitterResult(null);
     try {
-      const res = await fetch("/api/fetch/twitter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bearerToken: twitterToken, query: twitterQuery, maxResults: 10 }) });
+      const res = await fetch("/api/fetch/twitter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bearerToken: twitterToken, query: twitterQuery, maxResults: 10 }), signal: AbortSignal.timeout(20_000) });
       const data = await res.json();
       if (!res.ok) { setTwitterError(data.error || "Failed to fetch tweets"); return; }
       setTwitterResult(data);
-    } catch { setTwitterError("Network error — check connection"); } finally { setTwitterLoading(false); }
+    } catch (err) { setTwitterError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setTwitterLoading(false); }
   };
 
   const fetchNostr = async () => {
@@ -134,11 +157,11 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     try {
       const relays = nostrRelays.split("\n").map(r => r.trim()).filter(Boolean);
       const pubkeys = nostrPubkeys.split("\n").map(p => p.trim()).filter(Boolean);
-      const res = await fetch("/api/fetch/nostr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ relays, pubkeys: pubkeys.length > 0 ? pubkeys : undefined, limit: 20 }) });
+      const res = await fetch("/api/fetch/nostr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ relays, pubkeys: pubkeys.length > 0 ? pubkeys : undefined, limit: 20 }), signal: AbortSignal.timeout(15_000) });
       const data = await res.json();
       if (!res.ok) { setNostrError(data.error || "Failed to fetch events"); return; }
       setNostrResult(data);
-    } catch { setNostrError("Network error — check connection"); } finally { setNostrLoading(false); }
+    } catch (err) { setNostrError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setNostrLoading(false); }
   };
 
   const handleAnalyzeOnce = async (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => {
@@ -171,6 +194,87 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     const added = addSource({ type: "nostr", label, relays, pubkeys, enabled: true });
     if (!added) { setNostrError("This relay config is already saved"); return; }
   };
+
+  const handleQuickAdd = useCallback(async () => {
+    const input = quickAddInput.trim();
+    if (!input) return;
+    setQuickAddLoading(true);
+    setQuickAddError("");
+
+    try {
+      let feedUrl: string;
+      let label: string;
+
+      switch (quickAddMode) {
+        case "youtube": {
+          const ytUrl = input.startsWith("http") ? input : `https://www.youtube.com/${input}`;
+          const res = await fetch("/api/fetch/discover-feed", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: ytUrl }),
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (!res.ok) { setQuickAddError("Could not find a YouTube feed"); return; }
+          const data = await res.json();
+          if (!data.feeds?.length) { setQuickAddError("No feed found \u2014 check the channel URL"); return; }
+          feedUrl = data.feeds[0].url;
+          label = data.feeds[0].title || "YouTube Channel";
+          break;
+        }
+        case "topic": {
+          feedUrl = buildTopicFeedUrl(input);
+          label = `Topic: ${input}`;
+          break;
+        }
+        case "github": {
+          const parsed = parseGitHubRepo(input);
+          if ("error" in parsed) { setQuickAddError(parsed.error); return; }
+          feedUrl = `https://github.com/${parsed.owner}/${parsed.repo}/releases.atom`;
+          label = `${parsed.owner}/${parsed.repo} Releases`;
+          break;
+        }
+        case "bluesky": {
+          const handle = parseBlueskyHandle(input);
+          feedUrl = `https://bsky.brid.gy/profile/${handle}/feed`;
+          label = `Bluesky: @${handle}`;
+          break;
+        }
+        default:
+          return;
+      }
+
+      setRssInput(feedUrl);
+      setRssLoading(true); setRssError(""); setRssResult(null);
+      try {
+        const res = await fetch("/api/fetch/rss", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ feedUrl, limit: 10 }),
+          signal: AbortSignal.timeout(15_000),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setRssInput("");
+          if (quickAddMode === "topic") {
+            setRssError("Google News may be blocking this request. Try different keywords or paste a direct RSS URL instead.");
+          } else {
+            setRssError(data.error || "Failed to parse feed");
+          }
+          return;
+        }
+        setRssResult({ ...data, feedTitle: data.feedTitle || label });
+        // Only clear quick add form after successful validation
+        setQuickAddMode("");
+        setQuickAddInput("");
+      } finally {
+        setRssLoading(false);
+      }
+    } catch (err) {
+      setQuickAddError(isTimeout(err) ? "Request timed out \u2014 try again" : "Network error \u2014 could not add feed");
+    } finally {
+      setQuickAddLoading(false);
+    }
+  }, [quickAddMode, quickAddInput]);
 
   const startEdit = (s: typeof sources[number]) => {
     setEditingId(s.id);
@@ -570,7 +674,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   setRssInput(e.target.value);
                   setDiscoveredFeeds([]);
                 }}
-                placeholder="https://example.com/feed.xml or blog URL"
+                placeholder="https://example.com/feed.xml \u2014 blogs, podcasts, any RSS/Atom feed"
                 style={{ ...inputStyle, flex: 1 }}
               />
               <button onClick={fetchRss} disabled={rssLoading || !rssInput.trim()} style={btnStyle(!rssInput.trim(), rssLoading)}>
@@ -618,6 +722,59 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                 )}
               </div>
             )}
+
+            {/* Quick Add Presets */}
+            {!rssResult && (() => {
+              const activePreset = QUICK_ADD_PRESETS.find(p => p.id === quickAddMode);
+              return (
+                <div style={{ marginTop: space[3] }}>
+                  <div style={{ ...kpiLabelStyle, marginBottom: space[2] }}>Quick Add</div>
+                  <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
+                    {QUICK_ADD_PRESETS.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => { setQuickAddMode(quickAddMode === p.id ? "" : p.id); setQuickAddInput(""); setQuickAddError(""); setRssError(""); }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 4,
+                          padding: `${space[1]}px ${space[3]}px`, borderRadius: radii.sm,
+                          fontSize: t.caption.size, fontWeight: 600, cursor: "pointer",
+                          background: quickAddMode === p.id ? `${p.color}18` : colors.border.subtle,
+                          border: quickAddMode === p.id ? `1px solid ${p.color}40` : `1px solid ${colors.border.subtle}`,
+                          color: quickAddMode === p.id ? p.color : colors.text.muted,
+                          fontFamily: "inherit", transition: transitions.fast,
+                        }}
+                      >
+                        {p.id === "github" ? <GitHubIcon s={12} /> : <span>{p.icon}</span>} {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {activePreset && (
+                    <div style={{ marginTop: space[3], background: colors.bg.raised, borderRadius: radii.md, padding: space[4] }}>
+                      <label style={{ ...kpiLabelStyle, display: "block", marginBottom: space[1] }}>{activePreset.formLabel}</label>
+                      <div style={{ display: "flex", gap: space[2] }}>
+                        <input
+                          value={quickAddInput}
+                          onChange={e => { setQuickAddInput(e.target.value); setQuickAddError(""); }}
+                          onKeyDown={e => { if (e.key === "Enter" && quickAddInput.trim()) handleQuickAdd(); }}
+                          placeholder={activePreset.placeholder}
+                          style={{ ...inputStyle, flex: 1 }}
+                        />
+                        <button
+                          onClick={handleQuickAdd}
+                          disabled={quickAddLoading || !quickAddInput.trim()}
+                          style={btnStyle(!quickAddInput.trim(), quickAddLoading)}
+                        >
+                          {quickAddLoading ? "Adding..." : "Add Feed"}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: space[1] }}>{activePreset.hint}</div>
+                      {quickAddError && <div style={errorStyle}>{quickAddError}</div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {rssError && <div style={errorStyle}>{rssError}</div>}
             {rssResult && (

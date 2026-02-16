@@ -69,11 +69,12 @@ export class IngestionScheduler {
 
   start(): void {
     if (this.intervalId) return;
-    // runCycle() is async but fire-and-forget is safe: it has internal try/catch/finally
-    // that handles all errors and resets the `running` guard. JS single-threaded event
-    // loop guarantees no concurrent execution of the same cycle.
-    this.initialTimeoutId = setTimeout(() => this.runCycle(), 5000);
-    this.intervalId = setInterval(() => this.runCycle(), BASE_CYCLE_MS);
+    const safeCycle = () => this.runCycle().catch(err => {
+      console.error("[scheduler] Unhandled cycle error:", errMsg(err));
+      this.running = false;
+    });
+    this.initialTimeoutId = setTimeout(safeCycle, 5000);
+    this.intervalId = setInterval(safeCycle, BASE_CYCLE_MS);
   }
 
   stop(): void {
@@ -179,7 +180,6 @@ export class IngestionScheduler {
         const key = getSourceKey(source.type, source.config);
         const state = this.getOrCreateState(key);
 
-        // Skip if auto-disabled
         if (state.errorCount >= MAX_CONSECUTIVE_FAILURES) continue;
 
         // Skip if not yet due (adaptive/backoff timing)

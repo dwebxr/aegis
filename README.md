@@ -16,7 +16,7 @@ Aegis is **free to use** for content filtering. No wallet, no deposit, no setup 
 1. **Open** https://aegis.dwebxr.xyz — Demo mode starts immediately with preset feeds
 2. **Browse** the Dashboard — 3 preset RSS feeds (Hacker News, CoinDesk, The Verge) are auto-fetched and scored
 3. **Login** with Internet Identity — unlocks custom sources, Pro mode, and publishing
-4. **Add Sources** in the Sources tab — RSS feeds, Nostr pubkeys, URLs, or Twitter searches
+4. **Add Sources** in the Sources tab — use Quick Add presets (YouTube, Topic, GitHub, Bluesky) or paste any RSS/Atom feed URL
 5. **(Optional)** Link your Nostr npub in Settings — enables WoT trust graph and free D2A with trusted peers
 
 ### Three Modes: Demo → Lite → Pro
@@ -647,6 +647,8 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 ### Multi-Source Ingestion
 - RSS/Atom feeds (YouTube, note.com, blogs — with thumbnail extraction, ETag conditional fetch)
 - Feed auto-discovery from any blog/site URL
+- Quick Add presets: YouTube channel, Google News topic, GitHub releases, Bluesky account — auto-generates RSS feed URL from a platform URL or keyword
+- Platform URL detection: YouTube `/channel/UCxxx`, `@handle`, `/c/name`; GitHub `owner/repo`; Bluesky `profile/handle`
 - Nostr relay queries (by pubkey or global)
 - Direct URL article extraction
 - X (Twitter) API search
@@ -675,7 +677,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, beforeSend scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (2018 tests, 139 suites) |
+| Test | Jest + ts-jest (2114 tests, 142 suites) |
 
 ## Project Structure
 
@@ -798,7 +800,10 @@ aegis/
 │       ├── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
 │       ├── math.ts                      # Shared clamp() utility
 │       └── statusEmitter.ts            # Generic status emitter factory (used by Ollama/WebLLM engines)
-├── __tests__/                           # 2018 tests across 139 suites
+│   └── sources/
+│       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Google News)
+│       └── storage.ts                   # Source config localStorage R/W
+├── __tests__/                           # 2114 tests across 142 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -834,7 +839,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 2018 tests
+npm test              # Run all 2114 tests
 npm run test:watch    # Watch mode
 ```
 

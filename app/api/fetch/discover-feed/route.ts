@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateUrl } from "@/lib/utils/url";
+import { detectPlatformFeed, extractYouTubeChannelId } from "@/lib/sources/platformFeed";
 
 export const maxDuration = 30;
 
@@ -35,6 +36,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: blocked }, { status: 400 });
   }
 
+  const platformResult = detectPlatformFeed(parsedUrl);
+  if (platformResult) {
+    return NextResponse.json(platformResult);
+  }
+
   const feeds: Array<{ url: string; title?: string; type?: string }> = [];
 
   // Step 1: Fetch HTML and look for <link rel="alternate"> tags
@@ -54,6 +60,15 @@ export async function POST(request: NextRequest) {
       } else {
         const raw = await res.text();
         const html = raw.length > 2_000_000 ? raw.slice(0, 2_000_000) : raw;
+
+        const host = parsedUrl.hostname.replace("www.", "");
+        if ((host === "youtube.com" || host === "m.youtube.com") && feeds.length === 0) {
+          const channelId = extractYouTubeChannelId(html);
+          if (channelId) {
+            feeds.push({ url: `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, title: "YouTube Channel", type: "atom" });
+          }
+        }
+
         const linkRegex = /<link[^>]+rel=["']alternate["'][^>]*>/gi;
         let match;
         let iters = 0;
@@ -67,7 +82,6 @@ export async function POST(request: NextRequest) {
             const type = typeMatch[1].toLowerCase();
             if (type.includes("rss") || type.includes("atom") || type.includes("xml")) {
               let feedUrl = hrefMatch[1];
-              // Resolve relative URLs
               if (feedUrl.startsWith("/")) {
                 feedUrl = `${parsedUrl.origin}${feedUrl}`;
               } else if (!feedUrl.startsWith("http")) {

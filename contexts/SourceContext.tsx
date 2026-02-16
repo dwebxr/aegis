@@ -41,6 +41,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "error">("idle");
   const [syncError, setSyncError] = useState("");
   const actorRef = useRef<_SERVICE | null>(null);
+  const pendingDeletesRef = useRef<Set<string>>(new Set());
   const sourcesRef = useRef(sources);
   sourcesRef.current = sources;
 
@@ -52,7 +53,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const principalTextRef = useRef(principalText);
   principalTextRef.current = principalText;
 
-  // Ensure actor uses current identity (invalidate on identity change)
   useEffect(() => {
     actorRef.current = null;
   }, [identity]);
@@ -65,7 +65,12 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   function saveToIC(source: SavedSource): void {
     const actor = getActor();
     const ident = identityRef.current;
-    if (!actor || !ident) return;
+    if (!actor || !ident) {
+      if (isAuthRef.current) {
+        addNotification("Saved locally — IC sync pending", "info");
+      }
+      return;
+    }
     actor.saveSourceConfig(savedToIC(source, ident.getPrincipal()))
       .catch((err: unknown) => {
         console.error("[sources] IC save FAILED:", errMsg(err));
@@ -105,9 +110,24 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       setSyncStatus("syncing");
       try {
         const principal = identity.getPrincipal();
+
+        // Flush pending deletes before fetching IC state
+        const pendingDeletes = pendingDeletesRef.current;
+        if (pendingDeletes.size > 0) {
+          await Promise.all(
+            Array.from(pendingDeletes).map(id =>
+              actor.deleteSourceConfig(id)
+                .then(() => pendingDeletes.delete(id))
+                .catch((e: unknown) => console.warn("[sources] pending delete failed:", id, errMsg(e)))
+            )
+          );
+        }
+
         const icConfigs = await actor.getUserSourceConfigs(principal);
 
-        const icSources = icConfigs.map(icToSaved).filter((s): s is SavedSource => s !== null);
+        const icSources = icConfigs.map(icToSaved)
+          .filter((s): s is SavedSource => s !== null)
+          .filter(s => !pendingDeletes.has(s.id));
         let localOnly: SavedSource[] = [];
         setSources(prev => {
           const icIds = new Set(icSources.map(s => s.id));
@@ -116,7 +136,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           saveSources(principalText, merged);
           return merged;
         });
-        // Push local-only items to IC and await completion
         let pushFailed = false;
         await Promise.all(
           localOnly.map(localSource =>
@@ -148,7 +167,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     });
   }, [isAuthenticated, identity, principalText]);
 
-  // Seed demo sources when in demo mode
   useEffect(() => {
     if (isDemoMode) setSources(DEMO_SOURCES);
   }, [isDemoMode]);
@@ -188,35 +206,51 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     const actor = getActor();
     if (actor) {
       actor.deleteSourceConfig(id)
+        .then(() => { pendingDeletesRef.current.delete(id); })
         .catch((err: unknown) => {
           console.error("[sources] IC delete failed:", errMsg(err));
+          pendingDeletesRef.current.add(id);
           setSyncStatus("error");
           setSyncError("Failed to delete source from IC");
           addNotification("Source removed locally but IC sync failed", "error");
         });
+    } else if (isAuthRef.current) {
+      pendingDeletesRef.current.add(id);
+      addNotification("Source removed locally — IC sync pending", "info");
     }
   }, [persist, isDemoMode]);
 
   const toggleSource = useCallback((id: string) => {
     if (isDemoMode) return;
+    let toggled: SavedSource | undefined;
     setSources(prev => {
-      const next = prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s);
+      const next = prev.map(s => {
+        if (s.id !== id) return s;
+        const updated = { ...s, enabled: !s.enabled };
+        toggled = updated;
+        return updated;
+      });
       persist(next);
       return next;
     });
-    const source = sourcesRef.current.find(s => s.id === id);
-    if (source) saveToIC({ ...source, enabled: !source.enabled });
+    // Use queueMicrotask to read `toggled` after setSources updater runs
+    queueMicrotask(() => { if (toggled) saveToIC(toggled); });
   }, [persist, isDemoMode]);
 
   const updateSource = useCallback((id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => {
     if (isDemoMode) return;
+    let updated: SavedSource | undefined;
     setSources(prev => {
-      const next = prev.map(s => s.id === id ? { ...s, ...partial } : s);
+      const next = prev.map(s => {
+        if (s.id !== id) return s;
+        const merged = { ...s, ...partial };
+        updated = merged;
+        return merged;
+      });
       persist(next);
       return next;
     });
-    const source = sourcesRef.current.find(s => s.id === id);
-    if (source) saveToIC({ ...source, ...partial });
+    queueMicrotask(() => { if (updated) saveToIC(updated); });
   }, [persist, isDemoMode]);
 
   const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }> => {

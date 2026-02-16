@@ -90,6 +90,17 @@ describe("sourceState", () => {
       expect(loaded["rss:null"].errorCount).toBe(0); // replaced with default
     });
 
+    it("rejects entries missing required string/number fields", () => {
+      store["aegis_source_states"] = JSON.stringify({
+        // Has numbers but missing lastError (string), consecutiveEmpty, totalItemsScored
+        "rss:partial": { errorCount: 1, nextFetchAt: 100, averageScore: 0.5 },
+      });
+      const loaded = loadSourceStates();
+      // Should be replaced with defaultState since validation now checks all critical fields
+      expect(loaded["rss:partial"].errorCount).toBe(0);
+      expect(loaded["rss:partial"].lastError).toBe("");
+    });
+
     it("returns empty on non-object JSON", () => {
       store["aegis_source_states"] = '"just a string"';
       expect(loadSourceStates()).toEqual({});

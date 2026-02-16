@@ -62,7 +62,10 @@ function isValidState(v: unknown): v is SourceRuntimeState {
   return (
     typeof s.errorCount === "number" &&
     typeof s.nextFetchAt === "number" &&
-    typeof s.averageScore === "number"
+    typeof s.averageScore === "number" &&
+    typeof s.lastError === "string" &&
+    typeof s.consecutiveEmpty === "number" &&
+    typeof s.totalItemsScored === "number"
   );
 }
 

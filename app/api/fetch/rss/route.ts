@@ -41,7 +41,6 @@ function extractAttr(field: unknown, attr: string): string | undefined {
       const attrs = obj.$ as Record<string, string>;
       return attrs[attr];
     }
-    // Direct attribute access
     if (typeof obj[attr] === "string") return obj[attr] as string;
   }
   return undefined;
@@ -106,7 +105,6 @@ export async function POST(request: NextRequest) {
         signal: AbortSignal.timeout(10_000),
       });
 
-      // 304 Not Modified
       if (res.status === 304) {
         return NextResponse.json({
           feedTitle: "",

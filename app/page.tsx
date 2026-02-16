@@ -175,7 +175,7 @@ function AegisAppInner() {
     }
     // Sync to IC (fire-and-forget)
     if (identity) {
-      syncLinkedAccountToIC(identity, account, agentEnabledRef.current).catch(() => {});
+      syncLinkedAccountToIC(identity, account, agentEnabledRef.current).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
     }
   }, [identity]);
 
@@ -279,10 +279,9 @@ function AegisAppInner() {
               const hydrated: LinkedNostrAccount = { ...restored, displayName: profile.displayName, followCount: profile.followCount };
               saveLinkedAccount(hydrated);
               setLinkedAccount(hydrated);
-            }).catch(() => {});
+            }).catch(err => console.warn("[nostr] Profile hydration failed:", errMsg(err)));
           } else if (localAccount && !icNpub) {
-            // Local has account but IC doesn't — sync local up
-            syncLinkedAccountToIC(identity, localAccount, settings.d2aEnabled).catch(() => {});
+            syncLinkedAccountToIC(identity, localAccount, settings.d2aEnabled).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
           }
         }
       } catch (err) {
@@ -417,7 +416,8 @@ function AegisAppInner() {
           imageUrl: data.imageUrl,
         });
         setShareState(s => s ? { ...s, status: "done" } : null);
-      } catch {
+      } catch (err) {
+        console.warn("[share] Auto-process failed:", errMsg(err));
         setShareState(s => s ? { ...s, status: "error", error: "Analysis failed" } : null);
         addNotification("Shared URL analysis failed", "error");
       }
