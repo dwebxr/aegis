@@ -379,326 +379,6 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         </p>
       </div>
 
-      {/* Saved Sources List */}
-      {sources.length > 0 && (
-        <div style={{
-          background: colors.bg.surface,
-          border: `1px solid ${colors.border.default}`,
-          borderRadius: radii.lg,
-          padding: mobile ? space[4] : space[5],
-          marginBottom: space[5],
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: space[3], fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[3] }}>
-            <span>Saved Sources ({sources.length})</span>
-            {syncStatus === "syncing" && <span style={{ fontSize: t.caption.size, color: colors.sky[400], fontWeight: 600 }}>syncing...</span>}
-            {syncStatus === "synced" && <span style={{ fontSize: t.caption.size, color: colors.green[400], fontWeight: 600 }}>synced</span>}
-            {syncStatus === "error" && <span style={{ fontSize: t.caption.size, color: colors.red[400], fontWeight: 600 }}>sync error{syncError ? `: ${syncError}` : ""}</span>}
-          </div>
-          {sources.map(s => {
-            const stateKey = getStateKey(s);
-            const state = sourceStates[stateKey];
-            const health = state ? getSourceHealth(state) : "healthy";
-            const healthColor = HEALTH_COLORS[health];
-
-            return (
-              <div key={s.id} style={{ marginBottom: space[1] }}>
-                <div style={{
-                  display: "flex", alignItems: "center", gap: space[3],
-                  padding: `${space[2]}px ${space[3]}px`,
-                  background: s.enabled ? `${s.type === "rss" ? colors.amber[400] : colors.purple[400]}08` : "transparent",
-                  borderRadius: editingId === s.id ? `${radii.sm} ${radii.sm} 0 0` : radii.sm,
-                }}>
-                  {/* Health-aware toggle */}
-                  <button
-                    onClick={() => toggleSource(s.id)}
-                    style={{
-                      width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "pointer",
-                      background: s.enabled ? healthColor : colors.border.default,
-                      flexShrink: 0, padding: 0,
-                    }}
-                    title={s.enabled ? `${health} — click to disable` : "Enable"}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: t.body.mobileSz, fontWeight: 600,
-                      color: s.enabled ? colors.text.secondary : colors.text.disabled,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }}>
-                      {s.label}
-                    </div>
-                    <div style={{ fontSize: t.tiny.size, color: colors.text.muted }}>
-                      {s.type === "rss" ? s.feedUrl : `${(s.relays || []).length} relays · ${(s.pubkeys || []).length} keys`}
-                    </div>
-                    {/* Runtime stats */}
-                    {state && (
-                      <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: 2 }}>
-                        {state.lastFetchedAt > 0 && (
-                          <span>Last fetch: {relativeTime(state.lastFetchedAt)}</span>
-                        )}
-                        {state.totalItemsScored > 0 && (
-                          <span> · {state.totalItemsScored} scored · avg {state.averageScore.toFixed(1)}</span>
-                        )}
-                        {state.itemsFetched > 0 && !state.totalItemsScored && (
-                          <span> · {state.itemsFetched} items</span>
-                        )}
-                      </div>
-                    )}
-                    {/* Error message */}
-                    {state && state.errorCount > 0 && (
-                      <div style={{ fontSize: t.tiny.size, color: colors.red[400], marginTop: 2 }}>
-                        {state.errorCount >= 5 ? "Auto-disabled: " : `Error (${state.errorCount}x): `}
-                        {state.lastError}
-                      </div>
-                    )}
-                  </div>
-                  <span style={{
-                    fontSize: t.tiny.size, fontWeight: 700, color: s.type === "rss" ? colors.amber[400] : colors.purple[400],
-                    textTransform: "uppercase", letterSpacing: 1,
-                  }}>
-                    {s.type}
-                  </span>
-                  {!isDemoMode && <button
-                    onClick={() => editingId === s.id ? cancelEdit() : startEdit(s)}
-                    style={{
-                      background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
-                      fontSize: t.caption.size, color: editingId === s.id ? colors.blue[400] : colors.text.disabled,
-                      fontFamily: "inherit", transition: transitions.fast,
-                    }}
-                    title="Edit source"
-                  >
-                    &#x270E;
-                  </button>}
-                  {!isDemoMode && <button
-                    onClick={() => removeSource(s.id)}
-                    style={{
-                      background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
-                      fontSize: t.caption.size, color: colors.text.disabled, fontFamily: "inherit",
-                      transition: transitions.fast,
-                    }}
-                    title="Remove source"
-                  >
-                    &#x2715;
-                  </button>}
-                </div>
-
-                {/* Inline Editor */}
-                {editingId === s.id && (
-                  <div style={{
-                    background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-                    borderTop: "none", borderRadius: `0 0 ${radii.sm} ${radii.sm}`,
-                    padding: `${space[3]}px ${space[4]}px`,
-                  }}>
-                    <div style={{ marginBottom: space[3] }}>
-                      <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Label</label>
-                      <input value={editLabel} onChange={e => setEditLabel(e.target.value)} style={{ ...inputStyle, padding: `${space[2]}px ${space[3]}px` }} />
-                    </div>
-
-                    {s.type === "rss" && (
-                      <div style={{ marginBottom: space[3] }}>
-                        <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Feed URL</label>
-                        <input value={editFeedUrl} onChange={e => setEditFeedUrl(e.target.value)} style={{ ...inputStyle, padding: `${space[2]}px ${space[3]}px` }} />
-                      </div>
-                    )}
-
-                    {s.type === "nostr" && (
-                      <>
-                        <div style={{ marginBottom: space[3] }}>
-                          <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Relays ({editRelays.length})</label>
-                          {editRelays.map((relay, i) => (
-                            <div key={relay} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
-                              <span style={{ flex: 1, fontSize: t.bodySm.size, color: colors.text.tertiary, fontFamily: fonts.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{relay}</span>
-                              <button
-                                onClick={() => setEditRelays(prev => prev.filter((_, idx) => idx !== i))}
-                                style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", fontSize: t.caption.size, color: colors.red[400], fontFamily: "inherit" }}
-                              >&#x2715;</button>
-                            </div>
-                          ))}
-                          <div style={{ display: "flex", gap: space[2], marginTop: space[1] }}>
-                            <input
-                              value={editNewRelay}
-                              onChange={e => setEditNewRelay(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === "Enter" && editNewRelay.trim()) {
-                                  setEditRelays(prev => [...prev, editNewRelay.trim()]);
-                                  setEditNewRelay("");
-                                }
-                              }}
-                              placeholder="wss://relay.example.com"
-                              style={{ ...inputStyle, flex: 1, padding: `${space[1]}px ${space[3]}px`, fontSize: t.bodySm.size }}
-                            />
-                            <button
-                              onClick={() => {
-                                if (editNewRelay.trim()) {
-                                  setEditRelays(prev => [...prev, editNewRelay.trim()]);
-                                  setEditNewRelay("");
-                                }
-                              }}
-                              style={{
-                                background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
-                                cursor: "pointer", padding: `${space[1]}px ${space[3]}px`,
-                                fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
-                              }}
-                            >+ Add</button>
-                          </div>
-                        </div>
-
-                        <div style={{ marginBottom: space[3] }}>
-                          <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Public Keys ({editPubkeys.length})</label>
-                          {editPubkeys.map((pk, i) => (
-                            <div key={pk} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
-                              <span style={{ flex: 1, fontSize: t.bodySm.size, color: colors.text.tertiary, fontFamily: fonts.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pk}</span>
-                              <button
-                                onClick={() => setEditPubkeys(prev => prev.filter((_, idx) => idx !== i))}
-                                style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", fontSize: t.caption.size, color: colors.red[400], fontFamily: "inherit" }}
-                              >&#x2715;</button>
-                            </div>
-                          ))}
-                          <div style={{ display: "flex", gap: space[2], marginTop: space[1] }}>
-                            <input
-                              value={editNewPubkey}
-                              onChange={e => setEditNewPubkey(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === "Enter" && editNewPubkey.trim()) {
-                                  setEditPubkeys(prev => [...prev, editNewPubkey.trim()]);
-                                  setEditNewPubkey("");
-                                }
-                              }}
-                              placeholder="npub or hex pubkey"
-                              style={{ ...inputStyle, flex: 1, padding: `${space[1]}px ${space[3]}px`, fontSize: t.bodySm.size }}
-                            />
-                            <button
-                              onClick={() => {
-                                if (editNewPubkey.trim()) {
-                                  setEditPubkeys(prev => [...prev, editNewPubkey.trim()]);
-                                  setEditNewPubkey("");
-                                }
-                              }}
-                              style={{
-                                background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
-                                cursor: "pointer", padding: `${space[1]}px ${space[3]}px`,
-                                fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
-                              }}
-                            >+ Add</button>
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    <div style={{ display: "flex", gap: space[2], justifyContent: "flex-end" }}>
-                      <button onClick={cancelEdit} style={{
-                        background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
-                        cursor: "pointer", padding: `${space[2]}px ${space[4]}px`,
-                        fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
-                      }}>Cancel</button>
-                      <button onClick={saveEdit} style={saveBtnStyle}>Save</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Popular Sources Catalog */}
-      <div style={{
-        background: colors.bg.surface,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: radii.lg,
-        padding: mobile ? space[4] : space[5],
-        marginBottom: space[5],
-      }}>
-        <div style={{
-          fontSize: t.h3.size, fontWeight: t.h3.weight,
-          color: colors.text.tertiary, marginBottom: space[1],
-        }}>
-          Popular Sources
-        </div>
-        <div style={{
-          fontSize: t.caption.size, color: colors.text.muted, marginBottom: space[3],
-        }}>
-          Add trusted feeds with a single tap
-        </div>
-
-        {/* Category filter chips */}
-        <div style={{ display: "flex", gap: space[1], marginBottom: space[3], flexWrap: "wrap" }}>
-          {([{ id: "all" as const, label: "All", emoji: "" }, ...CATALOG_CATEGORIES] as const).map(cat => {
-            const isAll = cat.id === "all";
-            const active = catalogFilter === cat.id;
-            const chipColor = isAll ? colors.text.muted : POPULAR_SOURCES.find(s => s.category === cat.id)?.color ?? colors.text.muted;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setCatalogFilter(cat.id)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 4,
-                  padding: `${space[1]}px ${space[3]}px`,
-                  borderRadius: radii.sm,
-                  fontSize: t.caption.size, fontWeight: 600,
-                  cursor: "pointer",
-                  background: active ? `${chipColor}18` : colors.border.subtle,
-                  border: active ? `1px solid ${chipColor}40` : `1px solid ${colors.border.subtle}`,
-                  color: active ? chipColor : colors.text.muted,
-                  fontFamily: "inherit",
-                  transition: transitions.fast,
-                }}
-              >
-                {cat.emoji ? `${cat.emoji} ` : ""}{cat.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Source grid */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: mobile ? "1fr 1fr" : "1fr 1fr 1fr",
-          gap: space[2],
-        }}>
-          {POPULAR_SOURCES
-            .filter(s => catalogFilter === "all" || s.category === catalogFilter)
-            .map(source => {
-              const isAdded = addedFeedUrls.has(source.feedUrl);
-              const justAdded = justAddedIds.has(source.id);
-              return (
-                <button
-                  key={source.id}
-                  onClick={() => handleCatalogAdd(source)}
-                  disabled={isAdded || isDemoMode}
-                  style={{
-                    display: "flex", alignItems: "center", gap: space[2],
-                    padding: `${space[2]}px ${space[3]}px`,
-                    borderRadius: radii.md,
-                    border: isAdded
-                      ? `1px solid ${colors.green[400]}30`
-                      : `1px solid ${source.color}30`,
-                    background: isAdded
-                      ? `${colors.green[400]}08`
-                      : justAdded ? `${colors.green[400]}15` : `${source.color}08`,
-                    cursor: isAdded || isDemoMode ? "default" : "pointer",
-                    opacity: isAdded ? 0.6 : 1,
-                    fontFamily: "inherit",
-                    transition: transitions.fast,
-                    textAlign: "left" as const,
-                    width: "100%",
-                  }}
-                >
-                  <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1 }}>
-                    {isAdded ? <CheckIcon /> : source.emoji}
-                  </span>
-                  <span style={{
-                    fontSize: t.bodySm.size, fontWeight: 600,
-                    color: isAdded ? colors.green[400] : colors.text.secondary,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>
-                    {source.label}
-                  </span>
-                </button>
-              );
-            })}
-        </div>
-      </div>
-
       {isDemoMode && (
         <div style={{
           background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.15)",
@@ -1006,6 +686,327 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
           </div>
         )}
       </div>
+
+      {/* Popular Sources Catalog */}
+      <div style={{
+        background: colors.bg.surface,
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: radii.lg,
+        padding: mobile ? space[4] : space[5],
+        marginTop: space[5],
+        marginBottom: space[5],
+      }}>
+        <div style={{
+          fontSize: t.h3.size, fontWeight: t.h3.weight,
+          color: colors.text.tertiary, marginBottom: space[1],
+        }}>
+          Popular Sources
+        </div>
+        <div style={{
+          fontSize: t.caption.size, color: colors.text.muted, marginBottom: space[3],
+        }}>
+          Add trusted feeds with a single tap
+        </div>
+
+        {/* Category filter chips */}
+        <div style={{ display: "flex", gap: space[1], marginBottom: space[3], flexWrap: "wrap" }}>
+          {([{ id: "all" as const, label: "All", emoji: "" }, ...CATALOG_CATEGORIES] as const).map(cat => {
+            const isAll = cat.id === "all";
+            const active = catalogFilter === cat.id;
+            const chipColor = isAll ? colors.text.muted : POPULAR_SOURCES.find(s => s.category === cat.id)?.color ?? colors.text.muted;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setCatalogFilter(cat.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4,
+                  padding: `${space[1]}px ${space[3]}px`,
+                  borderRadius: radii.sm,
+                  fontSize: t.caption.size, fontWeight: 600,
+                  cursor: "pointer",
+                  background: active ? `${chipColor}18` : colors.border.subtle,
+                  border: active ? `1px solid ${chipColor}40` : `1px solid ${colors.border.subtle}`,
+                  color: active ? chipColor : colors.text.muted,
+                  fontFamily: "inherit",
+                  transition: transitions.fast,
+                }}
+              >
+                {cat.emoji ? `${cat.emoji} ` : ""}{cat.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Source grid */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: mobile ? "1fr 1fr" : "1fr 1fr 1fr",
+          gap: space[2],
+        }}>
+          {POPULAR_SOURCES
+            .filter(s => catalogFilter === "all" || s.category === catalogFilter)
+            .map(source => {
+              const isAdded = addedFeedUrls.has(source.feedUrl);
+              const justAdded = justAddedIds.has(source.id);
+              return (
+                <button
+                  key={source.id}
+                  onClick={() => handleCatalogAdd(source)}
+                  disabled={isAdded || isDemoMode}
+                  style={{
+                    display: "flex", alignItems: "center", gap: space[2],
+                    padding: `${space[2]}px ${space[3]}px`,
+                    borderRadius: radii.md,
+                    border: isAdded
+                      ? `1px solid ${colors.green[400]}30`
+                      : `1px solid ${source.color}30`,
+                    background: isAdded
+                      ? `${colors.green[400]}08`
+                      : justAdded ? `${colors.green[400]}15` : `${source.color}08`,
+                    cursor: isAdded || isDemoMode ? "default" : "pointer",
+                    opacity: isAdded ? 0.6 : 1,
+                    fontFamily: "inherit",
+                    transition: transitions.fast,
+                    textAlign: "left" as const,
+                    width: "100%",
+                  }}
+                >
+                  <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1 }}>
+                    {isAdded ? <CheckIcon /> : source.emoji}
+                  </span>
+                  <span style={{
+                    fontSize: t.bodySm.size, fontWeight: 600,
+                    color: isAdded ? colors.green[400] : colors.text.secondary,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {source.label}
+                  </span>
+                </button>
+              );
+            })}
+        </div>
+      </div>
+
+      {/* Saved Sources List */}
+      {sources.length > 0 && (
+        <div style={{
+          background: colors.bg.surface,
+          border: `1px solid ${colors.border.default}`,
+          borderRadius: radii.lg,
+          padding: mobile ? space[4] : space[5],
+          marginBottom: space[5],
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: space[3], fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[3] }}>
+            <span>Saved Sources ({sources.length})</span>
+            {syncStatus === "syncing" && <span style={{ fontSize: t.caption.size, color: colors.sky[400], fontWeight: 600 }}>syncing...</span>}
+            {syncStatus === "synced" && <span style={{ fontSize: t.caption.size, color: colors.green[400], fontWeight: 600 }}>synced</span>}
+            {syncStatus === "error" && <span style={{ fontSize: t.caption.size, color: colors.red[400], fontWeight: 600 }}>sync error{syncError ? `: ${syncError}` : ""}</span>}
+          </div>
+          {sources.map(s => {
+            const stateKey = getStateKey(s);
+            const state = sourceStates[stateKey];
+            const health = state ? getSourceHealth(state) : "healthy";
+            const healthColor = HEALTH_COLORS[health];
+
+            return (
+              <div key={s.id} style={{ marginBottom: space[1] }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: space[3],
+                  padding: `${space[2]}px ${space[3]}px`,
+                  background: s.enabled ? `${s.type === "rss" ? colors.amber[400] : colors.purple[400]}08` : "transparent",
+                  borderRadius: editingId === s.id ? `${radii.sm} ${radii.sm} 0 0` : radii.sm,
+                }}>
+                  {/* Health-aware toggle */}
+                  <button
+                    onClick={() => toggleSource(s.id)}
+                    style={{
+                      width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "pointer",
+                      background: s.enabled ? healthColor : colors.border.default,
+                      flexShrink: 0, padding: 0,
+                    }}
+                    title={s.enabled ? `${health} — click to disable` : "Enable"}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: t.body.mobileSz, fontWeight: 600,
+                      color: s.enabled ? colors.text.secondary : colors.text.disabled,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {s.label}
+                    </div>
+                    <div style={{ fontSize: t.tiny.size, color: colors.text.muted }}>
+                      {s.type === "rss" ? s.feedUrl : `${(s.relays || []).length} relays · ${(s.pubkeys || []).length} keys`}
+                    </div>
+                    {/* Runtime stats */}
+                    {state && (
+                      <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: 2 }}>
+                        {state.lastFetchedAt > 0 && (
+                          <span>Last fetch: {relativeTime(state.lastFetchedAt)}</span>
+                        )}
+                        {state.totalItemsScored > 0 && (
+                          <span> · {state.totalItemsScored} scored · avg {state.averageScore.toFixed(1)}</span>
+                        )}
+                        {state.itemsFetched > 0 && !state.totalItemsScored && (
+                          <span> · {state.itemsFetched} items</span>
+                        )}
+                      </div>
+                    )}
+                    {/* Error message */}
+                    {state && state.errorCount > 0 && (
+                      <div style={{ fontSize: t.tiny.size, color: colors.red[400], marginTop: 2 }}>
+                        {state.errorCount >= 5 ? "Auto-disabled: " : `Error (${state.errorCount}x): `}
+                        {state.lastError}
+                      </div>
+                    )}
+                  </div>
+                  <span style={{
+                    fontSize: t.tiny.size, fontWeight: 700, color: s.type === "rss" ? colors.amber[400] : colors.purple[400],
+                    textTransform: "uppercase", letterSpacing: 1,
+                  }}>
+                    {s.type}
+                  </span>
+                  {!isDemoMode && <button
+                    onClick={() => editingId === s.id ? cancelEdit() : startEdit(s)}
+                    style={{
+                      background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
+                      fontSize: t.caption.size, color: editingId === s.id ? colors.blue[400] : colors.text.disabled,
+                      fontFamily: "inherit", transition: transitions.fast,
+                    }}
+                    title="Edit source"
+                  >
+                    &#x270E;
+                  </button>}
+                  {!isDemoMode && <button
+                    onClick={() => removeSource(s.id)}
+                    style={{
+                      background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
+                      fontSize: t.caption.size, color: colors.text.disabled, fontFamily: "inherit",
+                      transition: transitions.fast,
+                    }}
+                    title="Remove source"
+                  >
+                    &#x2715;
+                  </button>}
+                </div>
+
+                {/* Inline Editor */}
+                {editingId === s.id && (
+                  <div style={{
+                    background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
+                    borderTop: "none", borderRadius: `0 0 ${radii.sm} ${radii.sm}`,
+                    padding: `${space[3]}px ${space[4]}px`,
+                  }}>
+                    <div style={{ marginBottom: space[3] }}>
+                      <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Label</label>
+                      <input value={editLabel} onChange={e => setEditLabel(e.target.value)} style={{ ...inputStyle, padding: `${space[2]}px ${space[3]}px` }} />
+                    </div>
+
+                    {s.type === "rss" && (
+                      <div style={{ marginBottom: space[3] }}>
+                        <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Feed URL</label>
+                        <input value={editFeedUrl} onChange={e => setEditFeedUrl(e.target.value)} style={{ ...inputStyle, padding: `${space[2]}px ${space[3]}px` }} />
+                      </div>
+                    )}
+
+                    {s.type === "nostr" && (
+                      <>
+                        <div style={{ marginBottom: space[3] }}>
+                          <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Relays ({editRelays.length})</label>
+                          {editRelays.map((relay, i) => (
+                            <div key={relay} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
+                              <span style={{ flex: 1, fontSize: t.bodySm.size, color: colors.text.tertiary, fontFamily: fonts.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{relay}</span>
+                              <button
+                                onClick={() => setEditRelays(prev => prev.filter((_, idx) => idx !== i))}
+                                style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", fontSize: t.caption.size, color: colors.red[400], fontFamily: "inherit" }}
+                              >&#x2715;</button>
+                            </div>
+                          ))}
+                          <div style={{ display: "flex", gap: space[2], marginTop: space[1] }}>
+                            <input
+                              value={editNewRelay}
+                              onChange={e => setEditNewRelay(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter" && editNewRelay.trim()) {
+                                  setEditRelays(prev => [...prev, editNewRelay.trim()]);
+                                  setEditNewRelay("");
+                                }
+                              }}
+                              placeholder="wss://relay.example.com"
+                              style={{ ...inputStyle, flex: 1, padding: `${space[1]}px ${space[3]}px`, fontSize: t.bodySm.size }}
+                            />
+                            <button
+                              onClick={() => {
+                                if (editNewRelay.trim()) {
+                                  setEditRelays(prev => [...prev, editNewRelay.trim()]);
+                                  setEditNewRelay("");
+                                }
+                              }}
+                              style={{
+                                background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
+                                cursor: "pointer", padding: `${space[1]}px ${space[3]}px`,
+                                fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
+                              }}
+                            >+ Add</button>
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: space[3] }}>
+                          <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Public Keys ({editPubkeys.length})</label>
+                          {editPubkeys.map((pk, i) => (
+                            <div key={pk} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
+                              <span style={{ flex: 1, fontSize: t.bodySm.size, color: colors.text.tertiary, fontFamily: fonts.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pk}</span>
+                              <button
+                                onClick={() => setEditPubkeys(prev => prev.filter((_, idx) => idx !== i))}
+                                style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", fontSize: t.caption.size, color: colors.red[400], fontFamily: "inherit" }}
+                              >&#x2715;</button>
+                            </div>
+                          ))}
+                          <div style={{ display: "flex", gap: space[2], marginTop: space[1] }}>
+                            <input
+                              value={editNewPubkey}
+                              onChange={e => setEditNewPubkey(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter" && editNewPubkey.trim()) {
+                                  setEditPubkeys(prev => [...prev, editNewPubkey.trim()]);
+                                  setEditNewPubkey("");
+                                }
+                              }}
+                              placeholder="npub or hex pubkey"
+                              style={{ ...inputStyle, flex: 1, padding: `${space[1]}px ${space[3]}px`, fontSize: t.bodySm.size }}
+                            />
+                            <button
+                              onClick={() => {
+                                if (editNewPubkey.trim()) {
+                                  setEditPubkeys(prev => [...prev, editNewPubkey.trim()]);
+                                  setEditNewPubkey("");
+                                }
+                              }}
+                              style={{
+                                background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
+                                cursor: "pointer", padding: `${space[1]}px ${space[3]}px`,
+                                fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
+                              }}
+                            >+ Add</button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    <div style={{ display: "flex", gap: space[2], justifyContent: "flex-end" }}>
+                      <button onClick={cancelEdit} style={{
+                        background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
+                        cursor: "pointer", padding: `${space[2]}px ${space[4]}px`,
+                        fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
+                      }}>Cancel</button>
+                      <button onClick={saveEdit} style={saveBtnStyle}>Save</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
