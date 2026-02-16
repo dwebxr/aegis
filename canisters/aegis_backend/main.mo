@@ -50,7 +50,24 @@ persistent actor AegisBackend {
   // Stable storage for upgrades
   // ──────────────────────────────────────
 
-  var stableEvaluations : [(Text, Types.ContentEvaluation)] = [];
+  // Migration: old type without validatedAt (read-only during upgrade from v1)
+  type ContentEvaluationV1 = {
+    id : Text;
+    owner : Principal;
+    author : Text;
+    avatar : Text;
+    text : Text;
+    source : Types.ContentSource;
+    sourceUrl : ?Text;
+    scores : Types.ScoreBreakdown;
+    verdict : Types.Verdict;
+    reason : Text;
+    createdAt : Int;
+    validated : Bool;
+    flagged : Bool;
+  };
+  var stableEvaluations : [(Text, ContentEvaluationV1)] = [];
+  var stableEvaluationsV2 : [(Text, Types.ContentEvaluation)] = [];
   var stableProfiles : [(Principal, Types.UserProfile)] = [];
   var stableSourceConfigs : [(Text, Types.SourceConfigEntry)] = [];
   var stableSignals : [(Text, Types.PublishedSignal)] = [];
@@ -124,7 +141,8 @@ persistent actor AegisBackend {
   // ──────────────────────────────────────
 
   system func preupgrade() {
-    stableEvaluations := Iter.toArray(evaluations.entries());
+    stableEvaluations := [];
+    stableEvaluationsV2 := Iter.toArray(evaluations.entries());
     stableProfiles := Iter.toArray(profiles.entries());
     stableSourceConfigs := Iter.toArray(sourceConfigs.entries());
     stableSignals := Iter.toArray(signals.entries());
@@ -142,10 +160,36 @@ persistent actor AegisBackend {
   };
 
   system func postupgrade() {
-    for ((id, eval) in stableEvaluations.vals()) {
-      evaluations.put(id, eval);
-      addToPrincipalIndex(ownerIndex, eval.owner, id);
+    // Load evaluations: prefer V2 (new type), fall back to V1 migration
+    if (stableEvaluationsV2.size() > 0) {
+      for ((id, eval) in stableEvaluationsV2.vals()) {
+        evaluations.put(id, eval);
+        addToPrincipalIndex(ownerIndex, eval.owner, id);
+      };
+    } else {
+      for ((id, old) in stableEvaluations.vals()) {
+        let migrated : Types.ContentEvaluation = {
+          id = old.id;
+          owner = old.owner;
+          author = old.author;
+          avatar = old.avatar;
+          text = old.text;
+          source = old.source;
+          sourceUrl = old.sourceUrl;
+          scores = old.scores;
+          verdict = old.verdict;
+          reason = old.reason;
+          createdAt = old.createdAt;
+          validated = old.validated;
+          flagged = old.flagged;
+          validatedAt = null;
+        };
+        evaluations.put(id, migrated);
+        addToPrincipalIndex(ownerIndex, migrated.owner, id);
+      };
     };
+    stableEvaluations := [];
+    stableEvaluationsV2 := [];
     for ((p, profile) in stableProfiles.vals()) { profiles.put(p, profile) };
     for ((id, config) in stableSourceConfigs.vals()) { sourceConfigs.put(id, config) };
     for ((id, signal) in stableSignals.vals()) {
@@ -157,7 +201,6 @@ persistent actor AegisBackend {
       signalStakeIndex.put(stake.signalId, id);
     };
     for ((p, rep) in stableReputations.vals()) { reputations.put(p, rep) };
-    stableEvaluations := [];
     stableProfiles := [];
     stableSourceConfigs := [];
     stableSignals := [];
