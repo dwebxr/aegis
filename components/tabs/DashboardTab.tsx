@@ -146,13 +146,23 @@ function ExpandedDetails({ item, onValidate, onFlag }: {
             Read more &rarr;
           </a>
         )}
-        <button onClick={e => { e.stopPropagation(); onValidate(item.id); }}
-          style={{ ...actionBtnBase, background: colors.green.bg, border: `1px solid ${colors.green.border}`, color: colors.green[400] }}>
-          <CheckIcon /> Validate
+        <button disabled={item.validated} onClick={e => { e.stopPropagation(); onValidate(item.id); }}
+          style={{
+            ...actionBtnBase,
+            background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
+            border: `1px solid ${colors.green.border}`, color: colors.green[400],
+            cursor: item.validated ? "default" : "pointer", opacity: item.validated ? 0.6 : 1,
+          }}>
+          <CheckIcon /> {item.validated ? "Validated" : "Validate"}
         </button>
-        <button onClick={e => { e.stopPropagation(); onFlag(item.id); }}
-          style={{ ...actionBtnBase, background: colors.red.bg, border: `1px solid ${colors.red.border}`, color: colors.red[400] }}>
-          <XCloseIcon /> Flag Slop
+        <button disabled={item.flagged} onClick={e => { e.stopPropagation(); onFlag(item.id); }}
+          style={{
+            ...actionBtnBase,
+            background: item.flagged ? `${colors.red[400]}18` : colors.red.bg,
+            border: `1px solid ${colors.red.border}`, color: colors.red[400],
+            cursor: item.flagged ? "default" : "pointer", opacity: item.flagged ? 0.6 : 1,
+          }}>
+          <XCloseIcon /> {item.flagged ? "Flagged" : "Flag Slop"}
         </button>
       </div>
     </div>
