@@ -5,7 +5,6 @@ import {
   getUserApiKey,
   setUserApiKey,
   clearUserApiKey,
-  hasUserApiKey,
   maskApiKey,
 } from "@/lib/apiKey/storage";
 
@@ -56,23 +55,6 @@ describe("apiKey/storage", () => {
 
     it("does not throw when no key exists", () => {
       expect(() => clearUserApiKey()).not.toThrow();
-    });
-  });
-
-  describe("hasUserApiKey", () => {
-    it("returns false when no key is stored", () => {
-      expect(hasUserApiKey()).toBe(false);
-    });
-
-    it("returns true when a key is stored", () => {
-      setUserApiKey("sk-ant-api03-exists");
-      expect(hasUserApiKey()).toBe(true);
-    });
-
-    it("returns false after clearing", () => {
-      setUserApiKey("sk-ant-api03-temp");
-      clearUserApiKey();
-      expect(hasUserApiKey()).toBe(false);
     });
   });
 

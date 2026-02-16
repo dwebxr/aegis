@@ -1,4 +1,3 @@
-import type { ActorSubclass } from "@dfinity/agent";
 import type { _SERVICE } from "@/lib/ic/declarations/aegis_backend.did";
 import type { BriefingState } from "./types";
 import type { D2ABriefingResponse, D2ABriefingItem } from "@/lib/d2a/types";
@@ -60,7 +59,7 @@ export function briefingToD2AResponse(
 }
 
 export async function syncBriefingToCanister(
-  actor: ActorSubclass<_SERVICE>,
+  actor: _SERVICE,
   state: BriefingState,
   nostrPubkey: string | null = null,
 ): Promise<boolean> {

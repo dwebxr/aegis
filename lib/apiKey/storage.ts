@@ -22,10 +22,6 @@ export function clearUserApiKey(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-export function hasUserApiKey(): boolean {
-  return getUserApiKey() !== null;
-}
-
 export function maskApiKey(key: string): string {
   if (key.length <= 12) return key;
   return `${key.slice(0, 7)}...${key.slice(-4)}`;

@@ -41,7 +41,7 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       if (!saveProfile(p)) {
-        console.error("[prefs] Preference save failed — changes may be lost on reload");
+        console.error("[prefs] Preference save failed");
       }
     }, 500);
   }, []);

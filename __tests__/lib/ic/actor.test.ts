@@ -56,7 +56,7 @@ describe("createBackendActorAsync", () => {
     expect(mockCreateActor).toHaveBeenCalledTimes(1);
     expect(actor).toEqual({ mock: "actor" });
     expect(errorSpy).toHaveBeenCalledWith(
-      "[ic] syncTime failed — IC calls may fail with certificate errors:",
+      "[ic] syncTime failed:",
       "Network unreachable"
     );
 

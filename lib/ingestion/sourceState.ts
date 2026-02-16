@@ -61,10 +61,14 @@ function isValidState(v: unknown): v is SourceRuntimeState {
   const s = v as Record<string, unknown>;
   return (
     typeof s.errorCount === "number" &&
+    typeof s.lastErrorAt === "number" &&
+    typeof s.lastError === "string" &&
+    typeof s.lastSuccessAt === "number" &&
+    typeof s.lastFetchedAt === "number" &&
+    typeof s.itemsFetched === "number" &&
+    typeof s.consecutiveEmpty === "number" &&
     typeof s.nextFetchAt === "number" &&
     typeof s.averageScore === "number" &&
-    typeof s.lastError === "string" &&
-    typeof s.consecutiveEmpty === "number" &&
     typeof s.totalItemsScored === "number"
   );
 }

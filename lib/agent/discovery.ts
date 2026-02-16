@@ -107,10 +107,14 @@ export async function discoverPeers(
   }
   pool.destroy();
 
-  const peers: AgentProfile[] = [];
+  // Single-pass: parse events and deduplicate by pubkey (keep latest)
+  const byPubkey = new Map<string, AgentProfile>();
 
   for (const ev of events) {
     if (ev.pubkey === myPubkey) continue;
+
+    const existing = byPubkey.get(ev.pubkey);
+    if (existing && existing.lastSeen >= ev.created_at * 1000) continue;
 
     const interests: string[] = [];
     let capacity = 5;
@@ -133,11 +137,7 @@ export async function discoverPeers(
 
     let manifest;
     if (ev.content && ev.content.length > 0) {
-      try {
-        manifest = decodeManifest(ev.content) || undefined;
-      } catch {
-        // Malformed manifest — ignore, peer may be running older version
-      }
+      manifest = decodeManifest(ev.content) || undefined;
     }
 
     const profile: AgentProfile = {
@@ -150,15 +150,7 @@ export async function discoverPeers(
     };
 
     profile.resonance = calculateResonance(myPrefs, profile);
-    peers.push(profile);
-  }
-
-  const byPubkey = new Map<string, AgentProfile>();
-  for (const peer of peers) {
-    const existing = byPubkey.get(peer.nostrPubkey);
-    if (!existing || peer.lastSeen > existing.lastSeen) {
-      byPubkey.set(peer.nostrPubkey, peer);
-    }
+    byPubkey.set(ev.pubkey, profile);
   }
 
   return Array.from(byPubkey.values())

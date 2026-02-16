@@ -51,7 +51,7 @@ export async function buildFollowGraph(
               .filter((tag: string[]): tag is [string, string, ...string[]] =>
                 tag[0] === "p" && typeof tag[1] === "string",
               )
-              .map((tag: [string, string, ...string[]]) => tag[1]);
+              .map(tag => tag[1]);
             allFollows.set(author, follows);
 
             const existingNode = nodes.get(author);
@@ -97,31 +97,19 @@ function calculateMutualFollows(nodes: Map<string, WoTNode>, userPubkey: string)
   const userNode = nodes.get(userPubkey);
   if (!userNode) return;
 
-  const userDirectFollows = new Set(userNode.follows);
-
-  // Build reverse index: for each pubkey, which nodes follow them
-  const followedBy = new Map<string, Set<string>>();
-  nodes.forEach((node, pubkey) => {
-    for (const followPubkey of node.follows) {
-      let set = followedBy.get(followPubkey);
-      if (!set) {
-        set = new Set();
-        followedBy.set(followPubkey, set);
+  // For each person the user follows, count their follows as mutual connections.
+  // O(userFollows × avgFollowsPerUser) — typically much smaller than O(allNodes × avgFollowers).
+  for (const followPubkey of userNode.follows) {
+    const followNode = nodes.get(followPubkey);
+    if (!followNode) continue;
+    for (const target of followNode.follows) {
+      if (target === userPubkey) continue;
+      const targetNode = nodes.get(target);
+      if (targetNode) {
+        targetNode.mutualFollows++;
       }
-      set.add(pubkey);
     }
-  });
-
-  nodes.forEach((node, pubkey) => {
-    if (pubkey === userPubkey) return;
-    const followers = followedBy.get(pubkey);
-    if (!followers) return;
-    let mutual = 0;
-    followers.forEach((follower) => {
-      if (userDirectFollows.has(follower)) mutual++;
-    });
-    node.mutualFollows = mutual;
-  });
+  }
 }
 
 export { calculateMutualFollows as _calculateMutualFollows };

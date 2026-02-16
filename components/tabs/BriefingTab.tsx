@@ -1,10 +1,11 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { ContentCard } from "@/components/ui/ContentCard";
 import { ShareBriefingModal } from "@/components/ui/ShareBriefingModal";
 import { ShareIcon } from "@/components/icons";
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
+import { useContent } from "@/contexts/ContentContext";
 import { colors, space, fonts, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
@@ -26,8 +27,22 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showFiltered, setShowFiltered] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const { syncBriefing } = useContent();
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
+
+  // Stable key: only changes when the actual briefing composition changes
+  const briefingSyncKey = useMemo(
+    () => briefing.priority.map(b => b.item.id).join(",") + "|" + (briefing.serendipity?.item.id ?? ""),
+    [briefing.priority, briefing.serendipity],
+  );
+  const briefingRef = useRef(briefing);
+  briefingRef.current = briefing;
+  useEffect(() => {
+    if (briefingRef.current.priority.length > 0) {
+      syncBriefing(briefingRef.current, nostrKeys?.pk ?? null);
+    }
+  }, [briefingSyncKey, syncBriefing, nostrKeys?.pk]);
 
   const insightCount = briefing.priority.length + (briefing.serendipity ? 1 : 0) + discoveries.length;
   const canShare = nostrKeys && briefing.priority.length > 0;

@@ -11,11 +11,14 @@ import type { UserContext } from "@/lib/preferences/types";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
+import { withTimeout } from "@/lib/utils/timeout";
 import { recordUseful, recordSlop } from "@/lib/d2a/reputation";
 import { recordPublishValidation, recordPublishFlag } from "@/lib/reputation/publishGate";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
 import { encodeEngineInReason, decodeEngineFromReason } from "@/lib/scoring/types";
+import { syncBriefingToCanister } from "@/lib/briefing/sync";
+import type { BriefingState } from "@/lib/briefing/types";
 
 const CONTENT_CACHE_KEY = "aegis-content-cache";
 const MAX_CACHED_ITEMS = 200;
@@ -80,11 +83,14 @@ interface ContentState {
   isAnalyzing: boolean;
   syncStatus: "idle" | "syncing" | "synced" | "offline";
   analyze: (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
+  /** Run the full scoring cascade without side effects (no state update, no IC save). Used by scheduler. */
+  scoreText: (text: string, userContext?: UserContext | null) => Promise<AnalyzeResponse>;
   validateItem: (id: string) => void;
   flagItem: (id: string) => void;
   addContent: (item: ContentItem) => void;
   clearDemoContent: () => void;
   loadFromIC: () => Promise<void>;
+  syncBriefing: (state: BriefingState, nostrPubkey?: string | null) => void;
 }
 
 type PreferenceCallbacks = {
@@ -92,16 +98,20 @@ type PreferenceCallbacks = {
   onFlag?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop") => void;
 };
 
+const defaultAnalyzeResponse: AnalyzeResponse = { originality: 0, insight: 0, credibility: 0, composite: 0, verdict: "slop" as const, reason: "" };
+
 const ContentContext = createContext<ContentState>({
   content: [],
   isAnalyzing: false,
   syncStatus: "idle",
-  analyze: async () => ({ originality: 0, insight: 0, credibility: 0, composite: 0, verdict: "slop" as const, reason: "" }),
+  analyze: async () => defaultAnalyzeResponse,
+  scoreText: async () => defaultAnalyzeResponse,
   validateItem: () => {},
   flagItem: () => {},
   addContent: () => {},
   clearDemoContent: () => {},
   loadFromIC: async () => {},
+  syncBriefing: () => {},
 });
 
 const SOURCE_KEYS = ["rss", "url", "twitter", "nostr", "manual"] as const;
@@ -173,7 +183,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [content]);
 
   useEffect(() => {
-    const timestampTimer = setInterval(() => {
+    const updateTimestamps = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       setContent(prev => {
         let changed = false;
         const next = prev.map(c => {
@@ -186,38 +197,43 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         });
         return changed ? next : prev;
       });
-    }, 30000);
-    return () => clearInterval(timestampTimer);
+    };
+    const timestampTimer = setInterval(updateTimestamps, 30000);
+    const onVisible = () => { if (!document.hidden) updateTimestamps(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timestampTimer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
-  const analyze = useCallback(async (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }): Promise<AnalyzeResponse> => {
-    setIsAnalyzing(true);
-    try {
+  /** Run the full scoring cascade: Ollama → WebLLM → BYOK → IC LLM → Server → Heuristic. No side effects. */
+  const scoreText = useCallback(async (text: string, userContext?: UserContext | null): Promise<AnalyzeResponse> => {
     let result: AnalyzeResponse | null = null;
     const userApiKey = getUserApiKey();
     const topics = userContext
       ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
       : [];
 
-    // Tier 0: Ollama (local LLM server) — when enabled, tried first
+    // Tier 0: Ollama (local LLM server)
     if (isOllamaEnabled()) {
       try {
         const { scoreWithOllama } = await import("@/lib/ollama/engine");
         const ollamaResult = await scoreWithOllama(text, topics);
         result = { ...ollamaResult, scoredByAI: true, scoringEngine: "ollama" as const } as AnalyzeResponse;
       } catch (err) {
-        console.warn("[analyze] Ollama scoring failed, falling back:", errMsg(err));
+        console.warn("[scoreText] Ollama failed, falling back:", errMsg(err));
       }
     }
 
-    // Tier 1: WebLLM (browser-local AI) — when enabled, tried first for privacy
+    // Tier 1: WebLLM (browser-local AI)
     if (!result && isWebLLMEnabled()) {
       try {
         const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
         const webllmResult = await scoreWithWebLLM(text, topics);
         result = { ...webllmResult, scoredByAI: true, scoringEngine: "webllm" as const } as AnalyzeResponse;
       } catch (err) {
-        console.warn("[analyze] WebLLM scoring failed, falling back:", errMsg(err));
+        console.warn("[scoreText] WebLLM failed, falling back:", errMsg(err));
       }
     }
 
@@ -227,17 +243,18 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       if (data) {
         result = { ...data, scoringEngine: "claude-byok" as const };
       } else {
-        console.warn("[analyze] BYOK Claude API failed, falling back to IC LLM");
+        console.warn("[scoreText] BYOK failed, falling back to IC LLM");
       }
     }
 
     // Tier 3: IC LLM via canister (free, on-chain)
     if (!result && actorRef.current && isAuthenticated) {
       try {
-        const icResult = await Promise.race([
+        const icResult = await withTimeout(
           actorRef.current.analyzeOnChain(text.slice(0, 3000), topics),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("IC LLM timeout (30s)")), 30_000)),
-        ]);
+          30_000,
+          "IC LLM timeout (30s)",
+        );
         if ("ok" in icResult) {
           const a = icResult.ok;
           result = {
@@ -254,80 +271,88 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
             scoringEngine: "claude-ic" as const,
           };
         } else if ("err" in icResult) {
-          console.warn("[analyze] IC LLM returned error:", icResult.err);
+          console.warn("[scoreText] IC LLM error:", icResult.err);
         }
       } catch (err) {
-        console.warn("[analyze] IC LLM failed:", errMsg(err));
+        console.warn("[scoreText] IC LLM failed:", errMsg(err));
       }
     }
 
-    // Tier 3.5: Claude API with server key (provisional — future Pro subscription)
+    // Tier 3.5: Claude API with server key
     if (!result && !userApiKey) {
       const data = await fetchAnalyze(text, userContext);
       if (data) {
         result = { ...data, scoringEngine: "claude-server" as const };
       } else {
-        console.warn("[analyze] Server Claude API failed, falling back to heuristic");
+        console.warn("[scoreText] Server Claude failed, falling back to heuristic");
       }
     }
 
-    // Tier 4: Heuristic fallback (client-side, no network call)
+    // Tier 4: Heuristic fallback
     if (!result) {
       const { heuristicScores } = await import("@/lib/ingestion/quickFilter");
       result = { ...heuristicScores(text), scoredByAI: false, scoringEngine: "heuristic" as const };
     }
 
-    const evaluation: ContentItem = {
-      id: uuidv4(),
-      owner: principal ? principal.toText() : "",
-      author: "You",
-      avatar: "\u{1F50D}",
-      text: text.slice(0, 300),
-      source: meta?.sourceUrl ? "url" : "manual",
-      sourceUrl: meta?.sourceUrl,
-      imageUrl: meta?.imageUrl,
-      scores: {
-        originality: result.originality,
-        insight: result.insight,
-        credibility: result.credibility,
-        composite: result.composite,
-      },
-      verdict: result.verdict,
-      reason: result.reason,
-      createdAt: Date.now(),
-      validated: false,
-      flagged: false,
-      timestamp: "just now",
-      topics: result.topics,
-      vSignal: result.vSignal,
-      cContext: result.cContext,
-      lSlop: result.lSlop,
-      scoredByAI: result.scoredByAI ?? true,
-      scoringEngine: result.scoringEngine,
-    };
-    setContent(prev => [evaluation, ...prev]);
-
-    if (actorRef.current && isAuthenticated && principal) {
-      actorRef.current.saveEvaluation(toICEvaluation(evaluation, principal)).catch((err: unknown) => {
-        console.warn("[content] IC saveEvaluation failed:", errMsg(err));
-        setSyncStatus("offline");
-        addNotification("Evaluation saved locally but IC sync failed", "error");
-      });
-    }
-
     return result;
+  }, [isAuthenticated]);
+
+  const analyze = useCallback(async (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }): Promise<AnalyzeResponse> => {
+    setIsAnalyzing(true);
+    try {
+      const result = await scoreText(text, userContext);
+
+      const evaluation: ContentItem = {
+        id: uuidv4(),
+        owner: principal ? principal.toText() : "",
+        author: "You",
+        avatar: "\u{1F50D}",
+        text: text.slice(0, 300),
+        source: meta?.sourceUrl ? "url" : "manual",
+        sourceUrl: meta?.sourceUrl,
+        imageUrl: meta?.imageUrl,
+        scores: {
+          originality: result.originality,
+          insight: result.insight,
+          credibility: result.credibility,
+          composite: result.composite,
+        },
+        verdict: result.verdict,
+        reason: result.reason,
+        createdAt: Date.now(),
+        validated: false,
+        flagged: false,
+        timestamp: "just now",
+        topics: result.topics,
+        vSignal: result.vSignal,
+        cContext: result.cContext,
+        lSlop: result.lSlop,
+        scoredByAI: result.scoringEngine !== "heuristic",
+        scoringEngine: result.scoringEngine,
+      };
+      setContent(prev => [evaluation, ...prev].slice(0, MAX_CACHED_ITEMS));
+
+      if (actorRef.current && isAuthenticated && principal) {
+        void actorRef.current.saveEvaluation(toICEvaluation(evaluation, principal)).catch((err: unknown) => {
+          console.warn("[content] IC saveEvaluation failed:", errMsg(err));
+          setSyncStatus("offline");
+          addNotification("Evaluation saved locally but IC sync failed", "error");
+        });
+      }
+
+      return result;
     } finally { setIsAnalyzing(false); }
-  }, [isAuthenticated, principal, addNotification]);
+  }, [scoreText, isAuthenticated, principal, addNotification]);
 
   const validateItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
-    if (!item) return;
+    if (!item || item.validated) return;
     setContent(prev => prev.map(c => c.id === id ? { ...c, validated: true, validatedAt: c.validatedAt ?? Date.now() } : c));
     preferenceCallbacks?.onValidate?.(item.topics || [], item.author, item.scores.composite, item.verdict);
     if (item.source === "nostr" && item.nostrPubkey) recordUseful(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishValidation(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
-      actorRef.current.updateEvaluation(id, true, item.flagged)
+      void actorRef.current.updateEvaluation(id, true, item.flagged)
         .catch((err: unknown) => {
           console.warn("[content] IC updateEvaluation (validate) failed:", errMsg(err));
           setSyncStatus("offline");
@@ -338,13 +363,13 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const flagItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
-    if (!item) return;
+    if (!item || item.flagged) return;
     setContent(prev => prev.map(c => c.id === id ? { ...c, flagged: true } : c));
     preferenceCallbacks?.onFlag?.(item.topics || [], item.author, item.scores.composite, item.verdict);
     if (item.source === "nostr" && item.nostrPubkey) recordSlop(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishFlag(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
-      actorRef.current.updateEvaluation(id, item.validated, true)
+      void actorRef.current.updateEvaluation(id, item.validated, true)
         .catch((err: unknown) => {
           console.warn("[content] IC updateEvaluation (flag) failed:", errMsg(err));
           setSyncStatus("offline");
@@ -364,9 +389,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       ? { ...item, owner: principal.toText() }
       : item;
 
-    setContent(prev => [owned, ...prev]);
+    setContent(prev => [owned, ...prev].slice(0, MAX_CACHED_ITEMS));
     if (actorRef.current && isAuthenticated && principal) {
-      actorRef.current.saveEvaluation(toICEvaluation(owned, principal)).catch((err: unknown) => {
+      void actorRef.current.saveEvaluation(toICEvaluation(owned, principal)).catch((err: unknown) => {
         console.warn("[content] IC save (addContent) failed:", errMsg(err));
         setSyncStatus("offline");
         addNotification("Content saved locally but IC sync failed", "error");
@@ -437,10 +462,17 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     }
   }, [isAuthenticated, principal, addNotification]);
 
+  const syncBriefing = useCallback((state: BriefingState, nostrPubkey?: string | null) => {
+    if (!actorRef.current || !isAuthenticated) return;
+    syncBriefingToCanister(actorRef.current, state, nostrPubkey ?? null).catch((err: unknown) => {
+      console.warn("[content] Briefing sync to IC failed:", errMsg(err));
+    });
+  }, [isAuthenticated]);
+
   const value = useMemo(() => ({
     content, isAnalyzing, syncStatus,
-    analyze, validateItem, flagItem, addContent, clearDemoContent, loadFromIC,
-  }), [content, isAnalyzing, syncStatus, analyze, validateItem, flagItem, addContent, clearDemoContent, loadFromIC]);
+    analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent, loadFromIC, syncBriefing,
+  }), [content, isAnalyzing, syncStatus, analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent, loadFromIC, syncBriefing]);
 
   return (
     <ContentContext.Provider value={value}>

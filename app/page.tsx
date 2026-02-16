@@ -30,7 +30,7 @@ import { recordFilterRun } from "@/lib/filtering/costTracker";
 import { DemoBanner } from "@/components/ui/DemoBanner";
 import { LandingHero } from "@/components/ui/LandingHero";
 import { WoTPromptBanner } from "@/components/ui/WoTPromptBanner";
-import { getLinkedAccount, saveLinkedAccount, syncLinkedAccountToIC, fetchNostrProfile } from "@/lib/nostr/linkAccount";
+import { getLinkedAccount, saveLinkedAccount, syncLinkedAccountToIC, fetchNostrProfile, parseICSettings } from "@/lib/nostr/linkAccount";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
@@ -65,7 +65,7 @@ function extractUrl(text: string | null): string | null {
 function AegisAppInner() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
-  const { content, isAnalyzing, syncStatus, analyze, validateItem, flagItem, addContent, clearDemoContent, loadFromIC } = useContent();
+  const { content, isAnalyzing, syncStatus, analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent, loadFromIC } = useContent();
   const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
@@ -175,7 +175,7 @@ function AegisAppInner() {
     }
     // Sync to IC (fire-and-forget)
     if (identity) {
-      syncLinkedAccountToIC(identity, account, agentEnabledRef.current).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
+      void syncLinkedAccountToIC(identity, account, agentEnabledRef.current).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
     }
   }, [identity]);
 
@@ -260,33 +260,31 @@ function AegisAppInner() {
         setEngagementIndex(eIndex);
 
         // Restore user settings from IC
-        const settings = icSettings[0];
-        if (settings) {
-          setD2AEnabled(settings.d2aEnabled);
+        const rawSettings = icSettings[0];
+        if (rawSettings) {
+          const { account: icAccount, d2aEnabled: icD2A } = parseICSettings(rawSettings);
+          setD2AEnabled(icD2A);
 
           const localAccount = getLinkedAccount();
-          const icNpub = settings.linkedNostrNpub.length > 0 ? settings.linkedNostrNpub[0] : null;
-          const icHex = settings.linkedNostrPubkeyHex.length > 0 ? settings.linkedNostrPubkeyHex[0] : null;
 
-          if (!localAccount && icNpub && icHex) {
+          if (!localAccount && icAccount) {
             // IC has linked account that localStorage doesn't — restore
-            const restored: LinkedNostrAccount = { npub: icNpub, pubkeyHex: icHex, linkedAt: Date.now(), followCount: 0 };
-            saveLinkedAccount(restored);
-            setLinkedAccount(restored);
+            saveLinkedAccount(icAccount);
+            setLinkedAccount(icAccount);
             // Hydrate displayName + followCount from relays in background
-            fetchNostrProfile(icHex).then(profile => {
+            void fetchNostrProfile(icAccount.pubkeyHex).then(profile => {
               if (cancelled) return;
-              const hydrated: LinkedNostrAccount = { ...restored, displayName: profile.displayName, followCount: profile.followCount };
+              const hydrated: LinkedNostrAccount = { ...icAccount, displayName: profile.displayName, followCount: profile.followCount };
               saveLinkedAccount(hydrated);
               setLinkedAccount(hydrated);
             }).catch(err => console.warn("[nostr] Profile hydration failed:", errMsg(err)));
-          } else if (localAccount && !icNpub) {
-            syncLinkedAccountToIC(identity, localAccount, settings.d2aEnabled).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
+          } else if (localAccount && !icAccount) {
+            void syncLinkedAccountToIC(identity, localAccount, icD2A).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
           }
         }
       } catch (err) {
         console.warn("[staking] Failed to init ledger/reputation:", errMsg(err));
-        addNotification("Could not load ICP balance — staking may be unavailable", "error");
+        addNotification("Could not load ICP balance", "error");
       }
     })();
 
@@ -299,6 +297,8 @@ function AegisAppInner() {
   isDemoRef.current = isDemoMode;
   const principalTextRef = useRef(principalText);
   principalTextRef.current = principalText;
+  const scoreTextRef = useRef(scoreText);
+  scoreTextRef.current = scoreText;
 
   const demoSchedulerSources = useMemo(() =>
     DEMO_SOURCES.map(s => ({
@@ -319,6 +319,7 @@ function AegisAppInner() {
       },
       getUserContext: () => userContextRef.current,
       getSkipAI: () => filterModeRef.current === "lite",
+      scoreFn: (text, userContext) => scoreTextRef.current(text, userContext),
       onSourceAutoDisabled: (key, error) => {
         addNotification(`Source auto-disabled after repeated failures: ${key} (${error})`, "error");
       },
@@ -351,7 +352,7 @@ function AegisAppInner() {
             tag: `briefing-${new Date().toISOString().slice(0, 10)}`,
           }),
         }).catch((err: unknown) => {
-          console.warn("[push] Send notification failed:", err instanceof Error ? err.message : err);
+          console.warn("[push] Send notification failed:", errMsg(err));
         });
       },
     });
@@ -388,6 +389,8 @@ function AegisAppInner() {
       throw err;
     }
   };
+  const handleAnalyzeRef = useRef(handleAnalyze);
+  handleAnalyzeRef.current = handleAnalyze;
 
   // Web Share Target: auto-process shared URL
   useEffect(() => {
@@ -411,7 +414,7 @@ function AegisAppInner() {
           return;
         }
         setShareState(s => s ? { ...s, status: "analyzing" } : null);
-        await handleAnalyze(data.content || data.description || "", {
+        await handleAnalyzeRef.current(data.content || data.description || "", {
           sourceUrl: sharedUrl,
           imageUrl: data.imageUrl,
         });
@@ -422,8 +425,7 @@ function AegisAppInner() {
         addNotification("Shared URL analysis failed", "error");
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sharedUrl]);
+  }, [sharedUrl, isDemoMode, bannerDismissed, dismissBanner, addNotification]);
 
   const handlePublishSignal = useCallback(async (
     text: string,

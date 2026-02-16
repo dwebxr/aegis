@@ -16,7 +16,6 @@ import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { errMsg } from "@/lib/utils/errors";
-import { getUserApiKey } from "@/lib/apiKey/storage";
 import { scoreItemWithHeuristics } from "@/lib/filtering/pipeline";
 
 interface RawItem {
@@ -45,6 +44,8 @@ interface SchedulerCallbacks {
   getSources: () => SchedulerSource[];
   getUserContext: () => UserContext | null;
   getSkipAI?: () => boolean;
+  /** Full scoring cascade (Ollama → WebLLM → BYOK → IC LLM → Server → Heuristic). Provided by ContentContext. */
+  scoreFn?: (text: string, userContext?: UserContext | null) => Promise<AnalyzeResponse>;
   onSourceError?: (sourceKey: string, error: string) => void;
   onSourceAutoDisabled?: (sourceKey: string, error: string) => void;
   onCycleComplete?: (newItemCount: number, items: ContentItem[]) => void;
@@ -330,10 +331,11 @@ export class IngestionScheduler {
 
   private async fetchNostr(relays: string[], pubkeys: string[] | undefined, key: string): Promise<RawItem[]> {
     try {
+      const validPubkeys = pubkeys?.filter(Boolean);
       const res = await fetch("/api/fetch/nostr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ relays, pubkeys: pubkeys?.filter(Boolean).length ? pubkeys.filter(Boolean) : undefined, limit: 20 }),
+        body: JSON.stringify({ relays, pubkeys: validPubkeys?.length ? validPubkeys : undefined, limit: 20 }),
         signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
@@ -395,21 +397,12 @@ export class IngestionScheduler {
     sourceType: SchedulerSource["type"],
   ): Promise<ContentItem | null> {
     try {
-      const body: Record<string, unknown> = { text: raw.text, source: "auto" };
-      if (userContext) body.userContext = userContext;
+      if (!this.callbacks.scoreFn) {
+        console.warn("[scheduler] No scoreFn provided — cannot score");
+        return null;
+      }
 
-      const hdrs: Record<string, string> = { "Content-Type": "application/json" };
-      const uak = getUserApiKey();
-      if (uak) hdrs["X-User-API-Key"] = uak;
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: hdrs,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      const result: AnalyzeResponse = data.fallback || data;
+      const result = await this.callbacks.scoreFn(raw.text, userContext);
 
       return {
         id: uuidv4(),
@@ -437,7 +430,8 @@ export class IngestionScheduler {
         vSignal: result.vSignal,
         cContext: result.cContext,
         lSlop: result.lSlop,
-        scoredByAI: true,
+        scoredByAI: result.scoringEngine !== "heuristic",
+        scoringEngine: result.scoringEngine,
       };
     } catch (err) {
       console.error("[scheduler] Score item failed:", errMsg(err));

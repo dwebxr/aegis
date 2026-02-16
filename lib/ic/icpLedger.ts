@@ -100,7 +100,7 @@ export async function createICPLedgerActorAsync(identity: Identity): Promise<ICP
   try {
     await agent.syncTime();
   } catch (err) {
-    console.error("[ic] ledger syncTime failed — IC calls may fail with certificate errors:", errMsg(err));
+    console.error("[ic] ledger syncTime failed:", errMsg(err));
   }
   return Actor.createActor<ICPLedgerActor>(icpLedgerIdlFactory, {
     agent,

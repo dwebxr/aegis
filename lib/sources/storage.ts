@@ -11,7 +11,12 @@ export function loadSources(principalId: string): SavedSource[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (s): s is SavedSource =>
-        s && typeof s.id === "string" && typeof s.type === "string" && typeof s.enabled === "boolean",
+        s &&
+        typeof s.id === "string" &&
+        (s.type === "rss" || s.type === "nostr") &&
+        typeof s.enabled === "boolean" &&
+        typeof s.label === "string" &&
+        typeof s.createdAt === "number",
     );
   } catch (err) {
     console.warn("[sources] Failed to load source configs:", err);

@@ -13,10 +13,17 @@ afterAll(() => {
   global.fetch = originalFetch;
 });
 
+const defaultScoreFn = jest.fn().mockResolvedValue({
+  originality: 7, insight: 7, credibility: 7, composite: 7,
+  verdict: "quality", reason: "Mock score", topics: ["test"],
+  scoringEngine: "heuristic",
+});
+
 function makeCallbacks(overrides: Partial<{
   onNewContent: jest.Mock;
   getSources: jest.Mock;
   getUserContext: jest.Mock;
+  scoreFn: jest.Mock;
   onSourceError: jest.Mock;
   onSourceAutoDisabled: jest.Mock;
 }> = {}) {
@@ -24,6 +31,7 @@ function makeCallbacks(overrides: Partial<{
     onNewContent: overrides.onNewContent ?? jest.fn(),
     getSources: overrides.getSources ?? jest.fn().mockReturnValue([]),
     getUserContext: overrides.getUserContext ?? jest.fn().mockReturnValue(null),
+    scoreFn: overrides.scoreFn ?? defaultScoreFn,
     onSourceError: overrides.onSourceError ?? jest.fn(),
     onSourceAutoDisabled: overrides.onSourceAutoDisabled ?? jest.fn(),
   };

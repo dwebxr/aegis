@@ -12,7 +12,7 @@ function feedErrorResponse(err: unknown, feedUrl: string, context: string): Next
   if (msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
     return NextResponse.json({ error: "Could not reach this feed. Check the URL and try again." }, { status: 502 });
   }
-  return NextResponse.json({ error: "Could not parse this feed. It may not be valid RSS/Atom." }, { status: 422 });
+  return NextResponse.json({ error: "Could not parse feed" }, { status: 422 });
 }
 
 const parser = new Parser({

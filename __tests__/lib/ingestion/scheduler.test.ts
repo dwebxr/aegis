@@ -25,15 +25,23 @@ describe("IngestionScheduler", () => {
     jest.useRealTimers();
   });
 
+  const defaultScoreFn = jest.fn().mockResolvedValue({
+    originality: 7, insight: 7, credibility: 7, composite: 7,
+    verdict: "quality", reason: "Mock score", topics: ["test"],
+    scoringEngine: "heuristic",
+  });
+
   function makeCallbacks(overrides: Partial<{
     onNewContent: jest.Mock;
     getSources: jest.Mock;
     getUserContext: jest.Mock;
+    scoreFn: jest.Mock;
   }> = {}) {
     return {
       onNewContent: overrides.onNewContent ?? jest.fn(),
       getSources: overrides.getSources ?? jest.fn().mockReturnValue([]),
       getUserContext: overrides.getUserContext ?? jest.fn().mockReturnValue(null),
+      scoreFn: overrides.scoreFn ?? defaultScoreFn,
     };
   }
 
@@ -182,15 +190,21 @@ describe("IngestionScheduler", () => {
       jest.useRealTimers(); // Use real timers since we need to await async chain
 
       const onNewContent = jest.fn();
+      const scoreFn = jest.fn().mockResolvedValue({
+        originality: 8, insight: 7, credibility: 9, composite: 8.1,
+        verdict: "quality", reason: "Novel research with data",
+        topics: ["transformers", "attention"], vSignal: 8, cContext: 6, lSlop: 1,
+        scoringEngine: "claude-server",
+      });
       const callbacks = makeCallbacks({
         onNewContent,
+        scoreFn,
         getSources: jest.fn().mockReturnValue([
           { type: "rss", config: { feedUrl: "https://example.com/feed.xml" }, enabled: true },
         ]),
       });
 
-      // Mock fetch: first call is /api/fetch/rss, second is /api/analyze
-      // Content must be >100 words to skip the enrichment step (which would call /api/fetch/url)
+      // Mock fetch: RSS feed response (>100 words to skip enrichment)
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({
           ok: true,
@@ -203,21 +217,6 @@ describe("IngestionScheduler", () => {
               link: "https://example.com/article",
               imageUrl: "https://example.com/thumb.jpg",
             }],
-          }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            originality: 8,
-            insight: 7,
-            credibility: 9,
-            composite: 8.1,
-            verdict: "quality",
-            reason: "Novel research with data",
-            topics: ["transformers", "attention"],
-            vSignal: 8,
-            cContext: 6,
-            lSlop: 1,
           }),
         });
 
@@ -281,12 +280,13 @@ describe("IngestionScheduler", () => {
       expect(onNewContent).not.toHaveBeenCalled();
     });
 
-    it("handles failed /api/analyze gracefully without crashing", async () => {
+    it("handles failed scoring gracefully without crashing", async () => {
       jest.useRealTimers();
 
       const onNewContent = jest.fn();
       const callbacks = makeCallbacks({
         onNewContent,
+        scoreFn: jest.fn().mockRejectedValue(new Error("Scoring cascade failed")),
         getSources: jest.fn().mockReturnValue([
           { type: "rss", config: { feedUrl: "https://example.com/feed.xml" }, enabled: true },
         ]),
@@ -305,18 +305,13 @@ describe("IngestionScheduler", () => {
               link: "https://example.com/good",
             }],
           }),
-        })
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 500,
-          json: async () => ({ error: "Internal error" }),
         });
 
       const scheduler = new IngestionScheduler(callbacks);
       const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
       await runCycle();
 
-      // Analyze failed, so no content should be produced
+      // Scoring failed, so no content should be produced
       expect(onNewContent).not.toHaveBeenCalled();
     });
   });

@@ -5,7 +5,6 @@ import {
   getUserApiKey,
   setUserApiKey,
   clearUserApiKey,
-  hasUserApiKey,
   maskApiKey,
 } from "@/lib/apiKey/storage";
 
@@ -46,17 +45,6 @@ describe("apiKey/storage — edge cases and boundary conditions", () => {
       expect(getUserApiKey()).toBeNull();
 
       if (origDescriptor) Object.defineProperty(globalThis, "localStorage", origDescriptor);
-    });
-  });
-
-  describe("hasUserApiKey — delegates to getUserApiKey", () => {
-    it("returns false when localStorage is empty", () => {
-      expect(hasUserApiKey()).toBe(false);
-    });
-
-    it("returns true after setting a key", () => {
-      setUserApiKey("sk-ant-test123");
-      expect(hasUserApiKey()).toBe(true);
     });
   });
 

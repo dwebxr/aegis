@@ -116,12 +116,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
       // Turning on — check WebGPU + GPU adapter
       const { isWebGPUUsable } = await import("@/lib/webllm/engine");
       if (!(await isWebGPUUsable())) {
-        addNotification("WebGPU is not available — check chrome://gpu or try enabling chrome://flags/#enable-unsafe-webgpu", "error");
+        addNotification("WebGPU not available — see chrome://gpu", "error");
         return;
       }
       setWebLLMEnabled(true);
       setWebllmOn(true);
-      addNotification("Browser AI enabled — model will download on first score", "success");
+      addNotification("Browser AI enabled", "success");
     }
   }, [webllmOn, addNotification]);
 
@@ -177,7 +177,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
     }
   }, [ollamaConfig.endpoint, addNotification]);
 
-  // Load saved frequency on mount
   useEffect(() => {
     const saved = localStorage.getItem(LS_PUSH_FREQ_KEY);
     if (saved && PUSH_FREQ_OPTIONS.some(o => o.value === saved)) {

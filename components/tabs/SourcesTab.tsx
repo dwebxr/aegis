@@ -265,7 +265,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         if (!res.ok) {
           setRssInput("");
           if (quickAddMode === "topic") {
-            setRssError("Google News may be blocking this request. Try different keywords or paste a direct RSS URL instead.");
+            setRssError("Feed fetch failed — try different keywords or paste a direct RSS URL");
           } else {
             setRssError(data.error || "Failed to parse feed");
           }

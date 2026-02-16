@@ -13,11 +13,18 @@ afterAll(() => {
   global.fetch = originalFetch;
 });
 
+const defaultScoreFn = jest.fn().mockResolvedValue({
+  originality: 7, insight: 7, credibility: 7, composite: 7,
+  verdict: "quality", reason: "Mock score", topics: ["test"],
+  scoringEngine: "heuristic",
+});
+
 function makeCallbacks(overrides: Partial<{
   onNewContent: jest.Mock;
   getSources: jest.Mock;
   getUserContext: jest.Mock;
   getSkipAI: jest.Mock;
+  scoreFn: jest.Mock;
   onSourceError: jest.Mock;
   onCycleComplete: jest.Mock;
 }> = {}) {
@@ -26,6 +33,7 @@ function makeCallbacks(overrides: Partial<{
     getSources: overrides.getSources ?? jest.fn().mockReturnValue([]),
     getUserContext: overrides.getUserContext ?? jest.fn().mockReturnValue(null),
     getSkipAI: overrides.getSkipAI,
+    scoreFn: overrides.scoreFn ?? defaultScoreFn,
     onSourceError: overrides.onSourceError ?? jest.fn(),
     onCycleComplete: overrides.onCycleComplete,
   };
@@ -73,22 +81,13 @@ describe("IngestionScheduler — enrichment flow", () => {
           }],
         }),
       })
-      // Enrichment: /api/fetch/url returns full article
+      // Enrichment: /api/fetch/url returns full article (scoring handled by scoreFn)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           title: "Full Article Title",
           content: "This is a much more detailed article content with extensive data analysis showing significant improvements. The comprehensive benchmark results demonstrate a 35% accuracy increase across multiple evaluation datasets. Researchers conducted ablation studies to understand the contribution of each component in the proposed architecture.",
           imageUrl: "https://example.com/enriched-img.jpg",
-        }),
-      })
-      // Analyze call
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "Good", topics: ["research"],
-          vSignal: 7, cContext: 5, lSlop: 2,
         }),
       });
 
@@ -130,16 +129,8 @@ describe("IngestionScheduler — enrichment flow", () => {
           }],
         }),
       })
-      // Enrichment fails
-      .mockRejectedValueOnce(new Error("Enrichment failed"))
-      // Analyze gets the original short text (but it may fail quick filter)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 5, insight: 5, credibility: 5, composite: 5.0,
-          verdict: "quality", reason: "ok",
-        }),
-      });
+      // Enrichment fails (scoring handled by scoreFn if item passes quickFilter)
+      .mockRejectedValueOnce(new Error("Enrichment failed"));
 
     const scheduler = new IngestionScheduler(callbacks);
     const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
@@ -162,13 +153,6 @@ describe("IngestionScheduler — enrichment flow", () => {
         json: async () => ({
           title: "Short",
           content: "Brief.",
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 5, insight: 5, credibility: 5, composite: 5.0,
-          verdict: "quality", reason: "ok",
         }),
       });
 
@@ -207,7 +191,7 @@ describe("IngestionScheduler — enrichment flow", () => {
           }],
         }),
       })
-      // Enrichment returns full article with imageUrl
+      // Enrichment returns full article with imageUrl (scoring handled by scoreFn)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -216,15 +200,6 @@ describe("IngestionScheduler — enrichment flow", () => {
             "The methodology uses a novel approach combining attention mechanisms with retrieval augmentation. " +
             "Experiments were conducted across multiple datasets to validate the findings comprehensively.",
           imageUrl: "https://example.com/enriched-og-image.jpg",
-        }),
-      })
-      // Analyze call
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "Good", topics: ["research"],
-          vSignal: 7, cContext: 5, lSlop: 2,
         }),
       });
 
@@ -261,7 +236,7 @@ describe("IngestionScheduler — enrichment flow", () => {
           }],
         }),
       })
-      // Enrichment returns full article with different imageUrl
+      // Enrichment returns full article with different imageUrl (scoring handled by scoreFn)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -269,14 +244,6 @@ describe("IngestionScheduler — enrichment flow", () => {
           content: "Detailed research with benchmark data showing 35% improvement across evaluation datasets. " +
             "The methodology demonstrates consistent gains across five model architectures with reproducible results.",
           imageUrl: "https://example.com/enriched-different-img.jpg",
-        }),
-      })
-      // Analyze call
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "Good", topics: ["ml"],
         }),
       });
 
@@ -311,24 +278,13 @@ describe("IngestionScheduler — enrichment flow", () => {
         json: async () => ({ items }),
       });
 
-    // Mock enrichment calls — all return long content
+    // Mock enrichment calls — all return long content (scoring handled by scoreFn)
     for (let i = 0; i < 5; i++) {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           title: `Full Article ${i}`,
           content: "Very detailed content. ".repeat(30),
-        }),
-      });
-    }
-
-    // Mock analyze calls
-    for (let i = 0; i < 5; i++) {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "ok",
         }),
       });
     }
@@ -485,13 +441,6 @@ describe("IngestionScheduler — onCycleComplete callback", () => {
         json: async () => ({
           items: [{ title: "Study", content: LONG_CONTENT, author: "Author", link: "https://example.com/1" }],
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "ok", topics: ["test"],
-        }),
       });
 
     const scheduler = new IngestionScheduler(callbacks);
@@ -518,21 +467,21 @@ describe("IngestionScheduler — onCycleComplete callback", () => {
   });
 });
 
-describe("IngestionScheduler — user API key forwarding", () => {
-  const mockGetUserApiKey = jest.fn();
-
+describe("IngestionScheduler — scoreFn delegation", () => {
   beforeEach(() => {
     (global.fetch as jest.Mock).mockReset().mockResolvedValue({
       ok: true,
       json: async () => ({ items: [], events: [] }),
     });
-    mockGetUserApiKey.mockReturnValue(null);
   });
 
-  // We can't easily mock getUserApiKey inside the module without restructuring,
-  // but we can verify the fetch call is made with the correct headers structure
-  it("makes analyze requests with Content-Type header", async () => {
+  it("delegates scoring to scoreFn callback instead of calling /api/analyze directly", async () => {
+    const scoreFn = jest.fn().mockResolvedValue({
+      originality: 7, insight: 7, credibility: 7, composite: 7.0,
+      verdict: "quality", reason: "ok", scoringEngine: "claude-server",
+    });
     const callbacks = makeCallbacks({
+      scoreFn,
       getSources: jest.fn().mockReturnValue([
         { type: "rss", config: { feedUrl: "https://example.com/feed" }, enabled: true },
       ]),
@@ -544,25 +493,18 @@ describe("IngestionScheduler — user API key forwarding", () => {
         json: async () => ({
           items: [{ title: "Study", content: LONG_CONTENT, author: "Author", link: "https://example.com/1" }],
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "ok",
-        }),
       });
 
     const scheduler = new IngestionScheduler(callbacks);
     const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
     await runCycle();
 
+    // scoreFn should be called, not /api/analyze
+    expect(scoreFn).toHaveBeenCalledTimes(1);
     const analyzeCalls = (global.fetch as jest.Mock).mock.calls.filter(
       (c: [string, ...unknown[]]) => c[0] === "/api/analyze"
     );
-    if (analyzeCalls.length > 0) {
-      expect(analyzeCalls[0][1].headers["Content-Type"]).toBe("application/json");
-    }
+    expect(analyzeCalls.length).toBe(0);
   });
 });
 
@@ -625,10 +567,11 @@ describe("IngestionScheduler — scoreItem error handling", () => {
     });
   });
 
-  it("returns null when analyze fetch throws exception", async () => {
+  it("returns null when scoreFn throws exception", async () => {
     const onNewContent = jest.fn();
     const callbacks = makeCallbacks({
       onNewContent,
+      scoreFn: jest.fn().mockRejectedValue(new Error("Scoring cascade failed")),
       getSources: jest.fn().mockReturnValue([
         { type: "rss", config: { feedUrl: "https://example.com/feed" }, enabled: true },
       ]),
@@ -640,9 +583,7 @@ describe("IngestionScheduler — scoreItem error handling", () => {
         json: async () => ({
           items: [{ title: "Study", content: LONG_CONTENT, author: "Author", link: "https://example.com/1" }],
         }),
-      })
-      // Analyze throws
-      .mockRejectedValueOnce(new Error("Network error"));
+      });
 
     const scheduler = new IngestionScheduler(callbacks);
     const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
@@ -662,7 +603,18 @@ describe("IngestionScheduler — average score tracking", () => {
   });
 
   it("computes and updates averageScore in source state", async () => {
+    let callCount = 0;
+    const scoreFn = jest.fn().mockImplementation(async () => {
+      callCount++;
+      const composite = callCount === 1 ? 8.0 : 6.0;
+      return {
+        originality: composite, insight: composite, credibility: composite, composite,
+        verdict: "quality", reason: "ok", scoringEngine: "claude-server",
+      };
+    });
+
     const callbacks = makeCallbacks({
+      scoreFn,
       getSources: jest.fn().mockReturnValue([
         { type: "rss", config: { feedUrl: "https://example.com/feed" }, enabled: true },
       ]),
@@ -677,14 +629,6 @@ describe("IngestionScheduler — average score tracking", () => {
             { title: "Article 2", content: LONG_CONTENT + " Additional novel findings.", author: "B", link: "https://example.com/2" },
           ],
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ originality: 8, insight: 8, credibility: 8, composite: 8.0, verdict: "quality", reason: "ok" }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ originality: 6, insight: 6, credibility: 6, composite: 6.0, verdict: "quality", reason: "ok" }),
       });
 
     const scheduler = new IngestionScheduler(callbacks);

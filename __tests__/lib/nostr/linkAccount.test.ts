@@ -36,6 +36,7 @@ import {
   linkNostrAccount,
   syncLinkedAccountToIC,
   loadSettingsFromIC,
+  parseICSettings,
 } from "@/lib/nostr/linkAccount";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 import { decode, npubEncode } from "nostr-tools/nip19";
@@ -563,5 +564,48 @@ describe("loadSettingsFromIC", () => {
     mockGetUserSettings.mockRejectedValue(new Error("IC unreachable"));
     const result = await loadSettingsFromIC(fakeIdentity, "aaaaa-aa");
     expect(result).toBeNull();
+  });
+});
+
+describe("parseICSettings", () => {
+  it("extracts account when npub and hex are present", () => {
+    const result = parseICSettings({
+      linkedNostrNpub: ["npub1abc"],
+      linkedNostrPubkeyHex: ["deadbeef"],
+      d2aEnabled: true,
+    });
+    expect(result.account).not.toBeNull();
+    expect(result.account!.npub).toBe("npub1abc");
+    expect(result.account!.pubkeyHex).toBe("deadbeef");
+    expect(result.account!.followCount).toBe(0);
+    expect(result.d2aEnabled).toBe(true);
+  });
+
+  it("returns null account when arrays are empty", () => {
+    const result = parseICSettings({
+      linkedNostrNpub: [],
+      linkedNostrPubkeyHex: [],
+      d2aEnabled: false,
+    });
+    expect(result.account).toBeNull();
+    expect(result.d2aEnabled).toBe(false);
+  });
+
+  it("returns null account when only npub is present (no hex)", () => {
+    const result = parseICSettings({
+      linkedNostrNpub: ["npub1abc"],
+      linkedNostrPubkeyHex: [],
+      d2aEnabled: true,
+    });
+    expect(result.account).toBeNull();
+  });
+
+  it("returns null account when only hex is present (no npub)", () => {
+    const result = parseICSettings({
+      linkedNostrNpub: [],
+      linkedNostrPubkeyHex: ["deadbeef"],
+      d2aEnabled: false,
+    });
+    expect(result.account).toBeNull();
   });
 });

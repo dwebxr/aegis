@@ -26,6 +26,12 @@ function makeFetchResponse(data: unknown, ok = true, status = 200): Response {
 
 type SchedulerOpts = ConstructorParameters<typeof IngestionScheduler>[0];
 
+const defaultScoreFn = jest.fn().mockResolvedValue({
+  originality: 7, insight: 8, credibility: 7, composite: 7.3,
+  verdict: "quality", reason: "Good analysis", topics: ["tech"],
+  scoringEngine: "claude-server",
+});
+
 function makeScheduler(overrides: Partial<SchedulerOpts> = {}) {
   const collected: ContentItem[] = [];
   const errors: Array<{ key: string; error: string }> = [];
@@ -34,6 +40,7 @@ function makeScheduler(overrides: Partial<SchedulerOpts> = {}) {
     onNewContent: (item) => collected.push(item),
     getSources: () => [],
     getUserContext: () => null,
+    scoreFn: defaultScoreFn,
     onSourceError: (key, error) => errors.push({ key, error }),
     ...overrides,
   });
@@ -71,14 +78,8 @@ describe("IngestionScheduler — cycle integration", () => {
       ],
     };
 
-    const analyzeResponse = {
-      originality: 7, insight: 8, credibility: 7, composite: 7.3,
-      verdict: "quality", reason: "Good analysis", topics: ["tech"],
-    };
-
     fetchMock
-      .mockResolvedValueOnce(makeFetchResponse(rssResponse)) // RSS fetch
-      .mockResolvedValueOnce(makeFetchResponse(analyzeResponse)); // Analyze
+      .mockResolvedValueOnce(makeFetchResponse(rssResponse)); // RSS fetch (scoring handled by scoreFn)
 
     const { scheduler, collected } = makeScheduler({
       getSources: () => [{ type: "rss", config: { feedUrl: "https://example.com/feed" }, enabled: true }],

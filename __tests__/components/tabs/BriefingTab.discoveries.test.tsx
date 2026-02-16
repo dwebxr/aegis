@@ -16,6 +16,10 @@ jest.mock("@/components/filtering/SerendipityBadge", () => ({
   SerendipityBadge: () => <span>badge</span>,
 }));
 
+jest.mock("@/contexts/ContentContext", () => ({
+  useContent: () => ({ syncBriefing: jest.fn() }),
+}));
+
 const { BriefingTab } = require("@/components/tabs/BriefingTab");
 
 const makeItem = (overrides: Partial<ContentItem> = {}): ContentItem => ({

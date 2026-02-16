@@ -676,8 +676,8 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
-| Monitoring | Sentry (@sentry/nextjs, beforeSend scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (2114 tests, 142 suites) |
+| Monitoring | Sentry (@sentry/nextjs, auth/cookie scrubbing, breadcrumb URL stripping, conditional on DSN) |
+| Test | Jest + ts-jest (2510 tests, 164 suites) |
 
 ## Project Structure
 
@@ -686,6 +686,7 @@ aegis/
 ├── app/
 │   ├── page.tsx                         # Main app page
 │   ├── layout.tsx                       # Root layout + metadata + icons
+│   ├── global-error.tsx                 # Root layout error boundary (Sentry capture)
 │   ├── b/[naddr]/page.tsx               # Shared briefing viewer (Nostr NIP-23)
 │   ├── offline/page.tsx                 # PWA offline fallback
 │   ├── favicon.ico                      # Browser tab icon
@@ -839,7 +840,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 2114 tests
+npm test              # Run all 2510 tests
 npm run test:watch    # Watch mode
 ```
 

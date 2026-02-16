@@ -127,13 +127,15 @@ describe("POST /api/fetch/url — extraction", () => {
       const res = await POST(makeRequest({ url: "https://example.com/paywalled" }));
       expect(res.status).toBe(422);
       const data = await res.json();
-      expect(data.error).toContain("Could not extract");
+      expect(data.error).toContain("no parseable content");
     });
 
     it("returns 422 when article has no content", async () => {
       mockExtract.mockResolvedValueOnce({ title: "Empty", content: "" });
       const res = await POST(makeRequest({ url: "https://example.com/empty" }));
       expect(res.status).toBe(422);
+      const data = await res.json();
+      expect(data.error).toContain("no article text");
     });
 
     it("returns 422 when extracted text is too short (under 50 chars)", async () => {

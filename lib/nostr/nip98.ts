@@ -2,10 +2,7 @@ import { finalizeEvent } from "nostr-tools/pure";
 
 const KIND_HTTP_AUTH = 27235;
 
-/**
- * Create a NIP-98 Authorization header value for HTTP requests.
- * Returns the full header string: "Nostr <base64-encoded-event>"
- */
+/** NIP-98: "Nostr <base64-event>" authorization header. */
 export function createNIP98AuthHeader(
   sk: Uint8Array,
   url: string,

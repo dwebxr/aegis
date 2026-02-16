@@ -44,9 +44,18 @@ function formatDate(ts: number): string {
 
 function itemTitle(item: ContentItem): string {
   const raw = item.text || "Untitled";
-  // Use first line or first 80 chars as title
   const firstLine = raw.split("\n")[0];
   return truncate(firstLine, 80);
+}
+
+/** Render a single briefing item's body lines (reason, text, topics, source). */
+function renderItemBody(it: ContentItem, lines: string[]): void {
+  if (it.reason) lines.push(`> ${truncate(it.reason, 200)}`);
+  if (it.text) lines.push(`${truncate(it.text, 280)}`);
+  if (it.topics && it.topics.length > 0) {
+    lines.push(`Topics: ${it.topics.map(t => "#" + t).join(" ")}`);
+  }
+  if (it.sourceUrl) lines.push(`[Source](${it.sourceUrl})`);
 }
 
 export function serializeBriefing(
@@ -79,18 +88,7 @@ export function serializeBriefing(
       const it = b.item;
       lines.push(`### #${i + 1}: ${itemTitle(it)}`);
       lines.push(`**Score: ${it.scores.composite.toFixed(1)}/10** | Verdict: ${it.verdict}`);
-      if (it.reason) {
-        lines.push(`> ${truncate(it.reason, 200)}`);
-      }
-      if (it.text) {
-        lines.push(`${truncate(it.text, 280)}`);
-      }
-      if (it.topics && it.topics.length > 0) {
-        lines.push(`Topics: ${it.topics.map(t => "#" + t).join(" ")}`);
-      }
-      if (it.sourceUrl) {
-        lines.push(`[Source](${it.sourceUrl})`);
-      }
+      renderItemBody(it, lines);
       lines.push("");
     });
   }
@@ -103,18 +101,7 @@ export function serializeBriefing(
     const it = briefing.serendipity.item;
     lines.push(`### ${itemTitle(it)}`);
     lines.push(`**Score: ${it.scores.composite.toFixed(1)}/10** | Novelty bonus applied`);
-    if (it.reason) {
-      lines.push(`> ${truncate(it.reason, 200)}`);
-    }
-    if (it.text) {
-      lines.push(`${truncate(it.text, 280)}`);
-    }
-    if (it.topics && it.topics.length > 0) {
-      lines.push(`Topics: ${it.topics.map(t => "#" + t).join(" ")}`);
-    }
-    if (it.sourceUrl) {
-      lines.push(`[Source](${it.sourceUrl})`);
-    }
+    renderItemBody(it, lines);
     lines.push("");
     lines.push("*Selected outside your usual topics to prevent filter bubbles.*");
     lines.push("");
@@ -124,7 +111,6 @@ export function serializeBriefing(
   lines.push("");
   lines.push("*Curated by [Aegis](https://aegis.dwebxr.xyz) — AI Content Quality Filter*");
 
-  // Collect unique topics for tags
   const allTopics = new Set<string>();
   for (const b of briefing.priority) {
     for (const t of b.item.topics || []) allTopics.add(t);
@@ -166,7 +152,6 @@ export function parseBriefingMarkdown(
   let inSerendipity = false;
 
   for (const line of lines) {
-    // Extract "N insights selected from M items"
     const statsMatch = line.match(/\*(\d+)\s+insights?\s+selected\s+from\s+(\d+)\s+items/);
     if (statsMatch) {
       totalItems = parseInt(statsMatch[2], 10);

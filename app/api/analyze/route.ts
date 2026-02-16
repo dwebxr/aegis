@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
   const userKey = request.headers.get("x-user-api-key");
   const isUserKey = !!(userKey && userKey.startsWith("sk-ant-"));
-  const apiKey = isUserKey ? userKey : process.env.ANTHROPIC_API_KEY;
+  const apiKey = isUserKey ? userKey : process.env.ANTHROPIC_API_KEY?.trim();
 
   if (!apiKey || (!isUserKey && !withinDailyBudget())) {
     const fallback = heuristicScores(text);

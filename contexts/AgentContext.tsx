@@ -64,7 +64,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     setIsEnabled(prev => {
       const next = !prev;
       if (identity) {
-        syncLinkedAccountToIC(identity, getLinkedAccount(), next).catch(e => console.warn("[agent] IC sync failed:", errMsg(e)));
+        void syncLinkedAccountToIC(identity, getLinkedAccount(), next).catch(e => console.warn("[agent] IC sync failed:", errMsg(e)));
       }
       return next;
     });

@@ -20,7 +20,7 @@ export async function createBackendActorAsync(identity?: Identity): Promise<_SER
   try {
     await agent.syncTime();
   } catch (err) {
-    console.error("[ic] syncTime failed — IC calls may fail with certificate errors:", errMsg(err));
+    console.error("[ic] syncTime failed:", errMsg(err));
   }
   return Actor.createActor<_SERVICE>(idlFactory, {
     agent,

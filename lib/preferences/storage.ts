@@ -34,7 +34,7 @@ export function saveProfile(profile: UserPreferenceProfile): boolean {
     localStorage.setItem(KEY_PREFIX + profile.principalId, JSON.stringify(profile));
     return true;
   } catch (err) {
-    console.warn("[prefs] Failed to save preference profile (localStorage may be full):", err);
+    console.warn("[prefs] Failed to save preference profile:", err);
     return false;
   }
 }

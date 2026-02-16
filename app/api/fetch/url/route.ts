@@ -36,8 +36,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Could not reach this URL. Please verify it is accessible." }, { status: 502 });
   }
 
-  if (!article || !article.content) {
-    return NextResponse.json({ error: "Could not extract article content. This may be a paywall or dynamic page." }, { status: 422 });
+  if (!article) {
+    return NextResponse.json({ error: "Page returned no parseable content — it may require authentication or JavaScript" }, { status: 422 });
+  }
+
+  if (!article.content) {
+    return NextResponse.json({ error: "Page loaded but contained no article text" }, { status: 422 });
   }
 
   const textContent = article.content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();

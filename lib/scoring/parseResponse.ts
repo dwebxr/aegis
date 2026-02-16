@@ -44,7 +44,8 @@ export function parseScoreResponse(raw: string): ScoreParseResult | null {
       : [];
 
     return { originality, insight, credibility, composite, verdict, reason, topics, vSignal, cContext, lSlop };
-  } catch {
+  } catch (err) {
+    console.warn("[parseResponse] Failed to parse LLM response:", err);
     return null;
   }
 }

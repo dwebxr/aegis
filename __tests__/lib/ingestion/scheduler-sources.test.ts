@@ -13,15 +13,23 @@ afterAll(() => {
   global.fetch = originalFetch;
 });
 
+const defaultScoreFn = jest.fn().mockResolvedValue({
+  originality: 7, insight: 7, credibility: 7, composite: 7,
+  verdict: "quality", reason: "Mock score", topics: ["test"],
+  scoringEngine: "heuristic",
+});
+
 function makeCallbacks(overrides: Partial<{
   onNewContent: jest.Mock;
   getSources: jest.Mock;
   getUserContext: jest.Mock;
+  scoreFn: jest.Mock;
 }> = {}) {
   return {
     onNewContent: overrides.onNewContent ?? jest.fn(),
     getSources: overrides.getSources ?? jest.fn().mockReturnValue([]),
     getUserContext: overrides.getUserContext ?? jest.fn().mockReturnValue(null),
+    scoreFn: overrides.scoreFn ?? defaultScoreFn,
   };
 }
 
@@ -97,7 +105,7 @@ describe("IngestionScheduler — Nostr source", () => {
       }]),
     });
 
-    // Nostr fetch returns events
+    // Nostr fetch returns events (scoring handled by scoreFn callback)
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({
         ok: true,
@@ -107,14 +115,6 @@ describe("IngestionScheduler — Nostr source", () => {
             pubkey: "abcdef1234567890abcdef1234567890",
             id: "event-id-123",
           }],
-        }),
-      })
-      // Analyze call
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "Good analysis",
         }),
       });
 
@@ -197,13 +197,6 @@ describe("IngestionScheduler — Nostr source", () => {
             },
           },
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "Good", topics: ["protocol"],
-        }),
       });
 
     const scheduler = new IngestionScheduler(callbacks);
@@ -240,13 +233,6 @@ describe("IngestionScheduler — Nostr source", () => {
             id: "event-no-profile",
           }],
           profiles: {},
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 6, insight: 6, credibility: 6, composite: 6.0,
-          verdict: "quality", reason: "ok",
         }),
       });
 
@@ -332,13 +318,6 @@ describe("IngestionScheduler — URL source", () => {
           content: "Detailed content with data: 42% improvement shown in benchmarks, referencing published studies at https://source.org/paper",
           // no author field
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 6, insight: 6, credibility: 6, composite: 6.0,
-          verdict: "quality", reason: "ok",
-        }),
       });
 
     const scheduler = new IngestionScheduler(callbacks);
@@ -389,13 +368,6 @@ describe("IngestionScheduler — URL source", () => {
           title: "Title",
           content: "Valid content with data analysis and references: https://source.org 50% improvement noted",
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 5, insight: 5, credibility: 5, composite: 5.0,
-          verdict: "quality", reason: "ok",
-        }),
       });
 
     const scheduler = new IngestionScheduler(callbacks);
@@ -417,8 +389,13 @@ describe("IngestionScheduler — MAX_ITEMS_PER_SOURCE cap", () => {
 
   it("limits scoring to 5 items per source even when more pass quickFilter", async () => {
     const onNewContent = jest.fn();
+    const scoreFn = jest.fn().mockResolvedValue({
+      originality: 7, insight: 7, credibility: 7, composite: 7,
+      verdict: "quality", reason: "Mock", topics: [], scoringEngine: "heuristic",
+    });
     const callbacks = makeCallbacks({
       onNewContent,
+      scoreFn,
       getSources: jest.fn().mockReturnValue([{
         type: "rss",
         config: { feedUrl: "https://example.com/feed.xml" },
@@ -440,26 +417,12 @@ describe("IngestionScheduler — MAX_ITEMS_PER_SOURCE cap", () => {
         json: async () => ({ feedTitle: "Science Feed", items }),
       });
 
-    // Mock 5 analyze calls (MAX_ITEMS_PER_SOURCE = 5)
-    for (let i = 0; i < 5; i++) {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "ok",
-        }),
-      });
-    }
-
     const scheduler = new IngestionScheduler(callbacks);
     const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
     await runCycle();
 
-    // At most 5 items should be scored (analyze calls capped)
-    const analyzeCalls = (global.fetch as jest.Mock).mock.calls.filter(
-      (c: [string, ...unknown[]]) => c[0] === "/api/analyze"
-    );
-    expect(analyzeCalls.length).toBeLessThanOrEqual(5);
+    // At most 5 items should be scored (scoreFn calls capped by MAX_ITEMS_PER_SOURCE)
+    expect(scoreFn).toHaveBeenCalledTimes(5);
   });
 });
 
@@ -512,10 +475,9 @@ describe("IngestionScheduler — multi-source partial failure", () => {
       ]),
     });
 
-    // First source fails
+    // First source fails, second succeeds (scoring handled by scoreFn)
     (global.fetch as jest.Mock)
       .mockRejectedValueOnce(new Error("First source down"))
-      // Second source succeeds
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -526,14 +488,6 @@ describe("IngestionScheduler — multi-source partial failure", () => {
             author: "Researcher",
             link: "https://working.com/article",
           }],
-        }),
-      })
-      // Analyze call for the working source's item
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "ok",
         }),
       });
 
@@ -551,14 +505,19 @@ describe("IngestionScheduler — userContext forwarding", () => {
     (global.fetch as jest.Mock).mockClear();
   });
 
-  it("includes userContext in /api/analyze request when available", async () => {
+  it("passes userContext to scoreFn when available", async () => {
     const userContext = {
       recentTopics: ["ai", "ml"],
       highAffinityTopics: ["transformers"],
       lowAffinityTopics: ["crypto"],
       trustedAuthors: ["dr-smith"],
     };
+    const scoreFn = jest.fn().mockResolvedValue({
+      originality: 7, insight: 7, credibility: 7, composite: 7.0,
+      verdict: "quality", reason: "ok", scoringEngine: "claude-server",
+    });
     const callbacks = makeCallbacks({
+      scoreFn,
       getSources: jest.fn().mockReturnValue([{
         type: "rss",
         config: { feedUrl: "https://example.com/feed" },
@@ -578,30 +537,23 @@ describe("IngestionScheduler — userContext forwarding", () => {
             link: "https://example.com/article",
           }],
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 7, insight: 7, credibility: 7, composite: 7.0,
-          verdict: "quality", reason: "ok",
-        }),
       });
 
     const scheduler = new IngestionScheduler(callbacks);
     const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
     await runCycle();
 
-    // Check that /api/analyze was called with userContext
-    const analyzeCalls = (global.fetch as jest.Mock).mock.calls.filter(
-      (c: [string, ...unknown[]]) => c[0] === "/api/analyze"
-    );
-    expect(analyzeCalls.length).toBe(1);
-    const analyzeBody = JSON.parse(analyzeCalls[0][1].body);
-    expect(analyzeBody.userContext).toEqual(userContext);
+    expect(scoreFn).toHaveBeenCalledTimes(1);
+    expect(scoreFn.mock.calls[0][1]).toEqual(userContext);
   });
 
-  it("omits userContext from /api/analyze when null", async () => {
+  it("passes null userContext to scoreFn when unavailable", async () => {
+    const scoreFn = jest.fn().mockResolvedValue({
+      originality: 5, insight: 5, credibility: 5, composite: 5.0,
+      verdict: "quality", reason: "ok", scoringEngine: "heuristic",
+    });
     const callbacks = makeCallbacks({
+      scoreFn,
       getSources: jest.fn().mockReturnValue([{
         type: "rss",
         config: { feedUrl: "https://example.com/feed" },
@@ -621,25 +573,13 @@ describe("IngestionScheduler — userContext forwarding", () => {
             link: "https://example.com/a",
           }],
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          originality: 5, insight: 5, credibility: 5, composite: 5.0,
-          verdict: "quality", reason: "ok",
-        }),
       });
 
     const scheduler = new IngestionScheduler(callbacks);
     const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
     await runCycle();
 
-    const analyzeCalls = (global.fetch as jest.Mock).mock.calls.filter(
-      (c: [string, ...unknown[]]) => c[0] === "/api/analyze"
-    );
-    if (analyzeCalls.length > 0) {
-      const body = JSON.parse(analyzeCalls[0][1].body);
-      expect(body.userContext).toBeUndefined();
-    }
+    expect(scoreFn).toHaveBeenCalledTimes(1);
+    expect(scoreFn.mock.calls[0][1]).toBeNull();
   });
 });

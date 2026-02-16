@@ -19,8 +19,22 @@ export function getLinkedAccount(): LinkedNostrAccount | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as LinkedNostrAccount;
-  } catch {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.npub !== "string" || typeof parsed.pubkeyHex !== "string") {
+      console.warn("[linkAccount] Corrupted linked account data, clearing");
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    // Provide defaults for fields that may be missing in older stored data
+    return {
+      npub: parsed.npub,
+      pubkeyHex: parsed.pubkeyHex,
+      displayName: typeof parsed.displayName === "string" ? parsed.displayName : undefined,
+      linkedAt: typeof parsed.linkedAt === "number" ? parsed.linkedAt : 0,
+      followCount: typeof parsed.followCount === "number" ? parsed.followCount : 0,
+    };
+  } catch (err) {
+    console.warn("[linkAccount] Failed to parse linked account:", err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -30,7 +44,8 @@ export function saveLinkedAccount(account: LinkedNostrAccount): boolean {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(account));
     return true;
-  } catch {
+  } catch (err) {
+    console.warn("[linkAccount] Failed to save linked account:", err instanceof Error ? err.message : err);
     return false;
   }
 }
@@ -131,7 +146,7 @@ export async function linkNostrAccount(
 
   const saved = saveLinkedAccount(account);
   if (!saved) {
-    throw new Error("Failed to save linked account — localStorage may be full");
+    throw new Error("Failed to save linked account");
   }
   clearWoTCache();
 
@@ -163,6 +178,29 @@ export async function syncLinkedAccountToIC(
 }
 
 /**
+ * Parse raw IC user settings into typed LinkedNostrAccount + d2aEnabled.
+ * Pure function — no I/O. Used by both loadSettingsFromIC and page.tsx.
+ */
+export function parseICSettings(
+  settings: { linkedNostrNpub: string[]; linkedNostrPubkeyHex: string[]; d2aEnabled: boolean },
+): { account: LinkedNostrAccount | null; d2aEnabled: boolean } {
+  const npub = settings.linkedNostrNpub.length > 0 ? settings.linkedNostrNpub[0] : null;
+  const pubkeyHex = settings.linkedNostrPubkeyHex.length > 0 ? settings.linkedNostrPubkeyHex[0] : null;
+
+  let account: LinkedNostrAccount | null = null;
+  if (npub && pubkeyHex) {
+    account = {
+      npub,
+      pubkeyHex,
+      linkedAt: Date.now(),
+      followCount: 0, // Will be hydrated from relays
+    };
+  }
+
+  return { account, d2aEnabled: settings.d2aEnabled };
+}
+
+/**
  * Load user settings (linked Nostr account + D2A) from the IC canister.
  * Returns null if no settings stored or on error.
  * Uses dynamic imports to avoid pulling @dfinity/agent into test bundles.
@@ -179,22 +217,7 @@ export async function loadSettingsFromIC(
     const result = await backend.getUserSettings(principal);
 
     if (result.length === 0) return null;
-
-    const settings = result[0];
-    const npub = settings.linkedNostrNpub.length > 0 ? settings.linkedNostrNpub[0] : null;
-    const pubkeyHex = settings.linkedNostrPubkeyHex.length > 0 ? settings.linkedNostrPubkeyHex[0] : null;
-
-    let account: LinkedNostrAccount | null = null;
-    if (npub && pubkeyHex) {
-      account = {
-        npub,
-        pubkeyHex,
-        linkedAt: Date.now(),
-        followCount: 0, // Will be hydrated from relays
-      };
-    }
-
-    return { account, d2aEnabled: settings.d2aEnabled };
+    return parseICSettings(result[0]);
   } catch (err) {
     console.warn("[nostr] Failed to load settings from IC:", err instanceof Error ? err.message : err);
     return null;

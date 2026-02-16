@@ -306,34 +306,40 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
               </a>
             )}
             {isSlop && !isLarge ? (
-              <button onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
-                flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.green.bg,
+              <button disabled={item.validated} onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
+                flex: 1, padding: `${space[2]}px ${space[3]}px`,
+                background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
                 border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
-                color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
+                color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600,
+                cursor: item.validated ? "default" : "pointer", opacity: item.validated ? 0.6 : 1,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                 transition: transitions.fast, fontFamily: "inherit",
               }}>
-                <CheckIcon /> Not Slop
+                <CheckIcon /> {item.validated ? "Validated" : "Not Slop"}
               </button>
             ) : (
               <>
-                <button onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
-                  flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.green.bg,
+                <button disabled={item.validated} onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
+                  flex: 1, padding: `${space[2]}px ${space[3]}px`,
+                  background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
                   border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
-                  color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
+                  color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600,
+                  cursor: item.validated ? "default" : "pointer", opacity: item.validated ? 0.6 : 1,
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                   transition: transitions.fast, fontFamily: "inherit",
                 }}>
-                  <CheckIcon /> Validate
+                  <CheckIcon /> {item.validated ? "Validated" : "Validate"}
                 </button>
-                <button onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
-                  flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.red.bg,
+                <button disabled={item.flagged} onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
+                  flex: 1, padding: `${space[2]}px ${space[3]}px`,
+                  background: item.flagged ? `${colors.red[400]}18` : colors.red.bg,
                   border: `1px solid ${colors.red.border}`, borderRadius: radii.md,
-                  color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
+                  color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600,
+                  cursor: item.flagged ? "default" : "pointer", opacity: item.flagged ? 0.6 : 1,
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                   transition: transitions.fast, fontFamily: "inherit",
                 }}>
-                  <XCloseIcon /> Flag Slop
+                  <XCloseIcon /> {item.flagged ? "Flagged" : "Flag Slop"}
                 </button>
               </>
             )}

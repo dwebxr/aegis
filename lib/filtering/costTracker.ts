@@ -31,7 +31,8 @@ function loadRecords(): Record<string, DailyCostRecord> {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     return JSON.parse(raw) as Record<string, DailyCostRecord>;
-  } catch {
+  } catch (err) {
+    console.warn("[costTracker] Corrupted localStorage data, resetting:", err);
     return {};
   }
 }
@@ -44,8 +45,8 @@ function saveRecords(records: Record<string, DailyCostRecord>): void {
       ? Object.fromEntries(keys.slice(-MAX_DAYS).map(k => [k, records[k]]))
       : records;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
-  } catch {
-    // localStorage quota exceeded
+  } catch (err) {
+    console.warn("[costTracker] Failed to persist cost data:", err);
   }
 }
 
