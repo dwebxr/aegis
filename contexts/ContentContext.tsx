@@ -135,6 +135,7 @@ function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal").Prin
     createdAt: BigInt(c.createdAt * 1_000_000),
     validated: c.validated,
     flagged: c.flagged,
+    validatedAt: c.validatedAt ? [BigInt(c.validatedAt * 1_000_000)] as [bigint] : [] as [],
   };
 }
 
@@ -321,7 +322,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const validateItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
     if (!item) return;
-    setContent(prev => prev.map(c => c.id === id ? { ...c, validated: true } : c));
+    setContent(prev => prev.map(c => c.id === id ? { ...c, validated: true, validatedAt: c.validatedAt ?? Date.now() } : c));
     preferenceCallbacks?.onValidate?.(item.topics || [], item.author, item.scores.composite, item.verdict);
     if (item.source === "nostr" && item.nostrPubkey) recordUseful(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishValidation(item.nostrPubkey);
@@ -413,6 +414,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           createdAt: Number(e.createdAt) / 1_000_000,
           validated: e.validated,
           flagged: e.flagged,
+          validatedAt: e.validatedAt.length > 0 ? Number(e.validatedAt[0]) / 1_000_000 : undefined,
           timestamp: relativeTime(Number(e.createdAt) / 1_000_000),
           scoredByAI: engine ? engine !== "heuristic" : !e.reason.startsWith("Heuristic"),
           scoringEngine: engine,

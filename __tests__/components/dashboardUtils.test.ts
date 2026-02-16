@@ -83,7 +83,7 @@ describe("contentToCSV", () => {
 
   it("generates valid CSV header", () => {
     const csv = contentToCSV([]);
-    expect(csv).toBe("id,author,source,verdict,composite,originality,insight,credibility,vSignal,cContext,lSlop,topics,text,reason,createdAt,sourceUrl");
+    expect(csv).toBe("id,author,source,verdict,composite,originality,insight,credibility,vSignal,cContext,lSlop,topics,text,reason,createdAt,validatedAt,sourceUrl");
   });
 
   it("generates one row per item", () => {
@@ -161,8 +161,8 @@ describe("contentToCSV", () => {
   it("leaves sourceUrl empty when absent", () => {
     const csv = contentToCSV([makeItem()]);
     const row = csv.split("\n")[1];
-    // sourceUrl is the last field, so row ends with the ISO date then empty
-    expect(row).toMatch(/T\d{2}:\d{2}:\d{2}\.\d{3}Z,$/);
+    // sourceUrl is the last field; validatedAt (empty) comes before it
+    expect(row).toMatch(/T\d{2}:\d{2}:\d{2}\.\d{3}Z,,$/);
   });
 
   it("escapes sourceUrl containing commas", () => {
@@ -171,11 +171,11 @@ describe("contentToCSV", () => {
     expect(row).toContain('"https://example.com/a,b?c=1,2"');
   });
 
-  it("each row has exactly 16 fields (matching header) even with commas in URL", () => {
+  it("each row has exactly 17 fields (matching header) even with commas in URL", () => {
     const csv = contentToCSV([makeItem({ topics: ["a", "b"], vSignal: 5, cContext: 6, lSlop: 1, sourceUrl: "https://example.com/a,b" })]);
     const header = csv.split("\n")[0];
     const headerFields = header.split(",").length;
-    expect(headerFields).toBe(16);
+    expect(headerFields).toBe(17);
     // Parse row properly: count commas outside quoted fields
     const row = csv.split("\n")[1];
     let inQuote = false;
@@ -184,6 +184,6 @@ describe("contentToCSV", () => {
       if (ch === '"') inQuote = !inQuote;
       else if (ch === ',' && !inQuote) fieldCount++;
     }
-    expect(fieldCount).toBe(16);
+    expect(fieldCount).toBe(17);
   });
 });

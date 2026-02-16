@@ -24,6 +24,7 @@ module {
     createdAt : Int;
     validated : Bool;
     flagged : Bool;
+    validatedAt : ?Int;
   };
 
   public type UserProfile = {

@@ -22,6 +22,7 @@ type ContentEvaluation = record {
   createdAt : int;
   validated : bool;
   flagged : bool;
+  validatedAt : opt int;
 };
 
 type UserProfile = record {

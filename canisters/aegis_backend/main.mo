@@ -355,6 +355,7 @@ persistent actor AegisBackend {
       createdAt = if (eval.createdAt == 0) { Time.now() } else { eval.createdAt };
       validated = eval.validated;
       flagged = eval.flagged;
+      validatedAt = eval.validatedAt;
     };
 
     evaluations.put(tagged.id, tagged);
@@ -394,6 +395,14 @@ persistent actor AegisBackend {
       case (?existing) {
         if (not Principal.equal(existing.owner, caller)) { return false };
 
+        let newValidatedAt : ?Int = if (validated and not existing.validated) {
+          ?Time.now()
+        } else if (not validated) {
+          null
+        } else {
+          existing.validatedAt
+        };
+
         let updated : Types.ContentEvaluation = {
           id = existing.id;
           owner = existing.owner;
@@ -412,6 +421,7 @@ persistent actor AegisBackend {
           createdAt = existing.createdAt;
           validated = validated;
           flagged = flagged;
+          validatedAt = newValidatedAt;
         };
         evaluations.put(id, updated);
         true;
@@ -444,6 +454,7 @@ persistent actor AegisBackend {
         createdAt = if (eval.createdAt == 0) { Time.now() } else { eval.createdAt };
         validated = eval.validated;
         flagged = eval.flagged;
+        validatedAt = eval.validatedAt;
       };
 
       evaluations.put(tagged.id, tagged);

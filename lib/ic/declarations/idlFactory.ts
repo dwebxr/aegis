@@ -28,6 +28,7 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     createdAt: IDL.Int,
     validated: IDL.Bool,
     flagged: IDL.Bool,
+    validatedAt: IDL.Opt(IDL.Int),
   });
   const UserProfile = IDL.Record({
     principal: IDL.Principal,

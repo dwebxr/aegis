@@ -24,6 +24,7 @@ export interface ContentEvaluation {
   createdAt: number;
   validated: boolean;
   flagged: boolean;
+  validatedAt?: number;
 }
 
 export interface ContentItem extends ContentEvaluation {

@@ -30,6 +30,7 @@ export interface ContentEvaluation {
   createdAt: bigint;
   validated: boolean;
   flagged: boolean;
+  validatedAt: [] | [bigint];
 }
 
 export interface UserProfile {

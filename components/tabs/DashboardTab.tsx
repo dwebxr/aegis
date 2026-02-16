@@ -32,7 +32,7 @@ interface DashboardTabProps {
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop">("quality");
+  const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop" | "validated">("quality");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [showAllContent, setShowAllContent] = useState(false);
   const { profile } = usePreferences();
@@ -64,7 +64,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   const filteredContent = useMemo(() => {
     let items = content;
-    if (verdictFilter !== "all") items = items.filter(c => c.verdict === verdictFilter);
+    if (verdictFilter === "validated") {
+      items = items.filter(c => c.validated);
+      items = [...items].sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0));
+    } else if (verdictFilter !== "all") {
+      items = items.filter(c => c.verdict === verdictFilter);
+    }
     if (sourceFilter !== "all") items = items.filter(c => c.source === sourceFilter);
     return items;
   }, [content, verdictFilter, sourceFilter]);
@@ -188,16 +193,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           Filtered Signal {hasActiveFilter && <span style={{ fontSize: t.bodySm.size, color: colors.text.disabled }}>({filteredContent.length})</span>}
         </div>
         <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
-          {(["quality", "all", "slop"] as const).map(v => (
+          {(["quality", "all", "slop", "validated"] as const).map(v => (
             <button
               key={v}
               onClick={() => setVerdictFilter(v)}
               style={{
                 padding: `${space[1]}px ${space[3]}px`,
-                background: verdictFilter === v ? (v === "quality" ? colors.green.bg : v === "slop" ? colors.red.bg : colors.bg.raised) : "transparent",
-                border: `1px solid ${verdictFilter === v ? (v === "quality" ? colors.green.border : v === "slop" ? colors.red.border : colors.border.emphasis) : colors.border.default}`,
+                background: verdictFilter === v
+                  ? (v === "quality" ? colors.green.bg : v === "slop" ? colors.red.bg : v === "validated" ? "rgba(167,139,250,0.06)" : colors.bg.raised)
+                  : "transparent",
+                border: `1px solid ${verdictFilter === v
+                  ? (v === "quality" ? colors.green.border : v === "slop" ? colors.red.border : v === "validated" ? "rgba(167,139,250,0.15)" : colors.border.emphasis)
+                  : colors.border.default}`,
                 borderRadius: radii.pill,
-                color: verdictFilter === v ? (v === "quality" ? colors.green[400] : v === "slop" ? colors.red[400] : colors.text.secondary) : colors.text.disabled,
+                color: verdictFilter === v
+                  ? (v === "quality" ? colors.green[400] : v === "slop" ? colors.red[400] : v === "validated" ? colors.purple[400] : colors.text.secondary)
+                  : colors.text.disabled,
                 fontSize: t.caption.size,
                 fontWeight: 600,
                 cursor: "pointer",
@@ -206,7 +217,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 textTransform: "capitalize",
               }}
             >
-              {v}
+              {v === "validated" ? `\u2713 ${v}` : v}
             </button>
           ))}
           {availableSources.length > 1 && (
@@ -284,6 +295,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         <>
           {filteredContent.slice(0, showAllContent ? 50 : 5).map((it, i) => (
             <div key={it.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
+              {verdictFilter === "validated" && it.validatedAt && (
+                <div style={{
+                  fontSize: t.caption.size, color: colors.purple[400],
+                  marginBottom: space[1], marginLeft: space[1],
+                  fontFamily: fonts.mono, fontWeight: 600,
+                }}>
+                  Validated {new Date(it.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  {" "}
+                  {new Date(it.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              )}
               <ContentCard
                 item={it}
                 expanded={expanded === it.id}
@@ -410,7 +432,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 id: c.id, author: c.author, source: c.source, verdict: c.verdict,
                 scores: c.scores, vSignal: c.vSignal, cContext: c.cContext, lSlop: c.lSlop,
                 topics: c.topics, text: c.text, reason: c.reason,
-                createdAt: new Date(c.createdAt).toISOString(), sourceUrl: c.sourceUrl,
+                createdAt: new Date(c.createdAt).toISOString(),
+                validatedAt: c.validatedAt ? new Date(c.validatedAt).toISOString() : null,
+                sourceUrl: c.sourceUrl,
               }));
               downloadFile(JSON.stringify(data, null, 2), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
             }},
