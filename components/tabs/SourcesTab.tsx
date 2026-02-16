@@ -32,7 +32,7 @@ const QUICK_ADD_PRESETS: ReadonlyArray<{
   { id: "youtube", icon: "\u25B6", label: "YouTube", color: colors.red[400], formLabel: "YouTube Channel URL", placeholder: "https://youtube.com/@channelname", hint: "Paste a channel URL \u2014 we\u2019ll find the RSS feed automatically" },
   { id: "topic", icon: "\uD83D\uDCF0", label: "Topic", color: colors.amber[400], formLabel: "Search Keywords", placeholder: "AI safety, machine learning", hint: "Creates a Google News RSS feed for these keywords" },
   { id: "github", icon: "", label: "GitHub", color: colors.text.secondary, formLabel: "GitHub Repository", placeholder: "owner/repo or https://github.com/owner/repo", hint: "Subscribes to release notifications for this repository" },
-  { id: "bluesky", icon: "\uD83E\uDD8B", label: "Bluesky", color: colors.sky[400], formLabel: "Bluesky Handle", placeholder: "@handle.bsky.social", hint: "Subscribes to this account\u2019s posts via RSS bridge" },
+  { id: "bluesky", icon: "\uD83E\uDD8B", label: "Bluesky", color: colors.sky[400], formLabel: "Bluesky Handle", placeholder: "@handle.bsky.social", hint: "Subscribes to this account\u2019s posts via Bluesky native RSS" },
 ];
 
 const HEALTH_COLORS: Record<string, string> = {
@@ -244,7 +244,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         }
         case "bluesky": {
           const handle = parseBlueskyHandle(input);
-          feedUrl = `https://bsky.brid.gy/profile/${handle}/feed`;
+          feedUrl = `https://bsky.app/profile/${handle}/rss`;
           label = `Bluesky: @${handle}`;
           break;
         }

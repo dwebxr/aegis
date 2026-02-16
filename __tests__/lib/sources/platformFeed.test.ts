@@ -151,7 +151,7 @@ describe("detectPlatformFeed", () => {
       const result = detectPlatformFeed(u("https://bsky.app/profile/jay.bsky.social"));
       expect(result).not.toBeNull();
       expect(result!.feeds[0]).toEqual({
-        url: "https://bsky.brid.gy/profile/jay.bsky.social/feed",
+        url: "https://bsky.app/profile/jay.bsky.social/rss",
         title: "Bluesky: @jay.bsky.social",
         type: "rss",
       });
@@ -160,13 +160,13 @@ describe("detectPlatformFeed", () => {
     it("detects /profile/handle with trailing slash", () => {
       const result = detectPlatformFeed(u("https://bsky.app/profile/jay.bsky.social/"));
       expect(result).not.toBeNull();
-      expect(result!.feeds[0].url).toBe("https://bsky.brid.gy/profile/jay.bsky.social/feed");
+      expect(result!.feeds[0].url).toBe("https://bsky.app/profile/jay.bsky.social/rss");
     });
 
     it("detects custom domain handle", () => {
       const result = detectPlatformFeed(u("https://bsky.app/profile/example.com"));
       expect(result).not.toBeNull();
-      expect(result!.feeds[0].url).toBe("https://bsky.brid.gy/profile/example.com/feed");
+      expect(result!.feeds[0].url).toBe("https://bsky.app/profile/example.com/rss");
     });
 
     it("rejects /profile/handle/post/xxx (deep path)", () => {

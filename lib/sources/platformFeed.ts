@@ -25,11 +25,11 @@ export function detectPlatformFeed(parsed: URL): PlatformFeedResult | null {
     }
   }
 
-  // Bluesky: /profile/handle → bsky.brid.gy RSS bridge
+  // Bluesky: /profile/handle → native RSS feed
   if (host === "bsky.app") {
     const handleMatch = parsed.pathname.match(/^\/profile\/([^/]+)\/?$/);
     if (handleMatch) {
-      return { feeds: [{ url: `https://bsky.brid.gy/profile/${handleMatch[1]}/feed`, title: `Bluesky: @${handleMatch[1]}`, type: "rss" }] };
+      return { feeds: [{ url: `https://bsky.app/profile/${handleMatch[1]}/rss`, title: `Bluesky: @${handleMatch[1]}`, type: "rss" }] };
     }
   }
 
