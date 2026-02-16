@@ -246,6 +246,28 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 }}>
                   {d.reason}
                 </div>
+
+                {d.item.sourceUrl && (
+                  <a
+                    href={d.item.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      marginTop: space[2],
+                      fontSize: t.caption.size,
+                      color: colors.cyan[400],
+                      textDecoration: "none",
+                      fontWeight: 600,
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {(() => { try { return new URL(d.item.sourceUrl).hostname; } catch { return d.item.sourceUrl; } })()}
+                    <span style={{ fontSize: 10 }}>{"\u2197"}</span>
+                  </a>
+                )}
               </div>
             </div>
           ))}
