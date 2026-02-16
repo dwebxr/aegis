@@ -29,7 +29,7 @@ const CAT_COLORS: Record<CatalogCategory, string> = {
 
 export const POPULAR_SOURCES: ReadonlyArray<CatalogSource> = [
   // ── News ──
-  { id: "reuters",      label: "Reuters",       feedUrl: "https://feeds.reuters.com/reuters/topNews",        category: "news", emoji: "\uD83C\uDF10", color: CAT_COLORS.news },
+  { id: "ap-news",      label: "AP News",       feedUrl: "https://feedx.net/rss/ap.xml",                     category: "news", emoji: "\uD83C\uDF10", color: CAT_COLORS.news },
   { id: "bbc",          label: "BBC News",      feedUrl: "https://feeds.bbci.co.uk/news/rss.xml",           category: "news", emoji: "\uD83C\uDDEC\uD83C\uDDE7", color: CAT_COLORS.news },
   { id: "npr",          label: "NPR",           feedUrl: "https://feeds.npr.org/1001/rss.xml",              category: "news", emoji: "\uD83C\uDFA7", color: CAT_COLORS.news },
   { id: "guardian",     label: "The Guardian",   feedUrl: "https://www.theguardian.com/world/rss",           category: "news", emoji: "\uD83D\uDCF0", color: CAT_COLORS.news },

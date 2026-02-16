@@ -247,7 +247,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                   {d.reason}
                 </div>
 
-                {d.item.sourceUrl && (
+                {d.item.sourceUrl && /^https?:\/\//i.test(d.item.sourceUrl) && (
                   <a
                     href={d.item.sourceUrl}
                     target="_blank"
