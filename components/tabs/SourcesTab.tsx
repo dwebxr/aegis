@@ -1,7 +1,8 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { fonts, colors, space, type as t, radii, transitions, kpiLabelStyle } from "@/styles/theme";
-import { RSSIcon, GlobeIcon, LinkIcon, GitHubIcon } from "@/components/icons";
+import { RSSIcon, GlobeIcon, LinkIcon, GitHubIcon, CheckIcon } from "@/components/icons";
+import { POPULAR_SOURCES, CATALOG_CATEGORIES, type CatalogCategory } from "@/lib/sources/catalog";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { FetchURLResponse, FetchRSSResponse, FetchTwitterResponse, FetchNostrResponse } from "@/lib/types/api";
 
@@ -78,6 +79,14 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const [quickAddInput, setQuickAddInput] = useState("");
   const [quickAddLoading, setQuickAddLoading] = useState(false);
   const [quickAddError, setQuickAddError] = useState("");
+
+  // Popular Sources catalog
+  const [catalogFilter, setCatalogFilter] = useState<CatalogCategory | "all">("all");
+  const [justAddedIds, setJustAddedIds] = useState<Set<string>>(new Set());
+  const addedFeedUrls = useMemo(
+    () => new Set(sources.filter(s => s.type === "rss" && s.feedUrl).map(s => s.feedUrl!)),
+    [sources],
+  );
 
   const [sourceStates, setSourceStates] = useState<Record<string, SourceRuntimeState>>({});
   useEffect(() => {
@@ -275,6 +284,14 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
       setQuickAddLoading(false);
     }
   }, [quickAddMode, quickAddInput]);
+
+  const handleCatalogAdd = useCallback((src: { id: string; label: string; feedUrl: string }) => {
+    if (addedFeedUrls.has(src.feedUrl)) return;
+    const added = addSource({ type: "rss", label: src.label, feedUrl: src.feedUrl, enabled: true });
+    if (!added) return;
+    setJustAddedIds(prev => { const n = new Set(prev); n.add(src.id); return n; });
+    setTimeout(() => setJustAddedIds(prev => { const n = new Set(prev); n.delete(src.id); return n; }), 2000);
+  }, [addSource, addedFeedUrls]);
 
   const startEdit = (s: typeof sources[number]) => {
     setEditingId(s.id);
@@ -582,6 +599,105 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
           })}
         </div>
       )}
+
+      {/* Popular Sources Catalog */}
+      <div style={{
+        background: colors.bg.surface,
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: radii.lg,
+        padding: mobile ? space[4] : space[5],
+        marginBottom: space[5],
+      }}>
+        <div style={{
+          fontSize: t.h3.size, fontWeight: t.h3.weight,
+          color: colors.text.tertiary, marginBottom: space[1],
+        }}>
+          Popular Sources
+        </div>
+        <div style={{
+          fontSize: t.caption.size, color: colors.text.muted, marginBottom: space[3],
+        }}>
+          Add trusted feeds with a single tap
+        </div>
+
+        {/* Category filter chips */}
+        <div style={{ display: "flex", gap: space[1], marginBottom: space[3], flexWrap: "wrap" }}>
+          {([{ id: "all" as const, label: "All", emoji: "" }, ...CATALOG_CATEGORIES] as const).map(cat => {
+            const isAll = cat.id === "all";
+            const active = catalogFilter === cat.id;
+            const chipColor = isAll ? colors.text.muted : POPULAR_SOURCES.find(s => s.category === cat.id)?.color ?? colors.text.muted;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setCatalogFilter(cat.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4,
+                  padding: `${space[1]}px ${space[3]}px`,
+                  borderRadius: radii.sm,
+                  fontSize: t.caption.size, fontWeight: 600,
+                  cursor: "pointer",
+                  background: active ? `${chipColor}18` : colors.border.subtle,
+                  border: active ? `1px solid ${chipColor}40` : `1px solid ${colors.border.subtle}`,
+                  color: active ? chipColor : colors.text.muted,
+                  fontFamily: "inherit",
+                  transition: transitions.fast,
+                }}
+              >
+                {cat.emoji ? `${cat.emoji} ` : ""}{cat.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Source grid */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: mobile ? "1fr 1fr" : "1fr 1fr 1fr",
+          gap: space[2],
+        }}>
+          {POPULAR_SOURCES
+            .filter(s => catalogFilter === "all" || s.category === catalogFilter)
+            .map(source => {
+              const isAdded = addedFeedUrls.has(source.feedUrl);
+              const justAdded = justAddedIds.has(source.id);
+              return (
+                <button
+                  key={source.id}
+                  onClick={() => handleCatalogAdd(source)}
+                  disabled={isAdded || isDemoMode}
+                  style={{
+                    display: "flex", alignItems: "center", gap: space[2],
+                    padding: `${space[2]}px ${space[3]}px`,
+                    borderRadius: radii.md,
+                    border: isAdded
+                      ? `1px solid ${colors.green[400]}30`
+                      : `1px solid ${source.color}30`,
+                    background: isAdded
+                      ? `${colors.green[400]}08`
+                      : justAdded ? `${colors.green[400]}15` : `${source.color}08`,
+                    cursor: isAdded || isDemoMode ? "default" : "pointer",
+                    opacity: isAdded ? 0.6 : 1,
+                    fontFamily: "inherit",
+                    transition: transitions.fast,
+                    textAlign: "left" as const,
+                    width: "100%",
+                  }}
+                >
+                  <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1 }}>
+                    {isAdded ? <CheckIcon /> : source.emoji}
+                  </span>
+                  <span style={{
+                    fontSize: t.bodySm.size, fontWeight: 600,
+                    color: isAdded ? colors.green[400] : colors.text.secondary,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {source.label}
+                  </span>
+                </button>
+              );
+            })}
+        </div>
+      </div>
 
       {isDemoMode && (
         <div style={{
