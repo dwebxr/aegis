@@ -35,7 +35,7 @@ function GradeBadge({ composite }: { composite: number }) {
   );
 }
 
-function ScoreGrid({ item }: { item: ContentItem }) {
+export function ScoreGrid({ item }: { item: ContentItem }) {
   const hasVCL = item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: space[3], marginBottom: space[4] }}>
@@ -56,7 +56,7 @@ function ScoreGrid({ item }: { item: ContentItem }) {
   );
 }
 
-function TopicTags({ topics }: { topics: string[] }) {
+export function TopicTags({ topics }: { topics: string[] }) {
   if (topics.length === 0) return null;
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: space[2] }}>

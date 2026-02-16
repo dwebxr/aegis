@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { MiniChart } from "@/components/ui/MiniChart";
-import { ContentCard, deriveScoreTags } from "@/components/ui/ContentCard";
+import { ContentCard, deriveScoreTags, ScoreGrid, TopicTags } from "@/components/ui/ContentCard";
+import { CheckIcon, XCloseIcon } from "@/components/icons";
 import { fonts, colors, space, type as t, radii, transitions, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { contentToCSV } from "@/lib/utils/csv";
@@ -522,6 +523,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
           gap: space[4],
           marginTop: space[3],
+          overflow: "hidden",
         }}>
           {/* Today's Top 3 — Hero Cards */}
           <div style={{ gridColumn: mobile ? undefined : "1 / -1" }}>
@@ -542,7 +544,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               </div>
             ) : (
               <div style={mobile
-                ? { display: "flex", overflowX: "auto", gap: space[3], scrollSnapType: "x mandatory" as const, paddingBottom: space[2] }
+                ? { display: "flex", flexDirection: "column" as const, gap: space[3] }
                 : { display: "grid", gridTemplateColumns: `repeat(${Math.min(dashboardTop3.length, 3)}, 1fr)`, gap: space[3] }
               }>
                 {dashboardTop3.map((bi, i) => {
@@ -551,138 +553,171 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   const tags = deriveScoreTags(item);
                   const isExpanded = expanded === item.id;
                   return (
-                    <div key={item.id} style={{
-                      ...(mobile ? { minWidth: 280, flex: "0 0 85%", scrollSnapAlign: "start" as const } : {}),
-                      animation: `slideUp .3s ease ${i * 0.08}s both`,
-                    }}>
+                    <div key={item.id} style={{ animation: `slideUp .3s ease ${i * 0.08}s both` }}>
+                      {/* Layer 1 — Card surface */}
                       <div
                         onClick={() => setExpanded(isExpanded ? null : item.id)}
                         style={{
-                          position: "relative",
                           background: colors.bg.surface,
-                          border: `1px solid ${colors.border.default}`,
+                          border: `1px solid ${isExpanded ? colors.border.emphasis : colors.border.default}`,
                           borderRadius: radii.lg,
-                          padding: `${space[4]}px`,
+                          padding: `${space[3]}px ${space[4]}px`,
                           cursor: "pointer",
-                          transition: transitions.normal,
+                          transition: transitions.fast,
+                          overflow: "hidden",
                         }}
                       >
-                        {/* Rank badge — top left */}
+                        {/* Header: rank + grade + score tag */}
                         <div style={{
-                          position: "absolute", top: space[2], left: space[2],
-                          width: 28, height: 28, borderRadius: "50%",
-                          background: `linear-gradient(135deg, ${colors.blue[600]}, ${colors.purple[600]})`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: t.bodySm.size, fontWeight: 800, color: "#fff",
-                          zIndex: 1,
+                          display: "flex", alignItems: "center", gap: space[2],
+                          marginBottom: space[2],
                         }}>
-                          {i + 1}
-                        </div>
-
-                        {/* Score tag — top right */}
-                        {tags.length > 0 && (
                           <div style={{
-                            position: "absolute", top: space[2], right: space[2],
-                            fontSize: 9, fontWeight: 700, textTransform: "uppercase" as const,
-                            letterSpacing: 1,
-                            padding: `2px ${space[2]}px`, borderRadius: radii.sm,
-                            background: `${tags[0].color}15`, color: tags[0].color,
-                            border: `1px solid ${tags[0].color}25`,
-                            zIndex: 1,
+                            width: 24, height: 24, borderRadius: "50%",
+                            background: `linear-gradient(135deg, ${colors.blue[600]}, ${colors.purple[600]})`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: t.caption.size, fontWeight: 800, color: "#fff", flexShrink: 0,
                           }}>
-                            {tags[0].label}
+                            {i + 1}
                           </div>
-                        )}
-
-                        {/* Image / Grade fallback */}
-                        <div style={{
-                          width: "100%", aspectRatio: "16/9",
-                          borderRadius: radii.md, overflow: "hidden",
-                          marginBottom: space[3], marginTop: space[1],
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          background: item.imageUrl ? "transparent" : gr.bg,
-                        }}>
-                          {item.imageUrl ? (
-                            /* eslint-disable-next-line @next/next/no-img-element -- hero card thumbnail */
-                            <img
-                              src={item.imageUrl}
-                              alt=""
-                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                              onError={(e) => {
-                                const el = e.target as HTMLImageElement;
-                                el.style.display = "none";
-                                if (el.parentElement) {
-                                  el.parentElement.style.background = gr.bg;
-                                  const span = document.createElement("span");
-                                  span.textContent = gr.grade;
-                                  span.style.cssText = `font-size:48px;font-weight:800;color:${gr.color};font-family:${fonts.mono}`;
-                                  el.parentElement.appendChild(span);
-                                }
-                              }}
-                            />
-                          ) : (
-                            <span style={{ fontSize: 48, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>
-                              {gr.grade}
+                          <span style={{
+                            fontSize: t.bodySm.size, fontWeight: 800, color: gr.color,
+                            fontFamily: fonts.mono,
+                          }}>{gr.grade}</span>
+                          <div style={{ flex: 1 }} />
+                          {tags.length > 0 && (
+                            <span style={{
+                              fontSize: 9, fontWeight: 700, textTransform: "uppercase" as const,
+                              letterSpacing: 1, padding: "2px 8px", borderRadius: radii.sm,
+                              background: `${tags[0].color}15`, color: tags[0].color,
+                              border: `1px solid ${tags[0].color}25`, flexShrink: 0,
+                              whiteSpace: "nowrap",
+                            }}>
+                              {tags[0].label}
                             </span>
                           )}
                         </div>
 
-                        {/* Title text */}
+                        {/* Title — 3 lines max */}
                         <div style={{
                           fontSize: t.body.size, fontWeight: 700,
                           color: colors.text.secondary,
                           overflow: "hidden",
                           display: "-webkit-box",
-                          WebkitLineClamp: 2,
+                          WebkitLineClamp: 3,
                           WebkitBoxOrient: "vertical" as const,
                           lineHeight: 1.4,
-                          marginBottom: space[1],
+                          marginBottom: space[2],
+                          wordBreak: "break-word" as const,
                         }}>
-                          {item.text.slice(0, 120)}
+                          {item.text.slice(0, 150)}
                         </div>
 
-                        {/* Reason summary */}
-                        {item.reason && (
-                          <div style={{
-                            fontSize: t.caption.size, color: colors.text.muted,
-                            overflow: "hidden", textOverflow: "ellipsis",
-                            whiteSpace: "nowrap", marginBottom: space[2],
-                          }}>
-                            {item.reason.slice(0, 80)}
-                          </div>
-                        )}
-
-                        {/* Topic pills */}
-                        {item.topics && item.topics.length > 0 && (
-                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: space[2] }}>
-                            {item.topics.slice(0, 3).map(tp => (
-                              <span key={tp} style={{
-                                fontSize: t.caption.size, padding: "2px 8px", borderRadius: radii.pill,
-                                background: `${colors.cyan[400]}12`, color: colors.cyan[400], fontWeight: 600,
-                              }}>{tp}</span>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Meta: author · source · timestamp */}
+                        {/* Meta — 1 line, ellipsis */}
                         <div style={{
                           fontSize: t.caption.size, color: colors.text.disabled,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         }}>
                           {item.author} &middot; {item.source} &middot; {item.timestamp}
                         </div>
                       </div>
 
-                      {/* Expanded: full ContentCard inline */}
+                      {/* Layer 2 — Expanded details */}
                       {isExpanded && (
-                        <div style={{ marginTop: space[2] }}>
-                          <ContentCard
-                            item={item}
-                            expanded
-                            onToggle={() => setExpanded(null)}
-                            onValidate={handleValidateWithFeedback}
-                            onFlag={handleFlagWithFeedback}
-                            mobile={mobile}
-                          />
+                        <div
+                          style={{
+                            marginTop: space[2], padding: `${space[3]}px ${space[4]}px`,
+                            background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
+                            borderRadius: radii.md, overflow: "hidden",
+                          }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          {/* Thumbnail + ScoreGrid */}
+                          <div style={{ display: "flex", gap: space[3], marginBottom: space[3] }}>
+                            {item.imageUrl && (
+                              /* eslint-disable-next-line @next/next/no-img-element -- expanded thumbnail */
+                              <img
+                                src={item.imageUrl}
+                                alt=""
+                                style={{
+                                  width: 60, height: 60, objectFit: "cover",
+                                  borderRadius: radii.sm, flexShrink: 0,
+                                  border: `1px solid ${colors.border.default}`,
+                                }}
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              />
+                            )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <ScoreGrid item={item} />
+                            </div>
+                          </div>
+
+                          {/* Reason */}
+                          {item.reason && (
+                            <div style={{
+                              fontSize: t.bodySm.size, color: colors.text.tertiary, lineHeight: 1.5,
+                              fontStyle: "italic", background: colors.bg.surface,
+                              padding: `${space[2]}px ${space[3]}px`, borderRadius: radii.md,
+                              marginBottom: space[3], wordBreak: "break-word" as const,
+                            }}>
+                              {item.reason}
+                            </div>
+                          )}
+
+                          {/* Topics */}
+                          {item.topics && item.topics.length > 0 && (
+                            <div style={{ marginBottom: space[3] }}>
+                              <TopicTags topics={item.topics} />
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
+                            {item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) && (
+                              <a
+                                href={item.sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                style={{
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  padding: `${space[2]}px ${space[3]}px`,
+                                  background: `${colors.blue[400]}10`,
+                                  border: `1px solid ${colors.blue[400]}30`,
+                                  borderRadius: radii.md,
+                                  color: colors.blue[400], fontSize: t.bodySm.size, fontWeight: 600,
+                                  textDecoration: "none", whiteSpace: "nowrap",
+                                  transition: transitions.fast, fontFamily: "inherit",
+                                }}
+                              >
+                                Read more &rarr;
+                              </a>
+                            )}
+                            <button
+                              onClick={e => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
+                              style={{
+                                flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.green.bg,
+                                border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
+                                color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600,
+                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                                transition: transitions.fast, fontFamily: "inherit",
+                              }}
+                            >
+                              <CheckIcon /> Validate
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
+                              style={{
+                                flex: 1, padding: `${space[2]}px ${space[3]}px`, background: colors.red.bg,
+                                border: `1px solid ${colors.red.border}`, borderRadius: radii.md,
+                                color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600,
+                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                                transition: transitions.fast, fontFamily: "inherit",
+                              }}
+                            >
+                              <XCloseIcon /> Flag Slop
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
