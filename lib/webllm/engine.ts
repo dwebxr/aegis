@@ -27,6 +27,7 @@ export async function isWebGPUUsable(): Promise<boolean> {
   if (!isWebGPUAvailable()) return false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const gpu = (navigator as any).gpu;
+  if (!gpu) return false;
   const adapter = await gpu.requestAdapter();
   const usable = adapter !== null;
   if (usable) {

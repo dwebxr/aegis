@@ -15,7 +15,18 @@ export async function getLatestBriefing(principalText?: string): Promise<D2ABrie
 
   if (result.length === 0) return null;
   try {
-    return JSON.parse(result[0]) as D2ABriefingResponse;
+    const parsed = JSON.parse(result[0]);
+    if (
+      typeof parsed !== "object" || parsed === null ||
+      typeof parsed.generatedAt !== "string" ||
+      !parsed.summary || typeof parsed.summary.totalEvaluated !== "number" ||
+      !Array.isArray(parsed.items) ||
+      !parsed.meta || !Array.isArray(parsed.meta.topics)
+    ) {
+      console.warn("[briefingProvider] Briefing JSON has unexpected shape, ignoring");
+      return null;
+    }
+    return parsed as D2ABriefingResponse;
   } catch (err) {
     console.warn("[briefingProvider] Failed to parse briefing JSON:", err);
     return null;

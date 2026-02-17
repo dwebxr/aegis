@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     status: allOk ? "ok" : "degraded",
     timestamp: new Date().toISOString(),
     version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "local",
-    region: process.env.VERCEL_REGION || "local",
+    region: (process.env.VERCEL_REGION || "local").trim(),
     checks,
   });
 

@@ -1,7 +1,10 @@
 "use client";
-import React from "react";
+import React, { useEffect } from "react";
 import { useFilterMode } from "@/contexts/FilterModeContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { isOllamaEnabled } from "@/lib/ollama/storage";
+import { isWebLLMEnabled } from "@/lib/webllm/storage";
+import { getUserApiKey } from "@/lib/apiKey/storage";
 import { colors, space, type as t, radii, transitions } from "@/styles/theme";
 
 interface FilterModeSelectorProps {
@@ -17,6 +20,15 @@ export const FilterModeSelector: React.FC<FilterModeSelectorProps> = ({ mobile }
   const { filterMode, setFilterMode } = useFilterMode();
   const { isAuthenticated } = useAuth();
 
+  const hasAIScoring = isOllamaEnabled() || isWebLLMEnabled() || !!getUserApiKey();
+
+  // Auto-fallback: if Pro is persisted but conditions no longer met, revert to Lite
+  useEffect(() => {
+    if (filterMode === "pro" && (!isAuthenticated || !hasAIScoring)) {
+      setFilterMode("lite");
+    }
+  }, [filterMode, isAuthenticated, hasAIScoring, setFilterMode]);
+
   return (
     <div style={{
       display: "flex",
@@ -28,7 +40,8 @@ export const FilterModeSelector: React.FC<FilterModeSelectorProps> = ({ mobile }
     }}>
       {MODES.map(m => {
         const active = filterMode === m.key;
-        const locked = m.key === "pro" && !isAuthenticated;
+        const locked = m.key === "pro" && (!isAuthenticated || !hasAIScoring);
+        const lockReason = !isAuthenticated ? "Login required" : "AI setup required";
         return (
           <button
             key={m.key}
@@ -53,7 +66,7 @@ export const FilterModeSelector: React.FC<FilterModeSelectorProps> = ({ mobile }
             <span>{m.label}</span>
             {!mobile && (
               <div style={{ fontSize: t.caption.size, color: colors.text.disabled, marginTop: 2 }}>
-                {locked ? "Login required" : m.sub}
+                {locked ? lockReason : m.sub}
               </div>
             )}
           </button>

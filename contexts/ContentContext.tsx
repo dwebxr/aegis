@@ -464,7 +464,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const syncBriefing = useCallback((state: BriefingState, nostrPubkey?: string | null) => {
     if (!actorRef.current || !isAuthenticated) return;
-    syncBriefingToCanister(actorRef.current, state, nostrPubkey ?? null).catch((err: unknown) => {
+    void syncBriefingToCanister(actorRef.current, state, nostrPubkey ?? null).catch((err: unknown) => {
       console.warn("[content] Briefing sync to IC failed:", errMsg(err));
     });
   }, [isAuthenticated]);

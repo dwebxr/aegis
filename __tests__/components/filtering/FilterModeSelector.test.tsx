@@ -20,10 +20,27 @@ jest.mock("@/contexts/AuthContext", () => ({
   }),
 }));
 
+let mockOllamaEnabled = false;
+let mockWebLLMEnabled = false;
+let mockUserApiKey: string | null = null;
+
+jest.mock("@/lib/ollama/storage", () => ({
+  isOllamaEnabled: () => mockOllamaEnabled,
+}));
+jest.mock("@/lib/webllm/storage", () => ({
+  isWebLLMEnabled: () => mockWebLLMEnabled,
+}));
+jest.mock("@/lib/apiKey/storage", () => ({
+  getUserApiKey: () => mockUserApiKey,
+}));
+
 describe("FilterModeSelector", () => {
   beforeEach(() => {
     mockFilterMode = "lite";
     mockIsAuthenticated = false;
+    mockOllamaEnabled = false;
+    mockWebLLMEnabled = false;
+    mockUserApiKey = null;
     mockSetFilterMode.mockClear();
   });
 
@@ -51,11 +68,20 @@ describe("FilterModeSelector", () => {
       expect(html).toContain("Login required");
     });
 
-    it("shows 'WoT + AI' subtitle for Pro when authenticated", () => {
+    it("shows 'AI setup required' when authenticated but no AI scoring", () => {
       mockIsAuthenticated = true;
+      const html = renderToStaticMarkup(<FilterModeSelector mobile={false} />);
+      expect(html).toContain("AI setup required");
+      expect(html).not.toContain("Login required");
+    });
+
+    it("shows 'WoT + AI' subtitle for Pro when authenticated with AI scoring", () => {
+      mockIsAuthenticated = true;
+      mockUserApiKey = "sk-ant-test-key";
       const html = renderToStaticMarkup(<FilterModeSelector mobile={false} />);
       expect(html).toContain("WoT + AI");
       expect(html).not.toContain("Login required");
+      expect(html).not.toContain("AI setup required");
     });
 
     it("renders Pro button as disabled when not authenticated", () => {
@@ -65,12 +91,18 @@ describe("FilterModeSelector", () => {
       expect(html).toContain("disabled");
     });
 
-    it("renders Pro button as enabled when authenticated", () => {
+    it("renders Pro button as enabled when authenticated with AI scoring", () => {
       mockIsAuthenticated = true;
+      mockOllamaEnabled = true;
       const html = renderToStaticMarkup(<FilterModeSelector />);
-      // Count disabled occurrences — should be 0 or fewer
       const disabledCount = (html.match(/disabled=""/g) || []).length;
       expect(disabledCount).toBe(0);
+    });
+
+    it("renders Pro button as disabled when authenticated but no AI scoring", () => {
+      mockIsAuthenticated = true;
+      const html = renderToStaticMarkup(<FilterModeSelector />);
+      expect(html).toContain("disabled");
     });
   });
 
@@ -85,6 +117,7 @@ describe("FilterModeSelector", () => {
     it("reflects pro mode as active", () => {
       mockFilterMode = "pro";
       mockIsAuthenticated = true;
+      mockWebLLMEnabled = true;
       const html = renderToStaticMarkup(<FilterModeSelector />);
       expect(html).toContain("Pro");
     });
@@ -93,9 +126,41 @@ describe("FilterModeSelector", () => {
   describe("MODES config", () => {
     it("has exactly 2 modes", () => {
       const html = renderToStaticMarkup(<FilterModeSelector />);
-      // Both buttons render
       expect(html).toContain("Lite");
       expect(html).toContain("Pro");
+    });
+  });
+
+  describe("AI scoring gate", () => {
+    it("unlocks Pro when Ollama is enabled", () => {
+      mockIsAuthenticated = true;
+      mockOllamaEnabled = true;
+      const html = renderToStaticMarkup(<FilterModeSelector />);
+      const disabledCount = (html.match(/disabled=""/g) || []).length;
+      expect(disabledCount).toBe(0);
+    });
+
+    it("unlocks Pro when WebLLM is enabled", () => {
+      mockIsAuthenticated = true;
+      mockWebLLMEnabled = true;
+      const html = renderToStaticMarkup(<FilterModeSelector />);
+      const disabledCount = (html.match(/disabled=""/g) || []).length;
+      expect(disabledCount).toBe(0);
+    });
+
+    it("unlocks Pro when BYOK API key is saved", () => {
+      mockIsAuthenticated = true;
+      mockUserApiKey = "sk-ant-test-key";
+      const html = renderToStaticMarkup(<FilterModeSelector />);
+      const disabledCount = (html.match(/disabled=""/g) || []).length;
+      expect(disabledCount).toBe(0);
+    });
+
+    it("locks Pro when authenticated but no AI source configured", () => {
+      mockIsAuthenticated = true;
+      const html = renderToStaticMarkup(<FilterModeSelector mobile={false} />);
+      expect(html).toContain("disabled");
+      expect(html).toContain("AI setup required");
     });
   });
 });

@@ -108,6 +108,20 @@ describe("POST /api/fetch/nostr — edge cases", () => {
       }));
       expect(res.status).toBe(400);
     });
+
+    it("rejects more than 10 relays", async () => {
+      const relays = Array.from({ length: 11 }, (_, i) => `wss://relay${i}.example.com`);
+      const res = await POST(makeRequest({ relays }));
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Maximum 10");
+    });
+
+    it("accepts exactly 10 relays", async () => {
+      const relays = Array.from({ length: 10 }, (_, i) => `wss://relay${i}.example.com`);
+      const res = await POST(makeRequest({ relays }));
+      expect(res.status).toBe(200);
+    });
   });
 
   describe("default limit", () => {

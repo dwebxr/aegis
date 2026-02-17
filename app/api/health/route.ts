@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
   const checks: Record<string, string> = {};
 
-  checks.anthropicKey = process.env.ANTHROPIC_API_KEY ? "configured" : "missing";
+  checks.anthropicKey = process.env.ANTHROPIC_API_KEY?.trim() ? "configured" : "missing";
 
   const canisterId = getCanisterId();
   checks.canisterId = canisterId;
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     timestamp: new Date().toISOString(),
     version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "local",
     node: process.version,
-    region: process.env.VERCEL_REGION || "local",
+    region: (process.env.VERCEL_REGION || "local").trim(),
     checks,
   });
 }

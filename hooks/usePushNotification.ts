@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { errMsg } from "@/lib/utils/errors";
 
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+const VAPID_PUBLIC_KEY = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "").trim();
 const LS_KEY = "aegis-push-enabled";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {

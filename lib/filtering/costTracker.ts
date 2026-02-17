@@ -30,7 +30,24 @@ function loadRecords(): Record<string, DailyCostRecord> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
-    return JSON.parse(raw) as Record<string, DailyCostRecord>;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+    const valid: Record<string, DailyCostRecord> = {};
+    for (const [key, val] of Object.entries(parsed)) {
+      const r = val as Record<string, unknown>;
+      if (
+        r && typeof r === "object" &&
+        typeof r.date === "string" &&
+        typeof r.articlesEvaluated === "number" &&
+        typeof r.articlesPassedWoT === "number" &&
+        typeof r.articlesPassedAI === "number" &&
+        typeof r.discoveriesFound === "number" &&
+        typeof r.aiCostUSD === "number"
+      ) {
+        valid[key] = r as unknown as DailyCostRecord;
+      }
+    }
+    return valid;
   } catch (err) {
     console.warn("[costTracker] Corrupted localStorage data, resetting:", err);
     return {};

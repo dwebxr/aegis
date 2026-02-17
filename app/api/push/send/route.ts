@@ -11,7 +11,7 @@ export const maxDuration = 30;
 
 if (process.env.VAPID_PRIVATE_KEY && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || "mailto:admin@dwebxr.xyz",
+    (process.env.VAPID_SUBJECT || "mailto:admin@dwebxr.xyz").trim(),
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY.trim(),
     process.env.VAPID_PRIVATE_KEY.trim(),
   );

@@ -27,13 +27,13 @@ Aegis has two independent axes: **authentication state** (Demo vs Logged-in) and
 |------|---------------|---------|---------|:--:|------|
 | **Demo** | Not logged in | 3 preset feeds (read-only) | Heuristic (Lite) | No | Free |
 | **Lite** | Logged in | Custom (add/edit/remove) | Heuristic only | No | Free |
-| **Pro** | Logged in | Custom (add/edit/remove) | AI pipeline + heuristic fallback | Yes | Free during alpha |
+| **Pro** | Logged in + AI setup | Custom (add/edit/remove) | AI pipeline + heuristic fallback | Yes | Free during alpha |
 
 - **Demo**: Open the app without logging in. You get 3 preset RSS feeds scored with heuristic filters. Source management is disabled. Great for trying Aegis without commitment. Pro mode selector is locked.
 - **Lite**: Login and select "Lite" in the filter mode selector. Full source management with heuristic-only scoring. No API calls, $0 cost. WoT and serendipity disabled.
-- **Pro**: Login and select "Pro" in the filter mode selector. Full AI scoring pipeline (Ollama → WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
+- **Pro**: Login and select "Pro" in the filter mode selector. **Requires at least one AI scoring engine** (Ollama, Browser AI, or BYOK API key) to be configured in Settings. Full AI scoring pipeline (Ollama → WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
 
-Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. Demo mode is automatic when not logged in — logging in clears demo content and enables full source management.
+Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. Pro is gated behind AI scoring availability — if no AI engine is configured, the Pro button shows "AI setup required" and auto-falls back to Lite. Demo mode is automatic when not logged in — logging in clears demo content and enables full source management.
 
 ### AI Scoring Engines
 
@@ -234,13 +234,13 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 |------|---------------|:---:|:---:|:---:|
 | **Demo** | Heuristic only (Lite locked) | No | No | No |
 | **Lite** | Heuristic only (client-side) | No | No | Yes |
-| **Pro** | Ollama → WebLLM → BYOK → IC LLM → heuristic | Yes | Yes | Yes |
+| **Pro** | Ollama → WebLLM → BYOK → IC LLM → heuristic | Yes | Yes | Yes + AI setup |
 
 - **Demo**: Unauthenticated state. 3 preset RSS feeds, heuristic scoring, Pro selector locked. Source management disabled.
 - **Lite**: Authenticated, heuristic-only scoring. Full source management but no API calls, no WoT, no serendipity. $0 cost.
-- **Pro**: Authenticated, full AI scoring pipeline + WoT social graph filtering + serendipity discovery (up to 5 per cycle). Free during alpha; alternatively bring your own Claude API key in Settings.
+- **Pro**: Authenticated + at least one AI engine configured (Ollama, WebLLM, or BYOK key). Full AI scoring pipeline + WoT social graph filtering + serendipity discovery (up to 5 per cycle). Free during alpha; alternatively bring your own Claude API key in Settings.
 
-Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. Demo mode is automatic when not logged in.
+Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. Pro is locked with "AI setup required" until an AI engine is configured. Demo mode is automatic when not logged in.
 
 ### Nostr Account Linking
 
@@ -677,7 +677,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, auth/cookie scrubbing, breadcrumb URL stripping, conditional on DSN) |
-| Test | Jest + ts-jest (2510 tests, 164 suites) |
+| Test | Jest + ts-jest (2519 tests, 164 suites) |
 
 ## Project Structure
 
@@ -708,7 +708,7 @@ aegis/
 │           └── discover-feed/route.ts   # RSS feed auto-discovery from any URL
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
-│   ├── tabs/                            # Dashboard, Briefing, Incinerator, Sources, Analytics
+│   ├── tabs/                            # Dashboard (+ Discoveries), Briefing, Incinerator, Sources, Analytics
 │   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner
 │   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
 │   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
@@ -804,7 +804,7 @@ aegis/
 │   └── sources/
 │       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Google News)
 │       └── storage.ts                   # Source config localStorage R/W
-├── __tests__/                           # 2114 tests across 142 suites
+├── __tests__/                           # 2519 tests across 164 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -812,7 +812,7 @@ aegis/
 │       ├── ledger.mo                    # ICRC-1/2 ICP Ledger + CMC interface module
 │       └── aegis_backend.did            # Candid interface
 ├── .github/workflows/ci.yml             # GitHub Actions CI (lint → test → security audit → build)
-├── sentry.client.config.ts              # Sentry client-side init (breadcrumb URL scrubbing)
+├── instrumentation-client.ts             # Sentry client-side init + navigation instrumentation
 ├── sentry.server.config.ts              # Sentry server-side init (auth header/cookie scrubbing)
 ├── sentry.edge.config.ts                # Sentry edge runtime init (auth header/cookie scrubbing)
 ├── instrumentation.ts                   # Next.js instrumentation hook (Sentry)
@@ -840,7 +840,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 2510 tests
+npm test              # Run all 2519 tests
 npm run test:watch    # Watch mode
 ```
 

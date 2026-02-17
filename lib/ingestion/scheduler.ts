@@ -376,7 +376,7 @@ export class IngestionScheduler {
       }
       const data = await res.json();
       let hostname = "unknown";
-      try { hostname = new URL(url).hostname; } catch { /* noop */ }
+      try { hostname = new URL(url).hostname; } catch (e) { console.warn("[scheduler] Malformed URL:", url, e); }
       return [{
         text: `${data.title || ""}\n\n${data.content || ""}`.slice(0, MAX_TEXT_LENGTH),
         author: data.author || hostname,

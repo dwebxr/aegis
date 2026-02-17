@@ -83,6 +83,7 @@ function AegisAppInner() {
   const [linkedAccount, setLinkedAccount] = useState<LinkedNostrAccount | null>(() => getLinkedAccount());
   const [wotPromptDismissed, setWotPromptDismissed] = useState(() => {
     if (typeof window === "undefined") return false;
+    // sessionStorage may throw in SSR or restrictive privacy modes; default to not-dismissed
     try { return sessionStorage.getItem("aegis-wot-prompt-dismissed") === "true"; } catch { return false; }
   });
 
@@ -181,6 +182,7 @@ function AegisAppInner() {
 
   const dismissWotPrompt = useCallback(() => {
     setWotPromptDismissed(true);
+    // sessionStorage may throw in SSR or restrictive privacy modes; dismissal is non-critical UI state
     try { sessionStorage.setItem("aegis-wot-prompt-dismissed", "true"); } catch { /* noop */ }
   }, []);
 
@@ -341,7 +343,7 @@ function AegisAppInner() {
           .join("\n");
         const summary = `${count} item${count > 1 ? "s" : ""} scored`;
         localStorage.setItem("aegis-push-last", String(Date.now()));
-        fetch("/api/push/send", {
+        void fetch("/api/push/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -351,7 +353,7 @@ function AegisAppInner() {
             url: "/",
             tag: `briefing-${new Date().toISOString().slice(0, 10)}`,
           }),
-        }).catch((err: unknown) => {
+        }).then(r => { void r.arrayBuffer(); }).catch((err: unknown) => {
           console.warn("[push] Send notification failed:", errMsg(err));
         });
       },
@@ -595,7 +597,7 @@ function AegisAppInner() {
       {isAuthenticated && !linkedAccount && !wotPromptDismissed && (
         <WoTPromptBanner onGoToSettings={() => setTab("settings")} onDismiss={dismissWotPrompt} />
       )}
-      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={setTab} />}
+      {tab === "dashboard" && <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={setTab} discoveries={discoveries} />}
       {tab === "briefing" && <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} onTabChange={setTab} />}
       {tab === "incinerator" && (
         <IncineratorTab

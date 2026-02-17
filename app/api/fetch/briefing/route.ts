@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     if (events.length === 0) {
       return NextResponse.json(
-        { error: "Event not found on relays", _debug: { relays, filter } },
+        { error: "Event not found on relays" },
         { status: 404 },
       );
     }

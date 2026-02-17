@@ -118,7 +118,10 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         setDiscoveredFeeds(feeds);
         if (feeds.length === 0) setRssError("No feeds found at this URL");
       } else {
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch((e: unknown) => {
+          console.warn("[sources] Failed to parse error response:", e);
+          return {};
+        });
         setRssError(data.error || "Feed discovery failed");
       }
     } catch (err) {

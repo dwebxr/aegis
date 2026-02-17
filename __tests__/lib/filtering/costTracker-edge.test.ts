@@ -266,18 +266,29 @@ describe("costTracker — edge cases", () => {
       expect(summary.totalDays).toBe(0);
     });
 
-    it("handles record with missing fields gracefully", () => {
+    it("rejects records with missing required fields", () => {
       const month = new Date().toISOString().slice(0, 7);
       const day = `${month}-01`;
-      // Partial record — missing some fields
+      // Partial record — missing aiCostUSD → rejected by validation
       store["aegis-cost-tracker"] = JSON.stringify({
         [day]: { date: day, articlesEvaluated: 10 },
       });
 
       const summary = getMonthlyCost(month);
-      // NaN from undefined + number → this tests if the code is robust
-      // In JS: undefined + 0 = NaN, so totalPassedWoT might be NaN
+      expect(summary.totalEvaluated).toBe(0);
+      expect(summary.totalDays).toBe(0);
+    });
+
+    it("accepts records with all required fields", () => {
+      const month = new Date().toISOString().slice(0, 7);
+      const day = `${month}-01`;
+      store["aegis-cost-tracker"] = JSON.stringify({
+        [day]: { date: day, articlesEvaluated: 10, articlesPassedWoT: 5, articlesPassedAI: 3, discoveriesFound: 1, aiCostUSD: 0.05 },
+      });
+
+      const summary = getMonthlyCost(month);
       expect(summary.totalEvaluated).toBe(10);
+      expect(summary.totalDays).toBe(1);
     });
   });
 
