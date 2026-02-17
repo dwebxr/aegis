@@ -6,7 +6,7 @@ import { CheckIcon, XCloseIcon, ChevronDownIcon } from "@/components/icons";
 import { fonts, colors, space, type as t, radii, transitions, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { contentToCSV } from "@/lib/utils/csv";
-import { FilterModeSelector } from "@/components/filtering/FilterModeSelector";
+import { useFilterMode } from "@/contexts/FilterModeContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
@@ -227,6 +227,7 @@ interface DashboardTabProps {
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [] }) => {
+  const { filterMode } = useFilterMode();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop" | "validated">("quality");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -420,7 +421,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               );
             })}
           </div>
-          <FilterModeSelector mobile={mobile} />
+          <button
+            onClick={() => onTabChange?.("settings")}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: space[1],
+              padding: `${space[1]}px ${space[3]}px`,
+              borderRadius: radii.pill,
+              background: filterMode === "pro" ? "rgba(56,189,248,0.1)" : colors.bg.raised,
+              border: `1px solid ${filterMode === "pro" ? "rgba(56,189,248,0.2)" : colors.border.default}`,
+              color: filterMode === "pro" ? colors.sky[400] : colors.text.muted,
+              fontSize: t.caption.size, fontWeight: 700, cursor: "pointer",
+              fontFamily: "inherit", transition: transitions.fast,
+            }}
+            title="Change in Settings"
+          >
+            {filterMode === "pro" ? "Pro" : "Lite"}
+          </button>
           {wotLoading && (
             <span style={{ fontSize: t.caption.size, color: colors.text.disabled, animation: "pulse 2s infinite" }}>
               &#x1F310; WoT...

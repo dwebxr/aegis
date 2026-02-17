@@ -396,6 +396,7 @@ describe("SettingsTab — section ordering", () => {
     const html = renderToStaticMarkup(<SettingsTab />);
     expect(html).toContain("Push Notifications");
     expect(html).toContain("D2A Social Agent");
+    expect(html).toContain("Filter Mode");
     expect(html).toContain("AI Scoring");
     expect(html).toContain("Browser AI");
     expect(html).toContain("Account");
@@ -403,11 +404,14 @@ describe("SettingsTab — section ordering", () => {
     expect(html).toContain("AEGIS");
   });
 
-  it("Browser AI appears between AI Scoring and Account", () => {
+  it("Filter Mode, AI Scoring, Browser AI, Account appear in order", () => {
     const html = renderToStaticMarkup(<SettingsTab />);
+    const filterModeIdx = html.indexOf("Filter Mode");
     const aiScoringIdx = html.indexOf("AI Scoring");
-    const browserAiIdx = html.indexOf("Browser AI");
+    // Use section title occurrence (">Browser AI<") to skip engine status label
+    const browserAiIdx = html.indexOf(">Browser AI<");
     const accountIdx = html.indexOf("Account");
+    expect(filterModeIdx).toBeLessThan(aiScoringIdx);
     expect(aiScoringIdx).toBeLessThan(browserAiIdx);
     expect(browserAiIdx).toBeLessThan(accountIdx);
   });

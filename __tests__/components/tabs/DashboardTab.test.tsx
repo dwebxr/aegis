@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { DashboardTab } from "@/components/tabs/DashboardTab";
 import type { ContentItem } from "@/lib/types/content";
 
-jest.mock("@/components/filtering/FilterModeSelector", () => ({
-  FilterModeSelector: () => React.createElement("div", { "data-testid": "filter-mode-selector" }, "FilterMode"),
+jest.mock("@/contexts/FilterModeContext", () => ({
+  useFilterMode: () => ({ filterMode: "lite", setFilterMode: jest.fn() }),
 }));
 
 jest.mock("@/contexts/PreferenceContext", () => ({
@@ -230,11 +230,11 @@ describe("DashboardTab — single source", () => {
 });
 
 describe("DashboardTab — header", () => {
-  it("shows Home title and FilterModeSelector", () => {
+  it("shows Home title and filter mode badge", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     expect(html).toContain("Home");
-    expect(html).toContain("FilterMode");
+    expect(html).toContain("Lite");
   });
 });

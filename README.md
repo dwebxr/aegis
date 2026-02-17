@@ -30,10 +30,10 @@ Aegis has two independent axes: **authentication state** (Demo vs Logged-in) and
 | **Pro** | Logged in + AI setup | Custom (add/edit/remove) | AI pipeline + heuristic fallback | Yes | Free during alpha |
 
 - **Demo**: Open the app without logging in. You get 3 preset RSS feeds scored with heuristic filters. Source management is disabled. Great for trying Aegis without commitment. Pro mode selector is locked.
-- **Lite**: Login and select "Lite" in the filter mode selector. Full source management with heuristic-only scoring. No API calls, $0 cost. WoT and serendipity disabled.
-- **Pro**: Login and select "Pro" in the filter mode selector. **Requires at least one AI scoring engine** (Ollama, Browser AI, or BYOK API key) to be configured in Settings. Full AI scoring pipeline (Ollama → WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
+- **Lite**: Login and select "Lite" in Settings > Filter Mode. Full source management with heuristic-only scoring. No API calls, $0 cost. WoT and serendipity disabled.
+- **Pro**: Login and select "Pro" in Settings > Filter Mode. **Requires at least one AI scoring engine** (Ollama, Browser AI, or BYOK API key) to be configured in Settings. Full AI scoring pipeline (Ollama → WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
 
-Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. Pro is gated behind AI scoring availability — if no AI engine is configured, the Pro button shows "AI setup required" and auto-falls back to Lite. Demo mode is automatic when not logged in — logging in clears demo content and enables full source management.
+Users switch between Lite and Pro in Settings > Filter Mode, which also shows the status of each AI engine (Ollama, WebLLM, BYOK). The Dashboard displays the current mode as a read-only badge — clicking it navigates to Settings. Pro is gated behind AI scoring availability — if no AI engine is configured, the Pro button shows "AI setup required" and auto-falls back to Lite. Demo mode is automatic when not logged in — logging in clears demo content and enables full source management.
 
 ### AI Scoring Engines
 
@@ -240,7 +240,7 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 - **Lite**: Authenticated, heuristic-only scoring. Full source management but no API calls, no WoT, no serendipity. $0 cost.
 - **Pro**: Authenticated + at least one AI engine configured (Ollama, WebLLM, or BYOK key). Full AI scoring pipeline + WoT social graph filtering + serendipity discovery (up to 5 per cycle). Free during alpha; alternatively bring your own Claude API key in Settings.
 
-Users switch between Lite and Pro via the FilterModeSelector in the Dashboard. Pro is locked with "AI setup required" until an AI engine is configured. Demo mode is automatic when not logged in.
+Users switch between Lite and Pro in Settings > Filter Mode (with AI engine status indicators). The Dashboard shows the current mode as a read-only badge. Pro is locked with "AI setup required" until an AI engine is configured. Demo mode is automatic when not logged in.
 
 ### Nostr Account Linking
 

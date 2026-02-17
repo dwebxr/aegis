@@ -22,6 +22,7 @@ import { getOllamaConfig, setOllamaConfig } from "@/lib/ollama/storage";
 import type { OllamaConfig, OllamaStatus } from "@/lib/ollama/types";
 import { DEFAULT_OLLAMA_CONFIG } from "@/lib/ollama/types";
 import { NostrAccountLink } from "@/components/ui/NostrAccountLink";
+import { FilterModeSelector } from "@/components/filtering/FilterModeSelector";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 
 const LS_PUSH_FREQ_KEY = "aegis-push-frequency";
@@ -330,6 +331,32 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
             ))}
           </div>
         )}
+      </div>
+
+      {/* Filter Mode */}
+      <div style={cardStyle(mobile)}>
+        <div style={sectionTitle}>Filter Mode</div>
+        <FilterModeSelector />
+        <div style={{ marginTop: space[3], display: "flex", flexDirection: "column", gap: space[1] }}>
+          {([
+            { label: "Local LLM (Ollama)", on: ollamaConfig.enabled },
+            { label: "Browser AI (WebLLM)", on: webllmOn },
+            { label: "API Key (BYOK)", on: hasApiKey },
+          ] as const).map(e => (
+            <div key={e.label} style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+              <div style={{
+                width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                background: e.on ? colors.green[400] : colors.text.disabled,
+              }} />
+              <span style={{ fontSize: t.caption.size, color: e.on ? colors.text.secondary : colors.text.disabled }}>
+                {e.label}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
+          Pro requires at least one AI engine. Configure below.
+        </div>
       </div>
 
       {/* AI Scoring (BYOK) */}
