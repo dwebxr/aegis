@@ -517,7 +517,8 @@ Aegis exposes a paid API for AI agents (like [Coo](https://github.com/AegisOnCha
 
 | Endpoint | Auth | Description |
 |----------|------|-------------|
-| `GET /api/d2a/briefing` | x402 ($0.01 USDC) | Curated briefing with V/C/L scored items |
+| `GET /api/d2a/briefing?principal=<id>` | x402 ($0.01 USDC) | Individual curated briefing with V/C/L scored items |
+| `GET /api/d2a/briefing` | x402 ($0.01 USDC) | Global aggregated briefings from all D2A opt-in users |
 | `GET /api/d2a/info` | None | Service metadata, pricing, scoring model |
 | `GET /api/d2a/health` | None | Health check (IC canister + x402 config) |
 
@@ -538,7 +539,7 @@ AI Agent                        Aegis                        x402 Facilitator
    │                              │◄── tx hash ─────────────────│
 ```
 
-### Response Format
+### Response Format (Individual — `?principal=<id>`)
 
 ```json
 {
@@ -556,6 +557,30 @@ AI Agent                        Aegis                        x402 Facilitator
   }],
   "serendipityPick": { ... },
   "meta": { "scoringModel": "aegis-vcl-v1", "nostrPubkey": "...", "topics": [...] }
+}
+```
+
+### Response Format (Global — no `principal` param)
+
+When `?principal=` is omitted, returns aggregated summaries from all D2A opt-in users. Supports `?offset=` and `?limit=` (default 5, max 10) pagination.
+
+```json
+{
+  "version": "1.0",
+  "type": "global",
+  "generatedAt": "2025-01-15T12:00:00Z",
+  "pagination": { "offset": 0, "limit": 5, "total": 42 },
+  "contributors": [{
+    "principal": "rluf3-eiaaa-...",
+    "generatedAt": "2025-01-15T11:00:00Z",
+    "summary": { "totalEvaluated": 10, "totalBurned": 3, "qualityRate": 0.7 },
+    "topItems": [
+      { "title": "...", "topics": ["ml"], "briefingScore": 8.2, "verdict": "quality" }
+    ]
+  }],
+  "aggregatedTopics": ["machine-learning", "web3"],
+  "totalEvaluated": 120,
+  "totalQualityRate": 0.65
 }
 ```
 
@@ -677,7 +702,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, auth/cookie scrubbing, breadcrumb URL stripping, conditional on DSN) |
-| Test | Jest + ts-jest (2519 tests, 164 suites) |
+| Test | Jest + ts-jest (2526 tests, 164 suites) |
 
 ## Project Structure
 
@@ -804,7 +829,7 @@ aegis/
 │   └── sources/
 │       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Google News)
 │       └── storage.ts                   # Source config localStorage R/W
-├── __tests__/                           # 2519 tests across 164 suites
+├── __tests__/                           # 2526 tests across 164 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -840,7 +865,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 2519 tests
+npm test              # Run all 2526 tests
 npm run test:watch    # Watch mode
 ```
 
@@ -920,6 +945,7 @@ service : {
   // D2A Briefing Snapshots
   saveLatestBriefing : (text) -> (bool);              // Save serialized briefing JSON
   getLatestBriefing : (principal) -> (opt text) query; // Retrieve latest briefing
+  getGlobalBriefingSummaries : (nat, nat) -> (record { items; total }) query; // Paginated global briefings (d2aEnabled users only)
 
   // User Settings (Nostr link + D2A toggle — synced across devices)
   saveUserSettings : (UserSettings) -> (bool);

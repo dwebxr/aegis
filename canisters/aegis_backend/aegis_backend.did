@@ -74,4 +74,9 @@ service : {
 
   getUserSettings : (principal) -> (opt UserSettings) query;
   saveUserSettings : (UserSettings) -> (bool);
+
+  getGlobalBriefingSummaries : (nat, nat) -> (record {
+    items : vec record { principal; text; int };
+    total : nat;
+  }) query;
 };

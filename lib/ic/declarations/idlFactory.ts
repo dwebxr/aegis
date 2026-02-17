@@ -125,6 +125,10 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     d2aEnabled: IDL.Bool,
     updatedAt: IDL.Int,
   });
+  const GlobalBriefingSummariesResult = IDL.Record({
+    items: IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Text, IDL.Int)),
+    total: IDL.Nat,
+  });
   return IDL.Service({
     getProfile: IDL.Func([IDL.Principal], [IDL.Opt(UserProfile)], ["query"]),
     getEvaluation: IDL.Func([IDL.Text], [IDL.Opt(ContentEvaluation)], ["query"]),
@@ -158,6 +162,7 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     getPushSubscriptionCount: IDL.Func([], [IDL.Nat], ["query"]),
     saveLatestBriefing: IDL.Func([IDL.Text], [IDL.Bool], []),
     getLatestBriefing: IDL.Func([IDL.Principal], [IDL.Opt(IDL.Text)], ["query"]),
+    getGlobalBriefingSummaries: IDL.Func([IDL.Nat, IDL.Nat], [GlobalBriefingSummariesResult], ["query"]),
     getUserSettings: IDL.Func([IDL.Principal], [IDL.Opt(UserSettings)], ["query"]),
     saveUserSettings: IDL.Func([UserSettings], [IDL.Bool], []),
   });

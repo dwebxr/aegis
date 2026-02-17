@@ -32,3 +32,110 @@ export async function getLatestBriefing(principalText?: string): Promise<D2ABrie
     return null;
   }
 }
+
+// ── Global Briefing Aggregation ──
+
+export interface GlobalBriefingContributor {
+  principal: string;
+  generatedAt: string;
+  summary: {
+    totalEvaluated: number;
+    totalBurned: number;
+    qualityRate: number;
+  };
+  topItems: Array<{
+    title: string;
+    topics: string[];
+    briefingScore: number;
+    verdict: "quality" | "slop";
+  }>;
+}
+
+export interface GlobalBriefingResponse {
+  version: "1.0";
+  type: "global";
+  generatedAt: string;
+  pagination: { offset: number; limit: number; total: number };
+  contributors: GlobalBriefingContributor[];
+  aggregatedTopics: string[];
+  totalEvaluated: number;
+  totalQualityRate: number;
+}
+
+const MAX_TOP_ITEMS = 3;
+
+export async function getGlobalBriefingSummaries(
+  offset = 0,
+  limit = 5,
+): Promise<GlobalBriefingResponse | null> {
+  const agent = await HttpAgent.create({ host: getHost() });
+  const actor = Actor.createActor<_SERVICE>(idlFactory, { agent, canisterId: getCanisterId() });
+
+  const result = await actor.getGlobalBriefingSummaries(BigInt(offset), BigInt(limit));
+
+  if (result.items.length === 0 && Number(result.total) === 0) return null;
+
+  const topicCounts = new Map<string, number>();
+  let totalEvaluated = 0;
+  let totalQuality = 0;
+  const contributors: GlobalBriefingContributor[] = [];
+
+  for (const [principal, briefingJson, generatedAt] of result.items) {
+    try {
+      const parsed = JSON.parse(briefingJson) as D2ABriefingResponse;
+      if (typeof parsed !== "object" || parsed === null || !parsed.summary || !Array.isArray(parsed.items)) {
+        continue;
+      }
+
+      totalEvaluated += parsed.summary.totalEvaluated || 0;
+      totalQuality += (parsed.summary.totalEvaluated || 0) - (parsed.summary.totalBurned || 0);
+
+      for (const item of parsed.items) {
+        for (const topic of item.topics || []) {
+          topicCounts.set(topic, (topicCounts.get(topic) || 0) + 1);
+        }
+      }
+      if (parsed.meta?.topics) {
+        for (const topic of parsed.meta.topics) {
+          topicCounts.set(topic, (topicCounts.get(topic) || 0) + 1);
+        }
+      }
+
+      const topItems = parsed.items.slice(0, MAX_TOP_ITEMS).map((item) => ({
+        title: item.title,
+        topics: item.topics || [],
+        briefingScore: item.briefingScore,
+        verdict: item.verdict,
+      }));
+
+      contributors.push({
+        principal: principal.toText(),
+        generatedAt: typeof generatedAt === "bigint"
+          ? new Date(Number(generatedAt / BigInt(1_000_000))).toISOString()
+          : parsed.generatedAt,
+        summary: parsed.summary,
+        topItems,
+      });
+    } catch {
+      console.warn(`[briefingProvider] Failed to parse global briefing for ${principal.toText()}`);
+    }
+  }
+
+  const aggregatedTopics = Array.from(topicCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([topic]) => topic);
+
+  const totalQualityRate = totalEvaluated > 0 ? totalQuality / totalEvaluated : 0;
+
+  return {
+    version: "1.0",
+    type: "global",
+    generatedAt: new Date().toISOString(),
+    pagination: { offset, limit, total: Number(result.total) },
+    contributors,
+    aggregatedTopics,
+    totalEvaluated,
+    totalQualityRate: Math.round(totalQualityRate * 100) / 100,
+  };
+}

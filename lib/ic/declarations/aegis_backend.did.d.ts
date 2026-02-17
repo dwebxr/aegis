@@ -143,6 +143,11 @@ export interface UserSettings {
   updatedAt: bigint;
 }
 
+export interface GlobalBriefingSummariesResult {
+  items: Array<[Principal, string, bigint]>;
+  total: bigint;
+}
+
 export type Result<T, E> = { ok: T } | { err: E };
 
 export interface _SERVICE {
@@ -178,6 +183,7 @@ export interface _SERVICE {
   getPushSubscriptionCount: ActorMethod<[], bigint>;
   saveLatestBriefing: ActorMethod<[string], boolean>;
   getLatestBriefing: ActorMethod<[Principal], [] | [string]>;
+  getGlobalBriefingSummaries: ActorMethod<[bigint, bigint], GlobalBriefingSummariesResult>;
   getUserSettings: ActorMethod<[Principal], [] | [UserSettings]>;
   saveUserSettings: ActorMethod<[UserSettings], boolean>;
 }

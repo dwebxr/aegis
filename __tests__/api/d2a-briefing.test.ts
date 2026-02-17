@@ -4,6 +4,7 @@ import { _resetRateLimits } from "@/lib/api/rateLimit";
 // Mock briefingProvider before importing route
 jest.mock("@/lib/d2a/briefingProvider", () => ({
   getLatestBriefing: jest.fn(),
+  getGlobalBriefingSummaries: jest.fn(),
 }));
 
 // Mock x402 — when X402_RECEIVER is empty, route uses handleGet directly
@@ -15,9 +16,10 @@ jest.mock("@/lib/d2a/x402Server", () => ({
 }));
 
 import { GET, OPTIONS } from "@/app/api/d2a/briefing/route";
-import { getLatestBriefing } from "@/lib/d2a/briefingProvider";
+import { getLatestBriefing, getGlobalBriefingSummaries } from "@/lib/d2a/briefingProvider";
 
 const mockGetLatestBriefing = getLatestBriefing as jest.MockedFunction<typeof getLatestBriefing>;
+const mockGetGlobalBriefingSummaries = getGlobalBriefingSummaries as jest.MockedFunction<typeof getGlobalBriefingSummaries>;
 
 function makeRequest(params?: Record<string, string>, origin?: string): NextRequest {
   const url = new URL("http://localhost/api/d2a/briefing");
@@ -50,18 +52,29 @@ const sampleBriefing = {
   meta: { scoringModel: "aegis-vcl-v1", nostrPubkey: null, topics: ["tech"] },
 };
 
-describe("GET /api/d2a/briefing (ungated)", () => {
+const sampleGlobalBriefing = {
+  version: "1.0" as const,
+  type: "global" as const,
+  generatedAt: "2025-01-01T00:00:00.000Z",
+  pagination: { offset: 0, limit: 5, total: 2 },
+  contributors: [{
+    principal: "rrkah-fqaaa-aaaaa-aaaaq-cai",
+    generatedAt: "2025-01-01T00:00:00.000Z",
+    summary: { totalEvaluated: 10, totalBurned: 2, qualityRate: 0.8 },
+    topItems: [
+      { title: "Test Article", topics: ["tech"], briefingScore: 85, verdict: "quality" as const },
+    ],
+  }],
+  aggregatedTopics: ["tech"],
+  totalEvaluated: 10,
+  totalQualityRate: 0.8,
+};
+
+describe("GET /api/d2a/briefing — individual path", () => {
   beforeEach(() => {
     _resetRateLimits();
     mockGetLatestBriefing.mockReset();
-  });
-
-  it("returns 404 when no principal provided", async () => {
-    mockGetLatestBriefing.mockResolvedValue(null);
-    const res = await GET(makeRequest());
-    expect(res.status).toBe(404);
-    const data = await res.json();
-    expect(data.error).toContain("No briefing");
+    mockGetGlobalBriefingSummaries.mockReset();
   });
 
   it("returns 404 when principal has no data", async () => {
@@ -87,12 +100,6 @@ describe("GET /api/d2a/briefing (ungated)", () => {
     expect(mockGetLatestBriefing).toHaveBeenCalledWith("rrkah-fqaaa-aaaaa-aaaaq-cai");
   });
 
-  it("passes undefined when no principal param", async () => {
-    mockGetLatestBriefing.mockResolvedValue(null);
-    await GET(makeRequest());
-    expect(mockGetLatestBriefing).toHaveBeenCalledWith(undefined);
-  });
-
   it("returns 500 when getLatestBriefing throws", async () => {
     mockGetLatestBriefing.mockRejectedValue(new Error("IC network error"));
     const consoleSpy = jest.spyOn(console, "error").mockImplementation();
@@ -109,33 +116,10 @@ describe("GET /api/d2a/briefing (ungated)", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
-  it("omits CORS allow-origin for unknown origin on 404", async () => {
-    mockGetLatestBriefing.mockResolvedValue(null);
-    const res = await GET(makeRequest());
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
-  });
-
-  it("omits CORS allow-origin for unknown origin on 500", async () => {
-    mockGetLatestBriefing.mockRejectedValue(new Error("fail"));
-    jest.spyOn(console, "error").mockImplementation();
-    const res = await GET(makeRequest({ principal: "aaaaa-aa" }));
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
-    jest.restoreAllMocks();
-  });
-
-  it("reflects known origin on all responses", async () => {
+  it("reflects known origin on success", async () => {
     mockGetLatestBriefing.mockResolvedValue(sampleBriefing);
     const res = await GET(makeRequest({ principal: "aaaaa-aa" }, "https://aegis.dwebxr.xyz"));
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://aegis.dwebxr.xyz");
-  });
-
-  it("enforces rate limit of 30 per minute", async () => {
-    mockGetLatestBriefing.mockResolvedValue(null);
-    for (let i = 0; i < 30; i++) {
-      await GET(makeRequest());
-    }
-    const res = await GET(makeRequest());
-    expect(res.status).toBe(429);
   });
 
   it("returns full briefing structure with items and meta", async () => {
@@ -146,6 +130,110 @@ describe("GET /api/d2a/briefing (ungated)", () => {
     expect(data.meta.scoringModel).toBe("aegis-vcl-v1");
     expect(data.summary.totalEvaluated).toBe(10);
     expect(data.items[0].scores.originality).toBe(7);
+  });
+});
+
+describe("GET /api/d2a/briefing — global path", () => {
+  beforeEach(() => {
+    _resetRateLimits();
+    mockGetLatestBriefing.mockReset();
+    mockGetGlobalBriefingSummaries.mockReset();
+  });
+
+  it("calls getGlobalBriefingSummaries when no principal param", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(null);
+    await GET(makeRequest());
+    expect(mockGetGlobalBriefingSummaries).toHaveBeenCalledWith(0, 5);
+    expect(mockGetLatestBriefing).not.toHaveBeenCalled();
+  });
+
+  it("returns global briefings when data exists", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(sampleGlobalBriefing);
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.type).toBe("global");
+    expect(data.contributors).toHaveLength(1);
+    expect(data.pagination.total).toBe(2);
+  });
+
+  it("returns 404 when no global briefings available", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(null);
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(404);
+    const data = await res.json();
+    expect(data.hint).toContain("No users have opted into D2A");
+  });
+
+  it("passes offset and limit query params", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(sampleGlobalBriefing);
+    await GET(makeRequest({ offset: "10", limit: "3" }));
+    expect(mockGetGlobalBriefingSummaries).toHaveBeenCalledWith(10, 3);
+  });
+
+  it("clamps limit to max 10", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(sampleGlobalBriefing);
+    await GET(makeRequest({ limit: "50" }));
+    expect(mockGetGlobalBriefingSummaries).toHaveBeenCalledWith(0, 10);
+  });
+
+  it("defaults offset=0 limit=5 when params absent", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(sampleGlobalBriefing);
+    await GET(makeRequest());
+    expect(mockGetGlobalBriefingSummaries).toHaveBeenCalledWith(0, 5);
+  });
+
+  it("returns 500 when getGlobalBriefingSummaries throws", async () => {
+    mockGetGlobalBriefingSummaries.mockRejectedValue(new Error("IC error"));
+    const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(500);
+    consoleSpy.mockRestore();
+  });
+
+  it("includes aggregatedTopics and totalEvaluated in response", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(sampleGlobalBriefing);
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.aggregatedTopics).toContain("tech");
+    expect(data.totalEvaluated).toBe(10);
+    expect(data.totalQualityRate).toBe(0.8);
+  });
+
+  it("includes pagination metadata", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(sampleGlobalBriefing);
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.pagination).toEqual({ offset: 0, limit: 5, total: 2 });
+  });
+
+  it("applies CORS for allowed origins", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(sampleGlobalBriefing);
+    const res = await GET(makeRequest({}, "https://aegis.dwebxr.xyz"));
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://aegis.dwebxr.xyz");
+  });
+
+  it("omits CORS for unknown origins on 404", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(null);
+    const res = await GET(makeRequest());
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+});
+
+describe("GET /api/d2a/briefing — rate limiting", () => {
+  beforeEach(() => {
+    _resetRateLimits();
+    mockGetLatestBriefing.mockReset();
+    mockGetGlobalBriefingSummaries.mockReset();
+  });
+
+  it("enforces rate limit of 30 per minute", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(null);
+    for (let i = 0; i < 30; i++) {
+      await GET(makeRequest());
+    }
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(429);
   });
 });
 

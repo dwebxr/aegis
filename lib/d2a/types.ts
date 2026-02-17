@@ -36,3 +36,5 @@ export interface D2ABriefingResponse {
     topics: string[];
   };
 }
+
+export type { GlobalBriefingResponse, GlobalBriefingContributor } from "./briefingProvider";

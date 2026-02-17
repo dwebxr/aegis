@@ -1,6 +1,7 @@
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
 import Buffer "mo:base/Buffer";
+import Order "mo:base/Order";
 import ExperimentalCycles "mo:base/ExperimentalCycles";
 import Float "mo:base/Float";
 import HashMap "mo:base/HashMap";
@@ -1539,6 +1540,46 @@ persistent actor AegisBackend {
       case (?snapshot) { ?snapshot.briefingJson };
       case null { null };
     };
+  };
+
+  /// Return briefings from all d2aEnabled users, paginated (newest first).
+  /// TypeScript caller extracts summary fields from each briefingJson.
+  public query func getGlobalBriefingSummaries(offset : Nat, limit : Nat) : async {
+    items : [(Principal, Text, Int)];
+    total : Nat;
+  } {
+    let clampedLimit = if (limit > 10) { 10 } else if (limit == 0) { 5 } else { limit };
+
+    let eligible = Buffer.Buffer<(Principal, Types.D2ABriefingSnapshot)>(briefings.size());
+    for ((p, snap) in briefings.entries()) {
+      switch (userSettings.get(p)) {
+        case (?s) { if (s.d2aEnabled) { eligible.add((p, snap)) } };
+        case null {};
+      };
+    };
+
+    let total = eligible.size();
+
+    let sorted = Array.sort<(Principal, Types.D2ABriefingSnapshot)>(
+      Buffer.toArray(eligible),
+      func(a, b) : Order.Order {
+        if (a.1.generatedAt > b.1.generatedAt) { #less }
+        else if (a.1.generatedAt < b.1.generatedAt) { #greater }
+        else { #equal }
+      }
+    );
+
+    let start = if (offset >= total) { total } else { offset };
+    let end = Nat.min(start + clampedLimit, total);
+    let result = Buffer.Buffer<(Principal, Text, Int)>(end - start);
+    var i = start;
+    while (i < end) {
+      let (p, snap) = sorted[i];
+      result.add((p, snap.briefingJson, snap.generatedAt));
+      i += 1;
+    };
+
+    { items = Buffer.toArray(result); total = total };
   };
 
   // ──────────────────────────────────────
