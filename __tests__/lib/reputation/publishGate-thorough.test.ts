@@ -158,7 +158,10 @@ describe("applyReputationRecovery", () => {
 describe("publishGate persistence", () => {
   it("corrupted store returns empty map", () => {
     store["aegis_publish_reputations"] = "{invalid json";
-    expect(() => loadPublishReputations()).toThrow(); // JSON.parse fails
+    const map = loadPublishReputations();
+    expect(map.size).toBe(0);
+    // Corrupted data should be cleared
+    expect(store["aegis_publish_reputations"]).toBeUndefined();
   });
 
   it("wrong version returns empty map", () => {

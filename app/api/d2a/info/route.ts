@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         composite: "Weighted final score (0-10)",
       },
     },
-    compatibility: { erc8004: false, x402Version: 2 },
+    compatibility: { x402Version: 2 },
   }), request.headers.get("origin"));
 }
 

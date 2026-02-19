@@ -22,9 +22,15 @@ export function loadReputations(): Map<string, PeerReputation> {
   if (typeof globalThis.localStorage === "undefined") return new Map();
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return new Map();
-  const parsed: SerializedReputationStore = JSON.parse(raw);
-  if (parsed.version !== 1 || !Array.isArray(parsed.peers)) return new Map();
-  return new Map(parsed.peers);
+  try {
+    const parsed: SerializedReputationStore = JSON.parse(raw);
+    if (parsed.version !== 1 || !Array.isArray(parsed.peers)) return new Map();
+    return new Map(parsed.peers);
+  } catch {
+    console.warn("[d2a-reputation] Corrupted localStorage data, resetting");
+    localStorage.removeItem(STORAGE_KEY);
+    return new Map();
+  }
 }
 
 export function saveReputations(map: Map<string, PeerReputation>): void {
@@ -105,11 +111,12 @@ export function getTrustTier(effectiveTrust: number): TrustTier {
   return "restricted";
 }
 
+/** Map trust tier → fee. Caller should reject "restricted" before calling. */
 export function calculateDynamicFee(tier: TrustTier): number {
   switch (tier) {
     case "trusted": return D2A_FEE_TRUSTED;
     case "known": return D2A_FEE_KNOWN;
     case "unknown": return D2A_FEE_UNKNOWN;
-    case "restricted": return 0;
+    case "restricted": return 0; // Defensive: caller filters restricted tier
   }
 }

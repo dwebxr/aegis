@@ -573,12 +573,23 @@ describe("parseICSettings", () => {
       linkedNostrNpub: ["npub1abc"],
       linkedNostrPubkeyHex: ["deadbeef"],
       d2aEnabled: true,
+      updatedAt: BigInt(1700000000_000_000_000),
     });
     expect(result.account).not.toBeNull();
     expect(result.account!.npub).toBe("npub1abc");
     expect(result.account!.pubkeyHex).toBe("deadbeef");
     expect(result.account!.followCount).toBe(0);
+    expect(result.account!.linkedAt).toBe(1700000000_000);
     expect(result.d2aEnabled).toBe(true);
+  });
+
+  it("uses 0 for linkedAt when updatedAt is absent", () => {
+    const result = parseICSettings({
+      linkedNostrNpub: ["npub1abc"],
+      linkedNostrPubkeyHex: ["deadbeef"],
+      d2aEnabled: true,
+    });
+    expect(result.account!.linkedAt).toBe(0);
   });
 
   it("returns null account when arrays are empty", () => {

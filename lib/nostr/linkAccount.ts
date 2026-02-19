@@ -182,17 +182,19 @@ export async function syncLinkedAccountToIC(
  * Pure function — no I/O. Used by both loadSettingsFromIC and page.tsx.
  */
 export function parseICSettings(
-  settings: { linkedNostrNpub: string[]; linkedNostrPubkeyHex: string[]; d2aEnabled: boolean },
+  settings: { linkedNostrNpub: string[]; linkedNostrPubkeyHex: string[]; d2aEnabled: boolean; updatedAt?: bigint },
 ): { account: LinkedNostrAccount | null; d2aEnabled: boolean } {
   const npub = settings.linkedNostrNpub.length > 0 ? settings.linkedNostrNpub[0] : null;
   const pubkeyHex = settings.linkedNostrPubkeyHex.length > 0 ? settings.linkedNostrPubkeyHex[0] : null;
 
   let account: LinkedNostrAccount | null = null;
   if (npub && pubkeyHex) {
+    // Use IC's updatedAt (nanoseconds → ms) as linkedAt; fall back to 0 if unavailable
+    const linkedAt = settings.updatedAt ? Number(settings.updatedAt / BigInt(1_000_000)) : 0;
     account = {
       npub,
       pubkeyHex,
-      linkedAt: Date.now(),
+      linkedAt,
       followCount: 0, // Will be hydrated from relays
     };
   }

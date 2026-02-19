@@ -38,9 +38,15 @@ export function loadPublishReputations(): Map<string, PublishReputation> {
   if (typeof globalThis.localStorage === "undefined") return new Map();
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return new Map();
-  const parsed: SerializedStore = JSON.parse(raw);
-  if (parsed.version !== 1 || !Array.isArray(parsed.entries)) return new Map();
-  return new Map(parsed.entries);
+  try {
+    const parsed: SerializedStore = JSON.parse(raw);
+    if (parsed.version !== 1 || !Array.isArray(parsed.entries)) return new Map();
+    return new Map(parsed.entries);
+  } catch {
+    console.warn("[publishGate] Corrupted localStorage data, resetting");
+    localStorage.removeItem(STORAGE_KEY);
+    return new Map();
+  }
 }
 
 export function savePublishReputations(map: Map<string, PublishReputation>): void {

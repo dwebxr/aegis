@@ -166,15 +166,17 @@ describe("persistence — get/save/clear", () => {
 });
 
 describe("parseICSettings", () => {
-  it("parses full settings with linked account", () => {
+  it("parses full settings with linked account and IC updatedAt", () => {
     const result = parseICSettings({
       linkedNostrNpub: ["npub1test"],
       linkedNostrPubkeyHex: ["ab".repeat(32)],
       d2aEnabled: true,
+      updatedAt: BigInt(1700000000_000_000_000),
     });
     expect(result.account).not.toBeNull();
     expect(result.account!.npub).toBe("npub1test");
     expect(result.account!.pubkeyHex).toBe("ab".repeat(32));
+    expect(result.account!.linkedAt).toBe(1700000000_000);
     expect(result.d2aEnabled).toBe(true);
   });
 
@@ -206,15 +208,13 @@ describe("parseICSettings", () => {
     expect(result.d2aEnabled).toBe(false);
   });
 
-  it("created account has followCount 0 and current timestamp", () => {
-    const before = Date.now();
+  it("defaults linkedAt to 0 and followCount to 0 when updatedAt absent", () => {
     const result = parseICSettings({
       linkedNostrNpub: ["npub1test"],
       linkedNostrPubkeyHex: ["ff".repeat(32)],
       d2aEnabled: true,
     });
     expect(result.account!.followCount).toBe(0);
-    expect(result.account!.linkedAt).toBeGreaterThanOrEqual(before);
-    expect(result.account!.linkedAt).toBeLessThanOrEqual(Date.now());
+    expect(result.account!.linkedAt).toBe(0);
   });
 });

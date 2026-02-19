@@ -47,7 +47,10 @@ describe("loadReputations / saveReputations", () => {
 
   it("returns empty map for corrupted localStorage", () => {
     localStorage.setItem("aegis-d2a-reputation", "{invalid json");
-    expect(() => loadReputations()).toThrow();
+    const map = loadReputations();
+    expect(map.size).toBe(0);
+    // Corrupted data should be cleared
+    expect(localStorage.getItem("aegis-d2a-reputation")).toBeNull();
   });
 });
 

@@ -44,7 +44,14 @@ function loadRecords(): Record<string, DailyCostRecord> {
         typeof r.discoveriesFound === "number" &&
         typeof r.aiCostUSD === "number"
       ) {
-        valid[key] = r as unknown as DailyCostRecord;
+        valid[key] = {
+          date: r.date,
+          articlesEvaluated: r.articlesEvaluated,
+          articlesPassedWoT: r.articlesPassedWoT,
+          articlesPassedAI: r.articlesPassedAI,
+          discoveriesFound: r.discoveriesFound,
+          aiCostUSD: r.aiCostUSD,
+        };
       }
     }
     return valid;

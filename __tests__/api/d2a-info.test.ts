@@ -84,8 +84,8 @@ describe("GET /api/d2a/info", () => {
   it("includes compatibility info", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.compatibility.erc8004).toBe(false);
     expect(data.compatibility.x402Version).toBe(2);
+    expect(data.compatibility.erc8004).toBeUndefined();
   });
 
   it("omits CORS allow-origin for unknown origin", async () => {

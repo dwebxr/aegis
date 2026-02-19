@@ -1,7 +1,7 @@
 import type { ContentItem } from "@/lib/types/content";
 import type { WoTScore } from "@/lib/wot/types";
 
-export type FilterMode = "lite" | "pro" | "demo";
+export type FilterMode = "lite" | "pro";
 
 export interface FilterConfig {
   mode: FilterMode;
