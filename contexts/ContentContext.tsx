@@ -72,10 +72,35 @@ function loadCachedContent(): ContentItem[] {
 function saveCachedContent(items: ContentItem[]): void {
   if (typeof globalThis.localStorage === "undefined") return;
   try {
-    localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(items.slice(0, MAX_CACHED_ITEMS)));
+    localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncatePreservingActioned(items)));
   } catch {
     // localStorage full — ignore
   }
+}
+
+/** Truncate to MAX_CACHED_ITEMS but never drop validated or flagged items. */
+function truncatePreservingActioned(items: ContentItem[]): ContentItem[] {
+  if (items.length <= MAX_CACHED_ITEMS) return items;
+
+  const actioned: ContentItem[] = [];
+  const unactioned: ContentItem[] = [];
+  for (const item of items) {
+    if (item.validated || item.flagged) {
+      actioned.push(item);
+    } else {
+      unactioned.push(item);
+    }
+  }
+
+  const unactionedBudget = Math.max(0, MAX_CACHED_ITEMS - actioned.length);
+  const trimmedUnactioned = unactioned.slice(0, unactionedBudget);
+
+  // Preserve original order (newest-first)
+  const preservedIds = new Set([
+    ...actioned.map(c => c.id),
+    ...trimmedUnactioned.map(c => c.id),
+  ]);
+  return items.filter(c => preservedIds.has(c.id));
 }
 
 interface ContentState {
@@ -158,6 +183,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const actorRef = useRef<_SERVICE | null>(null);
   const contentRef = useRef(content);
   contentRef.current = content;
+  const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   useEffect(() => {
     if (isAuthenticated && identity) {
@@ -165,6 +191,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         .then(actor => {
           actorRef.current = actor;
           setSyncStatus("idle");
+          // Actor is now ready — auto-load IC data
+          loadFromICRef.current().catch((err: unknown) => {
+            console.warn("[content] Auto-loadFromIC after actor creation failed:", errMsg(err));
+          });
         })
         .catch((err: unknown) => {
           console.error("[content] Failed to create IC actor:", errMsg(err));
@@ -330,7 +360,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         scoredByAI: result.scoringEngine !== "heuristic",
         scoringEngine: result.scoringEngine,
       };
-      setContent(prev => [evaluation, ...prev].slice(0, MAX_CACHED_ITEMS));
+      setContent(prev => truncatePreservingActioned([evaluation, ...prev]));
 
       if (actorRef.current && isAuthenticated && principal) {
         void actorRef.current.saveEvaluation(toICEvaluation(evaluation, principal)).catch((err: unknown) => {
@@ -389,7 +419,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       ? { ...item, owner: principal.toText() }
       : item;
 
-    setContent(prev => [owned, ...prev].slice(0, MAX_CACHED_ITEMS));
+    setContent(prev => truncatePreservingActioned([owned, ...prev]));
     if (actorRef.current && isAuthenticated && principal) {
       void actorRef.current.saveEvaluation(toICEvaluation(owned, principal)).catch((err: unknown) => {
         console.warn("[content] IC save (addContent) failed:", errMsg(err));
@@ -461,6 +491,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       addNotification("Could not load content history from IC", "error");
     }
   }, [isAuthenticated, principal, addNotification]);
+  loadFromICRef.current = loadFromIC;
 
   const syncBriefing = useCallback((state: BriefingState, nostrPubkey?: string | null) => {
     if (!actorRef.current || !isAuthenticated) return;

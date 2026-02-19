@@ -65,7 +65,7 @@ function extractUrl(text: string | null): string | null {
 function AegisAppInner() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
-  const { content, isAnalyzing, syncStatus, analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent, loadFromIC } = useContent();
+  const { content, isAnalyzing, syncStatus, analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent } = useContent();
   const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
@@ -221,15 +221,6 @@ function AegisAppInner() {
       aiCostUSD: pipelineResult.stats.estimatedAPICost,
     });
   }, [pipelineResult, discoveries.length]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadFromIC().catch((err: unknown) => {
-        console.warn("[page] Failed to load from IC:", errMsg(err));
-        addNotification("Could not load saved content from IC", "error");
-      });
-    }
-  }, [isAuthenticated, loadFromIC, addNotification]);
 
   useEffect(() => {
     if (!isAuthenticated || !identity || !principalText) {
