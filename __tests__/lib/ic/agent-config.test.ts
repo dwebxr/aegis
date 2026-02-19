@@ -87,7 +87,7 @@ describe("getInternetIdentityUrl", () => {
   it("returns production II URL when not local", () => {
     delete process.env.NEXT_PUBLIC_INTERNET_IDENTITY_URL;
     const { getInternetIdentityUrl } = importAgentModule();
-    expect(getInternetIdentityUrl()).toBe("https://identity.ic0.app");
+    expect(getInternetIdentityUrl()).toBe("https://identity.internetcomputer.org");
   });
 
   it("returns local II URL when on localhost", () => {

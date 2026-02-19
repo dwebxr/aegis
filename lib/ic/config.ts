@@ -7,7 +7,7 @@ export function getHost(): string {
 }
 
 export function getInternetIdentityUrl(): string {
-  return (process.env.NEXT_PUBLIC_INTERNET_IDENTITY_URL || (isLocal ? "http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai" : "https://identity.ic0.app")).trim();
+  return (process.env.NEXT_PUBLIC_INTERNET_IDENTITY_URL || (isLocal ? "http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai" : "https://identity.internetcomputer.org")).trim();
 }
 
 export function getCanisterId(): string {
