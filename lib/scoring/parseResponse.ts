@@ -26,6 +26,7 @@ export function parseScoreResponse(raw: string): ScoreParseResult | null {
 
     const jsonStr = cleaned.slice(jsonStart, jsonEnd + 1);
     const parsed = JSON.parse(jsonStr);
+    if (typeof parsed !== "object" || parsed === null) return null;
 
     const vSignal = scoreField(parsed, "vSignal");
     const cContext = scoreField(parsed, "cContext");

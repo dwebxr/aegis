@@ -9,6 +9,10 @@ import type { ContentItem } from "@/lib/types/content";
 
 type CardVariant = "default" | "priority" | "serendipity";
 
+function hasVCL(item: ContentItem): boolean {
+  return item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
+}
+
 interface ContentCardProps {
   item: ContentItem;
   expanded: boolean;
@@ -36,10 +40,9 @@ function GradeBadge({ composite }: { composite: number }) {
 }
 
 export function ScoreGrid({ item }: { item: ContentItem }) {
-  const hasVCL = item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: space[3], marginBottom: space[4] }}>
-      {hasVCL ? (
+      {hasVCL(item) ? (
         <>
           <Tooltip text={GLOSSARY["V-Signal"]} position="bottom"><ScoreBar label="V Signal" score={item.vSignal!} color={colors.purple[400]} /></Tooltip>
           <Tooltip text={GLOSSARY["C-Context"]} position="bottom"><ScoreBar label="C Context" score={item.cContext!} color={colors.sky[400]} /></Tooltip>
@@ -72,9 +75,8 @@ export function TopicTags({ topics }: { topics: string[] }) {
 
 export function deriveScoreTags(item: ContentItem): Array<{ label: string; color: string }> {
   const tags: Array<{ label: string; color: string }> = [];
-  const hasVCL = item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
 
-  if (hasVCL) {
+  if (hasVCL(item)) {
     if (item.vSignal! >= 7) tags.push({ label: "High signal", color: colors.purple[400] });
     if (item.cContext! >= 7) tags.push({ label: "Rich context", color: colors.sky[400] });
     if (item.lSlop! >= 7) tags.push({ label: "High slop risk", color: colors.red[400] });

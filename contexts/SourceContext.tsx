@@ -114,13 +114,14 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         // Flush pending deletes before fetching IC state
         const pendingDeletes = pendingDeletesRef.current;
         if (pendingDeletes.size > 0) {
-          await Promise.all(
-            Array.from(pendingDeletes).map(id =>
-              actor.deleteSourceConfig(id)
-                .then(() => pendingDeletes.delete(id))
-                .catch((e: unknown) => console.warn("[sources] pending delete failed:", id, errMsg(e)))
-            )
+          const toDelete = Array.from(pendingDeletes);
+          const results = await Promise.allSettled(
+            toDelete.map(id => actor.deleteSourceConfig(id))
           );
+          results.forEach((res, idx) => {
+            if (res.status === "fulfilled") pendingDeletes.delete(toDelete[idx]);
+            else console.warn("[sources] pending delete failed:", toDelete[idx], errMsg(res.reason));
+          });
         }
 
         const icConfigs = await actor.getUserSourceConfigs(principal);

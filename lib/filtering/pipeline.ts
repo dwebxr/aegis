@@ -45,7 +45,7 @@ export function runFilterPipeline(
     items.push({ item, wotScore, weightedComposite, isWoTSerendipity: serendipity });
   }
 
-  // Single pass: count AI-scored items and paid (Claude) tiers for cost estimation
+  // Second pass over all content (incl. below-threshold): count AI-scored items and paid tiers for cost estimation
   let aiScoredCount = 0;
   let paidCount = 0;
   for (const c of content) {
