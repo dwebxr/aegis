@@ -4,23 +4,13 @@ import { fonts, colors, space, type as t, shadows, radii, transitions, scoreGrad
 import { ScoreBar } from "./ScoreBar";
 import { Tooltip } from "./Tooltip";
 import { GLOSSARY } from "@/lib/glossary";
-import { CheckIcon, XCloseIcon, RSSIcon, GlobeIcon, ShareIcon, SearchIcon, ChevronDownIcon } from "@/components/icons";
+import { CheckIcon, XCloseIcon } from "@/components/icons";
 import type { ContentItem } from "@/lib/types/content";
 
 type CardVariant = "default" | "priority" | "serendipity";
 
 function hasVCL(item: ContentItem): boolean {
   return item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
-}
-
-function SourceIcon({ source }: { source: string }) {
-  const s = 12;
-  switch (source) {
-    case "rss": return <RSSIcon s={s} />;
-    case "nostr": return <ShareIcon s={s} />;
-    case "twitter": return <GlobeIcon s={s} />;
-    default: return <SearchIcon s={s} />;
-  }
 }
 
 interface ContentCardProps {
@@ -35,18 +25,17 @@ interface ContentCardProps {
   focused?: boolean;
 }
 
-function GradeBadge({ composite, size = 44 }: { composite: number; size?: number }) {
+function GradeBadge({ composite }: { composite: number }) {
   const { grade, color, bg } = scoreGrade(composite);
-  const fontSize = size <= 32 ? 14 : 20;
   return (
     <div style={{
-      width: size, height: size, borderRadius: radii.sm,
+      width: 44, height: 44, borderRadius: radii.sm,
       background: bg, border: `2px solid ${color}40`,
       display: "flex", alignItems: "center", justifyContent: "center",
       flexShrink: 0,
       boxShadow: `0 0 12px ${color}30`,
     }}>
-      <span style={{ fontSize, fontWeight: 800, color, fontFamily: fonts.mono }}>{grade}</span>
+      <span style={{ fontSize: 20, fontWeight: 800, color, fontFamily: fonts.mono }}>{grade}</span>
     </div>
   );
 }
@@ -135,11 +124,9 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
   const [hovered, setHovered] = useState(false);
   const isSlop = item.verdict === "slop";
   const gr = scoreGrade(item.scores.composite);
-  const tag = deriveScoreTags(item)[0] ?? null;
 
   const isLarge = variant === "priority" || variant === "serendipity";
-  const isDefault = variant === "default";
-  const pad = isLarge ? (mobile ? `${space[4]}px ${space[4]}px` : `${space[5]}px ${space[6]}px`) : (mobile ? `${space[3]}px ${space[3]}px` : `${space[3]}px ${space[4]}px`);
+  const pad = isLarge ? (mobile ? `${space[4]}px ${space[4]}px` : `${space[5]}px ${space[6]}px`) : (mobile ? `${space[4]}px ${space[4]}px` : `${space[4]}px ${space[5]}px`);
 
   const bg = variant === "serendipity"
     ? `linear-gradient(135deg, rgba(124,58,237,0.06), rgba(37,99,235,0.04))`
@@ -204,149 +191,92 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
         </Tooltip>
       )}
 
-      {/* Default variant: compact score-first header */}
-      {isDefault && (
-        <>
-          <div style={{
-            display: "flex", alignItems: "center", gap: space[2],
-            marginBottom: space[2],
-          }}>
-            <GradeBadge composite={item.scores.composite} size={mobile ? 28 : 32} />
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "3px 10px", borderRadius: radii.pill,
-              background: `${gr.color}12`, border: `1px solid ${gr.color}25`,
-              fontSize: t.caption.size, fontWeight: 700, flexShrink: 0,
-            }}>
-              <span style={{ color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
-              {tag && (
-                <>
-                  <span style={{ color: colors.text.disabled }}>&middot;</span>
-                  <span style={{ color: tag.color, textTransform: "uppercase", fontSize: 9, letterSpacing: 0.5, whiteSpace: "nowrap" }}>{tag.label}</span>
-                </>
-              )}
-            </div>
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              fontSize: t.caption.size, color: colors.text.muted,
-              background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
-            }}>
-              <SourceIcon source={item.source} />
-              {item.source}
-            </span>
-            <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.timestamp}</span>
-            <div style={{ flex: 1 }} />
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggle(); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 4,
-                background: "transparent", border: "none",
-                color: colors.text.muted, fontSize: t.caption.size, fontWeight: 600,
-                cursor: "pointer", padding: `${space[1]}px ${space[2]}px`,
-                borderRadius: radii.sm, fontFamily: "inherit",
-                transition: transitions.fast,
-              }}
-            >
-              <span style={{
-                display: "inline-flex",
-                transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.2s ease",
-              }}>
-                <ChevronDownIcon s={14} />
-              </span>
-              {expanded ? "Close" : "Details"}
-            </button>
-          </div>
+      <div style={{
+        display: "flex", alignItems: "center", gap: space[2], flexWrap: "wrap",
+        paddingBottom: space[2],
+        borderBottom: `1px solid ${colors.border.subtle}`,
+        marginBottom: space[2],
+        ...(variant === "serendipity" ? { marginTop: space[1] } : {}),
+      }}>
+        {item.avatar?.startsWith("http") ? (
+          /* eslint-disable-next-line @next/next/no-img-element -- Nostr profile avatar */
+          <img
+            src={item.avatar}
+            alt=""
+            style={{
+              width: isLarge ? 22 : 20, height: isLarge ? 22 : 20,
+              borderRadius: "50%", objectFit: "cover", flexShrink: 0,
+              border: `1px solid ${colors.border.default}`,
+            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <span style={{ fontSize: isLarge ? 16 : 18 }}>{item.avatar}</span>
+        )}
+        <span style={{ fontWeight: 700, color: colors.text.secondary, fontSize: isLarge ? t.body.size : t.body.mobileSz, fontFamily: fonts.mono }}>{item.author}</span>
+        <span style={{
+          fontSize: t.caption.size, color: colors.text.muted,
+          background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
+        }}>{item.source}</span>
+        {variant !== "serendipity" && <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.timestamp}</span>}
+        {variant === "priority" && <div style={{ flex: 1 }} />}
+      </div>
+
+      <div style={{ display: "flex", gap: mobile ? space[3] : space[4], alignItems: "flex-start" }}>
+        {item.imageUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
+          <img
+            src={item.imageUrl}
+            alt=""
+            style={{
+              width: isLarge ? 80 : 60,
+              height: isLarge ? 80 : 60,
+              objectFit: "cover",
+              borderRadius: radii.sm,
+              flexShrink: 0,
+              border: `1px solid ${colors.border.default}`,
+            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
+        <div style={{ flex: 1, minWidth: 0, paddingRight: variant === "serendipity" ? 90 : (variant === "priority" ? 36 : 0) }}>
           <p style={{
-            color: colors.text.tertiary,
-            fontSize: mobile ? t.body.mobileSz : t.body.size,
-            lineHeight: t.body.lineHeight,
+            color: isSlop ? colors.text.tertiary : (variant === "serendipity" ? "#d8b4fe" : colors.text.tertiary),
+            fontSize: mobile ? t.body.mobileSz : (isLarge ? t.bodyLg.size : t.body.size),
+            lineHeight: isLarge ? t.bodyLg.lineHeight : t.body.lineHeight,
             margin: 0,
-            opacity: isSlop ? 0.5 : 1,
+            textDecoration: isSlop && !isLarge ? "line-through" : "none",
+            opacity: isSlop && !isLarge ? 0.5 : 1,
             wordBreak: "break-word",
-            display: "-webkit-box",
-            WebkitLineClamp: expanded ? undefined : 2,
-            WebkitBoxOrient: "vertical" as const,
-            overflow: expanded ? undefined : "hidden",
           }}>
             {item.text}
           </p>
-        </>
-      )}
-
-      {/* Large variants: original header layout */}
-      {isLarge && (
-        <>
-          <div style={{
-            display: "flex", alignItems: "center", gap: space[2], flexWrap: "wrap",
-            paddingBottom: space[2],
-            borderBottom: `1px solid ${colors.border.subtle}`,
-            marginBottom: space[2],
-            ...(variant === "serendipity" ? { marginTop: space[1] } : {}),
-          }}>
-            {item.avatar?.startsWith("http") ? (
-              /* eslint-disable-next-line @next/next/no-img-element -- Nostr profile avatar */
-              <img
-                src={item.avatar}
-                alt=""
-                style={{
-                  width: 22, height: 22,
-                  borderRadius: "50%", objectFit: "cover", flexShrink: 0,
-                  border: `1px solid ${colors.border.default}`,
-                }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
-            ) : (
-              <span style={{ fontSize: 16 }}>{item.avatar}</span>
-            )}
-            <span style={{ fontWeight: 700, color: colors.text.secondary, fontSize: t.body.size, fontFamily: fonts.mono }}>{item.author}</span>
-            <span style={{
-              fontSize: t.caption.size, color: colors.text.muted,
-              background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
-            }}>{item.source}</span>
-            {variant !== "serendipity" && <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.timestamp}</span>}
-            {variant === "priority" && <div style={{ flex: 1 }} />}
-          </div>
-
-          <div style={{ display: "flex", gap: mobile ? space[3] : space[4], alignItems: "flex-start" }}>
-            {item.imageUrl && (
-              /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
-              <img
-                src={item.imageUrl}
-                alt=""
-                style={{
-                  width: 80, height: 80,
-                  objectFit: "cover",
-                  borderRadius: radii.sm,
-                  flexShrink: 0,
-                  border: `1px solid ${colors.border.default}`,
-                }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
-            )}
-            <div style={{ flex: 1, minWidth: 0, paddingRight: variant === "serendipity" ? 90 : 36 }}>
-              <p style={{
-                color: variant === "serendipity" ? "#d8b4fe" : colors.text.tertiary,
-                fontSize: mobile ? t.body.mobileSz : t.bodyLg.size,
-                lineHeight: t.bodyLg.lineHeight,
-                margin: 0,
-                wordBreak: "break-word",
-              }}>
-                {item.text}
-              </p>
-              {variant === "serendipity" && (
-                <div style={{ marginTop: space[2], fontSize: t.caption.size, color: colors.purple[400], fontStyle: "italic" }}>
-                  Outside your usual topics — expanding your perspective
-                </div>
-              )}
+          {variant === "serendipity" && (
+            <div style={{ marginTop: space[2], fontSize: t.caption.size, color: colors.purple[400], fontStyle: "italic" }}>
+              Outside your usual topics — expanding your perspective
             </div>
+          )}
+        </div>
 
-            <div style={{ flexShrink: 0, marginTop: space[1] }}>
-              <GradeBadge composite={item.scores.composite} />
+        {!isLarge && (
+          <div style={{ textAlign: "center", flexShrink: 0 }}>
+            <GradeBadge composite={item.scores.composite} />
+            <div style={{
+              marginTop: space[1], fontSize: t.tiny.size, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: 1,
+              color: isSlop ? colors.red[400] : colors.green[400],
+            }}>
+              {item.verdict}
             </div>
           </div>
-        </>
-      )}
+        )}
+
+        {isLarge && (
+          <div style={{ flexShrink: 0, marginTop: space[1] }}>
+            <GradeBadge composite={item.scores.composite} />
+          </div>
+        )}
+      </div>
 
       <ScoreTags item={item} />
 
@@ -356,27 +286,10 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
 
       {expanded && (
         <div style={{
-          marginTop: space[3],
-          paddingTop: space[3],
+          marginTop: space[4],
+          paddingTop: space[4],
           borderTop: `1px solid ${variant === "serendipity" ? "rgba(124,58,237,0.15)" : colors.border.default}`,
         }}>
-          {/* Show author in expanded details for compact default cards */}
-          {isDefault && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: space[2], marginBottom: space[3],
-            }}>
-              {item.avatar?.startsWith("http") ? (
-                /* eslint-disable-next-line @next/next/no-img-element -- Nostr profile avatar */
-                <img src={item.avatar} alt="" style={{
-                  width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0,
-                  border: `1px solid ${colors.border.default}`,
-                }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-              ) : (
-                <span style={{ fontSize: 18 }}>{item.avatar}</span>
-              )}
-              <span style={{ fontWeight: 700, color: colors.text.secondary, fontSize: t.body.mobileSz, fontFamily: fonts.mono }}>{item.author}</span>
-            </div>
-          )}
           <ScoreGrid item={item} />
           {item.reason && (
             <div style={{

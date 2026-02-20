@@ -761,15 +761,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
       {homeMode === "dashboard" && (
         <div style={{ marginTop: space[3] }}>
-          {/* === Hero Row: Top 3 (left) + Spotlight & Agent (right) === */}
           <div style={{
             display: "grid",
             gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
             gap: space[4],
             marginBottom: space[4],
           }}>
-          {/* Today's Top 3 — left column */}
-          <div>
+          {/* Today's Top 3 — full width */}
+          <div style={{ gridColumn: mobile ? undefined : "1 / -1" }}>
             <div style={{
               fontSize: t.h3.size, fontWeight: t.h3.weight,
               color: colors.text.tertiary, marginBottom: space[3],
@@ -857,8 +856,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             )}
           </div>
 
-          {/* Right column: Spotlight + Agent Knowledge stacked */}
-          <div style={{ display: "flex", flexDirection: "column", gap: space[4] }}>
             {/* Topic Spotlight */}
             <div style={{
               background: "transparent",
@@ -1000,24 +997,190 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               )}
             </div>
 
-            {/* Agent Knowledge — inside right column */}
-            {agentContext && (
-              <div style={{
-                padding: `${space[3]}px ${space[4]}px`,
-                background: "transparent",
-                border: `1px solid ${agentKnowsHighlight ? "rgba(139,92,246,0.3)" : colors.border.subtle}`,
-                borderRadius: radii.lg,
-                transition: "border-color 0.5s ease, box-shadow 0.5s ease",
-                boxShadow: agentKnowsHighlight ? "0 0 12px rgba(139,92,246,0.1)" : "none",
-              }}>
-                <div style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary, marginBottom: space[2], display: "flex", alignItems: "center", gap: space[2] }}>
-                  <span>&#x1F9E0;</span> Your Agent Knows
-                </div>
-                <AgentKnowledgePills agentContext={agentContext} profile={profile} />
+          {/* Validated */}
+          <div style={{
+            background: "transparent",
+            border: `1px solid ${colors.border.subtle}`,
+            borderRadius: radii.lg,
+            padding: `${space[3]}px ${space[4]}px`,
+          }}>
+            <div style={{
+              fontSize: t.bodySm.size, fontWeight: 600,
+              color: colors.text.tertiary, marginBottom: space[3],
+              display: "flex", alignItems: "center", gap: space[2],
+            }}>
+              <span>&#x2713;</span> Validated
+            </div>
+            {dashboardValidated.length === 0 ? (
+              <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
+                No validated items yet. Validate quality content to save it here.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
+                {dashboardValidated.map(item => {
+                  const gr = scoreGrade(item.scores.composite);
+                  const tag = deriveScoreTags(item)[0] ?? null;
+                  const isExp = expanded === item.id;
+                  const showThumb = item.imageUrl && !failedImages.has(item.id);
+                  return (
+                    <div key={item.id} style={{
+                      background: colors.bg.surface,
+                      border: `1px solid ${isExp ? colors.border.emphasis : colors.border.default}`,
+                      borderRadius: radii.md,
+                      overflow: "hidden", transition: transitions.fast,
+                    }}>
+                      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+                        <div style={{
+                          width: 80, minHeight: 60, flexShrink: 0,
+                          overflow: "hidden",
+                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          flexDirection: "column", gap: 2,
+                        }}>
+                          {showThumb ? (
+                            /* eslint-disable-next-line @next/next/no-img-element -- validated card thumbnail */
+                            <img src={item.imageUrl!} alt=""
+                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              onError={() => markImgFailed(item.id)} />
+                          ) : (
+                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
+                          <div style={{
+                            fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
+                            overflow: "hidden", display: "-webkit-box",
+                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                            lineHeight: 1.4, marginBottom: space[1], wordBreak: "break-word" as const,
+                          }}>
+                            {item.text.slice(0, 160)}
+                          </div>
+                          <div style={{
+                            fontSize: t.caption.size, color: colors.text.disabled,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            marginBottom: space[2],
+                          }}>
+                            {item.author} &middot; {item.source}
+                            {item.validatedAt && (
+                              <> &middot; {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <ScorePill gr={gr} tag={tag} />
+                            <ExpandToggle isExpanded={isExp} onClick={(e) => { e.stopPropagation(); setExpanded(isExp ? null : item.id); }} />
+                          </div>
+                        </div>
+                      </div>
+                      {isExp && <ExpandedDetails item={item} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
-          </div>{/* end hero row grid */}
+          </div>{/* end 2-col grid */}
+
+          {/* Discoveries — full width */}
+          {discoveries.length > 0 && (
+            <div style={{
+              background: "transparent",
+              border: `1px solid rgba(124,58,237,0.15)`,
+              borderRadius: radii.lg,
+              padding: `${space[3]}px ${space[4]}px`,
+              marginBottom: space[4],
+            }}>
+              <div style={{
+                fontSize: t.bodySm.size, fontWeight: 600,
+                color: colors.purple[400], marginBottom: space[3],
+                display: "flex", alignItems: "center", gap: space[2],
+              }}>
+                <span>&#x1F52D;</span> Discoveries
+                <span style={{
+                  fontSize: t.caption.size, color: colors.text.muted,
+                  background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
+                }}>{discoveries.length}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
+                {discoveries.map(d => {
+                  const item = d.item;
+                  const gr = scoreGrade(item.scores.composite);
+                  const tag = deriveScoreTags(item)[0] ?? null;
+                  const isExp = expanded === item.id;
+                  const showThumb = item.imageUrl && !failedImages.has(item.id);
+                  return (
+                    <div key={item.id} style={{
+                      background: "linear-gradient(135deg, rgba(124,58,237,0.04), rgba(37,99,235,0.03))",
+                      border: `1px solid ${isExp ? "rgba(124,58,237,0.3)" : "rgba(124,58,237,0.1)"}`,
+                      borderRadius: radii.md,
+                      overflow: "hidden", transition: transitions.fast,
+                    }}>
+                      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+                        <div style={{
+                          width: 80, minHeight: 60, flexShrink: 0,
+                          overflow: "hidden",
+                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          flexDirection: "column", gap: 2,
+                        }}>
+                          {showThumb ? (
+                            /* eslint-disable-next-line @next/next/no-img-element -- discovery card thumbnail */
+                            <img src={item.imageUrl!} alt=""
+                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              onError={() => markImgFailed(item.id)} />
+                          ) : (
+                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[1] }}>
+                            <SerendipityBadge discoveryType={d.discoveryType} mobile={mobile} />
+                          </div>
+                          <div style={{
+                            fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
+                            overflow: "hidden", display: "-webkit-box",
+                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                            lineHeight: 1.4, marginBottom: space[1], wordBreak: "break-word" as const,
+                          }}>
+                            {item.text.slice(0, 160)}
+                          </div>
+                          <div style={{
+                            fontSize: t.caption.size, color: colors.purple[400],
+                            fontStyle: "italic", marginBottom: space[2],
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {d.reason}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <ScorePill gr={gr} tag={tag} />
+                            <ExpandToggle isExpanded={isExp} onClick={(e) => { e.stopPropagation(); setExpanded(isExp ? null : item.id); }} />
+                          </div>
+                        </div>
+                      </div>
+                      {isExp && <ExpandedDetails item={item} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Agent Knowledge — full width */}
+          {agentContext && (
+            <div style={{
+              padding: `${space[3]}px ${space[4]}px`,
+              background: "transparent",
+              border: `1px solid ${agentKnowsHighlight ? "rgba(139,92,246,0.3)" : colors.border.subtle}`,
+              borderRadius: radii.lg,
+              marginBottom: space[4],
+              transition: "border-color 0.5s ease, box-shadow 0.5s ease",
+              boxShadow: agentKnowsHighlight ? "0 0 12px rgba(139,92,246,0.1)" : "none",
+            }}>
+              <div style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary, marginBottom: space[2], display: "flex", alignItems: "center", gap: space[2] }}>
+                <span>&#x1F9E0;</span> Your Agent Knows
+              </div>
+              <AgentKnowledgePills agentContext={agentContext} profile={profile} />
+            </div>
+          )}
 
           {/* === Inline Agent Settings === */}
           <div style={{
@@ -1294,177 +1457,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             <D2ANetworkMini mobile={mobile} />
           </div>
 
-          {/* === Secondary Row: Validated + Discoveries === */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
-            gap: space[4],
-          }}>
-          {/* Validated */}
-          <div style={{
-            background: "transparent",
-            border: `1px solid ${colors.border.subtle}`,
-            borderRadius: radii.lg,
-            padding: `${space[3]}px ${space[4]}px`,
-          }}>
-            <div style={{
-              fontSize: t.bodySm.size, fontWeight: 600,
-              color: colors.text.tertiary, marginBottom: space[3],
-              display: "flex", alignItems: "center", gap: space[2],
-            }}>
-              <span>&#x2713;</span> Validated
-            </div>
-            {dashboardValidated.length === 0 ? (
-              <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
-                No validated items yet. Validate quality content to save it here.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
-                {dashboardValidated.map(item => {
-                  const gr = scoreGrade(item.scores.composite);
-                  const tag = deriveScoreTags(item)[0] ?? null;
-                  const isExp = expanded === item.id;
-                  const showThumb = item.imageUrl && !failedImages.has(item.id);
-                  return (
-                    <div key={item.id} style={{
-                      background: colors.bg.surface,
-                      border: `1px solid ${isExp ? colors.border.emphasis : colors.border.default}`,
-                      borderRadius: radii.md,
-                      overflow: "hidden", transition: transitions.fast,
-                    }}>
-                      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-                        <div style={{
-                          width: 80, minHeight: 60, flexShrink: 0,
-                          overflow: "hidden",
-                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          flexDirection: "column", gap: 2,
-                        }}>
-                          {showThumb ? (
-                            /* eslint-disable-next-line @next/next/no-img-element -- validated card thumbnail */
-                            <img src={item.imageUrl!} alt=""
-                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                              onError={() => markImgFailed(item.id)} />
-                          ) : (
-                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
-                          )}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
-                          <div style={{
-                            fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
-                            overflow: "hidden", display: "-webkit-box",
-                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                            lineHeight: 1.4, marginBottom: space[1], wordBreak: "break-word" as const,
-                          }}>
-                            {item.text.slice(0, 160)}
-                          </div>
-                          <div style={{
-                            fontSize: t.caption.size, color: colors.text.disabled,
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            marginBottom: space[2],
-                          }}>
-                            {item.author} &middot; {item.source}
-                            {item.validatedAt && (
-                              <> &middot; {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</>
-                            )}
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <ScorePill gr={gr} tag={tag} />
-                            <ExpandToggle isExpanded={isExp} onClick={(e) => { e.stopPropagation(); setExpanded(isExp ? null : item.id); }} />
-                          </div>
-                        </div>
-                      </div>
-                      {isExp && <ExpandedDetails item={item} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Discoveries */}
-          {discoveries.length > 0 && (
-            <div style={{
-              background: "transparent",
-              border: `1px solid rgba(124,58,237,0.15)`,
-              borderRadius: radii.lg,
-              padding: `${space[3]}px ${space[4]}px`,
-            }}>
-              <div style={{
-                fontSize: t.bodySm.size, fontWeight: 600,
-                color: colors.purple[400], marginBottom: space[3],
-                display: "flex", alignItems: "center", gap: space[2],
-              }}>
-                <span>&#x1F52D;</span> Discoveries
-                <span style={{
-                  fontSize: t.caption.size, color: colors.text.muted,
-                  background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
-                }}>{discoveries.length}</span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
-                {discoveries.map(d => {
-                  const item = d.item;
-                  const gr = scoreGrade(item.scores.composite);
-                  const tag = deriveScoreTags(item)[0] ?? null;
-                  const isExp = expanded === item.id;
-                  const showThumb = item.imageUrl && !failedImages.has(item.id);
-                  return (
-                    <div key={item.id} style={{
-                      background: "linear-gradient(135deg, rgba(124,58,237,0.04), rgba(37,99,235,0.03))",
-                      border: `1px solid ${isExp ? "rgba(124,58,237,0.3)" : "rgba(124,58,237,0.1)"}`,
-                      borderRadius: radii.md,
-                      overflow: "hidden", transition: transitions.fast,
-                    }}>
-                      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-                        <div style={{
-                          width: 80, minHeight: 60, flexShrink: 0,
-                          overflow: "hidden",
-                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          flexDirection: "column", gap: 2,
-                        }}>
-                          {showThumb ? (
-                            /* eslint-disable-next-line @next/next/no-img-element -- discovery card thumbnail */
-                            <img src={item.imageUrl!} alt=""
-                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                              onError={() => markImgFailed(item.id)} />
-                          ) : (
-                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
-                          )}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[1] }}>
-                            <SerendipityBadge discoveryType={d.discoveryType} mobile={mobile} />
-                          </div>
-                          <div style={{
-                            fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
-                            overflow: "hidden", display: "-webkit-box",
-                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                            lineHeight: 1.4, marginBottom: space[1], wordBreak: "break-word" as const,
-                          }}>
-                            {item.text.slice(0, 160)}
-                          </div>
-                          <div style={{
-                            fontSize: t.caption.size, color: colors.purple[400],
-                            fontStyle: "italic", marginBottom: space[2],
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          }}>
-                            {d.reason}
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <ScorePill gr={gr} tag={tag} />
-                            <ExpandToggle isExpanded={isExp} onClick={(e) => { e.stopPropagation(); setExpanded(isExp ? null : item.id); }} />
-                          </div>
-                        </div>
-                      </div>
-                      {isExp && <ExpandedDetails item={item} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          </div>{/* end secondary grid */}
         </div>
       )}
 

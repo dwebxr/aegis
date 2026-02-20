@@ -125,9 +125,10 @@ describe("DashboardTab — with content", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    // Default compact cards show text and score; author is in expanded details
+    // Cards show text, author, and verdict
     expect(html).toContain("Test content text");
-    expect(html).toContain("Details");
+    expect(html).toContain("Test Author");
+    expect(html).toContain("quality");
   });
 });
 
@@ -243,23 +244,22 @@ describe("DashboardTab — header", () => {
   });
 });
 
-describe("DashboardTab — compact card layout", () => {
-  it("shows source icon and source name in card header", () => {
-    const items = [makeItem({ source: "rss" })];
+describe("DashboardTab — card layout", () => {
+  it("shows source name and author in card header", () => {
+    const items = [makeItem({ source: "rss", author: "Test Author" })];
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    // RSS source should render SourceIcon (svg) alongside source name
     expect(html).toContain("rss");
-    expect(html).toContain("Details");
+    expect(html).toContain("Test Author");
   });
 
-  it("shows score grade in card header", () => {
+  it("shows score grade badge in card", () => {
     const items = [makeItem({ scores: { originality: 8, insight: 8, credibility: 8, composite: 8.0 } })];
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    // Grade A should appear in the compact header
+    // Grade A should appear in GradeBadge
     expect(html).toContain(">A<");
   });
 
