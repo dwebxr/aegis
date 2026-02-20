@@ -6,6 +6,21 @@ export const maxDuration = 30;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
+// Magic bytes for image format validation (don't trust client-provided MIME)
+const MAGIC_BYTES: Array<{ type: string; bytes: number[] }> = [
+  { type: "image/jpeg", bytes: [0xFF, 0xD8, 0xFF] },
+  { type: "image/png",  bytes: [0x89, 0x50, 0x4E, 0x47] },
+  { type: "image/gif",  bytes: [0x47, 0x49, 0x46] },
+  { type: "image/webp", bytes: [0x52, 0x49, 0x46, 0x46] }, // "RIFF"
+];
+
+function detectImageType(header: Uint8Array): string | null {
+  for (const { type, bytes } of MAGIC_BYTES) {
+    if (bytes.every((b, i) => header[i] === b)) return type;
+  }
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 10, 60_000);
   if (limited) return limited;
@@ -28,6 +43,13 @@ export async function POST(request: NextRequest) {
 
   if (file.size > MAX_SIZE) {
     return NextResponse.json({ error: `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max: 5MB.` }, { status: 400 });
+  }
+
+  // Verify actual file content matches an image format (don't trust client MIME)
+  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const detectedType = detectImageType(header);
+  if (!detectedType || !ALLOWED_TYPES.has(detectedType)) {
+    return NextResponse.json({ error: "File content does not match a supported image format" }, { status: 400 });
   }
 
   const upstream = new FormData();

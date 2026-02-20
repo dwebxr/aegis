@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
               name: meta.display_name || meta.name || undefined,
               picture: meta.picture || undefined,
             };
-          } catch { /* malformed profile JSON — common on Nostr */ }
+          } catch { console.debug("[fetch/nostr] Skipped malformed profile JSON"); }
         }
       } catch { /* profile fetch is best-effort */ }
     }

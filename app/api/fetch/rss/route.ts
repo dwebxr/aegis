@@ -79,7 +79,8 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 });
   }
-  const { feedUrl, limit = 20, etag, lastModified } = body;
+  const { feedUrl, limit: rawLimit, etag, lastModified } = body;
+  const limit = typeof rawLimit === "number" && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 50) : 20;
 
   if (!feedUrl || typeof feedUrl !== "string") {
     return NextResponse.json({ error: "Feed URL is required" }, { status: 400 });

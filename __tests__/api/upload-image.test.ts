@@ -4,6 +4,22 @@ import { _resetRateLimits } from "@/lib/api/rateLimit";
 
 const originalFetch = global.fetch;
 
+// Magic byte headers for each image type
+const MAGIC: Record<string, number[]> = {
+  "image/jpeg": [0xFF, 0xD8, 0xFF, 0xE0],
+  "image/png":  [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+  "image/gif":  [0x47, 0x49, 0x46, 0x38, 0x39, 0x61],
+  "image/webp": [0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50],
+};
+
+function makeImageBlob(type: string, sizeBytes?: number): Blob {
+  const header = MAGIC[type] ?? [];
+  const total = sizeBytes ?? (header.length + 64);
+  const buf = new Uint8Array(total);
+  buf.set(header);
+  return new Blob([buf], { type });
+}
+
 function makeUploadRequest(file?: Blob, fieldName = "file"): NextRequest {
   const formData = new FormData();
   if (file) formData.append(fieldName, file);
@@ -68,6 +84,14 @@ describe("POST /api/upload/image", () => {
       expect(res.status).toBe(400);
     });
 
+    it("returns 400 for spoofed MIME with wrong magic bytes", async () => {
+      const file = new Blob(["not-an-image"], { type: "image/jpeg" });
+      const res = await POST(makeUploadRequest(file));
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("does not match");
+    });
+
     it("returns 400 for file exceeding 5MB", async () => {
       const bigData = new Uint8Array(5 * 1024 * 1024 + 1);
       const file = new Blob([bigData], { type: "image/jpeg" });
@@ -93,7 +117,7 @@ describe("POST /api/upload/image", () => {
 
     for (const type of validTypes) {
       it(`accepts ${type} files (passes validation)`, async () => {
-        const file = new Blob(["fake-image-data"], { type });
+        const file = makeImageBlob(type);
         const res = await POST(makeUploadRequest(file));
         expect(res.status).not.toBe(400);
       });
@@ -102,8 +126,7 @@ describe("POST /api/upload/image", () => {
 
   describe("file size boundary", () => {
     it("accepts file at exactly 5MB", async () => {
-      const data = new Uint8Array(5 * 1024 * 1024);
-      const file = new Blob([data], { type: "image/jpeg" });
+      const file = makeImageBlob("image/jpeg", 5 * 1024 * 1024);
       const res = await POST(makeUploadRequest(file));
       expect(res.status).not.toBe(400);
     }, 15000);
@@ -122,7 +145,7 @@ describe("POST /api/upload/image", () => {
         ok: true,
         json: () => Promise.resolve({ status: "success", data: [{ url: "https://nostr.build/i/abc123.jpg" }] }),
       });
-      const file = new Blob(["fake-jpeg"], { type: "image/jpeg" });
+      const file = makeImageBlob("image/jpeg");
       const res = await POST(makeUploadRequest(file));
       expect(res.status).toBe(200);
       const data = await res.json();
@@ -134,7 +157,7 @@ describe("POST /api/upload/image", () => {
         ok: true,
         json: () => Promise.resolve({ status: "success", data: [{ url: "https://nostr.build/i/authed.jpg" }] }),
       });
-      const file = new Blob(["fake-jpeg"], { type: "image/jpeg" });
+      const file = makeImageBlob("image/jpeg");
       const formData = new FormData();
       formData.append("file", file);
       const req = new NextRequest("http://localhost:3000/api/upload/image", {
@@ -154,7 +177,7 @@ describe("POST /api/upload/image", () => {
         ok: true,
         json: () => Promise.resolve({ status: "success", data: [{ url: "https://nostr.build/i/noauth.jpg" }] }),
       });
-      const file = new Blob(["fake-jpeg"], { type: "image/jpeg" });
+      const file = makeImageBlob("image/jpeg");
       const res = await POST(makeUploadRequest(file));
       expect(res.status).toBe(200);
 
@@ -164,7 +187,7 @@ describe("POST /api/upload/image", () => {
 
     it("returns 502 when nostr.build returns non-OK", async () => {
       (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 500 });
-      const file = new Blob(["fake-png"], { type: "image/png" });
+      const file = makeImageBlob("image/png");
       const res = await POST(makeUploadRequest(file));
       expect(res.status).toBe(502);
       const data = await res.json();
@@ -176,7 +199,7 @@ describe("POST /api/upload/image", () => {
         ok: true,
         json: () => Promise.reject(new Error("Unexpected token")),
       });
-      const file = new Blob(["fake-gif"], { type: "image/gif" });
+      const file = makeImageBlob("image/gif");
       const res = await POST(makeUploadRequest(file));
       expect(res.status).toBe(502);
       const data = await res.json();
@@ -188,7 +211,7 @@ describe("POST /api/upload/image", () => {
         ok: true,
         json: () => Promise.resolve({ status: "success", data: [] }),
       });
-      const file = new Blob(["fake-webp"], { type: "image/webp" });
+      const file = makeImageBlob("image/webp");
       const res = await POST(makeUploadRequest(file));
       expect(res.status).toBe(502);
       const data = await res.json();
@@ -197,7 +220,7 @@ describe("POST /api/upload/image", () => {
 
     it("returns 502 when fetch throws (host unreachable)", async () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED"));
-      const file = new Blob(["fake"], { type: "image/jpeg" });
+      const file = makeImageBlob("image/jpeg");
       const res = await POST(makeUploadRequest(file));
       expect(res.status).toBe(502);
       const data = await res.json();
@@ -209,7 +232,7 @@ describe("POST /api/upload/image", () => {
         ok: true,
         json: () => Promise.resolve({ data: [{ url: null }] }),
       });
-      const file = new Blob(["fake"], { type: "image/jpeg" });
+      const file = makeImageBlob("image/jpeg");
       const res = await POST(makeUploadRequest(file));
       expect(res.status).toBe(502);
     });
@@ -217,7 +240,7 @@ describe("POST /api/upload/image", () => {
 
   describe("rate limiting", () => {
     it("allows 10 requests within window", async () => {
-      const file = new Blob(["img"], { type: "image/jpeg" });
+      const file = makeImageBlob("image/jpeg");
       for (let i = 0; i < 10; i++) {
         const res = await POST(makeUploadRequest(file));
         expect(res.status).not.toBe(429);
@@ -225,7 +248,7 @@ describe("POST /api/upload/image", () => {
     });
 
     it("returns 429 after exceeding 10 requests", async () => {
-      const file = new Blob(["img"], { type: "image/jpeg" });
+      const file = makeImageBlob("image/jpeg");
       for (let i = 0; i < 10; i++) {
         await POST(makeUploadRequest(file));
       }
