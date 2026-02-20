@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
             };
           } catch { console.debug("[fetch/nostr] Skipped malformed profile JSON"); }
         }
-      } catch { /* profile fetch is best-effort */ }
+      } catch { console.debug("[fetch/nostr] Profile fetch failed (best-effort)"); }
     }
 
     return NextResponse.json({

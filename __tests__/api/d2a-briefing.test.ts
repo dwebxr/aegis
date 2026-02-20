@@ -122,6 +122,14 @@ describe("GET /api/d2a/briefing — individual path", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://aegis.dwebxr.xyz");
   });
 
+  it("returns 400 for invalid principal format", async () => {
+    const res = await GET(makeRequest({ principal: "not-a-valid-principal!!!" }));
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toContain("Invalid principal");
+    expect(mockGetLatestBriefing).not.toHaveBeenCalled();
+  });
+
   it("returns full briefing structure with items and meta", async () => {
     mockGetLatestBriefing.mockResolvedValue(sampleBriefing);
     const res = await GET(makeRequest({ principal: "aaaaa-aa" }));

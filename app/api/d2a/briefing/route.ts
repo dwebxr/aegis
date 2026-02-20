@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Principal } from "@dfinity/principal";
 import { withX402 } from "@x402/next";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { getLatestBriefing, getGlobalBriefingSummaries } from "@/lib/d2a/briefingProvider";
@@ -13,6 +14,14 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
 
   const origin = request.headers.get("origin");
   const principal = request.nextUrl.searchParams.get("principal") || undefined;
+
+  if (principal) {
+    try {
+      Principal.fromText(principal);
+    } catch {
+      return withCors(NextResponse.json({ error: "Invalid principal format" }, { status: 400 }), origin);
+    }
+  }
 
   try {
     if (principal) {
