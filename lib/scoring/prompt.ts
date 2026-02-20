@@ -24,7 +24,7 @@ Also score the legacy axes:
 - insight (0-10): Deep analysis or surface-level?
 - credibility (0-10): Reliable sourcing?
 
-Extract 1-3 topic tags from the content (lowercase, single words or short phrases).
+Topics: Extract 1-3 topic tags that describe the PRIMARY subject of this article (lowercase, short phrases). Only include topics the article is fundamentally ABOUT — not topics it merely mentions or references in passing. Do NOT copy from the user interests above; derive topics solely from the article content.
 
 Composite score: S = (vSignal * cContext) / (lSlop + 0.5), then normalize to 0-10 scale.
 Verdict: "quality" if composite >= 4, else "slop".

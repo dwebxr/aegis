@@ -79,4 +79,10 @@ describe("buildScoringPrompt", () => {
     const prompt = buildScoringPrompt("Content");
     expect(prompt).toContain("Slop Incinerator");
   });
+
+  it("instructs to extract topics from article content only, not user interests", () => {
+    const prompt = buildScoringPrompt("Content", ["ai", "crypto"]);
+    expect(prompt).toContain("PRIMARY subject");
+    expect(prompt).toContain("Do NOT copy from the user interests");
+  });
 });
