@@ -9,15 +9,14 @@ describe("LandingHero", () => {
     const html = renderToStaticMarkup(
       <LandingHero onTryDemo={noop} onLogin={noop} />
     );
-    expect(html).toContain("Survive What");
-    expect(html).toContain("Coming");
+    expect(html).toContain("Cut Through the Noise");
   });
 
   it("renders tagline", () => {
     const html = renderToStaticMarkup(
       <LandingHero onTryDemo={noop} onLogin={noop} />
     );
-    expect(html).toContain("AI noise filter for your feeds");
+    expect(html).toContain("quality filter for RSS and social feeds");
   });
 
   it("renders all 4 feature cards", () => {
@@ -34,46 +33,71 @@ describe("LandingHero", () => {
     const html = renderToStaticMarkup(
       <LandingHero onTryDemo={noop} onLogin={noop} />
     );
-    expect(html).toContain("AI scores every article");
-    expect(html).toContain("trades quality content with other agents");
+    expect(html).toContain("Automatically removes clickbait");
+    expect(html).toContain("discovers, evaluates, and exchanges");
   });
 
-  it("renders what-you-can-do section", () => {
+  it("renders what-you-get section", () => {
     const html = renderToStaticMarkup(
       <LandingHero onTryDemo={noop} onLogin={noop} />
     );
-    expect(html).toContain("What you can do today");
-    expect(html).toContain("AI-filtered reading list");
-    expect(html).toContain("Publish quality signals");
+    expect(html).toContain("What You Get");
+    expect(html).toContain("Daily Reading List");
+    expect(html).toContain("Share Quality Signals");
   });
 
-  it("renders Explore Demo button", () => {
+  it("renders Try the Demo button", () => {
     const html = renderToStaticMarkup(
       <LandingHero onTryDemo={noop} onLogin={noop} />
     );
-    expect(html).toContain("Explore Demo");
+    expect(html).toContain("Try the Demo");
   });
 
-  it("renders Login button", () => {
+  it("renders Login link", () => {
     const html = renderToStaticMarkup(
       <LandingHero onTryDemo={noop} onLogin={noop} />
     );
-    expect(html).toContain("Login with Internet Identity");
+    expect(html).toContain("sign in with Internet Identity");
   });
 
   it("renders in mobile mode without errors", () => {
     const html = renderToStaticMarkup(
       <LandingHero onTryDemo={noop} onLogin={noop} mobile />
     );
-    expect(html).toContain("Explore Demo");
+    expect(html).toContain("Try the Demo");
   });
 
-  it("renders footer with version, OSS note, and translation hint", () => {
+  it("renders footer with version and translation hint", () => {
     const html = renderToStaticMarkup(
       <LandingHero onTryDemo={noop} onLogin={noop} />
     );
-    expect(html).toContain("Open Source");
     expect(html).toContain("v3.0");
     expect(html).toContain("translate feature");
+  });
+
+  it("renders how-it-works steps", () => {
+    const html = renderToStaticMarkup(
+      <LandingHero onTryDemo={noop} onLogin={noop} />
+    );
+    expect(html).toContain("Add Your Feeds");
+    expect(html).toContain("AI Filters the Noise");
+    expect(html).toContain("Read What Matters");
+  });
+
+  it("renders trust block", () => {
+    const html = renderToStaticMarkup(
+      <LandingHero onTryDemo={noop} onLogin={noop} />
+    );
+    expect(html).toContain("Non-Custodial");
+    expect(html).toContain("No Tracking");
+  });
+
+  it("renders persona use cases", () => {
+    const html = renderToStaticMarkup(
+      <LandingHero onTryDemo={noop} onLogin={noop} />
+    );
+    expect(html).toContain("Crypto Trader");
+    expect(html).toContain("Researcher");
+    expect(html).toContain("Newsletter Writer");
   });
 });
