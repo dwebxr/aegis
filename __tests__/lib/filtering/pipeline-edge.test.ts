@@ -203,6 +203,62 @@ describe("runFilterPipeline — edge cases", () => {
     }
   });
 
+  it("returns empty items and zero stats for empty content array", () => {
+    const graph = makeGraph([["user-pk", { hopDistance: 0 }]]);
+    const result = runFilterPipeline([], graph, proConfig);
+    expect(result.items).toHaveLength(0);
+    expect(result.stats.totalInput).toBe(0);
+    expect(result.stats.wotScoredCount).toBe(0);
+    expect(result.stats.aiScoredCount).toBe(0);
+    expect(result.stats.serendipityCount).toBe(0);
+    expect(result.stats.estimatedAPICost).toBe(0);
+  });
+
+  it("returns empty items for empty content with null graph", () => {
+    const result = runFilterPipeline([], null, liteConfig);
+    expect(result.items).toHaveLength(0);
+    expect(result.stats.totalInput).toBe(0);
+  });
+
+  it("filters ALL items when qualityThreshold exceeds max composite", () => {
+    const items = [
+      makeItem({ scores: { originality: 9, insight: 9, credibility: 9, composite: 9.9 } }),
+      makeItem({ scores: { originality: 10, insight: 10, credibility: 10, composite: 10 } }),
+    ];
+    // threshold 10: composite 9.9 < 10 → filtered; composite 10 is NOT < 10, so it stays
+    const config: FilterConfig = { mode: "pro", wotEnabled: true, qualityThreshold: 10 };
+    const result = runFilterPipeline(items, null, config);
+    expect(result.items).toHaveLength(1);
+    expect(result.stats.totalInput).toBe(2);
+  });
+
+  it("stats count AI-scored items even when filtered out by threshold", () => {
+    const items = [
+      makeItem({ scores: { originality: 2, insight: 2, credibility: 2, composite: 2 }, reason: "AI scored this" }),
+      makeItem({ scores: { originality: 8, insight: 8, credibility: 8, composite: 8 }, reason: "Heuristic: basic" }),
+    ];
+    const config: FilterConfig = { mode: "pro", wotEnabled: true, qualityThreshold: 5 };
+    const result = runFilterPipeline(items, null, config);
+    // Only composite 8 passes threshold for display
+    expect(result.items).toHaveLength(1);
+    // But AI count scans ALL content (second pass), not just filtered
+    expect(result.stats.aiScoredCount).toBe(1);
+    expect(result.stats.totalInput).toBe(2);
+  });
+
+  it("counts scoringEngine correctly for paid tiers", () => {
+    const items = [
+      makeItem({ scoringEngine: "claude-byok" as ContentItem["scoringEngine"], reason: "AI" }),
+      makeItem({ scoringEngine: "claude-ic" as ContentItem["scoringEngine"], reason: "AI" }),
+      makeItem({ scoringEngine: "claude-server" as ContentItem["scoringEngine"], reason: "AI" }),
+      makeItem({ scoringEngine: "heuristic" as ContentItem["scoringEngine"], reason: "Heuristic: basic" }),
+      makeItem({ scoringEngine: "ollama" as ContentItem["scoringEngine"], reason: "Local AI" }),
+    ];
+    const result = runFilterPipeline(items, null, liteConfig);
+    // 3 claude engines are paid, heuristic/ollama are not
+    expect(result.stats.estimatedAPICost).toBeCloseTo(3 * 0.003, 5);
+  });
+
   it("handles mixed nostr and non-nostr items with graph", () => {
     const graph = makeGraph([
       ["user-pk", { hopDistance: 0 }],

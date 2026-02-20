@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
           });
           const ct = res.headers.get("content-type") ?? "";
           if (res.ok && (ct.includes("xml") || ct.includes("rss") || ct.includes("atom"))) {
-            return { url: probeUrl, type: "rss" as const };
+            return { url: probeUrl, type: "rss" };
           }
         } catch { /* probe 404 is expected for most paths */ }
         return null;

@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- rss-parser Output type uses `any` for media extensions
 function buildItems(feed: Parser.Output<any>, limit: number) {
   return (feed.items || []).slice(0, Math.min(limit, 50)).map(item => {
     const raw = item as unknown as Record<string, unknown>;

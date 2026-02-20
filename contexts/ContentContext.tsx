@@ -250,7 +250,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       try {
         const { scoreWithOllama } = await import("@/lib/ollama/engine");
         const ollamaResult = await scoreWithOllama(text, topics);
-        result = { ...ollamaResult, scoredByAI: true, scoringEngine: "ollama" as const } as AnalyzeResponse;
+        result = { ...ollamaResult, scoredByAI: true, scoringEngine: "ollama" as const };
       } catch (err) {
         console.warn("[scoreText] Ollama failed, falling back:", errMsg(err));
       }
@@ -261,7 +261,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       try {
         const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
         const webllmResult = await scoreWithWebLLM(text, topics);
-        result = { ...webllmResult, scoredByAI: true, scoringEngine: "webllm" as const } as AnalyzeResponse;
+        result = { ...webllmResult, scoredByAI: true, scoringEngine: "webllm" as const };
       } catch (err) {
         console.warn("[scoreText] WebLLM failed, falling back:", errMsg(err));
       }

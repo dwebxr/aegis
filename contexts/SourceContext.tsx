@@ -71,7 +71,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       }
       return;
     }
-    actor.saveSourceConfig(savedToIC(source, ident.getPrincipal()))
+    void actor.saveSourceConfig(savedToIC(source, ident.getPrincipal()))
       .catch((err: unknown) => {
         console.error("[sources] IC save FAILED:", errMsg(err));
         setSyncStatus("error");

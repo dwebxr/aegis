@@ -188,4 +188,11 @@ describe("isWoTSerendipity — edge cases", () => {
     expect(isWoTSerendipity(0.301, 7.001)).toBe(false);
     expect(isWoTSerendipity(0.299, 6.999)).toBe(false);
   });
+
+  it("returns false at exact boundary values (strict inequality)", () => {
+    // trustScore < 0.3 (strict) && qualityComposite > 7.0 (strict)
+    expect(isWoTSerendipity(0.3, 8.0)).toBe(false);  // 0.3 is NOT < 0.3
+    expect(isWoTSerendipity(0.1, 7.0)).toBe(false);  // 7.0 is NOT > 7.0
+    expect(isWoTSerendipity(0.3, 7.0)).toBe(false);  // both at boundary
+  });
 });

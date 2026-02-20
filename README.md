@@ -696,13 +696,13 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Blockchain | Internet Computer (Motoko canister, dfx 0.30.2) |
 | Payments | x402 protocol (@x402/next 2.3.0, USDC on Base) |
 | Tokens | ICP Ledger ICRC-1/2 (staking, D2A fees) |
-| Auth | Internet Identity (@dfinity/auth-client 2.1.3) |
-| Nostr | nostr-tools 2.23, @noble/hashes (key derivation) |
+| Auth | Internet Identity (@dfinity/auth-client 2.4.1) |
+| Nostr | nostr-tools 2.23.1, @noble/hashes (key derivation) |
 | Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, auth/cookie scrubbing, breadcrumb URL stripping, conditional on DSN) |
-| Test | Jest + ts-jest (2533 tests, 164 suites) |
+| Test | Jest + ts-jest (2575 tests, 165 suites) |
 
 ## Project Structure
 
@@ -811,6 +811,7 @@ aegis/
 │   │   └── engine.ts                    # Ollama/OpenAI-compatible scoring engine
 │   ├── webllm/
 │   │   ├── engine.ts                    # Browser-local AI scoring (WebGPU, Llama 3.1 8B)
+│   │   ├── webgpu.d.ts                  # Minimal WebGPU type declarations (navigator.gpu)
 │   │   └── types.ts                     # WebLLMStatus type
 │   ├── reputation/
 │   │   └── publishGate.ts               # Publish Signal reputation gating (localStorage)
@@ -829,7 +830,7 @@ aegis/
 │   └── sources/
 │       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Google News)
 │       └── storage.ts                   # Source config localStorage R/W
-├── __tests__/                           # 2533 tests across 164 suites
+├── __tests__/                           # 2575 tests across 165 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -865,7 +866,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 2533 tests
+npm test              # Run all 2575 tests
 npm run test:watch    # Watch mode
 ```
 

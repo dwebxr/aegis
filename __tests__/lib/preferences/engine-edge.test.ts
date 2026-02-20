@@ -277,6 +277,40 @@ describe("learn — edge cases", () => {
     });
   });
 
+  describe("empty topics handling", () => {
+    it("does not create topic affinities when topics is empty array", () => {
+      let profile = makeProfile();
+
+      profile = learn(profile, {
+        action: "validate",
+        topics: [],
+        author: "author",
+        composite: 7,
+        verdict: "quality",
+      });
+
+      expect(Object.keys(profile.topicAffinities).length).toBe(0);
+      // Author trust should still be updated
+      expect(profile.authorTrust["author"].validates).toBe(1);
+      // Counter still incremented
+      expect(profile.totalValidated).toBe(1);
+    });
+
+    it("does not add to recentTopics when topics is empty", () => {
+      let profile = makeProfile();
+
+      profile = learn(profile, {
+        action: "flag",
+        topics: [],
+        author: "author",
+        composite: 2,
+        verdict: "slop",
+      });
+
+      expect(profile.recentTopics).toHaveLength(0);
+    });
+  });
+
   describe("multi-topic events", () => {
     it("updates all topics in a single event", () => {
       let profile = makeProfile();
@@ -355,6 +389,39 @@ describe("getContext — edge cases", () => {
     });
     const ctx = getContext(profile);
     expect(ctx.highAffinityTopics[0]).toBe("high");
+  });
+
+  it("includes topics at exactly HIGH_THRESHOLD (0.3)", () => {
+    const profile = makeProfile({
+      topicAffinities: { "boundary": 0.3, "below": 0.29 },
+    });
+    const ctx = getContext(profile);
+    // >= 0.3 → included
+    expect(ctx.highAffinityTopics).toContain("boundary");
+    expect(ctx.highAffinityTopics).not.toContain("below");
+  });
+
+  it("includes topics at exactly LOW_THRESHOLD (-0.2)", () => {
+    const profile = makeProfile({
+      topicAffinities: { "boundary": -0.2, "above": -0.19 },
+    });
+    const ctx = getContext(profile);
+    // <= -0.2 → included
+    expect(ctx.lowAffinityTopics).toContain("boundary");
+    expect(ctx.lowAffinityTopics).not.toContain("above");
+  });
+
+  it("includes authors at exactly TRUST_THRESHOLD (0.3)", () => {
+    const profile = makeProfile({
+      authorTrust: {
+        "boundary": { validates: 5, flags: 0, trust: 0.3 },
+        "below": { validates: 3, flags: 0, trust: 0.29 },
+      },
+    });
+    const ctx = getContext(profile);
+    // >= 0.3 → included
+    expect(ctx.trustedAuthors).toContain("boundary");
+    expect(ctx.trustedAuthors).not.toContain("below");
   });
 });
 

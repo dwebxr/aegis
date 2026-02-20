@@ -294,7 +294,7 @@ export class AgentManager {
     this.listenerSub = this.listenerPool.subscribe(this.relayUrls, filter, {
       onevent: (event) => {
         this.handleIncomingMessage(event.pubkey, event.content)
-          .catch(err => console.warn("[agent] Message handler failed:", errMsg(err)));
+          .catch(err => console.warn("[agent] Message handler failed for", event.pubkey.slice(0, 8), ":", errMsg(err)));
       },
     });
   }

@@ -34,7 +34,7 @@ export function saveWoTCache(graph: WoTGraph, ttl: number): void {
     };
     localStorage.setItem(WOT_CACHE_KEY, JSON.stringify(entry));
   } catch {
-    // localStorage quota exceeded — ignore
+    console.debug("[wot-cache] localStorage write failed (quota exceeded?)");
   }
 }
 
@@ -42,5 +42,5 @@ export function clearWoTCache(): void {
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.removeItem(WOT_CACHE_KEY);
-  } catch { /* localStorage unavailable */ }
+  } catch { console.debug("[wot-cache] localStorage unavailable"); }
 }

@@ -1,7 +1,14 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import withSerwist from "@serwist/next";
 
-/** @type {import('next').NextConfig} */
+/**
+ * @type {import('next').NextConfig}
+ *
+ * SECURITY NOTE (Next.js 14 CVE mitigation):
+ * GHSA-9g9p-9gw9-jx7f requires `images.remotePatterns` — not configured here.
+ * GHSA-h25m-26qc-wcjf requires `"use server"` directives — none used in this project.
+ * If either is added, upgrade Next.js immediately.
+ */
 const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["ws"],

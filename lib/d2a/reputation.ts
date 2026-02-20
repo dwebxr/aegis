@@ -111,12 +111,12 @@ export function getTrustTier(effectiveTrust: number): TrustTier {
   return "restricted";
 }
 
-/** Map trust tier → fee. Caller should reject "restricted" before calling. */
+/** Map trust tier → fee. Returns 0 for "restricted" (callers typically filter this tier first). */
 export function calculateDynamicFee(tier: TrustTier): number {
   switch (tier) {
     case "trusted": return D2A_FEE_TRUSTED;
     case "known": return D2A_FEE_KNOWN;
     case "unknown": return D2A_FEE_UNKNOWN;
-    case "restricted": return 0; // Defensive: caller filters restricted tier
+    case "restricted": return 0;
   }
 }

@@ -170,19 +170,17 @@ describe("parseScoreResponse", () => {
     expect(result!.reason).toBe("Contains {data} and {analysis}");
   });
 
-  it("filters empty-string topics", () => {
+  it("keeps empty-string and whitespace topics (typeof filter only removes non-strings)", () => {
     const emptyTopics = JSON.stringify({
       vSignal: 5, cContext: 5, lSlop: 5,
       originality: 5, insight: 5, credibility: 5,
       composite: 5, verdict: "quality", reason: "test",
-      topics: ["valid", "", "   ", "also-valid"],
+      topics: ["valid", "", "   ", "also-valid", 42, null],
     });
     const result = parseScoreResponse(emptyTopics);
     expect(result).not.toBeNull();
-    // Empty strings and whitespace are still strings, so they pass the typeof check
-    // parseResponse only filters non-strings; empty strings are kept
-    expect(result!.topics).toContain("valid");
-    expect(result!.topics).toContain("also-valid");
+    // typeof check keeps all strings (including empty/whitespace), filters non-strings
+    expect(result!.topics).toEqual(["valid", "", "   ", "also-valid"]);
   });
 
   it("returns null for reversed braces '} {'", () => {
@@ -252,5 +250,65 @@ describe("parseScoreResponse", () => {
     const result = parseScoreResponse(weirdNums);
     expect(result).not.toBeNull();
     expect(Number.isFinite(result!.composite)).toBe(true);
+  });
+
+  it("returns null for JSON array (non-object) without braces", () => {
+    // "[1,2,3]" has no curly braces → indexOf("{") === -1 → null
+    expect(parseScoreResponse("[1, 2, 3]")).toBeNull();
+    expect(parseScoreResponse('["a", "b"]')).toBeNull();
+  });
+
+  it("returns null for plain number string", () => {
+    expect(parseScoreResponse("42")).toBeNull();
+    expect(parseScoreResponse("3.14")).toBeNull();
+  });
+
+  it("returns null for plain boolean string", () => {
+    expect(parseScoreResponse("true")).toBeNull();
+    expect(parseScoreResponse("false")).toBeNull();
+  });
+
+  it("returns null for JSON null string", () => {
+    expect(parseScoreResponse("null")).toBeNull();
+  });
+
+  it("returns defaults for empty JSON object {}", () => {
+    const result = parseScoreResponse("{}");
+    expect(result).not.toBeNull();
+    // All numeric fields fall back to 5
+    expect(result!.vSignal).toBe(5);
+    expect(result!.cContext).toBe(5);
+    expect(result!.lSlop).toBe(5);
+    expect(result!.verdict).toBe("slop"); // non-"quality" → "slop"
+    expect(result!.reason).toBe("");
+    expect(result!.topics).toEqual([]);
+  });
+
+  it("handles response with duplicate keys (last wins per JSON spec)", () => {
+    const duped = '{"vSignal": 3, "vSignal": 9, "cContext": 5, "lSlop": 5, "originality": 5, "insight": 5, "credibility": 5, "composite": 5, "verdict": "quality", "reason": "test", "topics": []}';
+    const result = parseScoreResponse(duped);
+    expect(result).not.toBeNull();
+    expect(result!.vSignal).toBe(9); // last value wins
+  });
+
+  it("handles deeply nested JSON (brace extraction picks outermost)", () => {
+    const nested = 'Analysis: {"vSignal": 7, "cContext": 6, "lSlop": 2, "originality": 8, "insight": 7, "credibility": 6, "composite": 7.5, "verdict": "quality", "reason": "Contains {nested} braces", "topics": ["ai"]}';
+    const result = parseScoreResponse(nested);
+    expect(result).not.toBeNull();
+    expect(result!.vSignal).toBe(7);
+    expect(result!.reason).toBe("Contains {nested} braces");
+  });
+
+  it("handles topics with duplicate strings", () => {
+    const dupeTopics = JSON.stringify({
+      vSignal: 5, cContext: 5, lSlop: 5,
+      originality: 5, insight: 5, credibility: 5,
+      composite: 5, verdict: "quality", reason: "test",
+      topics: ["ai", "ai", "ml", "ai"],
+    });
+    const result = parseScoreResponse(dupeTopics);
+    expect(result).not.toBeNull();
+    // parseResponse does not deduplicate — all 4 kept
+    expect(result!.topics).toEqual(["ai", "ai", "ml", "ai"]);
   });
 });

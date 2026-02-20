@@ -6,8 +6,7 @@ function num(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function scoreField(parsed: any, key: string): number {
+function scoreField(parsed: Record<string, unknown>, key: string): number {
   return clamp(num(parsed[key], 5), 0, 10);
 }
 
@@ -25,8 +24,9 @@ export function parseScoreResponse(raw: string): ScoreParseResult | null {
     if (jsonStart === -1 || jsonEnd === -1) return null;
 
     const jsonStr = cleaned.slice(jsonStart, jsonEnd + 1);
-    const parsed = JSON.parse(jsonStr);
-    if (typeof parsed !== "object" || parsed === null) return null;
+    const raw_parsed: unknown = JSON.parse(jsonStr);
+    if (typeof raw_parsed !== "object" || raw_parsed === null) return null;
+    const parsed = raw_parsed as Record<string, unknown>;
 
     const vSignal = scoreField(parsed, "vSignal");
     const cContext = scoreField(parsed, "cContext");

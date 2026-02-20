@@ -54,7 +54,7 @@ export function clearLinkedAccount(): void {
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.removeItem(STORAGE_KEY);
-  } catch { /* localStorage unavailable */ }
+  } catch { console.debug("[nostr-link] localStorage unavailable"); }
 }
 
 export function maskNpub(npub: string): string {

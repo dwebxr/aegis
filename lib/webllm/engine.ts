@@ -1,3 +1,4 @@
+import type { MLCEngine } from "@mlc-ai/web-llm";
 import type { WebLLMScoreResult, WebLLMStatus } from "./types";
 import { buildScoringPrompt } from "@/lib/scoring/prompt";
 import { parseScoreResponse } from "@/lib/scoring/parseResponse";
@@ -5,10 +6,8 @@ import { createStatusEmitter } from "@/lib/utils/statusEmitter";
 
 const MODEL_ID = "Llama-3.1-8B-Instruct-q4f16_1-MLC";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let engine: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let enginePromise: Promise<any> | null = null;
+let engine: MLCEngine | null = null;
+let enginePromise: Promise<MLCEngine> | null = null;
 
 const { emit: emitStatus, onStatusChange } = createStatusEmitter<WebLLMStatus>({
   available: false,
@@ -25,8 +24,7 @@ export function isWebGPUAvailable(): boolean {
 
 export async function isWebGPUUsable(): Promise<boolean> {
   if (!isWebGPUAvailable()) return false;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const gpu = (navigator as any).gpu;
+  const gpu = navigator.gpu;
   if (!gpu) return false;
   const adapter = await gpu.requestAdapter();
   const usable = adapter !== null;
@@ -36,8 +34,7 @@ export async function isWebGPUUsable(): Promise<boolean> {
   return usable;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getOrCreateEngine(): Promise<any> {
+export async function getOrCreateEngine(): Promise<MLCEngine> {
   if (engine) return engine;
   if (enginePromise) return enginePromise;
 
@@ -91,7 +88,7 @@ export async function scoreWithWebLLM(
 }
 
 export async function destroyEngine(): Promise<void> {
-  if (engine && typeof engine.unload === "function") {
+  if (engine) {
     await engine.unload();
   }
   engine = null;

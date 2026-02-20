@@ -172,7 +172,7 @@ function AegisAppInner() {
     if (!account) {
       clearWoTCache();
       setWotPromptDismissed(false);
-      try { sessionStorage.removeItem("aegis-wot-prompt-dismissed"); } catch { /* noop */ }
+      try { sessionStorage.removeItem("aegis-wot-prompt-dismissed"); } catch { console.debug("[page] sessionStorage unavailable"); }
     }
     // Sync to IC (fire-and-forget)
     if (identity) {
@@ -183,7 +183,7 @@ function AegisAppInner() {
   const dismissWotPrompt = useCallback(() => {
     setWotPromptDismissed(true);
     // sessionStorage may throw in SSR or restrictive privacy modes; dismissal is non-critical UI state
-    try { sessionStorage.setItem("aegis-wot-prompt-dismissed", "true"); } catch { /* noop */ }
+    try { sessionStorage.setItem("aegis-wot-prompt-dismissed", "true"); } catch { console.debug("[page] sessionStorage unavailable"); }
   }, []);
 
   const pipelineResult = useMemo(() => {

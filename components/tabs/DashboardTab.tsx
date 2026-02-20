@@ -244,7 +244,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const { profile } = usePreferences();
 
   useEffect(() => {
-    try { localStorage.setItem("aegis-home-mode", homeMode); } catch { /* noop */ }
+    try { localStorage.setItem("aegis-home-mode", homeMode); } catch { console.debug("[dashboard] localStorage unavailable"); }
   }, [homeMode]);
 
   const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {

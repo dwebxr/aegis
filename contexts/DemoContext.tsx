@@ -35,7 +35,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     setBannerDismissed(true);
     try {
       sessionStorage.setItem(DEMO_BANNER_KEY, "true");
-    } catch { /* sessionStorage unavailable */ }
+    } catch { console.debug("[demo] sessionStorage unavailable"); }
   }, []);
 
   // Reset banner on login
@@ -44,7 +44,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       setBannerDismissed(false);
       try {
         sessionStorage.removeItem(DEMO_BANNER_KEY);
-      } catch { /* sessionStorage unavailable */ }
+      } catch { console.debug("[demo] sessionStorage unavailable"); }
     }
   }, [isAuthenticated]);
 
