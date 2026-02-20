@@ -128,7 +128,7 @@ function ItemCard({ item }: { item: ParsedBriefingItem }) {
             #{topic}
           </span>
         ))}
-        {item.sourceUrl && (
+        {item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) && (
           <a
             href={item.sourceUrl}
             target="_blank"

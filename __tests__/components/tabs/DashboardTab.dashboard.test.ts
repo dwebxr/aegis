@@ -263,22 +263,6 @@ describe("Dashboard mode — Recent Activity", () => {
   });
 });
 
-describe("Dashboard mode — localStorage persistence", () => {
-  it("defaults to feed when no localStorage value", () => {
-    const saved = null;
-    const mode = saved === "dashboard" ? "dashboard" : "feed";
-    expect(mode).toBe("feed");
-  });
-
-  it("restores dashboard when localStorage has dashboard", () => {
-    const saved = "dashboard";
-    const mode = saved === "dashboard" ? "dashboard" : "feed";
-    expect(mode).toBe("dashboard");
-  });
-
-  it("defaults to feed for invalid localStorage value", () => {
-    const saved: string | null = "invalid";
-    const mode = saved === "dashboard" ? "dashboard" : "feed";
-    expect(mode).toBe("feed");
-  });
-});
+// localStorage persistence tests removed — they tested local variables
+// instead of real component behavior. Real coverage is in DashboardTab.test.tsx
+// "DashboardTab — dashboard mode rendering" → "restores dashboard mode from localStorage".

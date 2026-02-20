@@ -300,7 +300,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
             </div>
           )}
           <div style={{ display: "flex", gap: space[2] }}>
-            {item.sourceUrl && !item.sourceUrl.startsWith("nostr:") && (
+            {item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) && (
               <a
                 href={item.sourceUrl}
                 target="_blank"

@@ -1,3 +1,14 @@
+/**
+ * @jest-environment jsdom
+ */
+
+// Polyfill TextEncoder for react-dom/server in jsdom environment
+if (typeof globalThis.TextEncoder === "undefined") {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { TextEncoder, TextDecoder } = require("util");
+  Object.assign(globalThis, { TextEncoder, TextDecoder });
+}
+
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DashboardTab } from "@/components/tabs/DashboardTab";
@@ -286,5 +297,127 @@ describe("DashboardTab — keyboard shortcut hint", () => {
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} mobile />
     );
     expect(html).not.toContain("J/K");
+  });
+});
+
+describe("DashboardTab — dashboard mode rendering", () => {
+  beforeEach(() => {
+    localStorage.setItem("aegis-home-mode", "dashboard");
+  });
+  afterEach(() => {
+    localStorage.removeItem("aegis-home-mode");
+  });
+
+  it("renders Today's Top 3 section with quality content", () => {
+    const items = Array.from({ length: 5 }, (_, i) =>
+      makeItem({ id: `dash-${i}`, scores: { originality: 8, insight: 8, credibility: 8, composite: 8 } })
+    );
+    const html = renderToStaticMarkup(
+      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("Top 3");
+    expect(html).toContain("Review All");
+  });
+
+  it("renders empty Top 3 state when no quality items", () => {
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("No quality items scored yet");
+  });
+
+  it("renders Topic Spotlight section", () => {
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("Topic Spotlight");
+  });
+
+  it("renders Validated section", () => {
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("Validated");
+    expect(html).toContain("No validated items yet");
+  });
+
+  it("renders Validated items when present", () => {
+    const items = [
+      makeItem({ id: "val-1", validated: true, validatedAt: now - 1000 }),
+      makeItem({ id: "val-2", validated: true, validatedAt: now - 2000 }),
+    ];
+    const html = renderToStaticMarkup(
+      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("Test content text");
+    expect(html).toContain("Test Author");
+  });
+
+  it("renders Agent Settings section collapsed by default", () => {
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("Agent Settings");
+    expect(html).toContain("0 interests");
+    expect(html).toContain("threshold 5.5");
+    expect(html).toContain("0 reviews");
+  });
+
+  it("renders Recent Activity section with time-range tabs", () => {
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("Recent Activity");
+    expect(html).toContain("Today");
+    expect(html).toContain("7d");
+    expect(html).toContain("30d");
+  });
+
+  it("renders activity stats with content", () => {
+    const items = [
+      makeItem({ id: "act-1", verdict: "quality", createdAt: now - 1000 }),
+      makeItem({ id: "act-2", verdict: "slop", createdAt: now - 2000 }),
+    ];
+    const html = renderToStaticMarkup(
+      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("quality");
+    expect(html).toContain("burned");
+    expect(html).toContain("total");
+  });
+
+  it("renders Discoveries section when discoveries prop provided", () => {
+    const items = [makeItem({ id: "disc-src" })];
+    const discoveries = [{
+      item: items[0],
+      discoveryType: "emerging_topic" as const,
+      reason: "Expanding your horizons",
+      serendipityScore: 0.8,
+      wotScore: 0.5,
+      qualityComposite: 7,
+    }];
+    const html = renderToStaticMarkup(
+      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} discoveries={discoveries} />
+    );
+    expect(html).toContain("Discoveries");
+    expect(html).toContain("Expanding your horizons");
+  });
+
+  it("does not show feed-mode sections in dashboard mode", () => {
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).not.toContain("Filtered Signal");
+    expect(html).not.toContain("J/K");
+  });
+
+  it("restores dashboard mode from localStorage", () => {
+    // localStorage was set in beforeEach
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    // Dashboard mode should show Top 3 section, not Feed section
+    expect(html).toContain("Top 3");
+    expect(html).not.toContain("Filtered Signal");
   });
 });
