@@ -1,6 +1,6 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { deriveScoreTags, ScoreGrid, TopicTags } from "@/components/ui/ContentCard";
+import { ContentCard, deriveScoreTags, ScoreGrid, TopicTags } from "@/components/ui/ContentCard";
 import type { ContentItem } from "@/lib/types/content";
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
@@ -187,5 +187,61 @@ describe("TopicTags", () => {
   it("renders single topic", () => {
     const html = renderToStaticMarkup(<TopicTags topics={["defi"]} />);
     expect(html).toContain("defi");
+  });
+
+  it("limits visible topics to max prop and shows overflow", () => {
+    const html = renderToStaticMarkup(<TopicTags topics={["a", "b", "c", "d", "e"]} max={3} />);
+    expect(html).toContain("a");
+    expect(html).toContain("b");
+    expect(html).toContain("c");
+    expect(html).not.toContain(">d<");
+    expect(html).not.toContain(">e<");
+    expect(html).toContain("+2");
+  });
+
+  it("shows no overflow indicator when topics within max", () => {
+    const html = renderToStaticMarkup(<TopicTags topics={["a", "b"]} max={3} />);
+    expect(html).toContain("a");
+    expect(html).toContain("b");
+    expect(html).not.toContain("+");
+  });
+
+  it("uses default max of 3", () => {
+    const html = renderToStaticMarkup(<TopicTags topics={["a", "b", "c", "d"]} />);
+    expect(html).toContain("+1");
+  });
+});
+
+describe("ContentCard — data-source-url attribute", () => {
+  it("sets data-source-url for http sourceUrl", () => {
+    const item = makeItem({ sourceUrl: "https://example.com/article" });
+    const html = renderToStaticMarkup(
+      <ContentCard item={item} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain('data-source-url="https://example.com/article"');
+  });
+
+  it("omits data-source-url for nostr: URLs", () => {
+    const item = makeItem({ sourceUrl: "nostr:nevent1abc123" });
+    const html = renderToStaticMarkup(
+      <ContentCard item={item} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).not.toContain("data-source-url");
+  });
+
+  it("omits data-source-url when sourceUrl is undefined", () => {
+    const item = makeItem({ sourceUrl: undefined });
+    const html = renderToStaticMarkup(
+      <ContentCard item={item} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).not.toContain("data-source-url");
+  });
+
+  it("renders focus outline when focused prop is true", () => {
+    const item = makeItem();
+    const html = renderToStaticMarkup(
+      <ContentCard item={item} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} focused />
+    );
+    expect(html).toContain("outline:");
   });
 });

@@ -660,6 +660,13 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Client-side signing — private key never leaves the browser
 - Optional PoQ stake attachment with range slider UI
 
+### Keyboard Navigation & Command Palette
+- Vim-style J/K navigation through feed items with visual focus ring
+- L/Enter to expand, H/Escape to collapse, V to validate, F to flag, O to open source URL
+- Cmd+K / Ctrl+K command palette with fuzzy search, arrow key selection, and instant execution
+- Input/textarea/select detection — keyboard shortcuts disabled when typing in form fields
+- Smooth scroll-into-view on focus change
+
 ### Onboarding & UX
 - Landing hero for new visitors with feature overview and "Explore Demo" / "Login" CTAs
 - Terminology tooltips on hover for domain-specific terms (V-Signal, C-Context, L-Slop, WoT, D2A, Serendipity, etc.)
@@ -668,6 +675,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Sidebar navigation descriptions updated for clarity; active state with stronger visual indicator
 - Mobile touch targets meet 48px accessibility minimum
 - Settings gear icon visible in collapsed sidebar mode
+- Inline agent settings on Dashboard — add/remove topic interests, adjust quality threshold slider
 
 ### Multi-Source Ingestion
 - RSS/Atom feeds (YouTube, note.com, blogs — with thumbnail extraction, ETag conditional fetch)
@@ -702,7 +710,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, auth/cookie scrubbing, breadcrumb URL stripping, conditional on DSN) |
-| Test | Jest + ts-jest (2575 tests, 165 suites) |
+| Test | Jest + ts-jest (2636 tests, 167 suites) |
 
 ## Project Structure
 
@@ -734,7 +742,7 @@ aegis/
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
 │   ├── tabs/                            # Dashboard (+ Discoveries), Briefing, Incinerator, Sources, Analytics
-│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner
+│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner, CommandPalette
 │   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
 │   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
 │   ├── sources/                         # ManualInput
@@ -830,7 +838,9 @@ aegis/
 │   └── sources/
 │       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Google News)
 │       └── storage.ts                   # Source config localStorage R/W
-├── __tests__/                           # 2575 tests across 165 suites
+├── hooks/
+│   └── useKeyboardNav.ts               # J/K/L/H/V/F/O keyboard navigation + Cmd+K palette
+├── __tests__/                           # 2636 tests across 167 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -866,7 +876,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 2575 tests
+npm test              # Run all 2636 tests
 npm run test:watch    # Watch mode
 ```
 

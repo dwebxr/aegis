@@ -17,6 +17,9 @@ jest.mock("@/contexts/PreferenceContext", () => ({
       totalFlagged: 0,
       calibration: { qualityThreshold: 5.5 },
     },
+    setTopicAffinity: jest.fn(),
+    removeTopicAffinity: jest.fn(),
+    setQualityThreshold: jest.fn(),
   }),
 }));
 
@@ -122,8 +125,9 @@ describe("DashboardTab — with content", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("Test Author");
+    // Default compact cards show text and score; author is in expanded details
     expect(html).toContain("Test content text");
+    expect(html).toContain("Details");
   });
 });
 
@@ -210,8 +214,8 @@ describe("DashboardTab — old content (outside 24h)", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[oldItem, recentItem]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    // Both items exist in content list, but only 1 in "today" metrics
-    expect(html).toContain("Test Author");
+    // Both items exist in content list; compact cards show text content
+    expect(html).toContain("Test content text");
   });
 });
 
@@ -236,5 +240,51 @@ describe("DashboardTab — header", () => {
     );
     expect(html).toContain("Home");
     expect(html).toContain("Lite");
+  });
+});
+
+describe("DashboardTab — compact card layout", () => {
+  it("shows source icon and source name in card header", () => {
+    const items = [makeItem({ source: "rss" })];
+    const html = renderToStaticMarkup(
+      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    // RSS source should render SourceIcon (svg) alongside source name
+    expect(html).toContain("rss");
+    expect(html).toContain("Details");
+  });
+
+  it("shows score grade in card header", () => {
+    const items = [makeItem({ scores: { originality: 8, insight: 8, credibility: 8, composite: 8.0 } })];
+    const html = renderToStaticMarkup(
+      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    // Grade A should appear in the compact header
+    expect(html).toContain(">A<");
+  });
+
+  it("limits topic tags to 3 with overflow indicator", () => {
+    const items = [makeItem({ topics: ["a", "b", "c", "d", "e"] })];
+    const html = renderToStaticMarkup(
+      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("+2");
+  });
+});
+
+describe("DashboardTab — keyboard shortcut hint", () => {
+  it("shows keyboard hint on desktop", () => {
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("J/K");
+    expect(html).toContain("commands");
+  });
+
+  it("hides keyboard hint on mobile", () => {
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} mobile />
+    );
+    expect(html).not.toContain("J/K");
   });
 });

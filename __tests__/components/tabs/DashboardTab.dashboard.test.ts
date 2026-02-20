@@ -141,30 +141,125 @@ describe("Dashboard mode — Saved for Later", () => {
 });
 
 describe("Dashboard mode — Recent Activity", () => {
-  it("counts only today's items", () => {
-    const now = Date.now();
-    const dayMs = 86400000;
+  const now = Date.now();
+  const dayMs = 86400000;
+
+  // Replicate the dashboardActivity computation from DashboardTab
+  function computeActivity(
+    content: ContentItem[],
+    activityRange: "today" | "7d" | "30d",
+  ) {
+    const rangeDays = activityRange === "30d" ? 30 : activityRange === "7d" ? 7 : 1;
+    const rangeStart = now - rangeDays * dayMs;
+    const rangeItems = content.filter(c => c.createdAt >= rangeStart);
+    const actionLimit = activityRange === "today" ? 3 : 5;
+    const recentActions = content
+      .filter(c => c.validated || c.flagged)
+      .sort((a, b) => (b.validatedAt ?? b.createdAt) - (a.validatedAt ?? a.createdAt))
+      .slice(0, actionLimit);
+    const chartDays = Math.min(rangeDays, 30);
+    const chartQuality: number[] = [];
+    const chartSlop: number[] = [];
+    for (let i = chartDays - 1; i >= 0; i--) {
+      const dayStart = now - (i + 1) * dayMs;
+      const dayEnd = now - i * dayMs;
+      const dayItems = content.filter(c => c.createdAt >= dayStart && c.createdAt < dayEnd);
+      const dayQual = dayItems.filter(c => c.verdict === "quality").length;
+      const dayTotal = dayItems.length;
+      chartQuality.push(dayTotal > 0 ? Math.round((dayQual / dayTotal) * 100) : 0);
+      chartSlop.push(dayItems.filter(c => c.verdict === "slop").length);
+    }
+    return {
+      qualityCount: rangeItems.filter(c => c.verdict === "quality").length,
+      slopCount: rangeItems.filter(c => c.verdict === "slop").length,
+      totalEvaluated: rangeItems.length,
+      recentActions,
+      chartQuality,
+      chartSlop,
+    };
+  }
+
+  it("today range: counts only last 24h items", () => {
     const items = [
       makeItem({ id: "t1", createdAt: now - 1000, verdict: "quality" }),
       makeItem({ id: "t2", createdAt: now - 2000, verdict: "slop" }),
       makeItem({ id: "old", createdAt: now - dayMs - 1000, verdict: "quality" }),
     ];
-    const todayItems = items.filter(c => c.createdAt >= now - dayMs);
-    expect(todayItems).toHaveLength(2);
-    expect(todayItems.filter(c => c.verdict === "quality")).toHaveLength(1);
-    expect(todayItems.filter(c => c.verdict === "slop")).toHaveLength(1);
+    const result = computeActivity(items, "today");
+    expect(result.qualityCount).toBe(1);
+    expect(result.slopCount).toBe(1);
+    expect(result.totalEvaluated).toBe(2);
   });
 
-  it("returns most recent 3 actions", () => {
+  it("7d range: includes items from last 7 days", () => {
+    const items = [
+      makeItem({ id: "d0", createdAt: now - 1000, verdict: "quality" }),
+      makeItem({ id: "d3", createdAt: now - 3 * dayMs, verdict: "quality" }),
+      makeItem({ id: "d6", createdAt: now - 6 * dayMs, verdict: "slop" }),
+      makeItem({ id: "d8", createdAt: now - 8 * dayMs, verdict: "quality" }), // outside 7d
+    ];
+    const result = computeActivity(items, "7d");
+    expect(result.qualityCount).toBe(2);
+    expect(result.slopCount).toBe(1);
+    expect(result.totalEvaluated).toBe(3);
+  });
+
+  it("30d range: includes items from last 30 days", () => {
+    const items = [
+      makeItem({ id: "d0", createdAt: now - 1000, verdict: "quality" }),
+      makeItem({ id: "d15", createdAt: now - 15 * dayMs, verdict: "slop" }),
+      makeItem({ id: "d29", createdAt: now - 29 * dayMs, verdict: "quality" }),
+      makeItem({ id: "d31", createdAt: now - 31 * dayMs, verdict: "quality" }), // outside 30d
+    ];
+    const result = computeActivity(items, "30d");
+    expect(result.qualityCount).toBe(2);
+    expect(result.slopCount).toBe(1);
+    expect(result.totalEvaluated).toBe(3);
+  });
+
+  it("today range: limits recent actions to 3", () => {
     const items = Array.from({ length: 6 }, (_, i) =>
       makeItem({ id: `a-${i}`, validated: true, validatedAt: i * 1000 }),
     );
-    const recentActions = items
-      .filter(c => c.validated || c.flagged)
-      .sort((a, b) => (b.validatedAt ?? b.createdAt) - (a.validatedAt ?? a.createdAt))
-      .slice(0, 3);
-    expect(recentActions).toHaveLength(3);
-    expect(recentActions[0].validatedAt).toBe(5000);
+    const result = computeActivity(items, "today");
+    expect(result.recentActions).toHaveLength(3);
+    expect(result.recentActions[0].validatedAt).toBe(5000);
+  });
+
+  it("7d range: limits recent actions to 5", () => {
+    const items = Array.from({ length: 8 }, (_, i) =>
+      makeItem({ id: `a-${i}`, validated: true, validatedAt: i * 1000 }),
+    );
+    const result = computeActivity(items, "7d");
+    expect(result.recentActions).toHaveLength(5);
+  });
+
+  it("30d range: limits recent actions to 5", () => {
+    const items = Array.from({ length: 8 }, (_, i) =>
+      makeItem({ id: `a-${i}`, validated: true, validatedAt: i * 1000 }),
+    );
+    const result = computeActivity(items, "30d");
+    expect(result.recentActions).toHaveLength(5);
+  });
+
+  it("chart data has correct number of days", () => {
+    const items = [makeItem({ createdAt: now - 1000 })];
+    expect(computeActivity(items, "today").chartQuality).toHaveLength(1);
+    expect(computeActivity(items, "7d").chartQuality).toHaveLength(7);
+    expect(computeActivity(items, "30d").chartQuality).toHaveLength(30);
+  });
+
+  it("chart data computes quality percentage per day", () => {
+    // 2 quality, 1 slop in the most recent day bucket
+    const items = [
+      makeItem({ id: "q1", createdAt: now - 1000, verdict: "quality" }),
+      makeItem({ id: "q2", createdAt: now - 2000, verdict: "quality" }),
+      makeItem({ id: "s1", createdAt: now - 3000, verdict: "slop" }),
+    ];
+    const result = computeActivity(items, "today");
+    // Last entry = most recent day: 2 quality / 3 total = 67%
+    expect(result.chartQuality[result.chartQuality.length - 1]).toBe(67);
+    expect(result.chartSlop[result.chartSlop.length - 1]).toBe(1);
   });
 });
 

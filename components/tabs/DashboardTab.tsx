@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard, deriveScoreTags, ScoreGrid, TopicTags } from "@/components/ui/ContentCard";
-import { CheckIcon, XCloseIcon, ChevronDownIcon } from "@/components/icons";
+import { CheckIcon, XCloseIcon, ChevronDownIcon, GearIcon } from "@/components/icons";
 import { fonts, colors, space, type as t, radii, transitions, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { contentToCSV } from "@/lib/utils/csv";
@@ -13,6 +13,9 @@ import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
+import { useKeyboardNav } from "@/hooks/useKeyboardNav";
+import { CommandPalette } from "@/components/ui/CommandPalette";
+import type { PaletteCommand } from "@/components/ui/CommandPalette";
 
 function downloadFile(data: string, filename: string, mime: string) {
   const blob = new Blob([data], { type: mime });
@@ -241,7 +244,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     try { return localStorage.getItem("aegis-home-mode") === "dashboard" ? "dashboard" : "feed"; }
     catch { return "feed"; }
   });
-  const { profile } = usePreferences();
+  const { profile, setTopicAffinity, removeTopicAffinity, setQualityThreshold } = usePreferences();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activityRange, setActivityRange] = useState<"today" | "7d" | "30d">("today");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [newTopic, setNewTopic] = useState("");
 
   useEffect(() => {
     try { localStorage.setItem("aegis-home-mode", homeMode); } catch { console.debug("[dashboard] localStorage unavailable"); }
@@ -334,18 +341,36 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     if (homeMode !== "dashboard") return null;
     const now = Date.now();
     const dayMs = 86400000;
-    const todayItems = content.filter(c => c.createdAt >= now - dayMs);
+    const rangeDays = activityRange === "30d" ? 30 : activityRange === "7d" ? 7 : 1;
+    const rangeStart = now - rangeDays * dayMs;
+    const rangeItems = content.filter(c => c.createdAt >= rangeStart);
+    const actionLimit = activityRange === "today" ? 3 : 5;
     const recentActions = content
       .filter(c => c.validated || c.flagged)
       .sort((a, b) => (b.validatedAt ?? b.createdAt) - (a.validatedAt ?? a.createdAt))
-      .slice(0, 3);
+      .slice(0, actionLimit);
+    // Compute daily chart data for the selected range
+    const chartDays = Math.min(rangeDays, 30);
+    const chartQuality: number[] = [];
+    const chartSlop: number[] = [];
+    for (let i = chartDays - 1; i >= 0; i--) {
+      const dayStart = now - (i + 1) * dayMs;
+      const dayEnd = now - i * dayMs;
+      const dayItems = content.filter(c => c.createdAt >= dayStart && c.createdAt < dayEnd);
+      const dayQual = dayItems.filter(c => c.verdict === "quality").length;
+      const dayTotal = dayItems.length;
+      chartQuality.push(dayTotal > 0 ? Math.round((dayQual / dayTotal) * 100) : 0);
+      chartSlop.push(dayItems.filter(c => c.verdict === "slop").length);
+    }
     return {
-      qualityCount: todayItems.filter(c => c.verdict === "quality").length,
-      slopCount: todayItems.filter(c => c.verdict === "slop").length,
-      totalEvaluated: todayItems.length,
+      qualityCount: rangeItems.filter(c => c.verdict === "quality").length,
+      slopCount: rangeItems.filter(c => c.verdict === "slop").length,
+      totalEvaluated: rangeItems.length,
       recentActions,
+      chartQuality,
+      chartSlop,
     };
-  }, [content, homeMode]);
+  }, [content, homeMode, activityRange]);
 
   // Signal feedback loop
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; key: number } | null>(null);
@@ -391,6 +416,42 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   useEffect(() => {
     return () => { clearTimeout(feedbackTimerRef.current); };
   }, []);
+
+  const feedItemIds = useMemo(() => filteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.id), [filteredContent, showAllContent]);
+
+  const { focusedId } = useKeyboardNav({
+    items: feedItemIds,
+    expandedId: expanded,
+    onExpand: setExpanded,
+    onValidate: handleValidateWithFeedback,
+    onFlag: handleFlagWithFeedback,
+    onOpenPalette: () => setPaletteOpen(true),
+    enabled: !mobile && homeMode === "feed",
+  });
+
+  const paletteCommands: PaletteCommand[] = useMemo(() => [
+    { label: "Go to Feed", action: () => setHomeMode("feed") },
+    { label: "Go to Dashboard", action: () => setHomeMode("dashboard") },
+    { label: "Go to Analytics", action: () => onTabChange?.("analytics") },
+    { label: "Go to Settings", action: () => onTabChange?.("settings") },
+    { label: "Go to Sources", action: () => onTabChange?.("sources") },
+    { label: "Filter: Quality", action: () => setVerdictFilter("quality") },
+    { label: "Filter: Slop", action: () => setVerdictFilter("slop") },
+    { label: "Filter: All", action: () => setVerdictFilter("all") },
+    { label: "Filter: Validated", action: () => setVerdictFilter("validated") },
+    { label: "Export CSV", action: () => downloadFile(contentToCSV(content), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv") },
+    { label: "Export JSON", action: () => {
+      const data = content.map(c => ({
+        id: c.id, author: c.author, source: c.source, verdict: c.verdict,
+        scores: c.scores, vSignal: c.vSignal, cContext: c.cContext, lSlop: c.lSlop,
+        topics: c.topics, text: c.text, reason: c.reason,
+        createdAt: new Date(c.createdAt).toISOString(),
+        validatedAt: c.validatedAt ? new Date(c.validatedAt).toISOString() : null,
+        sourceUrl: c.sourceUrl,
+      }));
+      downloadFile(JSON.stringify(data, null, 2), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
+    }},
+  ], [content, onTabChange]);
 
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
@@ -647,6 +708,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     onValidate={handleValidateWithFeedback}
                     onFlag={handleFlagWithFeedback}
                     mobile={mobile}
+                    focused={focusedId === it.id}
                   />
                 </div>
               ))}
@@ -698,20 +760,33 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       )}
 
       {homeMode === "dashboard" && (
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
-          gap: space[4],
-          marginTop: space[3],
-        }}>
-          {/* Today's Top 3 — Hero Cards */}
-          <div style={{ gridColumn: mobile ? undefined : "1 / -1" }}>
+        <div style={{ marginTop: space[3] }}>
+          {/* === Hero Row: Top 3 (left) + Spotlight & Agent (right) === */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
+            gap: space[4],
+            marginBottom: space[4],
+          }}>
+          {/* Today's Top 3 — left column */}
+          <div>
             <div style={{
               fontSize: t.h3.size, fontWeight: t.h3.weight,
               color: colors.text.tertiary, marginBottom: space[3],
               display: "flex", alignItems: "center", gap: space[2],
             }}>
               <span>&#x2B50;</span> Today&#39;s Top 3
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => { setHomeMode("feed"); setVerdictFilter("all"); }}
+                style={{
+                  fontSize: t.caption.size, fontWeight: 600,
+                  color: colors.cyan[400], background: "transparent",
+                  border: "none", cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                Review All &rarr;
+              </button>
             </div>
             {dashboardTop3.length === 0 ? (
               <div style={{
@@ -782,149 +857,449 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             )}
           </div>
 
-          {/* Topic Spotlight */}
+          {/* Right column: Spotlight + Agent Knowledge stacked */}
+          <div style={{ display: "flex", flexDirection: "column", gap: space[4] }}>
+            {/* Topic Spotlight */}
+            <div style={{
+              background: "transparent",
+              border: `1px solid ${colors.border.subtle}`,
+              borderRadius: radii.lg,
+              padding: `${space[3]}px ${space[4]}px`,
+            }}>
+              <div style={{
+                fontSize: t.bodySm.size, fontWeight: 600,
+                color: colors.text.tertiary, marginBottom: space[3],
+                display: "flex", alignItems: "center", gap: space[2],
+              }}>
+                <span>&#x1F3AF;</span> Topic Spotlight
+              </div>
+              {dashboardTopicSpotlight.length === 0 ? (
+                <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
+                  Validate more content to refine recommendations.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
+                  {dashboardTopicSpotlight.map(({ topic, items }) => {
+                    const [heroItem, ...runnerUps] = items;
+                    const heroGr = scoreGrade(heroItem.scores.composite);
+                    const heroTag = deriveScoreTags(heroItem)[0] ?? null;
+                    const heroExp = expanded === heroItem.id;
+                    return (
+                      <div key={topic} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                        <div style={{
+                          background: colors.bg.surface,
+                          border: `1px solid ${heroExp ? colors.border.emphasis : colors.border.default}`,
+                          borderRadius: runnerUps.length > 0
+                            ? `${typeof radii.lg === "number" ? radii.lg : 12}px ${typeof radii.lg === "number" ? radii.lg : 12}px 0 0`
+                            : radii.lg,
+                          overflow: "hidden",
+                          transition: transitions.fast,
+                        }}>
+                          <ThumbnailArea item={heroItem} gr={heroGr} gradeSize={36}
+                            imgFailed={failedImages.has(heroItem.id)} onImgError={() => markImgFailed(heroItem.id)}
+                            overlay={
+                              <div style={{
+                                position: "absolute", top: space[2], left: space[2],
+                                padding: `2px ${space[2]}px`,
+                                background: "rgba(6,182,212,0.85)",
+                                borderRadius: radii.pill,
+                                fontSize: t.caption.size, fontWeight: 700, color: "#fff",
+                                backdropFilter: "blur(4px)",
+                              }}>{topic}</div>
+                            }
+                          />
+                          <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
+                            <div style={{
+                              fontSize: t.body.size, fontWeight: 700, color: colors.text.secondary,
+                              overflow: "hidden", display: "-webkit-box",
+                              WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                              lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
+                            }}>
+                              {heroItem.text.slice(0, 200)}
+                            </div>
+                            <div style={{
+                              fontSize: t.caption.size, color: colors.text.disabled,
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              marginBottom: space[3],
+                            }}>
+                              {heroItem.author} &middot; {heroItem.source} &middot; {heroItem.timestamp}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <ScorePill gr={heroGr} tag={heroTag} />
+                              <ExpandToggle isExpanded={heroExp} onClick={(e) => { e.stopPropagation(); setExpanded(heroExp ? null : heroItem.id); }} />
+                            </div>
+                            {heroExp && <ExpandedDetails item={heroItem} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
+                          </div>
+                        </div>
+                        {runnerUps.map((ruItem, ruIdx) => {
+                          const ruGr = scoreGrade(ruItem.scores.composite);
+                          const ruTag = deriveScoreTags(ruItem)[0] ?? null;
+                          const ruExp = expanded === ruItem.id;
+                          const showThumb = ruItem.imageUrl && !failedImages.has(ruItem.id);
+                          const isLast = ruIdx === runnerUps.length - 1;
+                          return (
+                            <div key={ruItem.id} style={{
+                              background: colors.bg.surface,
+                              borderLeft: `1px solid ${colors.border.default}`,
+                              borderRight: `1px solid ${colors.border.default}`,
+                              borderBottom: `1px solid ${ruExp ? colors.border.emphasis : colors.border.default}`,
+                              borderTop: "none",
+                              borderRadius: isLast
+                                ? `0 0 ${typeof radii.lg === "number" ? radii.lg : 12}px ${typeof radii.lg === "number" ? radii.lg : 12}px`
+                                : undefined,
+                              overflow: "hidden",
+                              transition: transitions.fast,
+                            }}>
+                              <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+                                <div style={{
+                                  width: 80, minHeight: 60, flexShrink: 0,
+                                  overflow: "hidden",
+                                  background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${ruGr.bg}, ${colors.bg.raised})`,
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  flexDirection: "column", gap: 2,
+                                }}>
+                                  {showThumb ? (
+                                    /* eslint-disable-next-line @next/next/no-img-element -- spotlight compact thumbnail */
+                                    <img src={ruItem.imageUrl!} alt=""
+                                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                      onError={() => markImgFailed(ruItem.id)} />
+                                  ) : (
+                                    <span style={{ fontSize: 20, fontWeight: 800, color: ruGr.color, fontFamily: fonts.mono }}>{ruGr.grade}</span>
+                                  )}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
+                                  <div style={{
+                                    fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
+                                    overflow: "hidden", display: "-webkit-box",
+                                    WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                                    lineHeight: 1.4, marginBottom: space[1], wordBreak: "break-word" as const,
+                                  }}>
+                                    {ruItem.text.slice(0, 160)}
+                                  </div>
+                                  <div style={{
+                                    fontSize: t.caption.size, color: colors.text.disabled,
+                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                    marginBottom: space[2],
+                                  }}>
+                                    {ruItem.author} &middot; {ruItem.source}
+                                  </div>
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                    <ScorePill gr={ruGr} tag={ruTag} />
+                                    <ExpandToggle isExpanded={ruExp} onClick={(e) => { e.stopPropagation(); setExpanded(ruExp ? null : ruItem.id); }} />
+                                  </div>
+                                </div>
+                              </div>
+                              {ruExp && <ExpandedDetails item={ruItem} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Agent Knowledge — inside right column */}
+            {agentContext && (
+              <div style={{
+                padding: `${space[3]}px ${space[4]}px`,
+                background: "transparent",
+                border: `1px solid ${agentKnowsHighlight ? "rgba(139,92,246,0.3)" : colors.border.subtle}`,
+                borderRadius: radii.lg,
+                transition: "border-color 0.5s ease, box-shadow 0.5s ease",
+                boxShadow: agentKnowsHighlight ? "0 0 12px rgba(139,92,246,0.1)" : "none",
+              }}>
+                <div style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary, marginBottom: space[2], display: "flex", alignItems: "center", gap: space[2] }}>
+                  <span>&#x1F9E0;</span> Your Agent Knows
+                </div>
+                <AgentKnowledgePills agentContext={agentContext} profile={profile} />
+              </div>
+            )}
+          </div>
+          </div>{/* end hero row grid */}
+
+          {/* === Inline Agent Settings === */}
+          <div style={{
+            background: colors.bg.surface,
+            border: `1px solid ${colors.border.default}`,
+            borderRadius: radii.lg,
+            padding: `${space[3]}px ${space[4]}px`,
+            marginBottom: space[4],
+          }}>
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              style={{
+                display: "flex", alignItems: "center", gap: space[2], width: "100%",
+                background: "transparent", border: "none", cursor: "pointer",
+                color: colors.text.tertiary, fontSize: t.bodySm.size, fontWeight: 600,
+                fontFamily: "inherit", padding: 0,
+              }}
+            >
+              <GearIcon s={16} />
+              <span>Agent Settings</span>
+              {!settingsOpen && (
+                <span style={{ color: colors.text.disabled, fontWeight: 400 }}>
+                  : {Object.entries(profile.topicAffinities).filter(([, v]) => v >= 0.2).length} interests
+                  &middot; threshold {profile.calibration.qualityThreshold.toFixed(1)}
+                  &middot; {profile.totalValidated + profile.totalFlagged} reviews
+                </span>
+              )}
+              <div style={{ flex: 1 }} />
+              <span style={{
+                display: "inline-flex",
+                transform: settingsOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s ease",
+              }}>
+                <ChevronDownIcon s={14} />
+              </span>
+            </button>
+
+            {settingsOpen && (
+              <div style={{ marginTop: space[3], paddingTop: space[3], borderTop: `1px solid ${colors.border.default}` }}>
+                {/* Interest tag chips */}
+                <div style={{ marginBottom: space[4] }}>
+                  <div style={{ fontSize: t.caption.size, color: colors.text.disabled, marginBottom: space[2], fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Interests
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: space[2], alignItems: "center" }}>
+                    {Object.entries(profile.topicAffinities)
+                      .filter(([, v]) => v >= 0.2)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([topic]) => (
+                        <span key={topic} style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          fontSize: t.caption.size, padding: `2px ${space[2]}px`,
+                          background: `${colors.cyan[400]}10`, border: `1px solid ${colors.cyan[400]}20`,
+                          borderRadius: radii.pill, color: colors.cyan[400],
+                        }}>
+                          {topic}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); removeTopicAffinity(topic); }}
+                            style={{
+                              background: "transparent", border: "none", cursor: "pointer",
+                              color: colors.cyan[400], padding: 0, fontSize: 14, lineHeight: 1,
+                              display: "inline-flex", alignItems: "center",
+                            }}
+                          >&times;</button>
+                        </span>
+                      ))}
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <input
+                        value={newTopic}
+                        onChange={(e) => setNewTopic(e.target.value.slice(0, 30))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newTopic.trim()) {
+                            const t = newTopic.trim().toLowerCase();
+                            if ((profile.topicAffinities[t] ?? 0) < 0.2) {
+                              setTopicAffinity(t, 0.3);
+                            }
+                            setNewTopic("");
+                          }
+                        }}
+                        placeholder="+ Add topic"
+                        style={{
+                          width: 100, padding: `2px ${space[2]}px`,
+                          background: "transparent",
+                          border: `1px solid ${colors.border.default}`,
+                          borderRadius: radii.pill,
+                          color: colors.text.secondary,
+                          fontSize: t.caption.size,
+                          fontFamily: "inherit",
+                          outline: "none",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Threshold slider */}
+                <div style={{ marginBottom: space[3] }}>
+                  <div style={{ fontSize: t.caption.size, color: colors.text.disabled, marginBottom: space[2], fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Quality Threshold: <span style={{ color: colors.cyan[400], fontFamily: fonts.mono }}>{profile.calibration.qualityThreshold.toFixed(1)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1} max={9} step={0.5}
+                    value={profile.calibration.qualityThreshold}
+                    onChange={(e) => { const v = parseFloat(e.target.value); if (!Number.isNaN(v)) setQualityThreshold(v); }}
+                    style={{
+                      width: "100%", accentColor: colors.cyan[400],
+                      cursor: "pointer",
+                    }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[1] }}>
+                    <span>More content</span>
+                    <span>Stricter filtering</span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
+                  <button
+                    onClick={() => { showFeedback("Settings saved"); setSettingsOpen(false); }}
+                    style={{
+                      padding: `${space[2]}px ${space[4]}px`,
+                      background: `${colors.cyan[400]}10`,
+                      border: `1px solid ${colors.cyan[400]}25`,
+                      borderRadius: radii.md,
+                      color: colors.cyan[400],
+                      fontSize: t.bodySm.size, fontWeight: 600,
+                      cursor: "pointer", fontFamily: "inherit",
+                      transition: transitions.fast,
+                    }}
+                  >
+                    Done
+                  </button>
+                  <span style={{ fontSize: t.tiny.size, color: colors.text.disabled }}>
+                    Changes apply in real time
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* === Recent Activity with time-range tabs === */}
           <div style={{
             background: "transparent",
             border: `1px solid ${colors.border.subtle}`,
             borderRadius: radii.lg,
             padding: `${space[3]}px ${space[4]}px`,
+            marginBottom: space[4],
           }}>
             <div style={{
-              fontSize: t.bodySm.size, fontWeight: 600,
-              color: colors.text.tertiary, marginBottom: space[3],
-              display: "flex", alignItems: "center", gap: space[2],
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              marginBottom: space[3],
             }}>
-              <span>&#x1F3AF;</span> Topic Spotlight
-            </div>
-            {dashboardTopicSpotlight.length === 0 ? (
-              <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
-                Validate more content to refine recommendations.
+              <div style={{
+                fontSize: t.bodySm.size, fontWeight: 600,
+                color: colors.text.tertiary,
+                display: "flex", alignItems: "center", gap: space[2],
+              }}>
+                <span>&#x26A1;</span> Recent Activity
               </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
-                {dashboardTopicSpotlight.map(({ topic, items }) => {
-                  const [heroItem, ...runnerUps] = items;
-                  const heroGr = scoreGrade(heroItem.scores.composite);
-                  const heroTag = deriveScoreTags(heroItem)[0] ?? null;
-                  const heroExp = expanded === heroItem.id;
+              <div style={{
+                display: "flex", gap: space[1],
+                background: colors.bg.raised, borderRadius: radii.md,
+                padding: space[1], border: `1px solid ${colors.border.default}`,
+              }}>
+                {(["today", "7d", "30d"] as const).map(range => {
+                  const active = activityRange === range;
                   return (
-                    <div key={topic} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                      {/* Hero card */}
-                      <div style={{
-                        background: colors.bg.surface,
-                        border: `1px solid ${heroExp ? colors.border.emphasis : colors.border.default}`,
-                        borderRadius: runnerUps.length > 0
-                          ? `${typeof radii.lg === "number" ? radii.lg : 12}px ${typeof radii.lg === "number" ? radii.lg : 12}px 0 0`
-                          : radii.lg,
-                        overflow: "hidden",
+                    <button
+                      key={range}
+                      onClick={() => setActivityRange(range)}
+                      style={{
+                        padding: `${space[1]}px ${space[2]}px`,
+                        background: active ? colors.bg.surface : "transparent",
+                        border: active ? `1px solid ${colors.border.emphasis}` : "1px solid transparent",
+                        borderRadius: radii.sm,
+                        color: active ? colors.text.primary : colors.text.muted,
+                        fontSize: t.caption.size, fontWeight: 600,
+                        cursor: "pointer", fontFamily: "inherit",
                         transition: transitions.fast,
-                      }}>
-                        <ThumbnailArea item={heroItem} gr={heroGr} gradeSize={36}
-                          imgFailed={failedImages.has(heroItem.id)} onImgError={() => markImgFailed(heroItem.id)}
-                          overlay={
-                            <div style={{
-                              position: "absolute", top: space[2], left: space[2],
-                              padding: `2px ${space[2]}px`,
-                              background: "rgba(6,182,212,0.85)",
-                              borderRadius: radii.pill,
-                              fontSize: t.caption.size, fontWeight: 700, color: "#fff",
-                              backdropFilter: "blur(4px)",
-                            }}>{topic}</div>
-                          }
-                        />
-                        <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
-                          <div style={{
-                            fontSize: t.body.size, fontWeight: 700, color: colors.text.secondary,
-                            overflow: "hidden", display: "-webkit-box",
-                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                            lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
-                          }}>
-                            {heroItem.text.slice(0, 200)}
-                          </div>
-                          <div style={{
-                            fontSize: t.caption.size, color: colors.text.disabled,
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            marginBottom: space[3],
-                          }}>
-                            {heroItem.author} &middot; {heroItem.source} &middot; {heroItem.timestamp}
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <ScorePill gr={heroGr} tag={heroTag} />
-                            <ExpandToggle isExpanded={heroExp} onClick={(e) => { e.stopPropagation(); setExpanded(heroExp ? null : heroItem.id); }} />
-                          </div>
-                          {heroExp && <ExpandedDetails item={heroItem} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
-                        </div>
-                      </div>
-                      {/* Runner-up compact rows */}
-                      {runnerUps.map((ruItem, ruIdx) => {
-                        const ruGr = scoreGrade(ruItem.scores.composite);
-                        const ruTag = deriveScoreTags(ruItem)[0] ?? null;
-                        const ruExp = expanded === ruItem.id;
-                        const showThumb = ruItem.imageUrl && !failedImages.has(ruItem.id);
-                        const isLast = ruIdx === runnerUps.length - 1;
-                        return (
-                          <div key={ruItem.id} style={{
-                            background: colors.bg.surface,
-                            borderLeft: `1px solid ${colors.border.default}`,
-                            borderRight: `1px solid ${colors.border.default}`,
-                            borderBottom: `1px solid ${ruExp ? colors.border.emphasis : colors.border.default}`,
-                            borderTop: "none",
-                            borderRadius: isLast
-                              ? `0 0 ${typeof radii.lg === "number" ? radii.lg : 12}px ${typeof radii.lg === "number" ? radii.lg : 12}px`
-                              : undefined,
-                            overflow: "hidden",
-                            transition: transitions.fast,
-                          }}>
-                            <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-                              <div style={{
-                                width: 80, minHeight: 60, flexShrink: 0,
-                                overflow: "hidden",
-                                background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${ruGr.bg}, ${colors.bg.raised})`,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                flexDirection: "column", gap: 2,
-                              }}>
-                                {showThumb ? (
-                                  /* eslint-disable-next-line @next/next/no-img-element -- spotlight compact thumbnail */
-                                  <img src={ruItem.imageUrl!} alt=""
-                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                                    onError={() => markImgFailed(ruItem.id)} />
-                                ) : (
-                                  <span style={{ fontSize: 20, fontWeight: 800, color: ruGr.color, fontFamily: fonts.mono }}>{ruGr.grade}</span>
-                                )}
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
-                                <div style={{
-                                  fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
-                                  overflow: "hidden", display: "-webkit-box",
-                                  WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                                  lineHeight: 1.4, marginBottom: space[1], wordBreak: "break-word" as const,
-                                }}>
-                                  {ruItem.text.slice(0, 160)}
-                                </div>
-                                <div style={{
-                                  fontSize: t.caption.size, color: colors.text.disabled,
-                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                  marginBottom: space[2],
-                                }}>
-                                  {ruItem.author} &middot; {ruItem.source}
-                                </div>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                  <ScorePill gr={ruGr} tag={ruTag} />
-                                  <ExpandToggle isExpanded={ruExp} onClick={(e) => { e.stopPropagation(); setExpanded(ruExp ? null : ruItem.id); }} />
-                                </div>
-                              </div>
-                            </div>
-                            {ruExp && <ExpandedDetails item={ruItem} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
-                          </div>
-                        );
-                      })}
-                    </div>
+                      }}
+                    >
+                      {range === "today" ? "Today" : range}
+                    </button>
                   );
                 })}
               </div>
+            </div>
+            {dashboardActivity && (
+              <>
+                <div style={{ display: "flex", gap: space[4], marginBottom: space[3] }}>
+                  {[
+                    { value: dashboardActivity.qualityCount, label: "quality", color: colors.cyan[400] },
+                    { value: dashboardActivity.slopCount, label: "burned", color: colors.orange[400] },
+                    { value: dashboardActivity.totalEvaluated, label: "total", color: colors.purple[400] },
+                  ].map(m => (
+                    <span key={m.label} style={{ fontSize: t.bodySm.size, color: colors.text.muted }}>
+                      <span style={{ fontWeight: 700, color: m.color, fontFamily: fonts.mono }}>{m.value}</span>
+                      {" "}{m.label}
+                    </span>
+                  ))}
+                </div>
+                {dashboardActivity.chartQuality.length > 0 && (
+                  <div style={{ display: "flex", gap: space[4], marginBottom: space[3], alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: 80 }}>
+                        <MiniChart data={dashboardActivity.chartQuality} color={colors.cyan[400]} h={24} />
+                      </div>
+                      <span style={{ fontSize: t.tiny.size, color: colors.cyan[400], fontFamily: fonts.mono }}>
+                        {dashboardActivity.chartQuality[dashboardActivity.chartQuality.length - 1]}% quality
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: 80 }}>
+                        <MiniChart data={dashboardActivity.chartSlop} color={colors.orange[500]} h={24} />
+                      </div>
+                      <span style={{ fontSize: t.tiny.size, color: colors.orange[500], fontFamily: fonts.mono }}>
+                        {dashboardActivity.chartSlop[dashboardActivity.chartSlop.length - 1]} slop
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {dashboardActivity.recentActions.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+                    {dashboardActivity.recentActions.map(item => (
+                      <div key={item.id} style={{
+                        display: "flex", alignItems: "center", gap: space[2],
+                        fontSize: t.caption.size, color: colors.text.disabled,
+                      }}>
+                        <span style={{ color: item.validated ? colors.green[400] : colors.red[400] }}>
+                          {item.validated ? "\u2713" : "\u2717"}
+                        </span>
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {item.text.slice(0, 60)}
+                        </span>
+                        {item.topics && item.topics.length > 0 && (() => {
+                          const topic = item.topics[0];
+                          return (
+                          <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                            <button
+                              onClick={() => {
+                                const current = profile.topicAffinities[topic] ?? 0;
+                                setTopicAffinity(topic, current + 0.1);
+                                showFeedback(`[${topic}] \u2191`);
+                              }}
+                              style={{
+                                background: "transparent", border: "none", cursor: "pointer",
+                                color: colors.green[400], fontSize: t.caption.size, padding: "0 2px",
+                                fontFamily: "inherit",
+                              }}
+                              title="More like this"
+                            >&#x25B2;</button>
+                            <button
+                              onClick={() => {
+                                const current = profile.topicAffinities[topic] ?? 0;
+                                setTopicAffinity(topic, current - 0.1);
+                                showFeedback(`[${topic}] \u2193`);
+                              }}
+                              style={{
+                                background: "transparent", border: "none", cursor: "pointer",
+                                color: colors.red[400], fontSize: t.caption.size, padding: "0 2px",
+                                fontFamily: "inherit",
+                              }}
+                              title="Less like this"
+                            >&#x25BC;</button>
+                          </div>
+                          );
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
+            <D2ANetworkMini mobile={mobile} />
           </div>
 
+          {/* === Secondary Row: Validated + Discoveries === */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
+            gap: space[4],
+          }}>
           {/* Validated */}
           <div style={{
             background: "transparent",
@@ -958,7 +1333,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                       overflow: "hidden", transition: transitions.fast,
                     }}>
                       <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-                        {/* Compact thumbnail — 80px wide, aspect 16:9 */}
                         <div style={{
                           width: 80, minHeight: 60, flexShrink: 0,
                           overflow: "hidden",
@@ -1011,7 +1385,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           {/* Discoveries */}
           {discoveries.length > 0 && (
             <div style={{
-              gridColumn: mobile ? undefined : "1 / -1",
               background: "transparent",
               border: `1px solid rgba(124,58,237,0.15)`,
               borderRadius: radii.lg,
@@ -1091,75 +1464,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               </div>
             </div>
           )}
-
-          {/* Agent Knowledge */}
-          {agentContext && (
-            <div style={{
-              gridColumn: mobile ? undefined : "1 / -1",
-              padding: `${space[3]}px ${space[4]}px`,
-              background: "transparent",
-              border: `1px solid ${agentKnowsHighlight ? "rgba(139,92,246,0.3)" : colors.border.subtle}`,
-              borderRadius: radii.lg,
-              transition: "border-color 0.5s ease, box-shadow 0.5s ease",
-              boxShadow: agentKnowsHighlight ? "0 0 12px rgba(139,92,246,0.1)" : "none",
-            }}>
-              <div style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary, marginBottom: space[2], display: "flex", alignItems: "center", gap: space[2] }}>
-                <span>&#x1F9E0;</span> Your Agent Knows
-              </div>
-              <AgentKnowledgePills agentContext={agentContext} profile={profile} />
-            </div>
-          )}
-
-          {/* Recent Activity */}
-          <div style={{
-            gridColumn: mobile ? undefined : "1 / -1",
-            background: "transparent",
-            border: `1px solid ${colors.border.subtle}`,
-            borderRadius: radii.lg,
-            padding: `${space[3]}px ${space[4]}px`,
-          }}>
-            <div style={{
-              fontSize: t.bodySm.size, fontWeight: 600,
-              color: colors.text.tertiary, marginBottom: space[3],
-              display: "flex", alignItems: "center", gap: space[2],
-            }}>
-              <span>&#x26A1;</span> Recent Activity
-            </div>
-            {dashboardActivity && (
-              <>
-                <div style={{ display: "flex", gap: space[4], marginBottom: space[3] }}>
-                  {[
-                    { value: dashboardActivity.qualityCount, label: "quality", color: colors.cyan[400] },
-                    { value: dashboardActivity.slopCount, label: "burned", color: colors.orange[400] },
-                    { value: dashboardActivity.totalEvaluated, label: "total", color: colors.purple[400] },
-                  ].map(m => (
-                    <span key={m.label} style={{ fontSize: t.bodySm.size, color: colors.text.muted }}>
-                      <span style={{ fontWeight: 700, color: m.color, fontFamily: fonts.mono }}>{m.value}</span>
-                      {" "}{m.label}
-                    </span>
-                  ))}
-                </div>
-                {dashboardActivity.recentActions.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
-                    {dashboardActivity.recentActions.map(item => (
-                      <div key={item.id} style={{
-                        display: "flex", alignItems: "center", gap: space[2],
-                        fontSize: t.caption.size, color: colors.text.disabled,
-                      }}>
-                        <span style={{ color: item.validated ? colors.green[400] : colors.red[400] }}>
-                          {item.validated ? "\u2713" : "\u2717"}
-                        </span>
-                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.text.slice(0, 60)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-            <D2ANetworkMini mobile={mobile} />
-          </div>
+          </div>{/* end secondary grid */}
         </div>
       )}
 
@@ -1185,6 +1490,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           ))}
         </div>
       )}
+
+      {/* Keyboard shortcut hint — only in feed mode where keyboard nav is active */}
+      {!mobile && homeMode === "feed" && (
+        <div style={{
+          textAlign: "center", marginTop: space[3],
+          fontSize: t.tiny.size, color: colors.text.disabled,
+        }}>
+          <span style={{ fontFamily: fonts.mono }}>J/K</span> navigate &middot; <span style={{ fontFamily: fonts.mono }}>V</span> validate &middot; <span style={{ fontFamily: fonts.mono }}>F</span> flag &middot; <span style={{ fontFamily: fonts.mono }}>{navigator?.platform?.includes("Mac") ? "\u2318" : "Ctrl"}+K</span> commands
+        </div>
+      )}
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={paletteCommands} mobile={mobile} />
     </div>
   );
 };
