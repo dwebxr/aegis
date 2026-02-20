@@ -306,13 +306,21 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       .slice(0, 5)
       .map(([k]) => k);
     if (highTopics.length === 0) return [];
-    const qualityItems = content.filter(c => c.verdict === "quality" && !c.flagged);
+    // Exclude items already shown in Today's Top 3
+    const top3Ids = new Set(dashboardTop3.map(c => c.item.id));
+    const qualityItems = content.filter(c => c.verdict === "quality" && !c.flagged && !top3Ids.has(c.id));
+    // Dedup across topic groups: higher-affinity topics claim items first
+    const usedIds = new Set<string>();
     return highTopics.map(topic => {
-      const items = qualityItems.filter(c => c.topics?.includes(topic));
-      if (items.length === 0) return null;
-      return { topic, item: items.reduce((a, b) => b.scores.composite > a.scores.composite ? b : a) };
-    }).filter(Boolean) as Array<{ topic: string; item: ContentItem }>;
-  }, [content, profile, homeMode]);
+      const topicItems = qualityItems
+        .filter(c => c.topics?.includes(topic) && !usedIds.has(c.id))
+        .sort((a, b) => b.scores.composite - a.scores.composite)
+        .slice(0, 3);
+      if (topicItems.length === 0) return null;
+      for (const c of topicItems) usedIds.add(c.id);
+      return { topic, items: topicItems };
+    }).filter(Boolean) as Array<{ topic: string; items: ContentItem[] }>;
+  }, [content, profile, homeMode, dashboardTop3]);
 
   const dashboardValidated = useMemo(() => {
     if (homeMode !== "dashboard") return [];
@@ -794,53 +802,122 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
-                {dashboardTopicSpotlight.map(({ topic, item }) => {
-                  const gr = scoreGrade(item.scores.composite);
-                  const tag = deriveScoreTags(item)[0] ?? null;
-                  const isExp = expanded === item.id;
+                {dashboardTopicSpotlight.map(({ topic, items }) => {
+                  const [heroItem, ...runnerUps] = items;
+                  const heroGr = scoreGrade(heroItem.scores.composite);
+                  const heroTag = deriveScoreTags(heroItem)[0] ?? null;
+                  const heroExp = expanded === heroItem.id;
                   return (
-                    <div key={topic} style={{
-                      background: colors.bg.surface,
-                      border: `1px solid ${isExp ? colors.border.emphasis : colors.border.default}`,
-                      borderRadius: radii.lg,
-                      overflow: "hidden",
-                      transition: transitions.fast,
-                    }}>
-                      <ThumbnailArea item={item} gr={gr} gradeSize={36}
-                        imgFailed={failedImages.has(item.id)} onImgError={() => markImgFailed(item.id)}
-                        overlay={
+                    <div key={topic} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                      {/* Hero card */}
+                      <div style={{
+                        background: colors.bg.surface,
+                        border: `1px solid ${heroExp ? colors.border.emphasis : colors.border.default}`,
+                        borderRadius: runnerUps.length > 0
+                          ? `${typeof radii.lg === "number" ? radii.lg : 12}px ${typeof radii.lg === "number" ? radii.lg : 12}px 0 0`
+                          : radii.lg,
+                        overflow: "hidden",
+                        transition: transitions.fast,
+                      }}>
+                        <ThumbnailArea item={heroItem} gr={heroGr} gradeSize={36}
+                          imgFailed={failedImages.has(heroItem.id)} onImgError={() => markImgFailed(heroItem.id)}
+                          overlay={
+                            <div style={{
+                              position: "absolute", top: space[2], left: space[2],
+                              padding: `2px ${space[2]}px`,
+                              background: "rgba(6,182,212,0.85)",
+                              borderRadius: radii.pill,
+                              fontSize: t.caption.size, fontWeight: 700, color: "#fff",
+                              backdropFilter: "blur(4px)",
+                            }}>{topic}</div>
+                          }
+                        />
+                        <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
                           <div style={{
-                            position: "absolute", top: space[2], left: space[2],
-                            padding: `2px ${space[2]}px`,
-                            background: "rgba(6,182,212,0.85)",
-                            borderRadius: radii.pill,
-                            fontSize: t.caption.size, fontWeight: 700, color: "#fff",
-                            backdropFilter: "blur(4px)",
-                          }}>{topic}</div>
-                        }
-                      />
-                      <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
-                        <div style={{
-                          fontSize: t.body.size, fontWeight: 700, color: colors.text.secondary,
-                          overflow: "hidden", display: "-webkit-box",
-                          WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                          lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
-                        }}>
-                          {item.text.slice(0, 200)}
+                            fontSize: t.body.size, fontWeight: 700, color: colors.text.secondary,
+                            overflow: "hidden", display: "-webkit-box",
+                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                            lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
+                          }}>
+                            {heroItem.text.slice(0, 200)}
+                          </div>
+                          <div style={{
+                            fontSize: t.caption.size, color: colors.text.disabled,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            marginBottom: space[3],
+                          }}>
+                            {heroItem.author} &middot; {heroItem.source} &middot; {heroItem.timestamp}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <ScorePill gr={heroGr} tag={heroTag} />
+                            <ExpandToggle isExpanded={heroExp} onClick={(e) => { e.stopPropagation(); setExpanded(heroExp ? null : heroItem.id); }} />
+                          </div>
+                          {heroExp && <ExpandedDetails item={heroItem} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
                         </div>
-                        <div style={{
-                          fontSize: t.caption.size, color: colors.text.disabled,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          marginBottom: space[3],
-                        }}>
-                          {item.author} &middot; {item.source} &middot; {item.timestamp}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <ScorePill gr={gr} tag={tag} />
-                          <ExpandToggle isExpanded={isExp} onClick={(e) => { e.stopPropagation(); setExpanded(isExp ? null : item.id); }} />
-                        </div>
-                        {isExp && <ExpandedDetails item={item} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
                       </div>
+                      {/* Runner-up compact rows */}
+                      {runnerUps.map((ruItem, ruIdx) => {
+                        const ruGr = scoreGrade(ruItem.scores.composite);
+                        const ruTag = deriveScoreTags(ruItem)[0] ?? null;
+                        const ruExp = expanded === ruItem.id;
+                        const showThumb = ruItem.imageUrl && !failedImages.has(ruItem.id);
+                        const isLast = ruIdx === runnerUps.length - 1;
+                        return (
+                          <div key={ruItem.id} style={{
+                            background: colors.bg.surface,
+                            borderLeft: `1px solid ${colors.border.default}`,
+                            borderRight: `1px solid ${colors.border.default}`,
+                            borderBottom: `1px solid ${ruExp ? colors.border.emphasis : colors.border.default}`,
+                            borderTop: "none",
+                            borderRadius: isLast
+                              ? `0 0 ${typeof radii.lg === "number" ? radii.lg : 12}px ${typeof radii.lg === "number" ? radii.lg : 12}px`
+                              : undefined,
+                            overflow: "hidden",
+                            transition: transitions.fast,
+                          }}>
+                            <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+                              <div style={{
+                                width: 80, minHeight: 60, flexShrink: 0,
+                                overflow: "hidden",
+                                background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${ruGr.bg}, ${colors.bg.raised})`,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                flexDirection: "column", gap: 2,
+                              }}>
+                                {showThumb ? (
+                                  /* eslint-disable-next-line @next/next/no-img-element -- spotlight compact thumbnail */
+                                  <img src={ruItem.imageUrl!} alt=""
+                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                    onError={() => markImgFailed(ruItem.id)} />
+                                ) : (
+                                  <span style={{ fontSize: 20, fontWeight: 800, color: ruGr.color, fontFamily: fonts.mono }}>{ruGr.grade}</span>
+                                )}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
+                                <div style={{
+                                  fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
+                                  overflow: "hidden", display: "-webkit-box",
+                                  WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                                  lineHeight: 1.4, marginBottom: space[1], wordBreak: "break-word" as const,
+                                }}>
+                                  {ruItem.text.slice(0, 160)}
+                                </div>
+                                <div style={{
+                                  fontSize: t.caption.size, color: colors.text.disabled,
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                  marginBottom: space[2],
+                                }}>
+                                  {ruItem.author} &middot; {ruItem.source}
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                  <ScorePill gr={ruGr} tag={ruTag} />
+                                  <ExpandToggle isExpanded={ruExp} onClick={(e) => { e.stopPropagation(); setExpanded(ruExp ? null : ruItem.id); }} />
+                                </div>
+                              </div>
+                            </div>
+                            {ruExp && <ExpandedDetails item={ruItem} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
