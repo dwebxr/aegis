@@ -1,5 +1,6 @@
 import type { OllamaConfig } from "./types";
 import { DEFAULT_OLLAMA_CONFIG } from "./types";
+import { errMsg } from "@/lib/utils/errors";
 
 const STORAGE_KEY = "aegis-ollama-config";
 
@@ -15,7 +16,7 @@ export function getOllamaConfig(): OllamaConfig {
       model: typeof parsed.model === "string" && parsed.model ? parsed.model : DEFAULT_OLLAMA_CONFIG.model,
     };
   } catch (err) {
-    console.warn("[ollama] Failed to parse config:", err instanceof Error ? err.message : err);
+    console.warn("[ollama] Failed to parse config:", errMsg(err));
     return DEFAULT_OLLAMA_CONFIG;
   }
 }

@@ -5,6 +5,7 @@ import { ShareIcon } from "@/components/icons";
 import { serializeBriefing } from "@/lib/briefing/serialize";
 import { publishBriefingToNostr } from "@/lib/nostr/publish";
 import type { BriefingState } from "@/lib/briefing/types";
+import { errMsg } from "@/lib/utils/errors";
 
 interface ShareBriefingModalProps {
   briefing: BriefingState;
@@ -51,7 +52,7 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
       setNaddr(result.naddr);
       setPhase("success");
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Unknown error");
+      setErrorMsg(errMsg(err));
       setPhase("error");
     }
   };

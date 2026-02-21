@@ -1,4 +1,5 @@
 import type { SavedSource } from "@/lib/types/sources";
+import { errMsg } from "@/lib/utils/errors";
 
 const KEY_PREFIX = "aegis_sources_";
 
@@ -19,7 +20,7 @@ export function loadSources(principalId: string): SavedSource[] {
         typeof s.createdAt === "number",
     );
   } catch (err) {
-    console.warn("[sources] Failed to load source configs:", err);
+    console.warn("[sources] Failed to load source configs:", errMsg(err));
     return [];
   }
 }
@@ -30,7 +31,7 @@ export function saveSources(principalId: string, sources: SavedSource[]): boolea
     localStorage.setItem(KEY_PREFIX + principalId, JSON.stringify(sources));
     return true;
   } catch (err) {
-    console.warn("[sources] Failed to save source configs:", err);
+    console.warn("[sources] Failed to save source configs:", errMsg(err));
     return false;
   }
 }

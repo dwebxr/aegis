@@ -1,5 +1,6 @@
 import type { UserPreferenceProfile } from "./types";
 import { createEmptyProfile } from "./types";
+import { errMsg } from "@/lib/utils/errors";
 
 const KEY_PREFIX = "aegis_prefs_";
 
@@ -55,7 +56,7 @@ export async function syncPreferencesToIC(
       BigInt(profile.lastUpdated),
     );
   } catch (err) {
-    console.warn("[prefs] IC sync failed:", err instanceof Error ? err.message : err);
+    console.warn("[prefs] IC sync failed:", errMsg(err));
     return false;
   }
 }
@@ -93,7 +94,7 @@ export async function loadPreferencesFromIC(
     parsed.principalId = principalText;
     return parsed as UserPreferenceProfile;
   } catch (err) {
-    console.warn("[prefs] IC load failed:", err instanceof Error ? err.message : err);
+    console.warn("[prefs] IC load failed:", errMsg(err));
     return null;
   }
 }

@@ -1,6 +1,5 @@
 import {
   calculateWoTScore,
-  calculateWoTScores,
   calculateWeightedScore,
   isWoTSerendipity,
 } from "@/lib/wot/scorer";
@@ -98,27 +97,6 @@ describe("calculateWoTScore", () => {
     ]);
     const score = calculateWoTScore("high", graph);
     expect(score.trustScore).toBeLessThanOrEqual(1.0);
-  });
-});
-
-describe("calculateWoTScores (batch)", () => {
-  it("returns scores for multiple pubkeys", () => {
-    const graph = makeGraph({}, [
-      ["user-pk", { hopDistance: 0 }],
-      ["a", { hopDistance: 1 }],
-      ["b", { hopDistance: 2 }],
-    ]);
-    const scores = calculateWoTScores(["a", "b", "unknown"], graph);
-    expect(scores.size).toBe(3);
-    expect(scores.get("a")!.isInGraph).toBe(true);
-    expect(scores.get("b")!.isInGraph).toBe(true);
-    expect(scores.get("unknown")!.isInGraph).toBe(false);
-  });
-
-  it("returns empty map for empty input", () => {
-    const graph = makeGraph();
-    const scores = calculateWoTScores([], graph);
-    expect(scores.size).toBe(0);
   });
 });
 

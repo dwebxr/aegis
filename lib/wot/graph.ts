@@ -3,6 +3,7 @@ import type { Filter } from "nostr-tools/filter";
 import type { WoTGraph, WoTNode, WoTConfig } from "./types";
 import { DEFAULT_WOT_CONFIG } from "./types";
 import { withTimeout } from "@/lib/utils/timeout";
+import { errMsg } from "@/lib/utils/errors";
 
 const BATCH_SIZE = 50;
 
@@ -60,8 +61,7 @@ export async function buildFollowGraph(
             }
           });
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(`[wot] Batch ${i / BATCH_SIZE + 1} at hop ${hop} failed: ${msg} — continuing with partial data`);
+          console.warn(`[wot] Batch ${i / BATCH_SIZE + 1} at hop ${hop} failed: ${errMsg(err)} — continuing with partial data`);
         }
       }
 

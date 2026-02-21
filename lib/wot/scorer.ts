@@ -38,17 +38,6 @@ export function calculateWoTScore(
   };
 }
 
-export function calculateWoTScores(
-  pubkeys: string[],
-  graph: WoTGraph,
-): Map<string, WoTScore> {
-  const results = new Map<string, WoTScore>();
-  for (const pk of pubkeys) {
-    results.set(pk, calculateWoTScore(pk, graph));
-  }
-  return results;
-}
-
 export function calculateWeightedScore(
   rawComposite: number,
   trustScore: number,

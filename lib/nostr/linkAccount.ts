@@ -3,6 +3,7 @@ import { SimplePool } from "nostr-tools/pool";
 import { DEFAULT_RELAYS } from "./types";
 import { clearWoTCache } from "@/lib/wot/cache";
 import { withTimeout } from "@/lib/utils/timeout";
+import { errMsg } from "@/lib/utils/errors";
 
 const STORAGE_KEY = "aegis-linked-nostr";
 
@@ -34,7 +35,7 @@ export function getLinkedAccount(): LinkedNostrAccount | null {
       followCount: typeof parsed.followCount === "number" ? parsed.followCount : 0,
     };
   } catch (err) {
-    console.warn("[linkAccount] Failed to parse linked account:", err instanceof Error ? err.message : err);
+    console.warn("[linkAccount] Failed to parse linked account:", errMsg(err));
     return null;
   }
 }
@@ -45,7 +46,7 @@ export function saveLinkedAccount(account: LinkedNostrAccount): boolean {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(account));
     return true;
   } catch (err) {
-    console.warn("[linkAccount] Failed to save linked account:", err instanceof Error ? err.message : err);
+    console.warn("[linkAccount] Failed to save linked account:", errMsg(err));
     return false;
   }
 }
@@ -173,7 +174,7 @@ export async function syncLinkedAccountToIC(
       updatedAt: BigInt(0), // Server overrides with Time.now()
     });
   } catch (err) {
-    console.warn("[nostr] Failed to sync settings to IC:", err instanceof Error ? err.message : err);
+    console.warn("[nostr] Failed to sync settings to IC:", errMsg(err));
   }
 }
 
@@ -221,7 +222,7 @@ export async function loadSettingsFromIC(
     if (result.length === 0) return null;
     return parseICSettings(result[0]);
   } catch (err) {
-    console.warn("[nostr] Failed to load settings from IC:", err instanceof Error ? err.message : err);
+    console.warn("[nostr] Failed to load settings from IC:", errMsg(err));
     return null;
   }
 }

@@ -7,6 +7,7 @@ import type { ParsedBriefing } from "@/lib/briefing/serialize";
 import { SharedBriefingView } from "@/components/shared/SharedBriefingView";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
 import { withTimeout } from "@/lib/utils/timeout";
+import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 30;
 
@@ -58,7 +59,7 @@ async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
     briefingCache.set(naddr, { data: parsed, at: Date.now() });
     return parsed;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = errMsg(err);
     if (msg === "timeout") {
       console.warn("[briefing/page] Relay query timed out for", naddr);
     } else {

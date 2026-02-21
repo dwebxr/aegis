@@ -65,7 +65,7 @@ function loadCachedContent(): ContentItem[] {
         typeof (c as ContentItem).createdAt === "number",
     );
   } catch (err) {
-    console.warn("[content] Failed to parse cached content:", err instanceof Error ? err.message : err);
+    console.warn("[content] Failed to parse cached content:", errMsg(err));
     return [];
   }
 }
@@ -75,7 +75,7 @@ function saveCachedContent(items: ContentItem[]): void {
   try {
     localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncatePreservingActioned(items)));
   } catch (err) {
-    console.warn("[content] localStorage save failed (quota?):", err instanceof Error ? err.message : err);
+    console.warn("[content] localStorage save failed (quota?):", errMsg(err));
   }
 }
 
@@ -578,6 +578,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (!actorRef.current || !isAuthenticated) return;
     void syncBriefingToCanister(actorRef.current, state, nostrPubkey ?? null).catch((err: unknown) => {
       console.warn("[content] Briefing sync to IC failed:", errMsg(err));
+      setSyncStatus("offline");
     });
   }, [isAuthenticated]);
 

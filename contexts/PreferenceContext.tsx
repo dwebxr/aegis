@@ -6,6 +6,7 @@ import { createEmptyProfile, TOPIC_AFFINITY_CAP, TOPIC_AFFINITY_FLOOR } from "@/
 import { learn, getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { loadProfile, saveProfile, syncPreferencesToIC, loadPreferencesFromIC, mergeProfiles } from "@/lib/preferences/storage";
 import { clamp } from "@/lib/utils/math";
+import { errMsg } from "@/lib/utils/errors";
 
 interface PreferenceState {
   profile: UserPreferenceProfile;
@@ -54,7 +55,9 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
           // No IC data yet: push local to IC as initial backup (if non-empty)
           const hasData = local.totalValidated > 0 || local.totalFlagged > 0
             || Object.keys(local.topicAffinities).length > 0;
-          if (hasData) void syncPreferencesToIC(identity, local);
+          if (hasData) void syncPreferencesToIC(identity, local).catch(err => {
+            console.warn("[prefs] IC initial sync failed:", errMsg(err));
+          });
           return;
         }
         const merged = mergeProfiles(local, icProfile);
@@ -63,10 +66,12 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
 
         // If local was newer, push to IC
         if (merged.lastUpdated > icProfile.lastUpdated) {
-          void syncPreferencesToIC(identity, merged);
+          void syncPreferencesToIC(identity, merged).catch(err => {
+            console.warn("[prefs] IC merge sync failed:", errMsg(err));
+          });
         }
       }).catch((err) => {
-        console.warn("[prefs] IC preference load failed:", err instanceof Error ? err.message : err);
+        console.warn("[prefs] IC preference load failed:", errMsg(err));
       });
     } else {
       setProfile(emptyProfile);
@@ -87,7 +92,9 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     icSyncTimeoutRef.current = setTimeout(() => {
       const ident = identityRef.current;
       if (!isAuthRef.current || !ident) return;
-      void syncPreferencesToIC(ident, p);
+      void syncPreferencesToIC(ident, p).catch(err => {
+        console.warn("[prefs] IC debounced sync failed:", errMsg(err));
+      });
     }, 3000);
   }, []);
 

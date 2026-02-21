@@ -4,6 +4,7 @@ import type { AddressPointer } from "nostr-tools/nip19";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { withTimeout } from "@/lib/utils/timeout";
+import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 30;
 
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
       created_at: event.created_at,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = errMsg(err);
     if (msg === "timeout") {
       return NextResponse.json({ error: "Relay query timed out" }, { status: 504 });
     }

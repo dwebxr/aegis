@@ -1,6 +1,5 @@
 import {
   calculateWoTScore,
-  calculateWoTScores,
   calculateWeightedScore,
   isWoTSerendipity,
 } from "@/lib/wot/scorer";
@@ -84,45 +83,6 @@ describe("calculateWoTScore — edge cases", () => {
     const score = calculateWoTScore("user-pk-2", graph);
     expect(score.hopDistance).toBe(2);
     expect(score.isInGraph).toBe(true);
-  });
-});
-
-describe("calculateWoTScores — edge cases", () => {
-  it("handles duplicates in input array", () => {
-    const graph = makeGraph([
-      ["user-pk", { hopDistance: 0 }],
-      ["pk-a", { hopDistance: 1 }],
-    ]);
-    const scores = calculateWoTScores(["pk-a", "pk-a", "pk-a"], graph);
-    // Map deduplicates, so last write wins (all same value)
-    expect(scores.size).toBe(1);
-    expect(scores.get("pk-a")!.isInGraph).toBe(true);
-  });
-
-  it("handles mix of known and unknown pubkeys", () => {
-    const graph = makeGraph([
-      ["user-pk", { hopDistance: 0 }],
-      ["known", { hopDistance: 1 }],
-    ]);
-    const scores = calculateWoTScores(["known", "unknown1", "unknown2"], graph);
-    expect(scores.get("known")!.isInGraph).toBe(true);
-    expect(scores.get("unknown1")!.isInGraph).toBe(false);
-    expect(scores.get("unknown2")!.isInGraph).toBe(false);
-  });
-
-  it("handles large batch (1000 pubkeys)", () => {
-    const nodes: Array<[string, Partial<WoTNode>]> = [["user-pk", { hopDistance: 0 }]];
-    for (let i = 0; i < 1000; i++) {
-      nodes.push([`pk-${i}`, { hopDistance: 2, mutualFollows: i % 10 }]);
-    }
-    const graph = makeGraph(nodes);
-    const pubkeys = Array.from({ length: 1000 }, (_, i) => `pk-${i}`);
-    const scores = calculateWoTScores(pubkeys, graph);
-    expect(scores.size).toBe(1000);
-    Array.from(scores.values()).forEach(score => {
-      expect(score.trustScore).toBeGreaterThan(0);
-      expect(score.isInGraph).toBe(true);
-    });
   });
 });
 

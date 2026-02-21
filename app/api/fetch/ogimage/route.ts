@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { blockPrivateUrl } from "@/lib/utils/url";
+import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 10;
 
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     const imageUrl = raw ? new URL(raw, url).href : null;
     return NextResponse.json({ imageUrl });
   } catch (err) {
-    console.warn("[fetch/ogimage] OG extraction failed:", err instanceof Error ? err.message : err);
+    console.warn("[fetch/ogimage] OG extraction failed:", errMsg(err));
     return NextResponse.json({ imageUrl: null });
   }
 }

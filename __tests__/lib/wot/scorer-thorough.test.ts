@@ -4,7 +4,6 @@
  */
 import {
   calculateWoTScore,
-  calculateWoTScores,
   calculateWeightedScore,
   isWoTSerendipity,
 } from "@/lib/wot/scorer";
@@ -110,27 +109,6 @@ describe("calculateWoTScore — trust formula", () => {
     const scoreB = calculateWoTScore("peer-b", graph);
     expect(scoreA.trustScore).toBeCloseTo(0.7, 2); // 0.6/1 + 0 + 0.1
     expect(scoreB.trustScore).toBeCloseTo(0.4, 2); // 0.6/2 + 0 + 0.1
-  });
-});
-
-describe("calculateWoTScores — batch", () => {
-  it("returns scores for all requested pubkeys", () => {
-    const graph = makeGraph([
-      ["user", { hopDistance: 0 }],
-      ["a", { hopDistance: 1 }],
-      ["b", { hopDistance: 2 }],
-    ]);
-    const scores = calculateWoTScores(["a", "b", "c"], graph);
-    expect(scores.size).toBe(3);
-    expect(scores.get("a")!.isInGraph).toBe(true);
-    expect(scores.get("b")!.isInGraph).toBe(true);
-    expect(scores.get("c")!.isInGraph).toBe(false);
-  });
-
-  it("empty pubkey array returns empty map", () => {
-    const graph = makeGraph([["user", { hopDistance: 0 }]]);
-    const scores = calculateWoTScores([], graph);
-    expect(scores.size).toBe(0);
   });
 });
 
