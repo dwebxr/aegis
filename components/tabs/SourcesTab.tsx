@@ -652,7 +652,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
 
         {activeSource === "nostr" && (
           <div>
-            <label style={labelStyle}>Relay URLs (one per line)</label>
+            <label style={labelStyle}>Relay URLs (one per line, max 20)</label>
             <textarea value={nostrRelays} onChange={e => setNostrRelays(e.target.value)} placeholder={"wss://relay.damus.io\nwss://nos.lol"} style={{ ...inputStyle, height: 70, resize: "vertical", marginBottom: space[3] }} />
             <label style={labelStyle}>Public Keys to follow (optional, one per line)</label>
             <textarea value={nostrPubkeys} onChange={e => setNostrPubkeys(e.target.value)} placeholder="npub or hex pubkey..." style={{ ...inputStyle, height: 50, resize: "vertical", marginBottom: space[3] }} />

@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "At least one relay URL is required" }, { status: 400 });
   }
 
-  if (relays.length > 10) {
-    return NextResponse.json({ error: "Maximum 10 relays allowed" }, { status: 400 });
+  if (relays.length > 20) {
+    return NextResponse.json({ error: "Maximum 20 relays allowed" }, { status: 400 });
   }
 
   for (const relay of relays) {
