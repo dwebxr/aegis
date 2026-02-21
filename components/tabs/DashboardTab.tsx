@@ -319,20 +319,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, [profile]);
 
   // Dashboard-mode computations (skipped when in Feed mode)
-  // Epoch-based snapshot: dashboard rankings only update on tab entry or user action
-  // (validate/flag changes profile → triggers recalc). Background scheduler and timer
-  // updates do NOT cause dashboard reshuffling.
-  const [dashboardEpoch, setDashboardEpoch] = useState(0);
-  useEffect(() => {
-    if (homeMode === "dashboard") setDashboardEpoch(e => e + 1);
-  }, [homeMode]);
-
+  // Pinned time reference: only updates when user takes action (validate/flag → profile change).
+  // Feed↔Dashboard toggles, scheduler updates, timers do NOT shift recency scores.
   const contentRef = useRef(content);
   contentRef.current = content;
+  const briefingNowRef = useRef(Date.now());
+  useEffect(() => {
+    briefingNowRef.current = Date.now();
+  }, [profile]);
 
   const dashboardTop3 = useMemo(() => {
     if (homeMode !== "dashboard") return [];
-    const briefing = generateBriefing(contentRef.current, profile, Date.now());
+    const briefing = generateBriefing(contentRef.current, profile, briefingNowRef.current);
     // Content-level dedup: same article may appear with different IDs from different sources
     const seenKeys = new Set<string>();
     const deduped = briefing.priority.filter(bi => {
@@ -343,7 +341,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     });
     return deduped.slice(0, 3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboardEpoch, profile, homeMode]);
+  }, [profile, homeMode]);
 
   const dashboardTopicSpotlight = useMemo(() => {
     if (homeMode !== "dashboard") return [];
@@ -393,7 +391,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       return { topic, items: topicItems };
     }).filter(Boolean) as Array<{ topic: string; items: ContentItem[] }>;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboardEpoch, profile, homeMode, dashboardTop3]);
+  }, [profile, homeMode, dashboardTop3]);
 
   // Cascading cross-section deduplication: Top3 → Spotlight → Discoveries → Validated
   const shownByTopSections = useMemo(() => {
@@ -421,7 +419,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       .sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0))
       .slice(0, 5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboardEpoch, homeMode, allShownIds]);
+  }, [homeMode, allShownIds]);
 
   const dashboardActivity = useMemo(() => {
     if (homeMode !== "dashboard") return null;
