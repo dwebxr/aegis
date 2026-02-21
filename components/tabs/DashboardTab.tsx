@@ -113,13 +113,15 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
   overlay?: React.ReactNode;
 }) {
   const showImg = item.imageUrl && !imgFailed;
-  return (
+  const hasLink = item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl);
+  const inner = (
     <div style={{
       position: "relative", width: "100%", aspectRatio: "16/9",
       overflow: "hidden",
       background: showImg ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
       display: "flex", alignItems: "center", justifyContent: "center",
       flexDirection: "column", gap: space[1],
+      cursor: hasLink ? "pointer" : undefined,
     }}>
       {showImg ? (
         /* eslint-disable-next-line @next/next/no-img-element -- dashboard card OG thumbnail */
@@ -135,7 +137,28 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
       {overlay}
     </div>
   );
+  if (hasLink) {
+    return (
+      <a href={item.sourceUrl!} target="_blank" rel="noopener noreferrer" style={{ display: "block", textDecoration: "none" }}>
+        {inner}
+      </a>
+    );
+  }
+  return inner;
 }
+
+const inlineVBtnStyle: React.CSSProperties = {
+  padding: `2px ${space[2]}px`, borderRadius: radii.sm,
+  background: colors.green.bg, border: `1px solid ${colors.green.border}`,
+  color: colors.green[400], fontSize: t.caption.size, fontWeight: 600,
+  cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
+};
+const inlineFBtnStyle: React.CSSProperties = {
+  padding: `2px ${space[2]}px`, borderRadius: radii.sm,
+  background: colors.red.bg, border: `1px solid ${colors.red.border}`,
+  color: colors.red[400], fontSize: t.caption.size, fontWeight: 600,
+  cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
+};
 
 function ExpandedDetails({ item, onValidate, onFlag }: {
   item: ContentItem;
@@ -811,12 +834,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   const item = bi.item;
                   const gr = scoreGrade(item.scores.composite);
                   const tag = deriveScoreTags(item)[0] ?? null;
-                  const isExpanded = expanded === item.id;
                   return (
                     <div key={item.id} style={{
                       animation: `slideUp .3s ease ${i * 0.08}s forwards`,
                       background: colors.bg.surface,
-                      border: `1px solid ${isExpanded ? colors.border.emphasis : colors.border.default}`,
+                      border: `1px solid ${colors.border.default}`,
                       borderRadius: radii.lg,
                       overflow: "hidden",
                       transition: transitions.fast,
@@ -850,11 +872,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         }}>
                           {item.author} &middot; {item.source} &middot; {item.timestamp}
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                           <ScorePill gr={gr} tag={tag} />
-                          <ExpandToggle isExpanded={isExpanded} onClick={(e) => { e.stopPropagation(); setExpanded(isExpanded ? null : item.id); }} />
+                          <div style={{ flex: 1 }} />
+                          <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
+                            disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
+                            disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1, cursor: item.flagged ? "default" : "pointer" }}>&#x2717;</button>
                         </div>
-                        {isExpanded && <ExpandedDetails item={item} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
                       </div>
                     </div>
                   );
@@ -887,12 +912,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     const [heroItem, ...runnerUps] = items;
                     const heroGr = scoreGrade(heroItem.scores.composite);
                     const heroTag = deriveScoreTags(heroItem)[0] ?? null;
-                    const heroExp = expanded === heroItem.id;
                     return (
                       <div key={topic} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                         <div style={{
                           background: colors.bg.surface,
-                          border: `1px solid ${heroExp ? colors.border.emphasis : colors.border.default}`,
+                          border: `1px solid ${colors.border.default}`,
                           borderRadius: runnerUps.length > 0
                             ? `${typeof radii.lg === "number" ? radii.lg : 12}px ${typeof radii.lg === "number" ? radii.lg : 12}px 0 0`
                             : radii.lg,
@@ -928,25 +952,47 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             }}>
                               {heroItem.author} &middot; {heroItem.source} &middot; {heroItem.timestamp}
                             </div>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                               <ScorePill gr={heroGr} tag={heroTag} />
-                              <ExpandToggle isExpanded={heroExp} onClick={(e) => { e.stopPropagation(); setExpanded(heroExp ? null : heroItem.id); }} />
+                              <div style={{ flex: 1 }} />
+                              <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(heroItem.id); }}
+                                disabled={heroItem.validated} style={{ ...inlineVBtnStyle, opacity: heroItem.validated ? 0.5 : 1, cursor: heroItem.validated ? "default" : "pointer" }}>&#x2713;</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(heroItem.id); }}
+                                disabled={heroItem.flagged} style={{ ...inlineFBtnStyle, opacity: heroItem.flagged ? 0.5 : 1, cursor: heroItem.flagged ? "default" : "pointer" }}>&#x2717;</button>
                             </div>
-                            {heroExp && <ExpandedDetails item={heroItem} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
                           </div>
                         </div>
                         {runnerUps.map((ruItem, ruIdx) => {
                           const ruGr = scoreGrade(ruItem.scores.composite);
                           const ruTag = deriveScoreTags(ruItem)[0] ?? null;
-                          const ruExp = expanded === ruItem.id;
                           const showThumb = ruItem.imageUrl && !failedImages.has(ruItem.id);
+                          const ruHasLink = ruItem.sourceUrl && /^https?:\/\//i.test(ruItem.sourceUrl);
                           const isLast = ruIdx === runnerUps.length - 1;
+                          const ruThumbContent = (
+                            <div style={{
+                              width: 80, minHeight: 60, flexShrink: 0,
+                              overflow: "hidden",
+                              background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${ruGr.bg}, ${colors.bg.raised})`,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              flexDirection: "column", gap: 2,
+                              cursor: ruHasLink ? "pointer" : undefined,
+                            }}>
+                              {showThumb ? (
+                                /* eslint-disable-next-line @next/next/no-img-element -- spotlight compact thumbnail */
+                                <img src={ruItem.imageUrl!} alt=""
+                                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                  onError={() => markImgFailed(ruItem.id)} />
+                              ) : (
+                                <span style={{ fontSize: 20, fontWeight: 800, color: ruGr.color, fontFamily: fonts.mono }}>{ruGr.grade}</span>
+                              )}
+                            </div>
+                          );
                           return (
                             <div key={ruItem.id} style={{
                               background: colors.bg.surface,
                               borderLeft: `1px solid ${colors.border.default}`,
                               borderRight: `1px solid ${colors.border.default}`,
-                              borderBottom: `1px solid ${ruExp ? colors.border.emphasis : colors.border.default}`,
+                              borderBottom: `1px solid ${colors.border.default}`,
                               borderTop: "none",
                               borderRadius: isLast
                                 ? `0 0 ${typeof radii.lg === "number" ? radii.lg : 12}px ${typeof radii.lg === "number" ? radii.lg : 12}px`
@@ -955,22 +1001,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                               transition: transitions.fast,
                             }}>
                               <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-                                <div style={{
-                                  width: 80, minHeight: 60, flexShrink: 0,
-                                  overflow: "hidden",
-                                  background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${ruGr.bg}, ${colors.bg.raised})`,
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                  flexDirection: "column", gap: 2,
-                                }}>
-                                  {showThumb ? (
-                                    /* eslint-disable-next-line @next/next/no-img-element -- spotlight compact thumbnail */
-                                    <img src={ruItem.imageUrl!} alt=""
-                                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                                      onError={() => markImgFailed(ruItem.id)} />
-                                  ) : (
-                                    <span style={{ fontSize: 20, fontWeight: 800, color: ruGr.color, fontFamily: fonts.mono }}>{ruGr.grade}</span>
-                                  )}
-                                </div>
+                                {ruHasLink ? (
+                                  <a href={ruItem.sourceUrl!} target="_blank" rel="noopener noreferrer" style={{ display: "flex", flexShrink: 0 }}>
+                                    {ruThumbContent}
+                                  </a>
+                                ) : ruThumbContent}
                                 <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
                                   <div style={{
                                     fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
@@ -987,13 +1022,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                                   }}>
                                     {ruItem.author} &middot; {ruItem.source}
                                   </div>
-                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                                     <ScorePill gr={ruGr} tag={ruTag} />
-                                    <ExpandToggle isExpanded={ruExp} onClick={(e) => { e.stopPropagation(); setExpanded(ruExp ? null : ruItem.id); }} />
+                                    <div style={{ flex: 1 }} />
+                                    <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(ruItem.id); }}
+                                      disabled={ruItem.validated} style={{ ...inlineVBtnStyle, opacity: ruItem.validated ? 0.5 : 1, cursor: ruItem.validated ? "default" : "pointer" }}>&#x2713;</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(ruItem.id); }}
+                                      disabled={ruItem.flagged} style={{ ...inlineFBtnStyle, opacity: ruItem.flagged ? 0.5 : 1, cursor: ruItem.flagged ? "default" : "pointer" }}>&#x2717;</button>
                                   </div>
                                 </div>
                               </div>
-                              {ruExp && <ExpandedDetails item={ruItem} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
                             </div>
                           );
                         })}
@@ -1031,32 +1069,40 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   const item = d.item;
                   const gr = scoreGrade(item.scores.composite);
                   const tag = deriveScoreTags(item)[0] ?? null;
-                  const isExp = expanded === item.id;
                   const showThumb = item.imageUrl && !failedImages.has(item.id);
+                  const dHasLink = item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl);
+                  const dThumbContent = (
+                    <div style={{
+                      width: 80, minHeight: 60, flexShrink: 0,
+                      overflow: "hidden",
+                      background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexDirection: "column", gap: 2,
+                      cursor: dHasLink ? "pointer" : undefined,
+                    }}>
+                      {showThumb ? (
+                        /* eslint-disable-next-line @next/next/no-img-element -- discovery card thumbnail */
+                        <img src={item.imageUrl!} alt=""
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          onError={() => markImgFailed(item.id)} />
+                      ) : (
+                        <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
+                      )}
+                    </div>
+                  );
                   return (
                     <div key={item.id} style={{
                       background: colors.bg.surface,
-                      border: `1px solid ${isExp ? colors.border.emphasis : colors.border.default}`,
+                      border: `1px solid ${colors.border.default}`,
                       borderRadius: radii.md,
                       overflow: "hidden", transition: transitions.fast,
                     }}>
                       <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-                        <div style={{
-                          width: 80, minHeight: 60, flexShrink: 0,
-                          overflow: "hidden",
-                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          flexDirection: "column", gap: 2,
-                        }}>
-                          {showThumb ? (
-                            /* eslint-disable-next-line @next/next/no-img-element -- discovery card thumbnail */
-                            <img src={item.imageUrl!} alt=""
-                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                              onError={() => markImgFailed(item.id)} />
-                          ) : (
-                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
-                          )}
-                        </div>
+                        {dHasLink ? (
+                          <a href={item.sourceUrl!} target="_blank" rel="noopener noreferrer" style={{ display: "flex", flexShrink: 0 }}>
+                            {dThumbContent}
+                          </a>
+                        ) : dThumbContent}
                         <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[1] }}>
                             <SerendipityBadge discoveryType={d.discoveryType} mobile={mobile} />
@@ -1076,13 +1122,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           }}>
                             {d.reason}
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                             <ScorePill gr={gr} tag={tag} />
-                            <ExpandToggle isExpanded={isExp} onClick={(e) => { e.stopPropagation(); setExpanded(isExp ? null : item.id); }} />
+                            <div style={{ flex: 1 }} />
+                            <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
+                              disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
+                              disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1, cursor: item.flagged ? "default" : "pointer" }}>&#x2717;</button>
                           </div>
                         </div>
                       </div>
-                      {isExp && <ExpandedDetails item={item} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
                     </div>
                   );
                 })}
@@ -1172,28 +1221,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                             <ScorePill gr={gr} tag={tag} />
                             <div style={{ flex: 1 }} />
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
-                              style={{
-                                padding: `2px ${space[2]}px`, borderRadius: radii.sm,
-                                background: colors.green.bg, border: `1px solid ${colors.green.border}`,
-                                color: colors.green[400], fontSize: t.caption.size, fontWeight: 600,
-                                cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
-                              }}
-                            >
-                              &#x2713;
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
-                              style={{
-                                padding: `2px ${space[2]}px`, borderRadius: radii.sm,
-                                background: colors.red.bg, border: `1px solid ${colors.red.border}`,
-                                color: colors.red[400], fontSize: t.caption.size, fontWeight: 600,
-                                cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
-                              }}
-                            >
-                              &#x2717;
-                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
+                              style={inlineVBtnStyle}>&#x2713;</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
+                              style={inlineFBtnStyle}>&#x2717;</button>
                           </div>
                         </div>
                       </div>
@@ -1230,32 +1261,40 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 {dashboardValidated.map(item => {
                   const gr = scoreGrade(item.scores.composite);
                   const tag = deriveScoreTags(item)[0] ?? null;
-                  const isExp = expanded === item.id;
                   const showThumb = item.imageUrl && !failedImages.has(item.id);
+                  const vHasLink = item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl);
+                  const vThumbContent = (
+                    <div style={{
+                      width: 80, minHeight: 60, flexShrink: 0,
+                      overflow: "hidden",
+                      background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexDirection: "column", gap: 2,
+                      cursor: vHasLink ? "pointer" : undefined,
+                    }}>
+                      {showThumb ? (
+                        /* eslint-disable-next-line @next/next/no-img-element -- validated card thumbnail */
+                        <img src={item.imageUrl!} alt=""
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          onError={() => markImgFailed(item.id)} />
+                      ) : (
+                        <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
+                      )}
+                    </div>
+                  );
                   return (
                     <div key={item.id} style={{
                       background: colors.bg.surface,
-                      border: `1px solid ${isExp ? colors.border.emphasis : colors.border.default}`,
+                      border: `1px solid ${colors.border.default}`,
                       borderRadius: radii.md,
                       overflow: "hidden", transition: transitions.fast,
                     }}>
                       <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-                        <div style={{
-                          width: 80, minHeight: 60, flexShrink: 0,
-                          overflow: "hidden",
-                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          flexDirection: "column", gap: 2,
-                        }}>
-                          {showThumb ? (
-                            /* eslint-disable-next-line @next/next/no-img-element -- validated card thumbnail */
-                            <img src={item.imageUrl!} alt=""
-                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                              onError={() => markImgFailed(item.id)} />
-                          ) : (
-                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
-                          )}
-                        </div>
+                        {vHasLink ? (
+                          <a href={item.sourceUrl!} target="_blank" rel="noopener noreferrer" style={{ display: "flex", flexShrink: 0 }}>
+                            {vThumbContent}
+                          </a>
+                        ) : vThumbContent}
                         <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
                           <div style={{
                             fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
@@ -1275,13 +1314,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                               <> &middot; {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</>
                             )}
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                             <ScorePill gr={gr} tag={tag} />
-                            <ExpandToggle isExpanded={isExp} onClick={(e) => { e.stopPropagation(); setExpanded(isExp ? null : item.id); }} />
+                            <div style={{ flex: 1 }} />
+                            <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
+                              disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
+                              disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1, cursor: item.flagged ? "default" : "pointer" }}>&#x2717;</button>
                           </div>
                         </div>
                       </div>
-                      {isExp && <ExpandedDetails item={item} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
                     </div>
                   );
                 })}
