@@ -1028,6 +1028,92 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               )}
             </div>
 
+          {/* Right column: Discoveries + Validated */}
+          <div style={{ display: "flex", flexDirection: "column", gap: `${space[4]}px` }}>
+
+          {/* Discoveries */}
+          {discoveries.length > 0 && (
+            <div style={{
+              background: "transparent",
+              border: `1px solid ${colors.border.subtle}`,
+              borderRadius: radii.lg,
+              padding: `${space[3]}px ${space[4]}px`,
+            }}>
+              <div style={{
+                fontSize: t.bodySm.size, fontWeight: 600,
+                color: colors.text.tertiary, marginBottom: space[3],
+                display: "flex", alignItems: "center", gap: space[2],
+              }}>
+                <span>&#x1F52D;</span> Discoveries
+                <span style={{
+                  fontSize: t.caption.size, color: colors.text.muted,
+                  background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
+                }}>{discoveries.length}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
+                {discoveries.map(d => {
+                  const item = d.item;
+                  const gr = scoreGrade(item.scores.composite);
+                  const tag = deriveScoreTags(item)[0] ?? null;
+                  const isExp = expanded === item.id;
+                  const showThumb = item.imageUrl && !failedImages.has(item.id);
+                  return (
+                    <div key={item.id} style={{
+                      background: colors.bg.surface,
+                      border: `1px solid ${isExp ? colors.border.emphasis : colors.border.default}`,
+                      borderRadius: radii.md,
+                      overflow: "hidden", transition: transitions.fast,
+                    }}>
+                      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+                        <div style={{
+                          width: 80, minHeight: 60, flexShrink: 0,
+                          overflow: "hidden",
+                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          flexDirection: "column", gap: 2,
+                        }}>
+                          {showThumb ? (
+                            /* eslint-disable-next-line @next/next/no-img-element -- discovery card thumbnail */
+                            <img src={item.imageUrl!} alt=""
+                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              onError={() => markImgFailed(item.id)} />
+                          ) : (
+                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[1] }}>
+                            <SerendipityBadge discoveryType={d.discoveryType} mobile={mobile} />
+                          </div>
+                          <div style={{
+                            fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
+                            overflow: "hidden", display: "-webkit-box",
+                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                            lineHeight: 1.4, marginBottom: space[1], wordBreak: "break-word" as const,
+                          }}>
+                            {item.text.slice(0, 160)}
+                          </div>
+                          <div style={{
+                            fontSize: t.caption.size, color: colors.text.disabled,
+                            fontStyle: "italic", marginBottom: space[2],
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {d.reason}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <ScorePill gr={gr} tag={tag} />
+                            <ExpandToggle isExpanded={isExp} onClick={(e) => { e.stopPropagation(); setExpanded(isExp ? null : item.id); }} />
+                          </div>
+                        </div>
+                      </div>
+                      {isExp && <ExpandedDetails item={item} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Validated */}
           <div style={{
             background: "transparent",
@@ -1109,91 +1195,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               </div>
             )}
           </div>
+          </div>{/* end right column */}
           </div>{/* end 2-col grid */}
-
-          {/* Discoveries — full width */}
-          {discoveries.length > 0 && (
-            <div style={{
-              background: "transparent",
-              border: `1px solid rgba(124,58,237,0.15)`,
-              borderRadius: radii.lg,
-              padding: `${space[3]}px ${space[4]}px`,
-              marginBottom: space[4],
-            }}>
-              <div style={{
-                fontSize: t.bodySm.size, fontWeight: 600,
-                color: colors.purple[400], marginBottom: space[3],
-                display: "flex", alignItems: "center", gap: space[2],
-              }}>
-                <span>&#x1F52D;</span> Discoveries
-                <span style={{
-                  fontSize: t.caption.size, color: colors.text.muted,
-                  background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
-                }}>{discoveries.length}</span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
-                {discoveries.map(d => {
-                  const item = d.item;
-                  const gr = scoreGrade(item.scores.composite);
-                  const tag = deriveScoreTags(item)[0] ?? null;
-                  const isExp = expanded === item.id;
-                  const showThumb = item.imageUrl && !failedImages.has(item.id);
-                  return (
-                    <div key={item.id} style={{
-                      background: "linear-gradient(135deg, rgba(124,58,237,0.04), rgba(37,99,235,0.03))",
-                      border: `1px solid ${isExp ? "rgba(124,58,237,0.3)" : "rgba(124,58,237,0.1)"}`,
-                      borderRadius: radii.md,
-                      overflow: "hidden", transition: transitions.fast,
-                    }}>
-                      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-                        <div style={{
-                          width: 80, minHeight: 60, flexShrink: 0,
-                          overflow: "hidden",
-                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          flexDirection: "column", gap: 2,
-                        }}>
-                          {showThumb ? (
-                            /* eslint-disable-next-line @next/next/no-img-element -- discovery card thumbnail */
-                            <img src={item.imageUrl!} alt=""
-                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                              onError={() => markImgFailed(item.id)} />
-                          ) : (
-                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
-                          )}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[1] }}>
-                            <SerendipityBadge discoveryType={d.discoveryType} mobile={mobile} />
-                          </div>
-                          <div style={{
-                            fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
-                            overflow: "hidden", display: "-webkit-box",
-                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                            lineHeight: 1.4, marginBottom: space[1], wordBreak: "break-word" as const,
-                          }}>
-                            {item.text.slice(0, 160)}
-                          </div>
-                          <div style={{
-                            fontSize: t.caption.size, color: colors.purple[400],
-                            fontStyle: "italic", marginBottom: space[2],
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          }}>
-                            {d.reason}
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <ScorePill gr={gr} tag={tag} />
-                            <ExpandToggle isExpanded={isExp} onClick={(e) => { e.stopPropagation(); setExpanded(isExp ? null : item.id); }} />
-                          </div>
-                        </div>
-                      </div>
-                      {isExp && <ExpandedDetails item={item} onValidate={handleValidateWithFeedback} onFlag={handleFlagWithFeedback} />}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Agent Knowledge — full width */}
           {agentContext && (
