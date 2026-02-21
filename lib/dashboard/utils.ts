@@ -163,3 +163,46 @@ export function computeDashboardValidated(
     .sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0))
     .slice(0, 5);
 }
+
+/** Compute unreviewed quality items for the review queue, excluding shown items */
+export function computeUnreviewedQueue(
+  content: ContentItem[],
+  excludeIds: Set<string>,
+): ContentItem[] {
+  return content
+    .filter(c => c.verdict === "quality" && !c.validated && !c.flagged && !excludeIds.has(c.id))
+    .sort((a, b) => b.scores.composite - a.scores.composite)
+    .slice(0, 5);
+}
+
+/** Topic distribution entry */
+export interface TopicDistEntry {
+  topic: string;
+  count: number;
+  qualityRate: number;
+}
+
+/** Compute topic frequency distribution across all content */
+export function computeTopicDistribution(
+  content: ContentItem[],
+): TopicDistEntry[] {
+  const topicStats = new Map<string, { total: number; quality: number }>();
+  for (const item of content) {
+    if (!item.topics) continue;
+    for (const topic of item.topics) {
+      const t = topic.toLowerCase();
+      const stats = topicStats.get(t) ?? { total: 0, quality: 0 };
+      stats.total++;
+      if (item.verdict === "quality") stats.quality++;
+      topicStats.set(t, stats);
+    }
+  }
+  return Array.from(topicStats.entries())
+    .map(([topic, stats]) => ({
+      topic,
+      count: stats.total,
+      qualityRate: stats.total > 0 ? stats.quality / stats.total : 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+}

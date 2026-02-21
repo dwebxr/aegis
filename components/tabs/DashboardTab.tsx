@@ -16,6 +16,8 @@ import {
   computeTopicSpotlight,
   computeDashboardActivity,
   computeDashboardValidated,
+  computeUnreviewedQueue,
+  computeTopicDistribution,
 } from "@/lib/dashboard/utils";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
@@ -346,10 +348,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return ids;
   }, [shownByTopSections, filteredDiscoveries]);
 
-  const dashboardValidated = useMemo(() => {
-    return computeDashboardValidated(contentRef.current, allShownIds);
+  const unreviewedQueue = useMemo(() => {
+    return computeUnreviewedQueue(contentRef.current, allShownIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allShownIds]);
+
+  const allShownIdsWithQueue = useMemo(() => {
+    const ids = new Set(allShownIds);
+    for (const item of unreviewedQueue) ids.add(item.id);
+    return ids;
+  }, [allShownIds, unreviewedQueue]);
+
+  const dashboardValidated = useMemo(() => {
+    return computeDashboardValidated(contentRef.current, allShownIdsWithQueue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allShownIdsWithQueue]);
+
+  const topicDistribution = useMemo(() => {
+    return computeTopicDistribution(content);
+  }, [content]);
 
   const dashboardActivity = useMemo(() => {
     if (homeMode !== "dashboard") return null;
@@ -1073,6 +1090,114 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </div>
           )}
 
+          {/* Unreviewed Queue */}
+          <div style={{
+            background: "transparent",
+            border: `1px solid ${colors.border.subtle}`,
+            borderRadius: radii.lg,
+            padding: `${space[3]}px ${space[4]}px`,
+          }}>
+            <div style={{
+              fontSize: t.bodySm.size, fontWeight: 600,
+              color: colors.text.tertiary, marginBottom: space[3],
+              display: "flex", alignItems: "center", gap: space[2],
+            }}>
+              <span>&#x1F4CB;</span> Needs Review
+              {unreviewedQueue.length > 0 && (
+                <span style={{
+                  fontSize: t.caption.size, color: colors.text.muted,
+                  background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
+                }}>{unreviewedQueue.length}</span>
+              )}
+            </div>
+            {unreviewedQueue.length === 0 ? (
+              <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
+                All caught up! No items need review.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
+                {unreviewedQueue.map(item => {
+                  const gr = scoreGrade(item.scores.composite);
+                  const tag = deriveScoreTags(item)[0] ?? null;
+                  const showThumb = item.imageUrl && !failedImages.has(item.id);
+                  return (
+                    <div key={item.id} style={{
+                      background: colors.bg.surface,
+                      border: `1px solid ${colors.border.default}`,
+                      borderRadius: radii.md,
+                      overflow: "hidden", transition: transitions.fast,
+                    }}>
+                      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+                        <div style={{
+                          width: 80, minHeight: 60, flexShrink: 0,
+                          overflow: "hidden",
+                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          flexDirection: "column", gap: 2,
+                        }}>
+                          {showThumb ? (
+                            /* eslint-disable-next-line @next/next/no-img-element -- unreviewed card thumbnail */
+                            <img src={item.imageUrl!} alt=""
+                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              onError={() => markImgFailed(item.id)} />
+                          ) : (
+                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, padding: `${space[2]}px ${space[3]}px` }}>
+                          <div style={{
+                            fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.secondary,
+                            overflow: "hidden", display: "-webkit-box",
+                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                            lineHeight: 1.4, marginBottom: space[1], wordBreak: "break-word" as const,
+                          }}>
+                            {item.text.slice(0, 120)}
+                          </div>
+                          <div style={{
+                            fontSize: t.caption.size, color: colors.text.disabled,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            marginBottom: space[2],
+                          }}>
+                            {item.author} &middot; {item.source}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+                            <ScorePill gr={gr} tag={tag} />
+                            <div style={{ flex: 1 }} />
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
+                              style={{
+                                padding: `2px ${space[2]}px`, borderRadius: radii.sm,
+                                background: colors.green.bg, border: `1px solid ${colors.green.border}`,
+                                color: colors.green[400], fontSize: t.caption.size, fontWeight: 600,
+                                cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
+                              }}
+                            >
+                              &#x2713;
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
+                              style={{
+                                padding: `2px ${space[2]}px`, borderRadius: radii.sm,
+                                background: colors.red.bg, border: `1px solid ${colors.red.border}`,
+                                color: colors.red[400], fontSize: t.caption.size, fontWeight: 600,
+                                cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
+                              }}
+                            >
+                              &#x2717;
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, textAlign: "center" }}>
+                  Review to teach your agent
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Validated */}
           <div style={{
             background: "transparent",
@@ -1154,6 +1279,66 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               </div>
             )}
           </div>
+          {/* Topic Distribution */}
+          <div style={{
+            background: "transparent",
+            border: `1px solid ${colors.border.subtle}`,
+            borderRadius: radii.lg,
+            padding: `${space[3]}px ${space[4]}px`,
+          }}>
+            <div style={{
+              fontSize: t.bodySm.size, fontWeight: 600,
+              color: colors.text.tertiary, marginBottom: space[3],
+              display: "flex", alignItems: "center", gap: space[2],
+            }}>
+              <span>&#x1F4CA;</span> Topic Breakdown
+            </div>
+            {topicDistribution.length === 0 ? (
+              <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
+                Add sources to see topic distribution.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+                {topicDistribution.map(entry => {
+                  const maxCount = topicDistribution[0].count;
+                  const barWidth = maxCount > 0 ? Math.max((entry.count / maxCount) * 100, 8) : 0;
+                  const barColor = entry.qualityRate >= 0.6 ? colors.cyan[400] : entry.qualityRate >= 0.3 ? colors.sky[400] : colors.orange[400];
+                  return (
+                    <div key={entry.topic} style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+                      <span style={{
+                        width: 72, fontSize: t.caption.size, color: colors.text.muted,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        flexShrink: 0, textAlign: "right",
+                      }}>
+                        {entry.topic}
+                      </span>
+                      <div style={{ flex: 1, height: 14, background: colors.bg.raised, borderRadius: radii.sm, overflow: "hidden" }}>
+                        <div style={{
+                          width: `${barWidth}%`, height: "100%",
+                          background: `${barColor}40`, borderRadius: radii.sm,
+                          transition: "width 0.3s ease",
+                        }} />
+                      </div>
+                      <span style={{
+                        width: 28, fontSize: t.caption.size, color: colors.text.disabled,
+                        fontFamily: fonts.mono, textAlign: "right", flexShrink: 0,
+                      }}>
+                        {entry.count}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div style={{
+                  fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[1],
+                  display: "flex", gap: space[3],
+                }}>
+                  <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: `${colors.cyan[400]}40`, marginRight: 4 }} />high quality</span>
+                  <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: `${colors.orange[400]}40`, marginRight: 4 }} />mixed</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           </div>{/* end right column */}
           </div>{/* end 2-col grid */}
 
