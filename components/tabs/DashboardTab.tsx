@@ -318,19 +318,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return getContext(profile);
   }, [profile]);
 
-  // Dashboard computations: always computed, cached by profile.
-  // Feed↔Dashboard toggle just shows/hides cached results — no recalculation.
-  // Only profile changes (validate/flag) trigger fresh computation.
+  // Dashboard computations: cached by profile only.
+  // Feed↔Dashboard toggle shows/hides cached results — no recalculation.
   const contentRef = useRef(content);
   contentRef.current = content;
   const briefingNowRef = useRef(Date.now());
-  useEffect(() => {
-    briefingNowRef.current = Date.now();
-  }, [profile]);
+  useEffect(() => { briefingNowRef.current = Date.now(); }, [profile]);
 
   const dashboardTop3 = useMemo(() => {
     const briefing = generateBriefing(contentRef.current, profile, briefingNowRef.current);
-    // Content-level dedup: same article may appear with different IDs from different sources
     const seenKeys = new Set<string>();
     const deduped = briefing.priority.filter(bi => {
       const key = contentDedup(bi.item);
@@ -349,11 +345,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       .slice(0, 5)
       .map(([k]) => k);
     if (highTopics.length === 0) return [];
-    // Exclude items already shown in Today's Top 3
+
     const top3Ids = new Set(dashboardTop3.map(c => c.item.id));
-    const currentContent = contentRef.current;
-    const qualityItems = currentContent.filter(c => c.verdict === "quality" && !c.flagged && !top3Ids.has(c.id));
-    // Pre-compile one regex per topic for word-boundary fallback matching
+    const qualityItems = contentRef.current.filter(c => c.verdict === "quality" && !c.flagged && !top3Ids.has(c.id));
+
+    // Pre-compute dedup keys once for all quality items
+    const dedupKeys = new Map<string, string>();
+    for (const c of qualityItems) dedupKeys.set(c.id, contentDedup(c));
+
     const topicPatterns = new Map(highTopics.map(topic => {
       const escaped = topic.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       return [topic, new RegExp(`\\b${escaped}\\b`, "i")];
@@ -361,26 +360,21 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     const matchesTopic = (c: ContentItem, topic: string) => {
       const t = topic.toLowerCase();
       if (c.topics?.some(tag => tag.toLowerCase() === t)) return true;
-      const pattern = topicPatterns.get(topic);
-      return pattern ? pattern.test(c.text) : false;
+      return topicPatterns.get(topic)?.test(c.text) ?? false;
     };
-    // Dedup across topic groups: higher-affinity topics claim items first
-    // Content-level dedup: same article with different IDs from different sources
+
+    // Cascading dedup: Top3 keys → across topics → within each topic
     const usedIds = new Set<string>();
-    const usedContentKeys = new Set<string>();
-    // Pre-populate with Top3 content keys so Spotlight never duplicates Top3
-    for (const bi of dashboardTop3) usedContentKeys.add(contentDedup(bi.item));
+    const usedKeys = new Set(dashboardTop3.map(bi => contentDedup(bi.item)));
     return highTopics.map(topic => {
-      // Iterative selection: dedup keys are added as each item is picked,
-      // so duplicates within the same topic group are caught immediately
       const sorted = qualityItems
-        .filter(c => matchesTopic(c, topic) && !usedIds.has(c.id) && !usedContentKeys.has(contentDedup(c)))
+        .filter(c => matchesTopic(c, topic) && !usedIds.has(c.id))
         .sort((a, b) => b.scores.composite - a.scores.composite || a.id.localeCompare(b.id));
       const topicItems: ContentItem[] = [];
       for (const c of sorted) {
-        const key = contentDedup(c);
-        if (usedContentKeys.has(key)) continue;
-        usedContentKeys.add(key);
+        const key = dedupKeys.get(c.id)!;
+        if (usedKeys.has(key)) continue;
+        usedKeys.add(key);
         usedIds.add(c.id);
         topicItems.push(c);
         if (topicItems.length >= 3) break;
