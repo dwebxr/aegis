@@ -375,15 +375,21 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     // Pre-populate with Top3 content keys so Spotlight never duplicates Top3
     for (const bi of dashboardTop3) usedContentKeys.add(contentDedup(bi.item));
     return highTopics.map(topic => {
-      const topicItems = qualityItems
+      // Iterative selection: dedup keys are added as each item is picked,
+      // so duplicates within the same topic group are caught immediately
+      const sorted = qualityItems
         .filter(c => matchesTopic(c, topic) && !usedIds.has(c.id) && !usedContentKeys.has(contentDedup(c)))
-        .sort((a, b) => b.scores.composite - a.scores.composite || a.id.localeCompare(b.id))
-        .slice(0, 3);
-      if (topicItems.length === 0) return null;
-      for (const c of topicItems) {
+        .sort((a, b) => b.scores.composite - a.scores.composite || a.id.localeCompare(b.id));
+      const topicItems: ContentItem[] = [];
+      for (const c of sorted) {
+        const key = contentDedup(c);
+        if (usedContentKeys.has(key)) continue;
+        usedContentKeys.add(key);
         usedIds.add(c.id);
-        usedContentKeys.add(contentDedup(c));
+        topicItems.push(c);
+        if (topicItems.length >= 3) break;
       }
+      if (topicItems.length === 0) return null;
       return { topic, items: topicItems };
     }).filter(Boolean) as Array<{ topic: string; items: ContentItem[] }>;
     // eslint-disable-next-line react-hooks/exhaustive-deps
