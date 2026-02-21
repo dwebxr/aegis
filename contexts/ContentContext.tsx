@@ -64,7 +64,8 @@ function loadCachedContent(): ContentItem[] {
         typeof (c as ContentItem).id === "string" &&
         typeof (c as ContentItem).createdAt === "number",
     );
-  } catch {
+  } catch (err) {
+    console.warn("[content] Failed to parse cached content:", err instanceof Error ? err.message : err);
     return [];
   }
 }
@@ -73,8 +74,8 @@ function saveCachedContent(items: ContentItem[]): void {
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncatePreservingActioned(items)));
-  } catch {
-    // localStorage full — ignore
+  } catch (err) {
+    console.warn("[content] localStorage save failed (quota?):", err instanceof Error ? err.message : err);
   }
 }
 
@@ -188,6 +189,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const contentRef = useRef(content);
   contentRef.current = content;
   const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const backfillCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (isAuthenticated && identity) {
@@ -238,6 +240,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     return () => {
       clearInterval(timestampTimer);
       document.removeEventListener("visibilitychange", onVisible);
+      backfillCleanupRef.current?.();
     };
   }, []);
 
@@ -312,8 +315,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       }
     }
 
-    // Tier 3.5: Claude API with server key
-    if (!result && !userApiKey) {
+    // Tier 3.5: Claude API with server key (fallback for all prior tiers)
+    if (!result) {
       const data = await fetchAnalyze(text, userContext);
       if (data) {
         result = { ...data, scoringEngine: "claude-server" as const };
@@ -437,15 +440,16 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     setContent(prev => prev.filter(c => c.owner !== ""));
   }, []);
 
-  const backfillImageUrls = useCallback(() => {
+  const backfillImageUrls = useCallback((): (() => void) => {
     const items = contentRef.current
       .filter(c => c.sourceUrl && !c.imageUrl && /^https?:\/\//i.test(c.sourceUrl))
       .slice(0, 10);
-    if (items.length === 0) return;
+    if (items.length === 0) return () => {};
 
-    // Stagger requests to avoid rate limiting
+    // Stagger requests to avoid rate limiting; return cleanup function
+    const timers: ReturnType<typeof setTimeout>[] = [];
     items.forEach((item, i) => {
-      setTimeout(async () => {
+      timers.push(setTimeout(async () => {
         try {
           const res = await fetch("/api/fetch/ogimage", {
             method: "POST",
@@ -463,14 +467,17 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           if (actorRef.current && isAuthenticated) {
             const updated = contentRef.current.find(c => c.id === item.id);
             if (updated && principal) {
-              void actorRef.current.saveEvaluation(toICEvaluation({ ...updated, imageUrl: data.imageUrl }, principal)).catch(() => {});
+              void actorRef.current.saveEvaluation(toICEvaluation({ ...updated, imageUrl: data.imageUrl }, principal)).catch((err: unknown) => {
+                console.warn("[content] IC imageUrl backfill save failed:", errMsg(err));
+              });
             }
           }
-        } catch {
-          // Silently ignore backfill failures
+        } catch (err) {
+          console.debug("[content] Image backfill failed for", item.id, errMsg(err));
         }
-      }, i * 1500);
+      }, i * 1500));
     });
+    return () => timers.forEach(clearTimeout);
   }, [isAuthenticated, principal]);
 
   const loadFromIC = useCallback(async () => {
@@ -479,13 +486,17 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
     try {
       const PAGE_SIZE = BigInt(100);
+      const MAX_PAGES = 50; // Safety limit: 5000 evaluations max
       const allEvals: Awaited<ReturnType<_SERVICE["getUserEvaluations"]>> = [];
       let offset = BigInt(0);
-      for (;;) {
+      for (let pageNum = 0; pageNum < MAX_PAGES; pageNum++) {
         const page = await actorRef.current.getUserEvaluations(principal, offset, PAGE_SIZE);
         allEvals.push(...page);
         if (BigInt(page.length) < PAGE_SIZE) break;
         offset += PAGE_SIZE;
+        if (pageNum === MAX_PAGES - 1) {
+          console.warn(`[content] Pagination limit reached (${MAX_PAGES} pages, ${allEvals.length} items). Some evaluations may not be loaded.`);
+        }
       }
 
       const loaded: ContentItem[] = allEvals.map(e => {
@@ -544,13 +555,14 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       setSyncStatus("synced");
 
       // Backfill missing imageUrls from OG tags (max 10, fire-and-forget)
-      backfillImageUrls();
+      backfillCleanupRef.current?.();
+      backfillCleanupRef.current = backfillImageUrls();
     } catch (err) {
       console.error("[content] Failed to load from IC:", errMsg(err));
       setSyncStatus("offline");
       addNotification("Could not load content history from IC", "error");
     }
-  }, [isAuthenticated, principal, addNotification]);
+  }, [isAuthenticated, principal, addNotification, backfillImageUrls]);
   loadFromICRef.current = loadFromIC;
 
   const syncBriefing = useCallback((state: BriefingState, nostrPubkey?: string | null) => {

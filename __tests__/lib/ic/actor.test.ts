@@ -1,76 +1,86 @@
-const mockSyncTime = jest.fn();
-const mockCreateActor = jest.fn().mockReturnValue({});
+/**
+ * Tests for IC actor creation — exercises real actor.ts + agent.ts code.
+ * Only the external @dfinity/agent library is mocked (no actual IC connection).
+ * Previous version was a LARP: mocked @/lib/ic/agent and @/lib/ic/declarations
+ * entirely, then asserted on mock call counts — tested the mock, not the code.
+ */
 
+const mockSyncTime = jest.fn().mockResolvedValue(undefined);
+const mockFetchRootKey = jest.fn().mockResolvedValue(undefined);
+const mockCreateSync = jest.fn().mockReturnValue({
+  syncTime: mockSyncTime,
+  fetchRootKey: mockFetchRootKey,
+});
+const mockActorCreateActor = jest.fn().mockReturnValue({ getUserEvaluations: jest.fn() });
+
+// Mock ONLY the external library — let project code (agent.ts, config.ts, declarations/) run for real
 jest.mock("@dfinity/agent", () => ({
-  Actor: { createActor: (...args: unknown[]) => mockCreateActor(...args) },
-}));
-
-jest.mock("@/lib/ic/agent", () => ({
-  createAgent: jest.fn().mockReturnValue({
-    syncTime: (...args: unknown[]) => mockSyncTime(...args),
-  }),
-  ensureRootKey: jest.fn().mockResolvedValue(undefined),
-  getCanisterId: jest.fn().mockReturnValue("test-canister-id"),
-}));
-
-jest.mock("@/lib/ic/declarations", () => ({
-  idlFactory: jest.fn(),
+  HttpAgent: { createSync: (...args: unknown[]) => mockCreateSync(...args) },
+  Actor: { createActor: (...args: unknown[]) => mockActorCreateActor(...args) },
 }));
 
 import { createBackendActorAsync, createBackendActor } from "@/lib/ic/actor";
+import { idlFactory } from "@/lib/ic/declarations";
 
-describe("createBackendActor", () => {
-  it("creates actor synchronously with correct canisterId", () => {
+beforeEach(() => jest.clearAllMocks());
+
+describe("createBackendActor (sync)", () => {
+  it("passes the real idlFactory and real canisterId from config", () => {
     const actor = createBackendActor();
-    expect(mockCreateActor).toHaveBeenCalledTimes(1);
-    const [, opts] = mockCreateActor.mock.calls[0];
-    expect(opts.canisterId).toBe("test-canister-id");
+
+    // Verify HttpAgent.createSync was called with the real host from config.ts
+    expect(mockCreateSync).toHaveBeenCalledTimes(1);
+    const [agentOpts] = mockCreateSync.mock.calls[0];
+    expect(typeof agentOpts.host).toBe("string");
+    expect(agentOpts.host).toMatch(/^https?:\/\//);
+
+    // Verify Actor.createActor was called with the REAL idlFactory, not a mock
+    expect(mockActorCreateActor).toHaveBeenCalledTimes(1);
+    const [passedFactory, actorOpts] = mockActorCreateActor.mock.calls[0];
+    expect(passedFactory).toBe(idlFactory); // Same reference — real, not mocked
+    expect(actorOpts.canisterId).toBe("rluf3-eiaaa-aaaam-qgjuq-cai"); // Real default from config.ts
+
     expect(actor).toBeDefined();
   });
 });
 
 describe("createBackendActorAsync", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockCreateActor.mockReturnValue({ mock: "actor" });
-  });
-
-  it("returns actor after successful syncTime", async () => {
-    mockSyncTime.mockResolvedValueOnce(undefined);
-
+  it("calls agent.syncTime() and creates actor on success", async () => {
     const actor = await createBackendActorAsync();
 
+    // Real ensureRootKey runs (isLocal=false in test env → no fetchRootKey call)
+    expect(mockFetchRootKey).not.toHaveBeenCalled();
+
+    // Real syncTime was called on the agent
     expect(mockSyncTime).toHaveBeenCalledTimes(1);
-    expect(mockCreateActor).toHaveBeenCalledTimes(1);
-    expect(actor).toEqual({ mock: "actor" });
+
+    // Actor created with real factory + real canisterId
+    const [passedFactory, actorOpts] = mockActorCreateActor.mock.calls[0];
+    expect(passedFactory).toBe(idlFactory);
+    expect(actorOpts.canisterId).toBe("rluf3-eiaaa-aaaam-qgjuq-cai");
+    expect(actor).toBeDefined();
   });
 
-  it("returns actor even when syncTime throws (clock drift tolerance)", async () => {
+  it("still creates actor when syncTime fails (clock drift tolerance)", async () => {
     mockSyncTime.mockRejectedValueOnce(new Error("Network unreachable"));
-
     const errorSpy = jest.spyOn(console, "error").mockImplementation();
 
     const actor = await createBackendActorAsync();
 
+    // syncTime failed but actor was still created
     expect(mockSyncTime).toHaveBeenCalledTimes(1);
-    expect(mockCreateActor).toHaveBeenCalledTimes(1);
-    expect(actor).toEqual({ mock: "actor" });
-    expect(errorSpy).toHaveBeenCalledWith(
-      "[ic] syncTime failed:",
-      "Network unreachable"
-    );
+    expect(mockActorCreateActor).toHaveBeenCalledTimes(1);
+    expect(actor).toBeDefined();
 
+    // Error was logged with the real errMsg() utility
+    expect(errorSpy).toHaveBeenCalledWith("[ic] syncTime failed:", "Network unreachable");
     errorSpy.mockRestore();
   });
 
-  it("does not call createActor twice on syncTime failure", async () => {
-    mockSyncTime.mockRejectedValueOnce(new Error("Timeout"));
-    jest.spyOn(console, "error").mockImplementation();
-
+  it("agent receives the same host as sync version", async () => {
     await createBackendActorAsync();
 
-    expect(mockCreateActor).toHaveBeenCalledTimes(1);
-
-    jest.restoreAllMocks();
+    const [agentOpts] = mockCreateSync.mock.calls[0];
+    expect(agentOpts.host).toMatch(/^https?:\/\//);
   });
 });

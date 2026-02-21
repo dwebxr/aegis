@@ -1,6 +1,7 @@
 import type { _SERVICE } from "@/lib/ic/declarations/aegis_backend.did";
 import type { BriefingState } from "./types";
 import type { D2ABriefingResponse, D2ABriefingItem } from "@/lib/d2a/types";
+import { errMsg } from "@/lib/utils/errors";
 
 function toBriefingItem(bi: BriefingState["priority"][0]): D2ABriefingItem {
   const { item } = bi;
@@ -67,7 +68,7 @@ export async function syncBriefingToCanister(
     const json = JSON.stringify(briefingToD2AResponse(state, nostrPubkey));
     return await actor.saveLatestBriefing(json);
   } catch (e) {
-    console.error("[briefing/sync] Failed to sync:", e);
+    console.error("[briefing/sync] Failed to sync:", errMsg(e));
     return false;
   }
 }

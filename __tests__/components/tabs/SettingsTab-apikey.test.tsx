@@ -35,8 +35,8 @@ jest.mock("@/contexts/NotificationContext", () => ({
 let mockStoredKey: string | null = null;
 jest.mock("@/lib/apiKey/storage", () => ({
   getUserApiKey: () => mockStoredKey,
-  setUserApiKey: (key: string) => { mockStoredKey = key; },
-  clearUserApiKey: () => { mockStoredKey = null; },
+  setUserApiKey: jest.fn(),
+  clearUserApiKey: jest.fn(),
   maskApiKey: (key: string) => key.length <= 12 ? key : `${key.slice(0, 7)}...${key.slice(-4)}`,
 }));
 

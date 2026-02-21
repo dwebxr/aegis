@@ -286,7 +286,7 @@ describe("syncBriefingToCanister", () => {
     expect(result).toBe(false);
     expect(consoleSpy).toHaveBeenCalledWith(
       "[briefing/sync] Failed to sync:",
-      expect.any(Error),
+      "Network error",
     );
     consoleSpy.mockRestore();
   });

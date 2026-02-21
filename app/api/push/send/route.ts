@@ -4,6 +4,7 @@ import { HttpAgent, Actor } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { idlFactory } from "@/lib/ic/declarations/idlFactory";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { errMsg } from "@/lib/utils/errors";
 import { getCanisterId, getHost } from "@/lib/ic/agent";
 import type { _SERVICE, PushSubscription } from "@/lib/ic/declarations/aegis_backend.did";
 
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
         await actor.removePushSubscriptions(userPrincipal, expiredEndpoints);
       } catch (e) {
         cleanupFailed = true;
-        console.error("[push] Failed to remove expired subscriptions for %s (%d endpoints):", body.principal, expiredEndpoints.length, e);
+        console.error("[push] Failed to remove expired subscriptions for %s (%d endpoints):", body.principal, expiredEndpoints.length, errMsg(e));
       }
     }
 
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ sent, failed, expired: expiredEndpoints.length, cleanupFailed });
   } catch (error) {
-    console.error("[push] Send error:", error);
+    console.error("[push] Send error:", errMsg(error));
     return NextResponse.json({ error: "Failed to send" }, { status: 500 });
   }
 }

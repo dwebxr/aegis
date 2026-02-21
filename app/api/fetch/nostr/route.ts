@@ -92,9 +92,9 @@ export async function POST(request: NextRequest) {
               name: meta.display_name || meta.name || undefined,
               picture: meta.picture || undefined,
             };
-          } catch { console.debug("[fetch/nostr] Skipped malformed profile JSON"); }
+          } catch (err) { console.warn("[fetch/nostr] Skipped malformed profile JSON:", err instanceof Error ? err.message : err); }
         }
-      } catch { console.debug("[fetch/nostr] Profile fetch failed (best-effort)"); }
+      } catch (err) { console.warn("[fetch/nostr] Profile fetch failed (best-effort):", err instanceof Error ? err.message : err); }
     }
 
     return NextResponse.json({

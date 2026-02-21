@@ -60,15 +60,18 @@ export async function POST(request: NextRequest) {
       // Stop early if we've passed </head>
       if (html.includes("</head>")) break;
     }
-    reader.cancel().catch(() => {});
+    reader.cancel().catch(() => {}); // cleanup — errors here are non-critical
 
     // Extract og:image
     const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
       || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
 
-    const imageUrl = ogMatch?.[1] || null;
+    const raw = ogMatch?.[1] || null;
+    // Resolve relative URLs against the page origin
+    const imageUrl = raw ? new URL(raw, url).href : null;
     return NextResponse.json({ imageUrl });
-  } catch {
+  } catch (err) {
+    console.warn("[fetch/ogimage] OG extraction failed:", err instanceof Error ? err.message : err);
     return NextResponse.json({ imageUrl: null });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Principal } from "@dfinity/principal";
 import { withX402 } from "@x402/next";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { errMsg } from "@/lib/utils/errors";
 import { getLatestBriefing, getGlobalBriefingSummaries } from "@/lib/d2a/briefingProvider";
 import { resourceServer, X402_NETWORK, X402_PRICE, X402_RECEIVER } from "@/lib/d2a/x402Server";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
@@ -49,7 +50,7 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
     }
     return withCors(NextResponse.json(global), origin);
   } catch (error) {
-    console.error("[d2a/briefing] Error:", error);
+    console.error("[d2a/briefing] Error:", errMsg(error));
     return withCors(NextResponse.json({ error: "Failed to fetch briefing" }, { status: 500 }), origin);
   }
 }

@@ -14,7 +14,8 @@ export function getOllamaConfig(): OllamaConfig {
       endpoint: typeof parsed.endpoint === "string" && parsed.endpoint ? parsed.endpoint : DEFAULT_OLLAMA_CONFIG.endpoint,
       model: typeof parsed.model === "string" && parsed.model ? parsed.model : DEFAULT_OLLAMA_CONFIG.model,
     };
-  } catch {
+  } catch (err) {
+    console.warn("[ollama] Failed to parse config:", err instanceof Error ? err.message : err);
     return DEFAULT_OLLAMA_CONFIG;
   }
 }

@@ -1,5 +1,3 @@
-import { NextRequest } from "next/server";
-
 // Mock @dfinity/agent and @dfinity/principal before importing
 jest.mock("@dfinity/agent", () => ({
   HttpAgent: { create: jest.fn() },
@@ -10,13 +8,10 @@ jest.mock("@dfinity/principal", () => ({
   Principal: { fromText: jest.fn((t: string) => ({ toText: () => t })) },
 }));
 
-jest.mock("@/lib/ic/declarations/idlFactory", () => ({
-  idlFactory: {},
-}));
-
 import { getLatestBriefing } from "@/lib/d2a/briefingProvider";
 import { HttpAgent, Actor } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
+import { idlFactory } from "@/lib/ic/declarations/idlFactory";
 
 describe("getLatestBriefing", () => {
   const mockAgent = {};
@@ -57,7 +52,7 @@ describe("getLatestBriefing", () => {
     mockActor.getLatestBriefing.mockResolvedValue([]);
     await getLatestBriefing("aaaaa-aa");
     expect(Actor.createActor).toHaveBeenCalledWith(
-      expect.anything(), // idlFactory
+      idlFactory, // Real idlFactory reference, not a mock
       expect.objectContaining({
         agent: mockAgent,
         canisterId: expect.any(String),

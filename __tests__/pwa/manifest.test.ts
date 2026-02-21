@@ -19,8 +19,8 @@ describe("PWA manifest.json", () => {
     expect(manifest.short_name).toBe("Aegis");
     expect(manifest.start_url).toBe("/");
     expect(manifest.display).toBe("standalone");
-    expect(manifest.background_color).toBeDefined();
-    expect(manifest.theme_color).toBeDefined();
+    expect(manifest.background_color).toBe("#0a0f1e");
+    expect(manifest.theme_color).toBe("#0a0f1e");
   });
 
   it("has icons array with at least 2 entries", () => {

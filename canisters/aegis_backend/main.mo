@@ -1,6 +1,8 @@
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
 import Buffer "mo:base/Buffer";
+import Debug "mo:base/Debug";
+import Error "mo:base/Error";
 import Order "mo:base/Order";
 import ExperimentalCycles "mo:base/ExperimentalCycles";
 import Float "mo:base/Float";
@@ -784,7 +786,9 @@ persistent actor AegisBackend {
           };
           case (#Err(_)) {}; // Transfer failed; funds stay for sweepProtocolFees
         };
-      } catch (_e) {};
+      } catch (e) {
+        Debug.print("[canister] distributeProtocolRevenue cycles top-up failed: " # Error.message(e));
+      };
     } else {
       // Cycles sufficient → send to protocol wallet
       try {
@@ -796,7 +800,9 @@ persistent actor AegisBackend {
           memo = null;
           created_at_time = null;
         });
-      } catch (_e) {}; // Failed; remains for sweepProtocolFees
+      } catch (e) {
+        Debug.print("[canister] distributeProtocolRevenue wallet transfer failed: " # Error.message(e));
+      };
     };
   };
 
@@ -854,7 +860,8 @@ persistent actor AegisBackend {
         memo = null;
         created_at_time = null;
       });
-    } catch (_e) {
+    } catch (e) {
+      Debug.print("[canister] publishWithStake transfer_from failed: " # Error.message(e));
       // Rollback: remove pre-debited records
       stakes.delete(stakeId);
       signalStakeIndex.delete(signal.id);
@@ -962,7 +969,8 @@ persistent actor AegisBackend {
           memo = null;
           created_at_time = null;
         });
-      } catch (_e) {
+      } catch (e) {
+        Debug.print("[canister] validateSignal stake return failed: " # Error.message(e));
         transferOk := false;
         putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
         #Err(#TemporarilyUnavailable);
@@ -1043,9 +1051,14 @@ persistent actor AegisBackend {
     #ok(true);
   };
 
-  /// Get a user's reputation profile
+  /// Get a user's reputation profile (query-safe: no state mutation)
   public query func getUserReputation(p : Principal) : async Types.UserReputation {
-    ensureReputation(p);
+    switch (reputations.get(p)) {
+      case (?r) { r };
+      case null {
+        { principal = p; trustScore = 5.0; totalStaked = 0; totalReturned = 0; totalSlashed = 0; qualitySignals = 0; slopSignals = 0 };
+      };
+    };
   };
 
   /// Get the stake record for a signal
@@ -1091,7 +1104,8 @@ persistent actor AegisBackend {
         memo = null;
         created_at_time = null;
       });
-    } catch (_e) {
+    } catch (e) {
+      Debug.print("[canister] recordD2AMatch fee collection failed: " # Error.message(e));
       return #err("Fee collection failed");
     };
 
@@ -1131,8 +1145,9 @@ persistent actor AegisBackend {
           memo = null;
           created_at_time = null;
         });
-      } catch (_e) {
+      } catch (e) {
         // Sender payout failed; funds remain in canister for sweepProtocolFees
+        Debug.print("[canister] recordD2AMatch sender payout failed: " # Error.message(e));
       };
     };
 
@@ -1278,6 +1293,9 @@ persistent actor AegisBackend {
   };
 
   // Called from Vercel API route to clean up expired subscriptions (410/404)
+  // NOTE: No auth check — server calls with anonymous identity.
+  // Risk: push-notification DoS only (no data leak). Proper fix requires
+  // server-side identity + controller check.
   public shared func removePushSubscriptions(
     user : Principal, endpoints : [Text]
   ) : async Bool {
@@ -1347,16 +1365,9 @@ persistent actor AegisBackend {
     #ok("Processed " # Nat.toText(surplus) # " e8s surplus");
   };
 
-  /// Manually trigger cycles top-up from surplus ICP. Anyone can call.
+  /// Alias for sweepProtocolFees — kept for backward compatibility.
   public shared func topUpCycles() : async Result.Result<Text, Text> {
-    let totalBalance = await ICP_LEDGER.icrc1_balance_of({
-      owner = Principal.fromActor(AegisBackend); subaccount = null;
-    });
-    let reserved = calcActiveStakeTotal();
-    let surplus = if (totalBalance > reserved + ICP_FEE) { totalBalance - reserved - ICP_FEE } else { 0 };
-    if (surplus == 0) { return #err("No surplus ICP available") };
-    await distributeProtocolRevenue(surplus + ICP_FEE);
-    #ok("Processed " # Nat.toText(surplus) # " e8s surplus");
+    await sweepProtocolFees();
   };
 
   /// Return deposits that have been active for longer than DEPOSIT_EXPIRY_NS (30 days).
@@ -1396,7 +1407,8 @@ persistent actor AegisBackend {
               putStakeUpdate(stakeId, stake, #active, stake.validationCount, stake.flagCount, null);
             };
           };
-        } catch (_e) {
+        } catch (e) {
+          Debug.print("[canister] resolveExpiredDeposits return failed: " # Error.message(e));
           putStakeUpdate(stakeId, stake, #active, stake.validationCount, stake.flagCount, null);
         };
       };
@@ -1464,7 +1476,8 @@ persistent actor AegisBackend {
     // Strip markdown code fences if present
     let cleaned = Text.replace(raw, #text "```json", "");
     let cleaned2 = Text.replace(cleaned, #text "```", "");
-    let trimmed = Text.trimStart(Text.trimEnd(cleaned2, #char ' '), #char ' ');
+    let isWhitespace = func(c : Char) : Bool { c == ' ' or c == '\n' or c == '\r' or c == '\t' };
+    let trimmed = Text.trimStart(Text.trimEnd(cleaned2, #predicate isWhitespace), #predicate isWhitespace);
 
     switch (Json.parse(trimmed)) {
       case (#err(e)) { #err("JSON parse failed: " # Json.errToText(e)) };
@@ -1561,7 +1574,8 @@ persistent actor AegisBackend {
 
     let response = try {
       await LLM.prompt(#Llama3_1_8B, prompt);
-    } catch (_e) {
+    } catch (e) {
+      Debug.print("[canister] analyzeOnChain LLM call failed: " # Error.message(e));
       return #err("IC LLM call failed");
     };
 

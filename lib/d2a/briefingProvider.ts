@@ -33,8 +33,6 @@ export async function getLatestBriefing(principalText?: string): Promise<D2ABrie
   }
 }
 
-// ── Global Briefing Aggregation ──
-
 export interface GlobalBriefingContributor {
   principal: string;
   generatedAt: string;

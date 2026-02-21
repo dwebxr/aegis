@@ -1,4 +1,4 @@
-import { _calculateMutualFollows as calculateMutualFollows } from "@/lib/wot/graph";
+import { calculateMutualFollows } from "@/lib/wot/graph";
 import type { WoTNode } from "@/lib/wot/types";
 
 describe("calculateMutualFollows — edge cases", () => {

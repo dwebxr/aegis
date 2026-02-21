@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
+import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 30;
 
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       signal: AbortSignal.timeout(25_000),
     });
   } catch (err) {
-    console.error("[upload/image] nostr.build fetch failed:", err);
+    console.error("[upload/image] nostr.build fetch failed:", errMsg(err));
     return NextResponse.json({ error: "Image host unreachable" }, { status: 502 });
   }
 

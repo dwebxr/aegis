@@ -69,7 +69,7 @@ export class IngestionScheduler {
   }
 
   start(): void {
-    if (this.intervalId) return;
+    if (this.intervalId || this.initialTimeoutId) return;
     const safeCycle = () => this.runCycle().catch(err => {
       console.error("[scheduler] Unhandled cycle error:", errMsg(err));
       this.running = false;

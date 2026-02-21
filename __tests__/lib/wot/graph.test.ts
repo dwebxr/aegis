@@ -1,4 +1,4 @@
-import { buildFollowGraph, _calculateMutualFollows } from "@/lib/wot/graph";
+import { buildFollowGraph, calculateMutualFollows } from "@/lib/wot/graph";
 import type { WoTConfig, WoTNode } from "@/lib/wot/types";
 
 // Mock nostr-tools/pool
@@ -120,7 +120,7 @@ describe("buildFollowGraph", () => {
   });
 });
 
-describe("_calculateMutualFollows", () => {
+describe("calculateMutualFollows", () => {
   it("counts mutual follows correctly", () => {
     const nodes = new Map<string, WoTNode>();
     nodes.set("user", { pubkey: "user", follows: ["a", "b"], hopDistance: 0, mutualFollows: 0 });
@@ -128,7 +128,7 @@ describe("_calculateMutualFollows", () => {
     nodes.set("b", { pubkey: "b", follows: ["c"], hopDistance: 1, mutualFollows: 0 });
     nodes.set("c", { pubkey: "c", follows: [], hopDistance: 2, mutualFollows: 0 });
 
-    _calculateMutualFollows(nodes, "user");
+    calculateMutualFollows(nodes, "user");
 
     // c is followed by a and b, both are direct follows of user → 2 mutual follows
     expect(nodes.get("c")!.mutualFollows).toBe(2);
@@ -139,6 +139,6 @@ describe("_calculateMutualFollows", () => {
   it("handles empty graph", () => {
     const nodes = new Map<string, WoTNode>();
     // Should not throw
-    _calculateMutualFollows(nodes, "user");
+    calculateMutualFollows(nodes, "user");
   });
 });

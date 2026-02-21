@@ -93,7 +93,8 @@ export async function buildFollowGraph(
   }
 }
 
-function calculateMutualFollows(nodes: Map<string, WoTNode>, userPubkey: string): void {
+/** Exported for tests. Mutates node.mutualFollows in-place. */
+export function calculateMutualFollows(nodes: Map<string, WoTNode>, userPubkey: string): void {
   const userNode = nodes.get(userPubkey);
   if (!userNode) return;
 
@@ -112,4 +113,3 @@ function calculateMutualFollows(nodes: Map<string, WoTNode>, userPubkey: string)
   }
 }
 
-export { calculateMutualFollows as _calculateMutualFollows };

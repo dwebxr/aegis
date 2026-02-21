@@ -279,6 +279,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop };
   }, [content]);
 
+  // Reset expansion/pagination when filters change
+  useEffect(() => {
+    setExpanded(null);
+    setShowAllContent(false);
+  }, [verdictFilter, sourceFilter]);
+
   const filteredContent = useMemo(() => {
     let items = content;
     if (verdictFilter === "validated") {
@@ -316,13 +322,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     // Exclude items already shown in Today's Top 3
     const top3Ids = new Set(dashboardTop3.map(c => c.item.id));
     const qualityItems = content.filter(c => c.verdict === "quality" && !c.flagged && !top3Ids.has(c.id));
-    // Match: explicit topics tag (case-insensitive) OR text/reason keyword match
+    // Pre-compile one regex per topic for word-boundary fallback matching
+    const topicPatterns = new Map(highTopics.map(topic => {
+      const escaped = topic.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return [topic, new RegExp(`\\b${escaped}\\b`, "i")];
+    }));
     const matchesTopic = (c: ContentItem, topic: string) => {
       const t = topic.toLowerCase();
       if (c.topics?.some(tag => tag.toLowerCase() === t)) return true;
-      // Fallback: word-boundary match in text or reason for items without topics
-      const pattern = new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
-      return pattern.test(c.text) || pattern.test(c.reason);
+      const pattern = topicPatterns.get(topic);
+      return pattern ? pattern.test(c.text) : false;
     };
     // Dedup across topic groups: higher-affinity topics claim items first
     const usedIds = new Set<string>();
@@ -437,6 +446,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     enabled: !mobile && homeMode === "feed",
   });
 
+  const exportCSV = useCallback(() => {
+    downloadFile(contentToCSV(content), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv");
+  }, [content]);
+
+  const exportJSON = useCallback(() => {
+    const data = content.map(c => ({
+      id: c.id, author: c.author, source: c.source, verdict: c.verdict,
+      scores: c.scores, vSignal: c.vSignal, cContext: c.cContext, lSlop: c.lSlop,
+      topics: c.topics, text: c.text, reason: c.reason,
+      createdAt: new Date(c.createdAt).toISOString(),
+      validatedAt: c.validatedAt ? new Date(c.validatedAt).toISOString() : null,
+      sourceUrl: c.sourceUrl,
+    }));
+    downloadFile(JSON.stringify(data, null, 2), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
+  }, [content]);
+
   const paletteCommands: PaletteCommand[] = useMemo(() => [
     { label: "Go to Feed", action: () => setHomeMode("feed") },
     { label: "Go to Dashboard", action: () => setHomeMode("dashboard") },
@@ -447,19 +472,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     { label: "Filter: Slop", action: () => setVerdictFilter("slop") },
     { label: "Filter: All", action: () => setVerdictFilter("all") },
     { label: "Filter: Validated", action: () => setVerdictFilter("validated") },
-    { label: "Export CSV", action: () => downloadFile(contentToCSV(content), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv") },
-    { label: "Export JSON", action: () => {
-      const data = content.map(c => ({
-        id: c.id, author: c.author, source: c.source, verdict: c.verdict,
-        scores: c.scores, vSignal: c.vSignal, cContext: c.cContext, lSlop: c.lSlop,
-        topics: c.topics, text: c.text, reason: c.reason,
-        createdAt: new Date(c.createdAt).toISOString(),
-        validatedAt: c.validatedAt ? new Date(c.validatedAt).toISOString() : null,
-        sourceUrl: c.sourceUrl,
-      }));
-      downloadFile(JSON.stringify(data, null, 2), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
-    }},
-  ], [content, onTabChange]);
+    { label: "Export CSV", action: exportCSV },
+    { label: "Export JSON", action: exportJSON },
+  ], [onTabChange, exportCSV, exportJSON]);
 
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
@@ -1471,18 +1486,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       {content.length > 0 && (
         <div style={{ display: "flex", gap: space[2], marginTop: space[4] }}>
           {([
-            { label: "Export CSV", onClick: () => downloadFile(contentToCSV(content), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv") },
-            { label: "Export JSON", onClick: () => {
-              const data = content.map(c => ({
-                id: c.id, author: c.author, source: c.source, verdict: c.verdict,
-                scores: c.scores, vSignal: c.vSignal, cContext: c.cContext, lSlop: c.lSlop,
-                topics: c.topics, text: c.text, reason: c.reason,
-                createdAt: new Date(c.createdAt).toISOString(),
-                validatedAt: c.validatedAt ? new Date(c.validatedAt).toISOString() : null,
-                sourceUrl: c.sourceUrl,
-              }));
-              downloadFile(JSON.stringify(data, null, 2), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
-            }},
+            { label: "Export CSV", onClick: exportCSV },
+            { label: "Export JSON", onClick: exportJSON },
           ] as const).map(btn => (
             <button key={btn.label} onClick={btn.onClick} style={exportBtnStyle}>
               &#x1F4E5; {btn.label}

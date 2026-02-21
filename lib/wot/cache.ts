@@ -14,7 +14,8 @@ export function loadWoTCache(): WoTGraph | null {
     }
     const s = entry.graph;
     return { userPubkey: s.userPubkey, nodes: new Map(s.nodes), maxHops: s.maxHops, builtAt: s.builtAt };
-  } catch {
+  } catch (err) {
+    console.warn("[wot-cache] Failed to parse cached graph:", err instanceof Error ? err.message : err);
     return null;
   }
 }

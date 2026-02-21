@@ -6,12 +6,8 @@ import {
   buildTopicFeedUrl,
 } from "@/lib/sources/platformFeed";
 
-// ─── detectPlatformFeed ──────────────────────────────────────────────
-
 describe("detectPlatformFeed", () => {
   const u = (s: string) => new URL(s);
-
-  // ── YouTube ──
 
   describe("YouTube", () => {
     it("detects /channel/UCxxx pattern", () => {
@@ -69,8 +65,6 @@ describe("detectPlatformFeed", () => {
       expect(detectPlatformFeed(u("https://youtube.com/channel/PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"))).toBeNull();
     });
   });
-
-  // ── GitHub ──
 
   describe("GitHub", () => {
     it("detects owner/repo", () => {
@@ -144,8 +138,6 @@ describe("detectPlatformFeed", () => {
     });
   });
 
-  // ── Bluesky ──
-
   describe("Bluesky", () => {
     it("detects /profile/handle.bsky.social", () => {
       const result = detectPlatformFeed(u("https://bsky.app/profile/jay.bsky.social"));
@@ -182,8 +174,6 @@ describe("detectPlatformFeed", () => {
     });
   });
 
-  // ── Non-matching URLs ──
-
   describe("non-matching URLs", () => {
     it("returns null for generic websites", () => {
       expect(detectPlatformFeed(u("https://example.com/blog"))).toBeNull();
@@ -202,8 +192,6 @@ describe("detectPlatformFeed", () => {
     });
   });
 });
-
-// ─── extractYouTubeChannelId ─────────────────────────────────────────
 
 describe("extractYouTubeChannelId", () => {
   it("extracts from externalId JSON field", () => {
@@ -282,11 +270,7 @@ describe("extractYouTubeChannelId", () => {
   });
 });
 
-// ─── parseGitHubRepo ─────────────────────────────────────────────────
-
 describe("parseGitHubRepo", () => {
-  // ── Valid inputs ──
-
   it("parses owner/repo shorthand", () => {
     expect(parseGitHubRepo("vercel/next.js")).toEqual({ owner: "vercel", repo: "next.js" });
   });
@@ -327,8 +311,6 @@ describe("parseGitHubRepo", () => {
     expect(parseGitHubRepo("my-org/my-repo")).toEqual({ owner: "my-org", repo: "my-repo" });
   });
 
-  // ── Invalid inputs ──
-
   it("rejects single name (no slash)", () => {
     const result = parseGitHubRepo("vercel");
     expect(result).toEqual({ error: "Enter as owner/repo (e.g. vercel/next.js)" });
@@ -359,8 +341,6 @@ describe("parseGitHubRepo", () => {
     expect(result).toEqual({ error: "Enter as owner/repo (e.g. vercel/next.js)" });
   });
 });
-
-// ─── parseBlueskyHandle ──────────────────────────────────────────────
 
 describe("parseBlueskyHandle", () => {
   it("parses bare handle with domain", () => {
@@ -408,8 +388,6 @@ describe("parseBlueskyHandle", () => {
     expect(parseBlueskyHandle("@user.example.com")).toBe("user.example.com");
   });
 });
-
-// ─── buildTopicFeedUrl ───────────────────────────────────────────────
 
 describe("buildTopicFeedUrl", () => {
   it("builds URL for simple keyword", () => {
