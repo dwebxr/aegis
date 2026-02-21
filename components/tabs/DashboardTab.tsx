@@ -218,10 +218,10 @@ function AgentKnowledgePills({ agentContext, profile }: {
   );
 }
 
-/** Content-level dedup key: same article may have different IDs across sources */
+/** Content-level dedup key: same article may have different IDs and URLs across sources */
 function contentDedup(item: ContentItem): string {
-  if (item.sourceUrl) return item.sourceUrl;
-  return item.text.slice(0, 100);
+  // Use normalized text prefix — catches same article regardless of URL differences
+  return item.text.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
 interface DashboardTabProps {
