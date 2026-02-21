@@ -105,7 +105,7 @@ describe("POST /api/analyze — daily budget", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.tier).toBe("heuristic");
-    expect(data.composite).toBeGreaterThanOrEqual(0);
+    expect(data.composite).toBeGreaterThanOrEqual(1);
     expect(data.composite).toBeLessThanOrEqual(10);
     expect(["quality", "slop"]).toContain(data.verdict);
   });

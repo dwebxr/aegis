@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
   if (!naddr) {
     return NextResponse.json({ error: "naddr parameter required" }, { status: 400 });
   }
+  if (naddr.length > 1000) {
+    return NextResponse.json({ error: "naddr too long" }, { status: 400 });
+  }
 
   let addr: AddressPointer;
   try {

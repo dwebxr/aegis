@@ -10,7 +10,13 @@ import { useFilterMode } from "@/contexts/FilterModeContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
-import { generateBriefing } from "@/lib/briefing/ranker";
+import {
+  applyDashboardFilters,
+  computeDashboardTop3,
+  computeTopicSpotlight,
+  computeDashboardActivity,
+  computeDashboardValidated,
+} from "@/lib/dashboard/utils";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
 import { useKeyboardNav } from "@/hooks/useKeyboardNav";
@@ -218,12 +224,6 @@ function AgentKnowledgePills({ agentContext, profile }: {
   );
 }
 
-/** Content-level dedup key: same article may have different IDs and URLs across sources */
-function contentDedup(item: ContentItem): string {
-  // Use normalized text prefix — catches same article regardless of URL differences
-  return item.text.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 120);
-}
-
 interface DashboardTabProps {
   content: ContentItem[];
   mobile?: boolean;
@@ -300,15 +300,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, [verdictFilter, sourceFilter]);
 
   const filteredContent = useMemo(() => {
-    let items = content;
-    if (verdictFilter === "validated") {
-      items = items.filter(c => c.validated);
-      items = [...items].sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0));
-    } else if (verdictFilter !== "all") {
-      items = items.filter(c => c.verdict === verdictFilter);
-    }
-    if (sourceFilter !== "all") items = items.filter(c => c.source === sourceFilter);
-    return items;
+    return applyDashboardFilters(content, verdictFilter, sourceFilter);
   }, [content, verdictFilter, sourceFilter]);
 
   const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
@@ -326,62 +318,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   useEffect(() => { briefingNowRef.current = Date.now(); }, [profile]);
 
   const dashboardTop3 = useMemo(() => {
-    const briefing = generateBriefing(contentRef.current, profile, briefingNowRef.current);
-    const seenKeys = new Set<string>();
-    const deduped = briefing.priority.filter(bi => {
-      const key = contentDedup(bi.item);
-      if (seenKeys.has(key)) return false;
-      seenKeys.add(key);
-      return true;
-    });
-    return deduped.slice(0, 3);
+    return computeDashboardTop3(contentRef.current, profile, briefingNowRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
   const dashboardTopicSpotlight = useMemo(() => {
-    const highTopics = Object.entries(profile.topicAffinities)
-      .filter(([, v]) => v >= 0.3)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([k]) => k);
-    if (highTopics.length === 0) return [];
-
-    const top3Ids = new Set(dashboardTop3.map(c => c.item.id));
-    const qualityItems = contentRef.current.filter(c => c.verdict === "quality" && !c.flagged && !top3Ids.has(c.id));
-
-    // Pre-compute dedup keys once for all quality items
-    const dedupKeys = new Map<string, string>();
-    for (const c of qualityItems) dedupKeys.set(c.id, contentDedup(c));
-
-    const topicPatterns = new Map(highTopics.map(topic => {
-      const escaped = topic.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return [topic, new RegExp(`\\b${escaped}\\b`, "i")];
-    }));
-    const matchesTopic = (c: ContentItem, topic: string) => {
-      const t = topic.toLowerCase();
-      if (c.topics?.some(tag => tag.toLowerCase() === t)) return true;
-      return topicPatterns.get(topic)?.test(c.text) ?? false;
-    };
-
-    // Cascading dedup: Top3 keys → across topics → within each topic
-    const usedIds = new Set<string>();
-    const usedKeys = new Set(dashboardTop3.map(bi => contentDedup(bi.item)));
-    return highTopics.map(topic => {
-      const sorted = qualityItems
-        .filter(c => matchesTopic(c, topic) && !usedIds.has(c.id))
-        .sort((a, b) => b.scores.composite - a.scores.composite || a.id.localeCompare(b.id));
-      const topicItems: ContentItem[] = [];
-      for (const c of sorted) {
-        const key = dedupKeys.get(c.id)!;
-        if (usedKeys.has(key)) continue;
-        usedKeys.add(key);
-        usedIds.add(c.id);
-        topicItems.push(c);
-        if (topicItems.length >= 3) break;
-      }
-      if (topicItems.length === 0) return null;
-      return { topic, items: topicItems };
-    }).filter(Boolean) as Array<{ topic: string; items: ContentItem[] }>;
+    return computeTopicSpotlight(contentRef.current, profile, dashboardTop3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, dashboardTop3]);
 
@@ -405,46 +347,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, [shownByTopSections, filteredDiscoveries]);
 
   const dashboardValidated = useMemo(() => {
-    return contentRef.current
-      .filter(c => c.validated && !allShownIds.has(c.id))
-      .sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0))
-      .slice(0, 5);
+    return computeDashboardValidated(contentRef.current, allShownIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allShownIds]);
 
   const dashboardActivity = useMemo(() => {
     if (homeMode !== "dashboard") return null;
-    const now = Date.now();
-    const dayMs = 86400000;
-    const rangeDays = activityRange === "30d" ? 30 : activityRange === "7d" ? 7 : 1;
-    const rangeStart = now - rangeDays * dayMs;
-    const rangeItems = content.filter(c => c.createdAt >= rangeStart);
-    const actionLimit = activityRange === "today" ? 3 : 5;
-    const recentActions = content
-      .filter(c => c.validated || c.flagged)
-      .sort((a, b) => (b.validatedAt ?? b.createdAt) - (a.validatedAt ?? a.createdAt))
-      .slice(0, actionLimit);
-    // Compute daily chart data for the selected range
-    const chartDays = Math.min(rangeDays, 30);
-    const chartQuality: number[] = [];
-    const chartSlop: number[] = [];
-    for (let i = chartDays - 1; i >= 0; i--) {
-      const dayStart = now - (i + 1) * dayMs;
-      const dayEnd = now - i * dayMs;
-      const dayItems = content.filter(c => c.createdAt >= dayStart && c.createdAt < dayEnd);
-      const dayQual = dayItems.filter(c => c.verdict === "quality").length;
-      const dayTotal = dayItems.length;
-      chartQuality.push(dayTotal > 0 ? Math.round((dayQual / dayTotal) * 100) : 0);
-      chartSlop.push(dayItems.filter(c => c.verdict === "slop").length);
-    }
-    return {
-      qualityCount: rangeItems.filter(c => c.verdict === "quality").length,
-      slopCount: rangeItems.filter(c => c.verdict === "slop").length,
-      totalEvaluated: rangeItems.length,
-      recentActions,
-      chartQuality,
-      chartSlop,
-    };
+    return computeDashboardActivity(content, activityRange);
   }, [content, homeMode, activityRange]);
 
   // Signal feedback loop

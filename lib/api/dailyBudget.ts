@@ -21,6 +21,10 @@ export function withinDailyBudget(): boolean {
 
 export function recordApiCall(): void {
   dailyApiCalls++;
+  const threshold = Math.floor(DAILY_BUDGET * 0.1);
+  if (threshold > 0 && dailyApiCalls === DAILY_BUDGET - threshold) {
+    console.warn(`[dailyBudget] 90% consumed: ${dailyApiCalls}/${DAILY_BUDGET} calls used`);
+  }
 }
 
 export function _resetDailyBudget(): void {

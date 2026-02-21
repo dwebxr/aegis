@@ -73,7 +73,7 @@ describe("protocol constants", () => {
     });
 
     it("min offer score is in valid range (0-10)", () => {
-      expect(MIN_OFFER_SCORE).toBeGreaterThanOrEqual(0);
+      // MIN_OFFER_SCORE is already asserted to be 7.0 above; just verify upper bound
       expect(MIN_OFFER_SCORE).toBeLessThanOrEqual(10);
     });
   });

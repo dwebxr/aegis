@@ -62,11 +62,11 @@ describe("POST /api/analyze", () => {
       const data = await res.json();
 
       // Fallback returns scores directly (flattened, no wrapper)
-      expect(data.originality).toBeGreaterThanOrEqual(0);
+      expect(data.originality).toBeGreaterThanOrEqual(1);
       expect(data.originality).toBeLessThanOrEqual(10);
-      expect(data.insight).toBeGreaterThanOrEqual(0);
-      expect(data.credibility).toBeGreaterThanOrEqual(0);
-      expect(data.composite).toBeGreaterThanOrEqual(0);
+      expect(data.insight).toBeGreaterThanOrEqual(1);
+      expect(data.credibility).toBeGreaterThanOrEqual(1);
+      expect(data.composite).toBeGreaterThanOrEqual(1);
       expect(["quality", "slop"]).toContain(data.verdict);
       expect(data.reason).toBeDefined();
       // LARP fix: tier is now explicit
@@ -125,7 +125,7 @@ describe("POST /api/analyze", () => {
       expect(res.status).toBe(200);
       // Still uses fallback since no API key
       const data = await res.json();
-      expect(data.originality).toBeGreaterThanOrEqual(0);
+      expect(data.originality).toBeGreaterThanOrEqual(1);
     });
 
     it("handles null userContext gracefully", async () => {

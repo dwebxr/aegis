@@ -1,7 +1,8 @@
 /**
  * DashboardTab — filter logic, content export helpers, and Topic Spotlight edge cases.
- * Tests exercise real utility functions used by DashboardTab.
+ * Tests exercise real utility functions from lib/dashboard/utils.
  */
+import { applyDashboardFilters, matchesTopic, buildTopicPatternCache } from "@/lib/dashboard/utils";
 import { contentToCSV } from "@/lib/utils/csv";
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { createEmptyProfile } from "@/lib/preferences/types";
@@ -27,24 +28,6 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   };
 }
 
-// ─── Filtering Logic (replicates DashboardTab useMemo) ──
-
-function applyFilters(
-  content: ContentItem[],
-  verdictFilter: "all" | "quality" | "slop" | "validated",
-  sourceFilter: string,
-): ContentItem[] {
-  let items = content;
-  if (verdictFilter === "validated") {
-    items = items.filter(c => c.validated);
-    items = [...items].sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0));
-  } else if (verdictFilter !== "all") {
-    items = items.filter(c => c.verdict === verdictFilter);
-  }
-  if (sourceFilter !== "all") items = items.filter(c => c.source === sourceFilter);
-  return items;
-}
-
 describe("Filtering logic", () => {
   const items = [
     makeItem({ id: "q1", verdict: "quality", source: "manual" }),
@@ -56,23 +39,23 @@ describe("Filtering logic", () => {
   ];
 
   it("all filter returns everything", () => {
-    expect(applyFilters(items, "all", "all")).toHaveLength(6);
+    expect(applyDashboardFilters(items, "all", "all")).toHaveLength(6);
   });
 
   it("quality filter only returns quality items", () => {
-    const result = applyFilters(items, "quality", "all");
+    const result = applyDashboardFilters(items, "quality", "all");
     expect(result.every(c => c.verdict === "quality")).toBe(true);
     expect(result).toHaveLength(4);
   });
 
   it("slop filter only returns slop items", () => {
-    const result = applyFilters(items, "slop", "all");
+    const result = applyDashboardFilters(items, "slop", "all");
     expect(result.every(c => c.verdict === "slop")).toBe(true);
     expect(result).toHaveLength(2);
   });
 
   it("validated filter only returns validated items sorted by validatedAt", () => {
-    const result = applyFilters(items, "validated", "all");
+    const result = applyDashboardFilters(items, "validated", "all");
     expect(result.every(c => c.validated)).toBe(true);
     expect(result).toHaveLength(2);
     expect(result[0].validatedAt).toBe(2000); // Most recent first
@@ -80,69 +63,55 @@ describe("Filtering logic", () => {
   });
 
   it("source filter narrows to specific source", () => {
-    const result = applyFilters(items, "all", "rss");
+    const result = applyDashboardFilters(items, "all", "rss");
     expect(result.every(c => c.source === "rss")).toBe(true);
     expect(result).toHaveLength(2);
   });
 
   it("combined verdict + source filter", () => {
-    const result = applyFilters(items, "quality", "manual");
+    const result = applyDashboardFilters(items, "quality", "manual");
     expect(result.every(c => c.verdict === "quality" && c.source === "manual")).toBe(true);
     // q1 (quality/manual) + v2 (quality/manual/validated) = 2
     expect(result).toHaveLength(2);
   });
 
   it("returns empty for non-matching source", () => {
-    expect(applyFilters(items, "all", "twitter")).toHaveLength(0);
+    expect(applyDashboardFilters(items, "all", "twitter")).toHaveLength(0);
   });
 
   it("returns empty for slop filter with only quality content", () => {
     const qualityOnly = items.filter(c => c.verdict === "quality");
-    expect(applyFilters(qualityOnly, "slop", "all")).toHaveLength(0);
+    expect(applyDashboardFilters(qualityOnly, "slop", "all")).toHaveLength(0);
   });
 
   it("empty content returns empty", () => {
-    expect(applyFilters([], "all", "all")).toHaveLength(0);
+    expect(applyDashboardFilters([], "all", "all")).toHaveLength(0);
   });
 });
 
 // ─── Topic Spotlight matching (replicates DashboardTab logic) ──
 
 describe("Topic Spotlight matching", () => {
-  function matchesTopic(c: ContentItem, topic: string, patternCache: Map<string, RegExp>): boolean {
-    const t = topic.toLowerCase();
-    if (c.topics?.some(tag => tag.toLowerCase() === t)) return true;
-    const pattern = patternCache.get(topic);
-    return pattern ? pattern.test(c.text) : false;
-  }
-
-  function buildPatternCache(topics: string[]): Map<string, RegExp> {
-    return new Map(topics.map(topic => {
-      const escaped = topic.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return [topic, new RegExp(`\\b${escaped}\\b`, "i")];
-    }));
-  }
-
   it("matches by explicit topic tag (case-insensitive)", () => {
-    const cache = buildPatternCache(["AI"]);
+    const cache = buildTopicPatternCache(["AI"]);
     const item = makeItem({ topics: ["ai", "ml"], text: "Some text" });
     expect(matchesTopic(item, "AI", cache)).toBe(true);
   });
 
   it("matches by text content when topics array is empty", () => {
-    const cache = buildPatternCache(["blockchain"]);
+    const cache = buildTopicPatternCache(["blockchain"]);
     const item = makeItem({ topics: undefined, text: "The blockchain revolution is here" });
     expect(matchesTopic(item, "blockchain", cache)).toBe(true);
   });
 
   it("does NOT match partial word in text", () => {
-    const cache = buildPatternCache(["ai"]);
+    const cache = buildTopicPatternCache(["ai"]);
     const item = makeItem({ topics: undefined, text: "The airplane was delayed" });
     expect(matchesTopic(item, "ai", cache)).toBe(false);
   });
 
   it("handles regex special characters in topic names via explicit tags", () => {
-    const cache = buildPatternCache(["c++"]);
+    const cache = buildTopicPatternCache(["c++"]);
     // Regex word-boundary \b won't match "c++" in text (+ is non-word char),
     // but explicit topic tag matching still works
     const itemWithTag = makeItem({ topics: ["c++"], text: "Some text" });
@@ -154,14 +123,14 @@ describe("Topic Spotlight matching", () => {
   });
 
   it("does NOT match in reason field (avoids encoded metadata)", () => {
-    const cache = buildPatternCache(["crypto"]);
+    const cache = buildTopicPatternCache(["crypto"]);
     const item = makeItem({ topics: undefined, text: "Unrelated text", reason: "This is about crypto [topics:crypto]" });
     // Should NOT match because we only search text, not reason
     expect(matchesTopic(item, "crypto", cache)).toBe(false);
   });
 
   it("explicit tag match takes priority (short-circuits text search)", () => {
-    const cache = buildPatternCache(["ai"]);
+    const cache = buildTopicPatternCache(["ai"]);
     const item = makeItem({ topics: ["ai"], text: "" }); // Empty text
     expect(matchesTopic(item, "ai", cache)).toBe(true);
   });
@@ -225,18 +194,17 @@ describe("generateBriefing edge cases", () => {
       ...createEmptyProfile("test"),
       topicAffinities: { "ai": 0.9 },
     };
-    const aiItem = makeItem({ id: "ai-item", topics: ["ai"], scores: { originality: 5, insight: 5, credibility: 5, composite: 5 } });
-    const plainItem = makeItem({ id: "plain", topics: ["cooking"], scores: { originality: 5, insight: 5, credibility: 5, composite: 5 } });
+    const aiItem = makeItem({ id: "ai-item", topics: ["ai"], text: "AI article about machine learning", scores: { originality: 5, insight: 5, credibility: 5, composite: 5 } });
+    const plainItem = makeItem({ id: "plain", topics: ["cooking"], text: "Cooking article about recipes", scores: { originality: 5, insight: 5, credibility: 5, composite: 5 } });
     const briefing = generateBriefing([aiItem, plainItem], profile);
 
-    if (briefing.priority.length >= 2) {
-      const aiEntry = briefing.priority.find(p => p.item.id === "ai-item");
-      const plainEntry = briefing.priority.find(p => p.item.id === "plain");
-      // AI item should have higher briefing score due to affinity boost
-      if (aiEntry && plainEntry) {
-        expect(aiEntry.briefingScore).toBeGreaterThanOrEqual(plainEntry.briefingScore);
-      }
-    }
+    expect(briefing.priority.length).toBeGreaterThanOrEqual(2);
+    const aiEntry = briefing.priority.find(p => p.item.id === "ai-item");
+    const plainEntry = briefing.priority.find(p => p.item.id === "plain");
+    expect(aiEntry).toBeDefined();
+    expect(plainEntry).toBeDefined();
+    // AI item should have higher briefing score due to affinity boost
+    expect(aiEntry!.briefingScore).toBeGreaterThan(plainEntry!.briefingScore);
   });
 
   it("excludes slop items from priority list", () => {

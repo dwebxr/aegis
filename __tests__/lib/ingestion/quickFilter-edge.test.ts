@@ -4,15 +4,15 @@ describe("heuristicScores — edge cases", () => {
   describe("boundary conditions", () => {
     it("handles empty string", () => {
       const scores = heuristicScores("");
-      expect(scores.originality).toBeGreaterThanOrEqual(0);
-      expect(scores.insight).toBeGreaterThanOrEqual(0);
-      expect(scores.credibility).toBeGreaterThanOrEqual(0);
-      expect(scores.composite).toBeGreaterThanOrEqual(0);
+      expect(scores.originality).toBeGreaterThanOrEqual(1);
+      expect(scores.insight).toBeGreaterThanOrEqual(1);
+      expect(scores.credibility).toBeGreaterThanOrEqual(1);
+      expect(scores.composite).toBeGreaterThanOrEqual(1);
     });
 
     it("handles single word", () => {
       const scores = heuristicScores("hello");
-      expect(scores.composite).toBeGreaterThanOrEqual(0);
+      expect(scores.composite).toBeGreaterThanOrEqual(1);
       expect(scores.composite).toBeLessThanOrEqual(10);
     });
 
@@ -162,20 +162,23 @@ describe("heuristicScores — edge cases", () => {
     it("handles CJK characters without crashing", () => {
       const text = "これは日本語のテストコンテンツです。品質分析とデータ: 42%改善";
       const scores = heuristicScores(text);
-      expect(scores.composite).toBeGreaterThanOrEqual(0);
+      expect(scores.composite).toBeGreaterThanOrEqual(1);
+      expect(scores.composite).toBeLessThanOrEqual(10);
     });
 
     it("counts emojis correctly in mixed Unicode", () => {
       const text = "こんにちは 🔥 世界 🌍 テスト 💡";
       const scores = heuristicScores(text);
       // Should detect emojis despite CJK text
-      expect(scores.composite).toBeGreaterThanOrEqual(0);
+      expect(scores.composite).toBeGreaterThanOrEqual(1);
+      expect(scores.composite).toBeLessThanOrEqual(10);
     });
 
     it("handles RTL text", () => {
       const text = "هذا نص عربي للاختبار مع بيانات: 42% تحسين في الأداء";
       const scores = heuristicScores(text);
-      expect(scores.composite).toBeGreaterThanOrEqual(0);
+      expect(scores.composite).toBeGreaterThanOrEqual(1);
+      expect(scores.composite).toBeLessThanOrEqual(10);
     });
   });
 });

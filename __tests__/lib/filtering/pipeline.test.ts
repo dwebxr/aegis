@@ -283,7 +283,7 @@ describe("scoreItemWithHeuristics", () => {
     expect(item.author).toBe("test-author");
     expect(item.source).toBe("rss");
     expect(item.sourceUrl).toBe("https://example.com");
-    expect(item.scores.composite).toBeGreaterThanOrEqual(0);
+    expect(item.scores.composite).toBeGreaterThanOrEqual(1);
     expect(item.scores.composite).toBeLessThanOrEqual(10);
     expect(item.reason).toMatch(/^Heuristic/);
     expect(item.validated).toBe(false);

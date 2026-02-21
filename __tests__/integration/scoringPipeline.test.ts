@@ -103,16 +103,15 @@ describe("End-to-end scoring flow", () => {
     expect(briefing1.priority.length).toBeGreaterThanOrEqual(1);
 
     // Learn from user feedback
-    const topItem = briefing1.priority[0]?.item;
-    if (topItem) {
-      profile = learn(profile, {
-        action: "validate",
-        topics: topItem.topics || [],
-        author: topItem.author,
-        composite: topItem.scores.composite,
-        verdict: topItem.verdict,
-      });
-    }
+    expect(briefing1.priority.length).toBeGreaterThanOrEqual(1);
+    const topItem = briefing1.priority[0].item;
+    profile = learn(profile, {
+      action: "validate",
+      topics: topItem.topics || [],
+      author: topItem.author,
+      composite: topItem.scores.composite,
+      verdict: topItem.verdict,
+    });
 
     expect(profile.totalValidated).toBe(1);
     expect(hasEnoughData(profile)).toBe(false); // Need 3 interactions
@@ -137,9 +136,14 @@ describe("End-to-end scoring flow", () => {
 
     // Context reflects learned preferences
     const ctx = getContext(profile);
-    // Nature MI should be trusted after 2 validates
-    if (profile.authorTrust["Nature MI"]?.trust >= 0.3) {
+    // Nature MI should be trusted after validation (trust > 0)
+    expect(profile.authorTrust["Nature MI"]).toBeDefined();
+    expect(profile.authorTrust["Nature MI"].trust).toBeGreaterThan(0);
+    if (profile.authorTrust["Nature MI"].trust >= 0.3) {
       expect(ctx.trustedAuthors).toContain("Nature MI");
+    } else {
+      // Trust was earned but below context threshold — still validates learning happened
+      expect(ctx.trustedAuthors).toBeDefined();
     }
 
     // Generate briefing with learned preferences

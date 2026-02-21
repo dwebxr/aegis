@@ -282,7 +282,8 @@ describe("scoreItemWithHeuristics — edge cases", () => {
   it("handles empty text", () => {
     const item = scoreItemWithHeuristics({ text: "", author: "test" }, "rss");
     expect(item.text).toBe("");
-    expect(item.scores.composite).toBeGreaterThanOrEqual(0);
+    expect(item.scores.composite).toBeGreaterThanOrEqual(1);
+    expect(item.scores.composite).toBeLessThanOrEqual(10);
   });
 
   it("handles very short text (1 character)", () => {

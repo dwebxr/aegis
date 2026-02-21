@@ -716,7 +716,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, auth/cookie scrubbing, breadcrumb URL stripping, conditional on DSN) |
-| Test | Jest + ts-jest (2774 tests, 175 suites) |
+| Test | Jest + ts-jest (2809 tests, 177 suites) |
 
 ## Project Structure
 
@@ -773,6 +773,8 @@ aegis/
 │   │   ├── ranker.ts                    # briefingScore, generateBriefing, serendipity
 │   │   ├── sync.ts                      # Sync briefing snapshot to IC canister
 │   │   └── types.ts                     # BriefingState, BriefingItem
+│   ├── dashboard/
+│   │   └── utils.ts                     # Shared dashboard computation (top3, spotlight, activity, validation)
 │   ├── d2a/
 │   │   ├── manifest.ts                  # Content manifest + SHA-256 hashing + diff logic
 │   │   ├── reputation.ts               # Local peer reputation tracker (behavioral trust)
@@ -847,7 +849,7 @@ aegis/
 │       └── storage.ts                   # Source config localStorage R/W
 ├── hooks/
 │   └── useKeyboardNav.ts               # J/K/L/H/V/F/O keyboard navigation + Cmd+K palette
-├── __tests__/                           # 2774 tests across 175 suites
+├── __tests__/                           # 2809 tests across 177 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -883,7 +885,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 2774 tests
+npm test              # Run all 2809 tests
 npm run test:watch    # Watch mode
 ```
 

@@ -43,7 +43,13 @@ export async function POST(request: NextRequest) {
   const isUserKey = !!(userKey && userKey.startsWith("sk-ant-"));
   const apiKey = isUserKey ? userKey : process.env.ANTHROPIC_API_KEY?.trim();
 
-  if (!apiKey || (!isUserKey && !withinDailyBudget())) {
+  if (!apiKey) {
+    console.warn("[analyze] No API key available, using heuristic fallback");
+    const fallback = heuristicScores(text);
+    return NextResponse.json({ ...fallback, tier: "heuristic" });
+  }
+  if (!isUserKey && !withinDailyBudget()) {
+    console.warn("[analyze] Daily budget exhausted, using heuristic fallback");
     const fallback = heuristicScores(text);
     return NextResponse.json({ ...fallback, tier: "heuristic" });
   }
@@ -84,6 +90,7 @@ export async function POST(request: NextRequest) {
   clearTimeout(timeout);
 
   if (!res.ok) {
+    console.error(`[analyze] Anthropic API returned ${res.status}`);
     const fallback = heuristicScores(text);
     return NextResponse.json({ error: `Anthropic API error: ${res.status}`, fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
   }

@@ -44,6 +44,7 @@ export function decodeManifest(raw: string): ContentManifest | null {
   try {
     parsed = JSON.parse(raw);
   } catch {
+    console.warn("[manifest] Failed to decode peer manifest:", raw.slice(0, 100));
     return null;
   }
   if (

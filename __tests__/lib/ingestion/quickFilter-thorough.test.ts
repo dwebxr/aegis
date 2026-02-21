@@ -174,7 +174,8 @@ describe("quickSlopFilter", () => {
 describe("heuristicScores — edge cases", () => {
   it("empty string doesn't crash", () => {
     const scores = heuristicScores("");
-    expect(scores.composite).toBeGreaterThanOrEqual(0);
+    expect(scores.composite).toBeGreaterThanOrEqual(1);
+    expect(scores.composite).toBeLessThanOrEqual(10);
     expect(scores.verdict).toMatch(/quality|slop/);
   });
 
@@ -185,7 +186,8 @@ describe("heuristicScores — edge cases", () => {
 
   it("only whitespace", () => {
     const scores = heuristicScores("   \n\t  ");
-    expect(scores.composite).toBeGreaterThanOrEqual(0);
+    expect(scores.composite).toBeGreaterThanOrEqual(1);
+    expect(scores.composite).toBeLessThanOrEqual(10);
   });
 
   it("very long text (10K words)", () => {

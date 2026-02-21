@@ -99,7 +99,7 @@ describe("heuristicScores", () => {
 
     it("composite is always 0-10", () => {
       const result = heuristicScores("");
-      expect(result.composite).toBeGreaterThanOrEqual(0);
+      expect(result.composite).toBeGreaterThanOrEqual(1);
       expect(result.composite).toBeLessThanOrEqual(10);
     });
   });
@@ -148,13 +148,15 @@ describe("heuristicScores", () => {
   describe("edge cases", () => {
     it("handles empty string", () => {
       const result = heuristicScores("");
-      expect(result.composite).toBeGreaterThanOrEqual(0);
+      expect(result.composite).toBeGreaterThanOrEqual(1);
+      expect(result.composite).toBeLessThanOrEqual(10);
       expect(result.verdict).toBeDefined();
     });
 
     it("handles single character", () => {
       const result = heuristicScores("a");
-      expect(result.composite).toBeGreaterThanOrEqual(0);
+      expect(result.composite).toBeGreaterThanOrEqual(1);
+      expect(result.composite).toBeLessThanOrEqual(10);
     });
 
     it("composite is rounded to 1 decimal place", () => {
@@ -298,7 +300,7 @@ describe("heuristicScores — boundary conditions", () => {
     const result = heuristicScores(text);
     // capsRatio = uppercase / text.length → depends on full string
     // Just verify it doesn't crash and gives meaningful output
-    expect(result.credibility).toBeGreaterThanOrEqual(0);
+    expect(result.credibility).toBeGreaterThanOrEqual(1);
   });
 
   it("all-lowercase text gets no caps penalty", () => {
@@ -339,7 +341,7 @@ describe("heuristicScores — boundary conditions", () => {
 
   it("only-whitespace text behaves like empty", () => {
     const result = heuristicScores("   \t\n  ");
-    expect(result.composite).toBeGreaterThanOrEqual(0);
+    expect(result.composite).toBeGreaterThanOrEqual(1);
     expect(result.composite).toBeLessThanOrEqual(10);
   });
 });

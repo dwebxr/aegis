@@ -8,8 +8,7 @@
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { act } = require("react-dom/test-utils");
+import { act } from "react";
 import { useKeyboardNav } from "@/hooks/useKeyboardNav";
 
 // Enable act environment

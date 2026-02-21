@@ -93,7 +93,7 @@ describe("timing constants consistency", () => {
   });
 
   it("MIN_OFFER_SCORE is in [0, 10]", () => {
-    expect(MIN_OFFER_SCORE).toBeGreaterThanOrEqual(0);
+    expect(MIN_OFFER_SCORE).toBeGreaterThanOrEqual(1);
     expect(MIN_OFFER_SCORE).toBeLessThanOrEqual(10);
   });
 });

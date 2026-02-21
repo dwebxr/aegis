@@ -11,10 +11,7 @@ function toBriefingItem(bi: BriefingState["priority"][0]): D2ABriefingItem {
     source: item.source,
     sourceUrl: item.sourceUrl || "",
     scores: {
-      originality: item.scores.originality,
-      insight: item.scores.insight,
-      credibility: item.scores.credibility,
-      composite: item.scores.composite,
+      ...item.scores,
       vSignal: item.vSignal,
       cContext: item.cContext,
       lSlop: item.lSlop,
