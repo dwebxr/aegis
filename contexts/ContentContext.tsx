@@ -437,6 +437,42 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     setContent(prev => prev.filter(c => c.owner !== ""));
   }, []);
 
+  const backfillImageUrls = useCallback(() => {
+    const items = contentRef.current
+      .filter(c => c.sourceUrl && !c.imageUrl && /^https?:\/\//i.test(c.sourceUrl))
+      .slice(0, 10);
+    if (items.length === 0) return;
+
+    // Stagger requests to avoid rate limiting
+    items.forEach((item, i) => {
+      setTimeout(async () => {
+        try {
+          const res = await fetch("/api/fetch/ogimage", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: item.sourceUrl }),
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!data.imageUrl) return;
+          setContent(prev => prev.map(c =>
+            c.id === item.id && !c.imageUrl ? { ...c, imageUrl: data.imageUrl } : c,
+          ));
+          // Persist to IC if authenticated
+          if (actorRef.current && isAuthenticated) {
+            const updated = contentRef.current.find(c => c.id === item.id);
+            if (updated && principal) {
+              void actorRef.current.saveEvaluation(toICEvaluation({ ...updated, imageUrl: data.imageUrl }, principal)).catch(() => {});
+            }
+          }
+        } catch {
+          // Silently ignore backfill failures
+        }
+      }, i * 1500);
+    });
+  }, [isAuthenticated, principal]);
+
   const loadFromIC = useCallback(async () => {
     if (!actorRef.current || !isAuthenticated || !principal) return;
     setSyncStatus("syncing");
@@ -506,6 +542,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       }
 
       setSyncStatus("synced");
+
+      // Backfill missing imageUrls from OG tags (max 10, fire-and-forget)
+      backfillImageUrls();
     } catch (err) {
       console.error("[content] Failed to load from IC:", errMsg(err));
       setSyncStatus("offline");
