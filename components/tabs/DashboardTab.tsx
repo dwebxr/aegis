@@ -218,6 +218,12 @@ function AgentKnowledgePills({ agentContext, profile }: {
   );
 }
 
+/** Content-level dedup key: same article may have different IDs across sources */
+function contentDedup(item: ContentItem): string {
+  if (item.sourceUrl) return item.sourceUrl;
+  return item.text.slice(0, 100);
+}
+
 interface DashboardTabProps {
   content: ContentItem[];
   mobile?: boolean;
@@ -327,7 +333,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const dashboardTop3 = useMemo(() => {
     if (homeMode !== "dashboard") return [];
     const briefing = generateBriefing(contentRef.current, profile, Date.now());
-    return briefing.priority.slice(0, 3);
+    // Content-level dedup: same article may appear with different IDs from different sources
+    const seenKeys = new Set<string>();
+    const deduped = briefing.priority.filter(bi => {
+      const key = contentDedup(bi.item);
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
+    return deduped.slice(0, 3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardEpoch, profile, homeMode]);
 
@@ -355,15 +369,21 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       return pattern ? pattern.test(c.text) : false;
     };
     // Dedup across topic groups: higher-affinity topics claim items first
-    // Stable sort with ID tiebreaker prevents flicker when content array is reordered
+    // Content-level dedup: same article with different IDs from different sources
     const usedIds = new Set<string>();
+    const usedContentKeys = new Set<string>();
+    // Pre-populate with Top3 content keys so Spotlight never duplicates Top3
+    for (const bi of dashboardTop3) usedContentKeys.add(contentDedup(bi.item));
     return highTopics.map(topic => {
       const topicItems = qualityItems
-        .filter(c => matchesTopic(c, topic) && !usedIds.has(c.id))
+        .filter(c => matchesTopic(c, topic) && !usedIds.has(c.id) && !usedContentKeys.has(contentDedup(c)))
         .sort((a, b) => b.scores.composite - a.scores.composite || a.id.localeCompare(b.id))
         .slice(0, 3);
       if (topicItems.length === 0) return null;
-      for (const c of topicItems) usedIds.add(c.id);
+      for (const c of topicItems) {
+        usedIds.add(c.id);
+        usedContentKeys.add(contentDedup(c));
+      }
       return { topic, items: topicItems };
     }).filter(Boolean) as Array<{ topic: string; items: ContentItem[] }>;
     // eslint-disable-next-line react-hooks/exhaustive-deps
