@@ -51,7 +51,7 @@ persistent actor AegisBackend {
   // Stable storage for upgrades
   // ──────────────────────────────────────
 
-  // Migration: old type without validatedAt (read-only during upgrade from v1)
+  // Migration: V1 type without validatedAt
   type ContentEvaluationV1 = {
     id : Text;
     owner : Principal;
@@ -67,8 +67,26 @@ persistent actor AegisBackend {
     validated : Bool;
     flagged : Bool;
   };
+  // Migration: V2 type without imageUrl
+  type ContentEvaluationV2 = {
+    id : Text;
+    owner : Principal;
+    author : Text;
+    avatar : Text;
+    text : Text;
+    source : Types.ContentSource;
+    sourceUrl : ?Text;
+    scores : Types.ScoreBreakdown;
+    verdict : Types.Verdict;
+    reason : Text;
+    createdAt : Int;
+    validated : Bool;
+    flagged : Bool;
+    validatedAt : ?Int;
+  };
   var stableEvaluations : [(Text, ContentEvaluationV1)] = [];
-  var stableEvaluationsV2 : [(Text, Types.ContentEvaluation)] = [];
+  var stableEvaluationsV2 : [(Text, ContentEvaluationV2)] = [];
+  var stableEvaluationsV3 : [(Text, Types.ContentEvaluation)] = [];
   var stableProfiles : [(Principal, Types.UserProfile)] = [];
   var stableSourceConfigs : [(Text, Types.SourceConfigEntry)] = [];
   var stableSignals : [(Text, Types.PublishedSignal)] = [];
@@ -147,7 +165,8 @@ persistent actor AegisBackend {
 
   system func preupgrade() {
     stableEvaluations := [];
-    stableEvaluationsV2 := Iter.toArray(evaluations.entries());
+    stableEvaluationsV2 := [];
+    stableEvaluationsV3 := Iter.toArray(evaluations.entries());
     stableProfiles := Iter.toArray(profiles.entries());
     stableSourceConfigs := Iter.toArray(sourceConfigs.entries());
     stableSignals := Iter.toArray(signals.entries());
@@ -166,11 +185,33 @@ persistent actor AegisBackend {
   };
 
   system func postupgrade() {
-    // Load evaluations: prefer V2 (new type), fall back to V1 migration
-    if (stableEvaluationsV2.size() > 0) {
-      for ((id, eval) in stableEvaluationsV2.vals()) {
+    // Load evaluations: prefer V3 (with imageUrl), then V2, then V1
+    if (stableEvaluationsV3.size() > 0) {
+      for ((id, eval) in stableEvaluationsV3.vals()) {
         evaluations.put(id, eval);
         addToPrincipalIndex(ownerIndex, eval.owner, id);
+      };
+    } else if (stableEvaluationsV2.size() > 0) {
+      for ((id, old) in stableEvaluationsV2.vals()) {
+        let migrated : Types.ContentEvaluation = {
+          id = old.id;
+          owner = old.owner;
+          author = old.author;
+          avatar = old.avatar;
+          text = old.text;
+          source = old.source;
+          sourceUrl = old.sourceUrl;
+          imageUrl = null;
+          scores = old.scores;
+          verdict = old.verdict;
+          reason = old.reason;
+          createdAt = old.createdAt;
+          validated = old.validated;
+          flagged = old.flagged;
+          validatedAt = old.validatedAt;
+        };
+        evaluations.put(id, migrated);
+        addToPrincipalIndex(ownerIndex, migrated.owner, id);
       };
     } else {
       for ((id, old) in stableEvaluations.vals()) {
@@ -182,6 +223,7 @@ persistent actor AegisBackend {
           text = old.text;
           source = old.source;
           sourceUrl = old.sourceUrl;
+          imageUrl = null;
           scores = old.scores;
           verdict = old.verdict;
           reason = old.reason;
@@ -196,6 +238,7 @@ persistent actor AegisBackend {
     };
     stableEvaluations := [];
     stableEvaluationsV2 := [];
+    stableEvaluationsV3 := [];
     for ((p, profile) in stableProfiles.vals()) { profiles.put(p, profile) };
     for ((id, config) in stableSourceConfigs.vals()) { sourceConfigs.put(id, config) };
     for ((id, signal) in stableSignals.vals()) {
@@ -400,6 +443,7 @@ persistent actor AegisBackend {
       text = eval.text;
       source = eval.source;
       sourceUrl = eval.sourceUrl;
+      imageUrl = eval.imageUrl;
       scores = eval.scores;
       verdict = eval.verdict;
       reason = eval.reason;
@@ -462,6 +506,7 @@ persistent actor AegisBackend {
           text = existing.text;
           source = existing.source;
           sourceUrl = existing.sourceUrl;
+          imageUrl = existing.imageUrl;
           scores = existing.scores;
           verdict = if (flagged and not existing.flagged) {
             #slop
@@ -499,6 +544,7 @@ persistent actor AegisBackend {
         text = eval.text;
         source = eval.source;
         sourceUrl = eval.sourceUrl;
+        imageUrl = eval.imageUrl;
         scores = eval.scores;
         verdict = eval.verdict;
         reason = eval.reason;

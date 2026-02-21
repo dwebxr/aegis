@@ -22,6 +22,7 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     text: IDL.Text,
     source: ContentSource,
     sourceUrl: IDL.Opt(IDL.Text),
+    imageUrl: IDL.Opt(IDL.Text),
     scores: ScoreBreakdown,
     verdict: Verdict,
     reason: IDL.Text,

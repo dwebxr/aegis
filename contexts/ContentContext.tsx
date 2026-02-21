@@ -159,6 +159,7 @@ function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal").Prin
     text: c.text,
     source: mapSource(c.source),
     sourceUrl: c.sourceUrl ? [c.sourceUrl] as [string] : [] as [],
+    imageUrl: c.imageUrl ? [c.imageUrl] as [string] : [] as [],
     scores: {
       originality: Math.round(c.scores.originality),
       insight: Math.round(c.scores.insight),
@@ -462,6 +463,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           text: e.text,
           source: mapSourceBack(e.source) as ContentItem["source"],
           sourceUrl: e.sourceUrl.length > 0 ? e.sourceUrl[0] : undefined,
+          imageUrl: e.imageUrl?.length ? e.imageUrl[0] : undefined,
           scores: {
             originality: e.scores.originality,
             insight: e.scores.insight,

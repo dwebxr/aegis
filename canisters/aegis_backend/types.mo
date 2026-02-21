@@ -18,6 +18,7 @@ module {
     text : Text;
     source : ContentSource;
     sourceUrl : ?Text;
+    imageUrl : ?Text;
     scores : ScoreBreakdown;
     verdict : Verdict;
     reason : Text;

@@ -16,6 +16,7 @@ type ContentEvaluation = record {
   text : text;
   source : ContentSource;
   sourceUrl : opt text;
+  imageUrl : opt text;
   scores : ScoreBreakdown;
   verdict : Verdict;
   reason : text;

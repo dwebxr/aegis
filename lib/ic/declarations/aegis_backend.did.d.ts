@@ -24,6 +24,7 @@ export interface ContentEvaluation {
   text: string;
   source: ContentSource;
   sourceUrl: [] | [string];
+  imageUrl: [] | [string];
   scores: ScoreBreakdown;
   verdict: Verdict;
   reason: string;
