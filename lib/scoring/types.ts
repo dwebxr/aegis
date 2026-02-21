@@ -16,6 +16,12 @@ export function encodeEngineInReason(engine: ScoringEngine, reason: string): str
   return `[${engine}] ${reason}`;
 }
 
+/** Append `[topics:tag1,tag2]` to reason for IC canister persistence. */
+export function encodeTopicsInReason(reason: string, topics?: string[]): string {
+  if (!topics || topics.length === 0) return reason;
+  return `${reason} [topics:${topics.join(",")}]`;
+}
+
 /** Extract engine id from reason prefix. Returns cleanReason with prefix stripped. */
 export function decodeEngineFromReason(reason: string): { engine?: ScoringEngine; cleanReason: string } {
   const match = reason.match(/^\[([a-z-]+)\] /);
@@ -24,6 +30,14 @@ export function decodeEngineFromReason(reason: string): { engine?: ScoringEngine
   }
   if (reason.startsWith("Heuristic")) return { engine: "heuristic", cleanReason: reason };
   return { engine: undefined, cleanReason: reason };
+}
+
+/** Extract topics from `[topics:tag1,tag2]` suffix in reason. */
+export function decodeTopicsFromReason(reason: string): { topics: string[]; cleanReason: string } {
+  const match = reason.match(/ \[topics:([^\]]+)\]$/);
+  if (!match) return { topics: [], cleanReason: reason };
+  const topics = match[1].split(",").map(t => t.trim()).filter(Boolean);
+  return { topics, cleanReason: reason.slice(0, match.index!) };
 }
 
 export interface ScoreParseResult {

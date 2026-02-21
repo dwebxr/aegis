@@ -16,7 +16,7 @@ import { recordUseful, recordSlop } from "@/lib/d2a/reputation";
 import { recordPublishValidation, recordPublishFlag } from "@/lib/reputation/publishGate";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
-import { encodeEngineInReason, decodeEngineFromReason } from "@/lib/scoring/types";
+import { encodeEngineInReason, decodeEngineFromReason, encodeTopicsInReason, decodeTopicsFromReason } from "@/lib/scoring/types";
 import { syncBriefingToCanister } from "@/lib/briefing/sync";
 import type { BriefingState } from "@/lib/briefing/types";
 
@@ -166,7 +166,10 @@ function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal").Prin
       compositeScore: c.scores.composite,
     },
     verdict: c.verdict === "quality" ? { quality: null } : { slop: null },
-    reason: c.scoringEngine ? encodeEngineInReason(c.scoringEngine, c.reason) : c.reason,
+    reason: encodeTopicsInReason(
+      c.scoringEngine ? encodeEngineInReason(c.scoringEngine, c.reason) : c.reason,
+      c.topics,
+    ),
     createdAt: BigInt(c.createdAt * 1_000_000),
     validated: c.validated,
     flagged: c.flagged,
@@ -449,7 +452,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       }
 
       const loaded: ContentItem[] = allEvals.map(e => {
-        const { engine, cleanReason } = decodeEngineFromReason(e.reason);
+        const { engine, cleanReason: reasonWithTopics } = decodeEngineFromReason(e.reason);
+        const { topics, cleanReason } = decodeTopicsFromReason(reasonWithTopics);
         return {
           id: e.id,
           owner: e.owner.toText(),
@@ -466,6 +470,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           },
           verdict: ("quality" in e.verdict ? "quality" : "slop") as ContentItem["verdict"],
           reason: cleanReason,
+          topics: topics.length > 0 ? topics : undefined,
           createdAt: Number(e.createdAt) / 1_000_000,
           validated: e.validated,
           flagged: e.flagged,
@@ -478,9 +483,23 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
       if (loaded.length > 0) {
         setContent(prev => {
-          const existingIds = new Set(loaded.map(l => l.id));
-          const nonDuplicates = prev.filter(c => !existingIds.has(c.id));
-          return [...loaded, ...nonDuplicates];
+          // Build lookup from cached items to preserve fields not stored in IC (topics, vSignal, etc.)
+          const cachedById = new Map(prev.map(c => [c.id, c]));
+          const merged = loaded.map(l => {
+            const cached = cachedById.get(l.id);
+            if (!cached) return l;
+            return {
+              ...l,
+              topics: l.topics ?? cached.topics,
+              vSignal: l.vSignal ?? cached.vSignal,
+              cContext: l.cContext ?? cached.cContext,
+              lSlop: l.lSlop ?? cached.lSlop,
+              imageUrl: l.imageUrl ?? cached.imageUrl,
+            };
+          });
+          const loadedIds = new Set(loaded.map(l => l.id));
+          const nonDuplicates = prev.filter(c => !loadedIds.has(c.id));
+          return [...merged, ...nonDuplicates];
         });
       }
 
