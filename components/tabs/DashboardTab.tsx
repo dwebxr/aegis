@@ -314,12 +314,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   // Dashboard-mode computations (skipped when in Feed mode)
 
-  // Stable content fingerprint: only changes when quality-relevant data changes
-  // (new items added, items validated/flagged/scored) — NOT on 30s timestamp refreshes.
+  // Stable content fingerprint: order-independent, only changes when quality items
+  // are added/removed/scored/validated/flagged — NOT on 30s timestamp refreshes or IC reorder.
   const qualityContentKey = useMemo(() => {
     return content
       .filter(c => c.verdict === "quality" && !c.flagged)
       .map(c => `${c.id}:${c.scores.composite}`)
+      .sort()
       .join("|");
   }, [content]);
 
@@ -347,7 +348,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     if (highTopics.length === 0) return [];
     // Exclude items already shown in Today's Top 3
     const top3Ids = new Set(dashboardTop3.map(c => c.item.id));
-    const qualityItems = content.filter(c => c.verdict === "quality" && !c.flagged && !top3Ids.has(c.id));
+    const currentContent = contentRef.current;
+    const qualityItems = currentContent.filter(c => c.verdict === "quality" && !c.flagged && !top3Ids.has(c.id));
     // Pre-compile one regex per topic for word-boundary fallback matching
     const topicPatterns = new Map(highTopics.map(topic => {
       const escaped = topic.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -360,17 +362,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       return pattern ? pattern.test(c.text) : false;
     };
     // Dedup across topic groups: higher-affinity topics claim items first
+    // Stable sort with ID tiebreaker prevents flicker when content array is reordered
     const usedIds = new Set<string>();
     return highTopics.map(topic => {
       const topicItems = qualityItems
         .filter(c => matchesTopic(c, topic) && !usedIds.has(c.id))
-        .sort((a, b) => b.scores.composite - a.scores.composite)
+        .sort((a, b) => b.scores.composite - a.scores.composite || a.id.localeCompare(b.id))
         .slice(0, 3);
       if (topicItems.length === 0) return null;
       for (const c of topicItems) usedIds.add(c.id);
       return { topic, items: topicItems };
     }).filter(Boolean) as Array<{ topic: string; items: ContentItem[] }>;
-  }, [content, profile, homeMode, dashboardTop3]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qualityContentKey, profile, homeMode, dashboardTop3]);
 
   // Cascading cross-section deduplication: Top3 → Spotlight → Discoveries → Validated
   const shownByTopSections = useMemo(() => {

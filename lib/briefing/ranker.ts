@@ -51,7 +51,8 @@ export function generateBriefing(
     item,
     score: briefingScore(item, prefs, now),
   }));
-  scored.sort((a, b) => b.score - a.score);
+  // Stable sort: tiebreaker by ID prevents ranking flicker when content array is reordered
+  scored.sort((a, b) => b.score - a.score || a.item.id.localeCompare(b.item.id));
 
   const priorityItems = scored.slice(0, PRIORITY_COUNT);
   const priorityIds = new Set(priorityItems.map(s => s.item.id));
@@ -64,7 +65,7 @@ export function generateBriefing(
       item: s.item,
       score: serendipityScore(s.item, prefs),
     }));
-    serendipityCandidates.sort((a, b) => b.score - a.score);
+    serendipityCandidates.sort((a, b) => b.score - a.score || a.item.id.localeCompare(b.item.id));
     const best = serendipityCandidates[0];
     serendipity = {
       item: best.item,
