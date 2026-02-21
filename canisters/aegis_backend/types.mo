@@ -138,6 +138,15 @@ module {
     updatedAt : Int;
   };
 
+  // ── User Preferences (cross-device sync, JSON blob) ──
+
+  public type UserPreferences = {
+    owner : Principal;
+    preferencesJson : Text;   // Serialized UserPreferenceProfile JSON
+    lastUpdated : Int;         // Client timestamp (milliseconds)
+    savedAt : Int;             // Server timestamp (nanoseconds) via Time.now()
+  };
+
   public type AnalysisTier = { #free; #premium };
 
   public type OnChainAnalysis = {

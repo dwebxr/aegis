@@ -4,7 +4,7 @@ import { useAuth } from "./AuthContext";
 import type { UserPreferenceProfile, UserContext } from "@/lib/preferences/types";
 import { createEmptyProfile, TOPIC_AFFINITY_CAP, TOPIC_AFFINITY_FLOOR } from "@/lib/preferences/types";
 import { learn, getContext, hasEnoughData } from "@/lib/preferences/engine";
-import { loadProfile, saveProfile } from "@/lib/preferences/storage";
+import { loadProfile, saveProfile, syncPreferencesToIC, loadPreferencesFromIC, mergeProfiles } from "@/lib/preferences/storage";
 import { clamp } from "@/lib/utils/math";
 
 interface PreferenceState {
@@ -32,17 +32,46 @@ const PreferenceContext = createContext<PreferenceState>({
 });
 
 export function PreferenceProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, principalText } = useAuth();
+  const { isAuthenticated, principalText, identity } = useAuth();
   const [profile, setProfile] = useState<UserPreferenceProfile>(emptyProfile);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const icSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Refs for async callbacks (avoid stale closures)
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
+  const isAuthRef = useRef(isAuthenticated);
+  isAuthRef.current = isAuthenticated;
+
+  // Load from localStorage immediately, then merge with IC async
   useEffect(() => {
-    if (isAuthenticated && principalText) {
-      setProfile(loadProfile(principalText));
+    if (isAuthenticated && principalText && identity) {
+      const local = loadProfile(principalText);
+      setProfile(local);
+
+      loadPreferencesFromIC(identity, principalText).then((icProfile) => {
+        if (!icProfile) {
+          // No IC data yet: push local to IC as initial backup (if non-empty)
+          const hasData = local.totalValidated > 0 || local.totalFlagged > 0
+            || Object.keys(local.topicAffinities).length > 0;
+          if (hasData) void syncPreferencesToIC(identity, local);
+          return;
+        }
+        const merged = mergeProfiles(local, icProfile);
+        setProfile(merged);
+        saveProfile(merged);
+
+        // If local was newer, push to IC
+        if (merged.lastUpdated > icProfile.lastUpdated) {
+          void syncPreferencesToIC(identity, merged);
+        }
+      }).catch((err) => {
+        console.warn("[prefs] IC preference load failed:", err instanceof Error ? err.message : err);
+      });
     } else {
       setProfile(emptyProfile);
     }
-  }, [isAuthenticated, principalText]);
+  }, [isAuthenticated, principalText, identity]);
 
   const debouncedSave = useCallback((p: UserPreferenceProfile) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -53,8 +82,20 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     }, 500);
   }, []);
 
+  const debouncedICSync = useCallback((p: UserPreferenceProfile) => {
+    if (icSyncTimeoutRef.current) clearTimeout(icSyncTimeoutRef.current);
+    icSyncTimeoutRef.current = setTimeout(() => {
+      const ident = identityRef.current;
+      if (!isAuthRef.current || !ident) return;
+      void syncPreferencesToIC(ident, p);
+    }, 3000);
+  }, []);
+
   useEffect(() => {
-    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (icSyncTimeoutRef.current) clearTimeout(icSyncTimeoutRef.current);
+    };
   }, []);
 
   const profileRef = useRef(profile);
@@ -64,13 +105,15 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     const next = learn(profileRef.current, { action: "validate", topics, author, composite, verdict });
     setProfile(next);
     debouncedSave(next);
-  }, [debouncedSave]);
+    debouncedICSync(next);
+  }, [debouncedSave, debouncedICSync]);
 
   const onFlag = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop") => {
     const next = learn(profileRef.current, { action: "flag", topics, author, composite, verdict });
     setProfile(next);
     debouncedSave(next);
-  }, [debouncedSave]);
+    debouncedICSync(next);
+  }, [debouncedSave, debouncedICSync]);
 
   const setTopicAffinity = useCallback((topic: string, value: number) => {
     const next = structuredClone(profileRef.current);
@@ -78,7 +121,8 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     next.lastUpdated = Date.now();
     setProfile(next);
     debouncedSave(next);
-  }, [debouncedSave]);
+    debouncedICSync(next);
+  }, [debouncedSave, debouncedICSync]);
 
   const removeTopicAffinity = useCallback((topic: string) => {
     const next = structuredClone(profileRef.current);
@@ -86,7 +130,8 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     next.lastUpdated = Date.now();
     setProfile(next);
     debouncedSave(next);
-  }, [debouncedSave]);
+    debouncedICSync(next);
+  }, [debouncedSave, debouncedICSync]);
 
   const setQualityThreshold = useCallback((value: number) => {
     const next = structuredClone(profileRef.current);
@@ -94,7 +139,8 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     next.lastUpdated = Date.now();
     setProfile(next);
     debouncedSave(next);
-  }, [debouncedSave]);
+    debouncedICSync(next);
+  }, [debouncedSave, debouncedICSync]);
 
   const isPersonalized = hasEnoughData(profile);
   const userContext = isPersonalized ? getContext(profile) : null;

@@ -143,6 +143,13 @@ export interface UserSettings {
   updatedAt: bigint;
 }
 
+export interface UserPreferences {
+  owner: Principal;
+  preferencesJson: string;
+  lastUpdated: bigint;
+  savedAt: bigint;
+}
+
 export interface GlobalBriefingSummariesResult {
   items: Array<[Principal, string, bigint]>;
   total: bigint;
@@ -186,4 +193,6 @@ export interface _SERVICE {
   getGlobalBriefingSummaries: ActorMethod<[bigint, bigint], GlobalBriefingSummariesResult>;
   getUserSettings: ActorMethod<[Principal], [] | [UserSettings]>;
   saveUserSettings: ActorMethod<[UserSettings], boolean>;
+  getUserPreferences: ActorMethod<[Principal], [] | [UserPreferences]>;
+  saveUserPreferences: ActorMethod<[string, bigint], boolean>;
 }

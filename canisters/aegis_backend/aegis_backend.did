@@ -58,6 +58,13 @@ type UserSettings = record {
   updatedAt : int;
 };
 
+type UserPreferences = record {
+  owner : principal;
+  preferencesJson : text;
+  lastUpdated : int;
+  savedAt : int;
+};
+
 service : {
   getProfile : (principal) -> (opt UserProfile) query;
   getEvaluation : (text) -> (opt ContentEvaluation) query;
@@ -74,6 +81,9 @@ service : {
 
   getUserSettings : (principal) -> (opt UserSettings) query;
   saveUserSettings : (UserSettings) -> (bool);
+
+  getUserPreferences : (principal) -> (opt UserPreferences) query;
+  saveUserPreferences : (text, int) -> (bool);
 
   getGlobalBriefingSummaries : (nat, nat) -> (record {
     items : vec record { principal; text; int };

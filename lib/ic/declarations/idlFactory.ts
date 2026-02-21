@@ -125,6 +125,12 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     d2aEnabled: IDL.Bool,
     updatedAt: IDL.Int,
   });
+  const UserPreferences = IDL.Record({
+    owner: IDL.Principal,
+    preferencesJson: IDL.Text,
+    lastUpdated: IDL.Int,
+    savedAt: IDL.Int,
+  });
   const GlobalBriefingSummariesResult = IDL.Record({
     items: IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Text, IDL.Int)),
     total: IDL.Nat,
@@ -165,5 +171,7 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     getGlobalBriefingSummaries: IDL.Func([IDL.Nat, IDL.Nat], [GlobalBriefingSummariesResult], ["query"]),
     getUserSettings: IDL.Func([IDL.Principal], [IDL.Opt(UserSettings)], ["query"]),
     saveUserSettings: IDL.Func([UserSettings], [IDL.Bool], []),
+    getUserPreferences: IDL.Func([IDL.Principal], [IDL.Opt(UserPreferences)], ["query"]),
+    saveUserPreferences: IDL.Func([IDL.Text, IDL.Int], [IDL.Bool], []),
   });
 };

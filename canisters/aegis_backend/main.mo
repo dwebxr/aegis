@@ -112,6 +112,10 @@ persistent actor AegisBackend {
   var stableUserSettings : [(Principal, Types.UserSettings)] = [];
   transient var userSettings = HashMap.HashMap<Principal, Types.UserSettings>(16, Principal.equal, Principal.hash);
 
+  // User preferences (cross-device preference profile sync, JSON blob)
+  var stableUserPreferences : [(Principal, Types.UserPreferences)] = [];
+  transient var userPreferences = HashMap.HashMap<Principal, Types.UserPreferences>(16, Principal.equal, Principal.hash);
+
   // Owner -> evaluation IDs index for fast user queries
   transient var ownerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
 
@@ -158,6 +162,7 @@ persistent actor AegisBackend {
     stablePushSubscriptions := Iter.toArray(pushSubscriptions.entries());
     stableBriefings := Iter.toArray(briefings.entries());
     stableUserSettings := Iter.toArray(userSettings.entries());
+    stableUserPreferences := Iter.toArray(userPreferences.entries());
   };
 
   system func postupgrade() {
@@ -226,6 +231,8 @@ persistent actor AegisBackend {
     stableBriefings := [];
     for ((p, s) in stableUserSettings.vals()) { userSettings.put(p, s) };
     stableUserSettings := [];
+    for ((p, prefs) in stableUserPreferences.vals()) { userPreferences.put(p, prefs) };
+    stableUserPreferences := [];
     initCertCache();
   };
 
@@ -1598,6 +1605,35 @@ persistent actor AegisBackend {
       linkedNostrPubkeyHex = settings.linkedNostrPubkeyHex;
       d2aEnabled = settings.d2aEnabled;
       updatedAt = Time.now();
+    });
+    true;
+  };
+
+  // ──────────────────────────────────────
+  // User Preferences (cross-device preference profile sync)
+  // ──────────────────────────────────────
+
+  public query func getUserPreferences(p : Principal) : async ?Types.UserPreferences {
+    userPreferences.get(p);
+  };
+
+  public shared(msg) func saveUserPreferences(preferencesJson : Text, lastUpdated : Int) : async Bool {
+    let caller = msg.caller;
+    if (not requireAuth(caller)) { return false };
+    if (Text.size(preferencesJson) > 500_000) { return false };
+
+    switch (userPreferences.get(caller)) {
+      case (?existing) {
+        if (lastUpdated <= existing.lastUpdated) { return false };
+      };
+      case null {};
+    };
+
+    userPreferences.put(caller, {
+      owner = caller;
+      preferencesJson = preferencesJson;
+      lastUpdated = lastUpdated;
+      savedAt = Time.now();
     });
     true;
   };
