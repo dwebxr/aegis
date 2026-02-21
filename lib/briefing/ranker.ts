@@ -5,7 +5,7 @@ import type { BriefingState, BriefingItem } from "./types";
 const PRIORITY_COUNT = 5;
 const RECENCY_HALF_LIFE_HOURS = 7;
 
-function briefingScore(item: ContentItem, prefs: UserPreferenceProfile): number {
+function briefingScore(item: ContentItem, prefs: UserPreferenceProfile, now?: number): number {
   const baseScore = item.scores.composite;
 
   const topicRelevance = item.topics?.reduce((sum, t) =>
@@ -13,7 +13,7 @@ function briefingScore(item: ContentItem, prefs: UserPreferenceProfile): number 
 
   const authorBoost = prefs.authorTrust[item.author]?.trust || 0;
 
-  const ageHours = (Date.now() - item.createdAt) / 3600000;
+  const ageHours = ((now ?? Date.now()) - item.createdAt) / 3600000;
   // Decay factor: ln(2)/RECENCY_HALF_LIFE_HOURS gives true half-life at RECENCY_HALF_LIFE_HOURS
   const decayRate = Math.LN2 / RECENCY_HALF_LIFE_HOURS;
   const recencyFactor = Math.exp(-decayRate * ageHours);
@@ -40,6 +40,7 @@ function serendipityScore(item: ContentItem, prefs: UserPreferenceProfile): numb
 export function generateBriefing(
   content: ContentItem[],
   prefs: UserPreferenceProfile,
+  now?: number,
 ): BriefingState {
   const threshold = prefs.calibration.qualityThreshold;
   const qualityItems = content.filter(c =>
@@ -48,7 +49,7 @@ export function generateBriefing(
 
   const scored: Array<{ item: ContentItem; score: number }> = qualityItems.map(item => ({
     item,
-    score: briefingScore(item, prefs),
+    score: briefingScore(item, prefs, now),
   }));
   scored.sort((a, b) => b.score - a.score);
 

@@ -387,9 +387,11 @@ describe("DashboardTab — dashboard mode rendering", () => {
   });
 
   it("renders Discoveries section when discoveries prop provided", () => {
-    const items = [makeItem({ id: "disc-src" })];
+    // Discovery item must differ from content items — dedup filters overlapping IDs
+    const contentItems = [makeItem({ id: "content-1" })];
+    const discItem = makeItem({ id: "disc-src" });
     const discoveries = [{
-      item: items[0],
+      item: discItem,
       discoveryType: "emerging_topic" as const,
       reason: "Expanding your horizons",
       serendipityScore: 0.8,
@@ -397,7 +399,7 @@ describe("DashboardTab — dashboard mode rendering", () => {
       qualityComposite: 7,
     }];
     const html = renderToStaticMarkup(
-      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} discoveries={discoveries} />
+      <DashboardTab content={contentItems} onValidate={jest.fn()} onFlag={jest.fn()} discoveries={discoveries} />
     );
     expect(html).toContain("Discoveries");
     expect(html).toContain("Expanding your horizons");

@@ -313,11 +313,29 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, [profile]);
 
   // Dashboard-mode computations (skipped when in Feed mode)
+
+  // Stable content fingerprint: only changes when quality-relevant data changes
+  // (new items added, items validated/flagged/scored) — NOT on 30s timestamp refreshes.
+  const qualityContentKey = useMemo(() => {
+    return content
+      .filter(c => c.verdict === "quality" && !c.flagged)
+      .map(c => `${c.id}:${c.scores.composite}`)
+      .join("|");
+  }, [content]);
+
+  // Pin the reference time for briefingScore recency decay to when content actually changed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const briefingNow = useMemo(() => Date.now(), [qualityContentKey]);
+
+  const contentRef = useRef(content);
+  contentRef.current = content;
+
   const dashboardTop3 = useMemo(() => {
     if (homeMode !== "dashboard") return [];
-    const briefing = generateBriefing(content, profile);
+    const briefing = generateBriefing(contentRef.current, profile, briefingNow);
     return briefing.priority.slice(0, 3);
-  }, [content, profile, homeMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qualityContentKey, profile, homeMode, briefingNow]);
 
   const dashboardTopicSpotlight = useMemo(() => {
     if (homeMode !== "dashboard") return [];
@@ -354,13 +372,32 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     }).filter(Boolean) as Array<{ topic: string; items: ContentItem[] }>;
   }, [content, profile, homeMode, dashboardTop3]);
 
+  // Cascading cross-section deduplication: Top3 → Spotlight → Discoveries → Validated
+  const shownByTopSections = useMemo(() => {
+    const ids = new Set(dashboardTop3.map(c => c.item.id));
+    for (const group of dashboardTopicSpotlight) {
+      for (const item of group.items) ids.add(item.id);
+    }
+    return ids;
+  }, [dashboardTop3, dashboardTopicSpotlight]);
+
+  const filteredDiscoveries = useMemo(() => {
+    return discoveries.filter(d => !shownByTopSections.has(d.item.id));
+  }, [discoveries, shownByTopSections]);
+
+  const allShownIds = useMemo(() => {
+    const ids = new Set(shownByTopSections);
+    for (const d of filteredDiscoveries) ids.add(d.item.id);
+    return ids;
+  }, [shownByTopSections, filteredDiscoveries]);
+
   const dashboardValidated = useMemo(() => {
     if (homeMode !== "dashboard") return [];
     return content
-      .filter(c => c.validated)
+      .filter(c => c.validated && !allShownIds.has(c.id))
       .sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0))
       .slice(0, 5);
-  }, [content, homeMode]);
+  }, [content, homeMode, allShownIds]);
 
   const dashboardActivity = useMemo(() => {
     if (homeMode !== "dashboard") return null;
@@ -1032,7 +1069,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           <div style={{ display: "flex", flexDirection: "column", gap: `${space[4]}px` }}>
 
           {/* Discoveries */}
-          {discoveries.length > 0 && (
+          {filteredDiscoveries.length > 0 && (
             <div style={{
               background: "transparent",
               border: `1px solid ${colors.border.subtle}`,
@@ -1048,10 +1085,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 <span style={{
                   fontSize: t.caption.size, color: colors.text.muted,
                   background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
-                }}>{discoveries.length}</span>
+                }}>{filteredDiscoveries.length}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
-                {discoveries.map(d => {
+                {filteredDiscoveries.map(d => {
                   const item = d.item;
                   const gr = scoreGrade(item.scores.composite);
                   const tag = deriveScoreTags(item)[0] ?? null;
