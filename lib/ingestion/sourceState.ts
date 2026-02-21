@@ -101,6 +101,18 @@ export function saveSourceStates(states: Record<string, SourceRuntimeState>): vo
   }
 }
 
+/** Reset error state for a source key in localStorage, re-enabling it if auto-disabled. */
+export function resetSourceErrors(key: string): void {
+  const states = loadSourceStates();
+  const state = states[key];
+  if (state && state.errorCount > 0) {
+    state.errorCount = 0;
+    state.lastError = "";
+    state.nextFetchAt = 0;
+    saveSourceStates(states);
+  }
+}
+
 export function computeBackoffDelay(errorCount: number): number {
   if (errorCount <= 0) return 0;
   const idx = Math.min(errorCount - 1, BACKOFF_MS.length - 1);

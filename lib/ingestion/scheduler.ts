@@ -9,6 +9,7 @@ import {
   saveSourceStates,
   computeBackoffDelay,
   computeAdaptiveInterval,
+  resetSourceErrors,
   MAX_CONSECUTIVE_FAILURES,
   BASE_CYCLE_MS,
 } from "./sourceState";
@@ -95,6 +96,20 @@ export class IngestionScheduler {
 
   resetDedup(): void {
     this.dedup.reset();
+  }
+
+  /** Reset error state for a source key, re-enabling it if it was auto-disabled. */
+  resetSourceState(key: string): void {
+    const state = this.sourceStates.get(key);
+    if (state) {
+      state.errorCount = 0;
+      state.lastError = "";
+      state.nextFetchAt = 0;
+      this.persistStates();
+    } else {
+      // Also reset in localStorage for cases where scheduler hasn't loaded the key yet
+      resetSourceErrors(key);
+    }
   }
 
   private getOrCreateState(key: string): SourceRuntimeState {

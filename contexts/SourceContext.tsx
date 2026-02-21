@@ -10,6 +10,7 @@ import { loadSources, saveSources } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
+import { getSourceKey, resetSourceErrors } from "@/lib/ingestion/sourceState";
 
 interface SourceState {
   sources: SavedSource[];
@@ -199,6 +200,14 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
 
   const removeSource = useCallback((id: string) => {
     if (isDemoMode) return;
+    // Reset error state so re-adding the same source starts fresh
+    const toRemove = sourcesRef.current.find(s => s.id === id);
+    if (toRemove) {
+      const config: Record<string, string> = {};
+      if (toRemove.feedUrl) config.feedUrl = toRemove.feedUrl;
+      if (toRemove.relays) config.relays = toRemove.relays.join(",");
+      resetSourceErrors(getSourceKey(toRemove.type, config));
+    }
     setSources(prev => {
       const next = prev.filter(s => s.id !== id);
       persist(next);
@@ -234,8 +243,18 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       persist(next);
       return next;
     });
-    // Use queueMicrotask to read `toggled` after setSources updater runs
-    queueMicrotask(() => { if (toggled) saveToIC(toggled); });
+    // Reset error state when re-enabling a source
+    queueMicrotask(() => {
+      if (toggled) {
+        saveToIC(toggled);
+        if (toggled.enabled) {
+          const config: Record<string, string> = {};
+          if (toggled.feedUrl) config.feedUrl = toggled.feedUrl;
+          if (toggled.relays) config.relays = toggled.relays.join(",");
+          resetSourceErrors(getSourceKey(toggled.type, config));
+        }
+      }
+    });
   }, [persist, isDemoMode]);
 
   const updateSource = useCallback((id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => {

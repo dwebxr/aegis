@@ -517,7 +517,7 @@ The receiving agent rejects deliveries from undiscovered peers (not in the known
 
 ## x402 D2A Briefing API
 
-Aegis exposes a paid API for AI agents (like [Coo](https://x.com/Coo_aiagent) to purchase curated briefings using the [x402 protocol](https://x402.org) — HTTP-native micropayments with USDC on Base.
+Aegis exposes a paid API for AI agents (like [Coo](https://x.com/Coo_aiagent)) to purchase curated briefings using the [x402 protocol](https://x402.org) — HTTP-native micropayments with USDC on Base.
 
 ### Endpoints
 
