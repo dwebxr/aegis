@@ -316,11 +316,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     // Exclude items already shown in Today's Top 3
     const top3Ids = new Set(dashboardTop3.map(c => c.item.id));
     const qualityItems = content.filter(c => c.verdict === "quality" && !c.flagged && !top3Ids.has(c.id));
+    // Match: explicit topics tag (case-insensitive) OR text/reason keyword match
+    const matchesTopic = (c: ContentItem, topic: string) => {
+      const t = topic.toLowerCase();
+      if (c.topics?.some(tag => tag.toLowerCase() === t)) return true;
+      // Fallback: word-boundary match in text or reason for items without topics
+      const pattern = new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+      return pattern.test(c.text) || pattern.test(c.reason);
+    };
     // Dedup across topic groups: higher-affinity topics claim items first
     const usedIds = new Set<string>();
     return highTopics.map(topic => {
       const topicItems = qualityItems
-        .filter(c => c.topics?.includes(topic) && !usedIds.has(c.id))
+        .filter(c => matchesTopic(c, topic) && !usedIds.has(c.id))
         .sort((a, b) => b.scores.composite - a.scores.composite)
         .slice(0, 3);
       if (topicItems.length === 0) return null;
