@@ -318,9 +318,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return getContext(profile);
   }, [profile]);
 
-  // Dashboard-mode computations (skipped when in Feed mode)
-  // Pinned time reference: only updates when user takes action (validate/flag → profile change).
-  // Feed↔Dashboard toggles, scheduler updates, timers do NOT shift recency scores.
+  // Dashboard computations: always computed, cached by profile.
+  // Feed↔Dashboard toggle just shows/hides cached results — no recalculation.
+  // Only profile changes (validate/flag) trigger fresh computation.
   const contentRef = useRef(content);
   contentRef.current = content;
   const briefingNowRef = useRef(Date.now());
@@ -329,7 +329,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, [profile]);
 
   const dashboardTop3 = useMemo(() => {
-    if (homeMode !== "dashboard") return [];
     const briefing = generateBriefing(contentRef.current, profile, briefingNowRef.current);
     // Content-level dedup: same article may appear with different IDs from different sources
     const seenKeys = new Set<string>();
@@ -341,10 +340,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     });
     return deduped.slice(0, 3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, homeMode]);
+  }, [profile]);
 
   const dashboardTopicSpotlight = useMemo(() => {
-    if (homeMode !== "dashboard") return [];
     const highTopics = Object.entries(profile.topicAffinities)
       .filter(([, v]) => v >= 0.3)
       .sort(([, a], [, b]) => b - a)
@@ -391,7 +389,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       return { topic, items: topicItems };
     }).filter(Boolean) as Array<{ topic: string; items: ContentItem[] }>;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, homeMode, dashboardTop3]);
+  }, [profile, dashboardTop3]);
 
   // Cascading cross-section deduplication: Top3 → Spotlight → Discoveries → Validated
   const shownByTopSections = useMemo(() => {
@@ -413,13 +411,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, [shownByTopSections, filteredDiscoveries]);
 
   const dashboardValidated = useMemo(() => {
-    if (homeMode !== "dashboard") return [];
     return contentRef.current
       .filter(c => c.validated && !allShownIds.has(c.id))
       .sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0))
       .slice(0, 5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [homeMode, allShownIds]);
+  }, [allShownIds]);
 
   const dashboardActivity = useMemo(() => {
     if (homeMode !== "dashboard") return null;
