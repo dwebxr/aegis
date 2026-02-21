@@ -1120,6 +1120,26 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   const gr = scoreGrade(item.scores.composite);
                   const tag = deriveScoreTags(item)[0] ?? null;
                   const showThumb = item.imageUrl && !failedImages.has(item.id);
+                  const hasLink = item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl);
+                  const thumbContent = (
+                    <div style={{
+                      width: 80, minHeight: 60, flexShrink: 0,
+                      overflow: "hidden",
+                      background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexDirection: "column", gap: 2,
+                      cursor: hasLink ? "pointer" : undefined,
+                    }}>
+                      {showThumb ? (
+                        /* eslint-disable-next-line @next/next/no-img-element -- unreviewed card thumbnail */
+                        <img src={item.imageUrl!} alt=""
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          onError={() => markImgFailed(item.id)} />
+                      ) : (
+                        <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
+                      )}
+                    </div>
+                  );
                   return (
                     <div key={item.id} style={{
                       background: colors.bg.surface,
@@ -1128,22 +1148,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                       overflow: "hidden", transition: transitions.fast,
                     }}>
                       <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-                        <div style={{
-                          width: 80, minHeight: 60, flexShrink: 0,
-                          overflow: "hidden",
-                          background: showThumb ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          flexDirection: "column", gap: 2,
-                        }}>
-                          {showThumb ? (
-                            /* eslint-disable-next-line @next/next/no-img-element -- unreviewed card thumbnail */
-                            <img src={item.imageUrl!} alt=""
-                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                              onError={() => markImgFailed(item.id)} />
-                          ) : (
-                            <span style={{ fontSize: 20, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
-                          )}
-                        </div>
+                        {hasLink ? (
+                          <a href={item.sourceUrl!} target="_blank" rel="noopener noreferrer" style={{ display: "flex", flexShrink: 0 }}>
+                            {thumbContent}
+                          </a>
+                        ) : thumbContent}
                         <div style={{ flex: 1, minWidth: 0, padding: `${space[2]}px ${space[3]}px` }}>
                           <div style={{
                             fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.secondary,
