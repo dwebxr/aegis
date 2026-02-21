@@ -1,6 +1,11 @@
 # Aegis — D2A Social Agent Protocol
 
-Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol — with on-chain quality assurance deposits and D2A content provision fees.
+<div align="left">
+  <img src="overview.png" alt="Coo + Aegis" width="100%" />
+  <p>
+    <strong>Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol — with on-chain quality assurance deposits and D2A content provision fees.</strong>
+  </p>
+</div>
 
 ## Live
 
