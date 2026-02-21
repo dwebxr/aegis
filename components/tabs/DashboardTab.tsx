@@ -239,6 +239,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const markImgFailed = useCallback((id: string) => {
     setFailedImages(prev => { const next = new Set(prev); next.add(id); return next; });
   }, []);
+  // Clear stale failedImages when content items are added/removed (e.g., after backfill)
+  const prevContentLenRef = useRef(content.length);
+  useEffect(() => {
+    if (content.length !== prevContentLenRef.current) {
+      setFailedImages(new Set());
+      prevContentLenRef.current = content.length;
+    }
+  }, [content.length]);
   const [homeMode, setHomeMode] = useState<"feed" | "dashboard">(() => {
     if (typeof window === "undefined") return "feed";
     try { return localStorage.getItem("aegis-home-mode") === "dashboard" ? "dashboard" : "feed"; }

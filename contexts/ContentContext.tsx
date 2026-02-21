@@ -190,6 +190,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   contentRef.current = content;
   const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const backfillCleanupRef = useRef<(() => void) | null>(null);
+  const backfillFnRef = useRef<() => (() => void)>(() => () => {});
 
   useEffect(() => {
     if (isAuthenticated && identity) {
@@ -235,7 +236,14 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       });
     };
     const timestampTimer = setInterval(updateTimestamps, 30000);
-    const onVisible = () => { if (!document.hidden) updateTimestamps(); };
+    const onVisible = () => {
+      if (!document.hidden) {
+        updateTimestamps();
+        // Re-trigger backfill for items still missing thumbnails
+        backfillCleanupRef.current?.();
+        backfillCleanupRef.current = backfillFnRef.current();
+      }
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearInterval(timestampTimer);
@@ -443,7 +451,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const backfillImageUrls = useCallback((): (() => void) => {
     const items = contentRef.current
       .filter(c => c.sourceUrl && !c.imageUrl && /^https?:\/\//i.test(c.sourceUrl))
-      .slice(0, 10);
+      .slice(0, 30);
     if (items.length === 0) return () => {};
 
     // Stagger requests to avoid rate limiting; return cleanup function
@@ -475,10 +483,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         } catch (err) {
           console.debug("[content] Image backfill failed for", item.id, errMsg(err));
         }
-      }, i * 1500));
+      }, i * 800));
     });
     return () => timers.forEach(clearTimeout);
   }, [isAuthenticated, principal]);
+  backfillFnRef.current = backfillImageUrls;
 
   const loadFromIC = useCallback(async () => {
     if (!actorRef.current || !isAuthenticated || !principal) return;
