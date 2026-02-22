@@ -6,6 +6,7 @@ import { CheckIcon, XCloseIcon, ChevronDownIcon, GearIcon } from "@/components/i
 import { fonts, colors, space, type as t, radii, transitions, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { contentToCSV } from "@/lib/utils/csv";
+import { extractYouTubeVideoId, youTubeEmbedUrl } from "@/lib/utils/youtube";
 import { useFilterMode } from "@/contexts/FilterModeContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { getContext, hasEnoughData } from "@/lib/preferences/engine";
@@ -114,6 +115,8 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
 }) {
   const showImg = item.imageUrl && !imgFailed;
   const hasLink = item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl);
+  const ytVideoId = item.sourceUrl ? extractYouTubeVideoId(item.sourceUrl) : null;
+
   const inner = (
     <div style={{
       position: "relative", width: "100%", aspectRatio: "16/9",
@@ -121,9 +124,18 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
       background: showImg ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
       display: "flex", alignItems: "center", justifyContent: "center",
       flexDirection: "column", gap: space[1],
-      cursor: hasLink ? "pointer" : undefined,
+      cursor: !ytVideoId && hasLink ? "pointer" : undefined,
     }}>
-      {showImg ? (
+      {ytVideoId ? (
+        <iframe
+          src={youTubeEmbedUrl(ytVideoId)}
+          title={item.text?.slice(0, 60) || "YouTube video"}
+          style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      ) : showImg ? (
         /* eslint-disable-next-line @next/next/no-img-element -- dashboard card OG thumbnail */
         <img src={item.imageUrl!} alt=""
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
@@ -134,10 +146,16 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
           <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.source}</span>
         </>
       )}
-      {overlay}
+      {overlay && (
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: ytVideoId ? "none" : "auto" as const }}>
+          {overlay}
+        </div>
+      )}
     </div>
   );
-  if (hasLink) {
+
+  // When YouTube is embedded, don't wrap in <a> — the iframe is the interaction
+  if (!ytVideoId && hasLink) {
     return (
       <a href={item.sourceUrl!} target="_blank" rel="noopener noreferrer" style={{ display: "block", textDecoration: "none" }}>
         {inner}
