@@ -653,7 +653,11 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Profile stored in localStorage (primary) with IC canister sync
 - After 3+ feedback events, AI scoring becomes personalized
 
-### Zero Feed Briefing
+### Dashboard & Briefing
+- **Top 3 + Topic Spotlight** hero cards with 16:9 thumbnails and inline Validate/Flag buttons
+- YouTube content auto-embeds as playable iframe in hero cards (Top3, Spotlight hero)
+- Unreviewed Queue and Topic Distribution panels for at-a-glance triage
+- Validated items excluded from Top3 and Spotlight to always surface actionable content
 - Ranks content by composite score, topic relevance, author trust, and recency
 - Surfaces 3–5 priority items + 1 serendipity pick (high novelty, outside your bubble)
 - Shareable briefings via Nostr NIP-23 long-form events with `/b/[naddr]` public pages
@@ -716,7 +720,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Sentry (@sentry/nextjs, auth/cookie scrubbing, breadcrumb URL stripping, conditional on DSN) |
-| Test | Jest + ts-jest (2809 tests, 177 suites) |
+| Test | Jest + ts-jest (2880 tests, 180 suites) |
 
 ## Project Structure
 
@@ -748,7 +752,7 @@ aegis/
 │           └── discover-feed/route.ts   # RSS feed auto-discovery from any URL
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
-│   ├── tabs/                            # Dashboard (+ Discoveries), Briefing, Incinerator, Sources, Analytics
+│   ├── tabs/                            # Dashboard (Top3, Spotlight, Discoveries, YouTube embed), Briefing, Incinerator, Sources, Analytics
 │   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner, CommandPalette
 │   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
 │   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
@@ -843,13 +847,14 @@ aegis/
 │       ├── csv.ts                       # CSV export (RFC-compliant escaping)
 │       ├── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
 │       ├── math.ts                      # Shared clamp() utility
+│       ├── youtube.ts                   # YouTube video ID extraction + embed URL builder
 │       └── statusEmitter.ts            # Generic status emitter factory (used by Ollama/WebLLM engines)
 │   └── sources/
 │       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Google News)
 │       └── storage.ts                   # Source config localStorage R/W
 ├── hooks/
 │   └── useKeyboardNav.ts               # J/K/L/H/V/F/O keyboard navigation + Cmd+K palette
-├── __tests__/                           # 2809 tests across 177 suites
+├── __tests__/                           # 2880 tests across 180 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -885,7 +890,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 2809 tests
+npm test              # Run all 2880 tests
 npm run test:watch    # Watch mode
 ```
 

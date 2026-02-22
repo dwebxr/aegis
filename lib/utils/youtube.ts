@@ -5,7 +5,7 @@
 /**
  * Extract YouTube video ID from common URL patterns.
  *
- * Supported: watch?v=, youtu.be/, /shorts/, /embed/
+ * Supported: watch?v=, youtu.be/, /shorts/, /embed/, /live/
  * Returns null for non-YouTube URLs, channels, playlists, etc.
  */
 export function extractYouTubeVideoId(url: string): string | null {
@@ -32,8 +32,8 @@ export function extractYouTubeVideoId(url: string): string | null {
     return v && /^[\w-]{11}$/.test(v) ? v : null;
   }
 
-  // /shorts/VIDEO_ID or /embed/VIDEO_ID
-  const pathMatch = parsed.pathname.match(/^\/(shorts|embed)\/([\w-]{11})(?:[/?#]|$)/);
+  // /shorts/VIDEO_ID, /embed/VIDEO_ID, or /live/VIDEO_ID
+  const pathMatch = parsed.pathname.match(/^\/(shorts|embed|live)\/([\w-]{11})(?:[/?#]|$)/);
   if (pathMatch) return pathMatch[2];
 
   return null;

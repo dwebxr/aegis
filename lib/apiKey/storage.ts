@@ -14,12 +14,20 @@ export function setUserApiKey(key: string): void {
     throw new Error("Invalid API key format: must start with sk-ant-");
   }
   if (typeof globalThis.localStorage === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, key);
+  try {
+    localStorage.setItem(STORAGE_KEY, key);
+  } catch {
+    // Quota exceeded or strict privacy mode
+  }
 }
 
 export function clearUserApiKey(): void {
   if (typeof globalThis.localStorage === "undefined") return;
-  localStorage.removeItem(STORAGE_KEY);
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Strict privacy mode
+  }
 }
 
 export function maskApiKey(key: string): string {

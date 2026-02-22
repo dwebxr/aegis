@@ -23,7 +23,11 @@ export function getOllamaConfig(): OllamaConfig {
 
 export function setOllamaConfig(config: OllamaConfig): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch {
+    // Quota exceeded or strict privacy mode
+  }
 }
 
 export function isOllamaEnabled(): boolean {

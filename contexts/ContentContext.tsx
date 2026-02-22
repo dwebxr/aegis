@@ -193,9 +193,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
 
   useEffect(() => {
+    let stale = false;
     if (isAuthenticated && identity) {
       createBackendActorAsync(identity)
         .then(actor => {
+          if (stale) return; // identity changed during async creation
           actorRef.current = actor;
           setSyncStatus("idle");
           // Actor is now ready — auto-load IC data
@@ -204,6 +206,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           });
         })
         .catch((err: unknown) => {
+          if (stale) return; // identity changed — ignore stale error
           console.error("[content] Failed to create IC actor:", errMsg(err));
           actorRef.current = null;
           setSyncStatus("offline");
@@ -213,6 +216,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       actorRef.current = null;
       setSyncStatus("offline");
     }
+    return () => { stale = true; };
   }, [isAuthenticated, identity, addNotification]);
 
   useEffect(() => {

@@ -43,19 +43,18 @@ export async function POST(request: NextRequest) {
   const isUserKey = !!(userKey && userKey.startsWith("sk-ant-"));
   const apiKey = isUserKey ? userKey : process.env.ANTHROPIC_API_KEY?.trim();
 
+  const heuristic = { ...heuristicScores(text), tier: "heuristic" as const };
+
   if (!apiKey) {
     console.warn("[analyze] No API key available, using heuristic fallback");
-    const fallback = heuristicScores(text);
-    return NextResponse.json({ ...fallback, tier: "heuristic" });
+    return NextResponse.json(heuristic);
   }
   if (!isUserKey && !withinDailyBudget()) {
     console.warn("[analyze] Daily budget exhausted, using heuristic fallback");
-    const fallback = heuristicScores(text);
-    return NextResponse.json({ ...fallback, tier: "heuristic" });
+    return NextResponse.json(heuristic);
   }
   if (!isUserKey) recordApiCall();
 
-  // Build prompt: merge all user topic types into a single list for the shared prompt
   const allTopics = userContext
     ? [...userContext.recentTopics, ...userContext.highAffinityTopics].filter(Boolean)
     : [];
@@ -83,31 +82,27 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     clearTimeout(timeout);
     console.error("[analyze] Anthropic fetch failed:", errMsg(err));
-    const fallback = heuristicScores(text);
-    return NextResponse.json({ error: "Request failed", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
+    return NextResponse.json({ error: "Request failed", fallback: heuristic }, { status: 502 });
   }
 
   clearTimeout(timeout);
 
   if (!res.ok) {
     console.error(`[analyze] Anthropic API returned ${res.status}`);
-    const fallback = heuristicScores(text);
-    return NextResponse.json({ error: `Anthropic API error: ${res.status}`, fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
+    return NextResponse.json({ error: `Anthropic API error: ${res.status}`, fallback: heuristic }, { status: 502 });
   }
 
   let data;
   try { data = await res.json(); } catch (err) {
     console.error("[analyze] Failed to parse Anthropic JSON:", errMsg(err));
-    const fallback = heuristicScores(text);
-    return NextResponse.json({ error: "Failed to parse Anthropic response", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
+    return NextResponse.json({ error: "Failed to parse Anthropic response", fallback: heuristic }, { status: 502 });
   }
   const rawText = data.content?.[0]?.text || "";
   const parsed = parseScoreResponse(rawText);
 
   if (!parsed) {
     console.warn("[analyze] AI returned non-JSON, falling back to heuristic");
-    const fallback = heuristicScores(text);
-    return NextResponse.json({ error: "Failed to parse AI response", fallback: { ...fallback, tier: "heuristic" } }, { status: 502 });
+    return NextResponse.json({ error: "Failed to parse AI response", fallback: heuristic }, { status: 502 });
   }
 
   return NextResponse.json({ ...parsed, tier: "claude" });

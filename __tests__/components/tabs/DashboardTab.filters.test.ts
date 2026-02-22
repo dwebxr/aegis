@@ -42,37 +42,40 @@ describe("Filtering logic", () => {
     expect(applyDashboardFilters(items, "all", "all")).toHaveLength(6);
   });
 
-  it("quality filter only returns quality items", () => {
+  it("quality filter returns exactly the 4 quality items by ID", () => {
     const result = applyDashboardFilters(items, "quality", "all");
-    expect(result.every(c => c.verdict === "quality")).toBe(true);
-    expect(result).toHaveLength(4);
+    const ids = result.map(c => c.id);
+    expect(ids).toHaveLength(4);
+    expect(ids).toEqual(expect.arrayContaining(["q1", "q2", "v1", "v2"]));
+    expect(ids).not.toContain("s1");
+    expect(ids).not.toContain("s2");
   });
 
-  it("slop filter only returns slop items", () => {
+  it("slop filter returns exactly the 2 slop items by ID", () => {
     const result = applyDashboardFilters(items, "slop", "all");
-    expect(result.every(c => c.verdict === "slop")).toBe(true);
-    expect(result).toHaveLength(2);
+    const ids = result.map(c => c.id);
+    expect(ids).toEqual(["s1", "s2"]);
   });
 
-  it("validated filter only returns validated items sorted by validatedAt", () => {
+  it("validated filter returns validated items sorted by validatedAt desc", () => {
     const result = applyDashboardFilters(items, "validated", "all");
-    expect(result.every(c => c.validated)).toBe(true);
-    expect(result).toHaveLength(2);
-    expect(result[0].validatedAt).toBe(2000); // Most recent first
+    expect(result.map(c => c.id)).toEqual(["v1", "v2"]);
+    expect(result[0].validatedAt).toBe(2000);
     expect(result[1].validatedAt).toBe(1000);
   });
 
-  it("source filter narrows to specific source", () => {
+  it("source filter narrows to specific source by ID", () => {
     const result = applyDashboardFilters(items, "all", "rss");
-    expect(result.every(c => c.source === "rss")).toBe(true);
-    expect(result).toHaveLength(2);
+    const ids = result.map(c => c.id);
+    expect(ids).toEqual(expect.arrayContaining(["q2", "v1"]));
+    expect(ids).toHaveLength(2);
   });
 
-  it("combined verdict + source filter", () => {
+  it("combined verdict + source filter returns matching items by ID", () => {
     const result = applyDashboardFilters(items, "quality", "manual");
-    expect(result.every(c => c.verdict === "quality" && c.source === "manual")).toBe(true);
-    // q1 (quality/manual) + v2 (quality/manual/validated) = 2
-    expect(result).toHaveLength(2);
+    const ids = result.map(c => c.id);
+    expect(ids).toHaveLength(2);
+    expect(ids).toEqual(expect.arrayContaining(["q1", "v2"]));
   });
 
   it("returns empty for non-matching source", () => {

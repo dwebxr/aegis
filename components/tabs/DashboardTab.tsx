@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { MiniChart } from "@/components/ui/MiniChart";
-import { ContentCard, deriveScoreTags, ScoreGrid, TopicTags } from "@/components/ui/ContentCard";
-import { CheckIcon, XCloseIcon, ChevronDownIcon, GearIcon } from "@/components/icons";
+import { ContentCard, deriveScoreTags } from "@/components/ui/ContentCard";
+import { ChevronDownIcon, GearIcon } from "@/components/icons";
 import { fonts, colors, space, type as t, radii, transitions, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { contentToCSV } from "@/lib/utils/csv";
@@ -36,41 +36,6 @@ function downloadFile(data: string, filename: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-const reasonBoxStyle: React.CSSProperties = {
-  fontSize: t.bodySm.size, color: colors.text.tertiary, lineHeight: 1.5,
-  fontStyle: "italic", background: colors.bg.raised,
-  padding: `${space[2]}px ${space[3]}px`, borderRadius: radii.md,
-  marginBottom: space[3], wordBreak: "break-word",
-};
-
-const expandToggleBtnStyle: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 4,
-  background: "transparent", border: "none",
-  color: colors.text.muted, fontSize: t.caption.size, fontWeight: 600,
-  cursor: "pointer", padding: `${space[1]}px ${space[2]}px`,
-  borderRadius: radii.sm, fontFamily: "inherit",
-  transition: transitions.fast,
-};
-
-const actionBtnBase: React.CSSProperties = {
-  flex: 1, padding: `${space[2]}px ${space[3]}px`,
-  borderRadius: radii.md,
-  fontSize: t.bodySm.size, fontWeight: 600,
-  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-  transition: transitions.fast, fontFamily: "inherit",
-};
-
-const readMoreLinkStyle: React.CSSProperties = {
-  display: "flex", alignItems: "center", justifyContent: "center",
-  padding: `${space[2]}px ${space[3]}px`,
-  background: `${colors.blue[400]}10`,
-  border: `1px solid ${colors.blue[400]}30`,
-  borderRadius: radii.md,
-  color: colors.blue[400], fontSize: t.bodySm.size, fontWeight: 600,
-  textDecoration: "none", whiteSpace: "nowrap",
-  transition: transitions.fast, fontFamily: "inherit",
-};
-
 function ScorePill({ gr, tag }: { gr: ReturnType<typeof scoreGrade>; tag: { label: string; color: string } | null }) {
   return (
     <div style={{
@@ -87,21 +52,6 @@ function ScorePill({ gr, tag }: { gr: ReturnType<typeof scoreGrade>; tag: { labe
         </>
       )}
     </div>
-  );
-}
-
-function ExpandToggle({ isExpanded, onClick }: { isExpanded: boolean; onClick: (e: React.MouseEvent) => void }) {
-  return (
-    <button onClick={onClick} style={expandToggleBtnStyle}>
-      <span style={{
-        display: "inline-flex",
-        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-        transition: "transform 0.2s ease",
-      }}>
-        <ChevronDownIcon s={14} />
-      </span>
-      {isExpanded ? "Close" : "Details"}
-    </button>
   );
 }
 
@@ -177,51 +127,6 @@ const inlineFBtnStyle: React.CSSProperties = {
   color: colors.red[400], fontSize: t.caption.size, fontWeight: 600,
   cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
 };
-
-function ExpandedDetails({ item, onValidate, onFlag }: {
-  item: ContentItem;
-  onValidate: (id: string) => void;
-  onFlag: (id: string) => void;
-}) {
-  return (
-    <div
-      style={{ marginTop: space[3], paddingTop: space[3], borderTop: `1px solid ${colors.border.default}`, overflow: "hidden" }}
-      onClick={e => e.stopPropagation()}
-    >
-      <ScoreGrid item={item} />
-      {item.reason && <div style={reasonBoxStyle}>{item.reason}</div>}
-      {item.topics && item.topics.length > 0 && (
-        <div style={{ marginBottom: space[3] }}><TopicTags topics={item.topics} /></div>
-      )}
-      <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
-        {item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) && (
-          <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()} style={readMoreLinkStyle}>
-            Read more &rarr;
-          </a>
-        )}
-        <button disabled={item.validated} onClick={e => { e.stopPropagation(); onValidate(item.id); }}
-          style={{
-            ...actionBtnBase,
-            background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
-            border: `1px solid ${colors.green.border}`, color: colors.green[400],
-            cursor: item.validated ? "default" : "pointer", opacity: item.validated ? 0.6 : 1,
-          }}>
-          <CheckIcon /> {item.validated ? "Validated" : "Validate"}
-        </button>
-        <button disabled={item.flagged} onClick={e => { e.stopPropagation(); onFlag(item.id); }}
-          style={{
-            ...actionBtnBase,
-            background: item.flagged ? `${colors.red[400]}18` : colors.red.bg,
-            border: `1px solid ${colors.red.border}`, color: colors.red[400],
-            cursor: item.flagged ? "default" : "pointer", opacity: item.flagged ? 0.6 : 1,
-          }}>
-          <XCloseIcon /> {item.flagged ? "Flagged" : "Flag Slop"}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function AgentKnowledgePills({ agentContext, profile }: {
   agentContext: { highAffinityTopics: string[]; trustedAuthors: string[] };
@@ -336,15 +241,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop };
   }, [content]);
 
-  // Reset expansion/pagination when filters change
   useEffect(() => {
     setExpanded(null);
     setShowAllContent(false);
   }, [verdictFilter, sourceFilter]);
 
-  const filteredContent = useMemo(() => {
-    return applyDashboardFilters(content, verdictFilter, sourceFilter);
-  }, [content, verdictFilter, sourceFilter]);
+  const filteredContent = useMemo(
+    () => applyDashboardFilters(content, verdictFilter, sourceFilter),
+    [content, verdictFilter, sourceFilter],
+  );
 
   const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
 
@@ -586,7 +491,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
       {homeMode === "feed" && (
         <>
-          {/* Compact metrics summary */}
           <div style={{
             display: "flex", flexWrap: "wrap", alignItems: "center",
             gap: mobile ? space[3] : space[4],
@@ -1122,7 +1026,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           </a>
                         ) : dThumbContent}
                         <div style={{ flex: 1, minWidth: 0, padding: `${space[3]}px ${space[4]}px` }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[1] }}>
+                          <div style={{ marginBottom: space[1] }}>
                             <SerendipityBadge discoveryType={d.discoveryType} mobile={mobile} />
                           </div>
                           <div style={{
@@ -1240,9 +1144,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             <ScorePill gr={gr} tag={tag} />
                             <div style={{ flex: 1 }} />
                             <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
-                              style={inlineVBtnStyle}>&#x2713;</button>
+                              disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
-                              style={inlineFBtnStyle}>&#x2717;</button>
+                              disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1, cursor: item.flagged ? "default" : "pointer" }}>&#x2717;</button>
                           </div>
                         </div>
                       </div>

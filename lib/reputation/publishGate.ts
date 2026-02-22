@@ -51,8 +51,12 @@ export function loadPublishReputations(): Map<string, PublishReputation> {
 
 export function savePublishReputations(map: Map<string, PublishReputation>): void {
   if (typeof globalThis.localStorage === "undefined") return;
-  const store: SerializedStore = { version: 1, entries: Array.from(map.entries()) };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  try {
+    const store: SerializedStore = { version: 1, entries: Array.from(map.entries()) };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // Quota exceeded or strict privacy mode
+  }
 }
 
 export function getPublishReputation(pubkey: string): PublishReputation | undefined {
