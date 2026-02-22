@@ -12,7 +12,6 @@ import { contentDedup, computeDashboardTop3, computeTopicSpotlight, computeDashb
 import { createEmptyProfile } from "@/lib/preferences/types";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { ContentItem } from "@/lib/types/content";
-import type { BriefingItem } from "@/lib/briefing/types";
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
@@ -367,19 +366,18 @@ describe("Ranking stability — pinned time reference", () => {
 
 // ─── Validated section dedup ───
 
-describe("Validated section — excluded from other sections", () => {
-  it("validated items shown in Top3/Spotlight are excluded from Validated section", () => {
+describe("Validated section — excluded from Top3/Spotlight", () => {
+  it("validated items never appear in Top3 or Spotlight, only in Validated section", () => {
     const now = Date.now();
     const profile = makeProfile({ ai: 0.8 });
-    // Fillers push only-validated out of priority so it only appears in Validated section
     const fillers = Array.from({ length: 6 }, (_, i) =>
       makeItem({ id: `fill-${i}`, topics: ["other"], text: `Filler ${i} unique`, scores: { originality: 20, insight: 20, credibility: 20, composite: 20 } }),
     );
     const items = [
       ...fillers,
-      // High-scoring validated item → should appear in Top3 (composite 10 + ai affinity boost = 11.6)
+      // High-scoring validated item → excluded from Top3/Spotlight, only in Validated
       makeItem({ id: "top-validated", topics: ["ai"], text: "Top validated AI article content", scores: { originality: 10, insight: 10, credibility: 10, composite: 10 }, validated: true, validatedAt: now }),
-      // Low-scoring validated item → should NOT make Top3, only in Validated section
+      // Low-scoring validated item → also only in Validated section
       makeItem({ id: "only-validated", topics: ["cooking"], text: "A validated cooking article", scores: { originality: 5, insight: 5, credibility: 5, composite: 5 }, validated: true, validatedAt: now - 1000 }),
     ];
 
@@ -392,13 +390,14 @@ describe("Validated section — excluded from other sections", () => {
       for (const item of g.items) shownIds.add(item.id);
     }
 
-    const validated = computeDashboardValidated(items, shownIds);
+    // Validated items must NOT appear in Top3 or Spotlight
+    expect(shownIds.has("top-validated")).toBe(false);
+    expect(shownIds.has("only-validated")).toBe(false);
 
+    const validated = computeDashboardValidated(items, shownIds);
     const valIds = validated.map((v: ContentItem) => v.id);
-    // top-validated should be in Spotlight (ai affinity 0.8) → in shownIds → excluded from Validated
-    expect(shownIds.has("top-validated")).toBe(true);
-    expect(valIds).not.toContain("top-validated");
-    // only-validated is not in Top3 or Spotlight → should appear in Validated
+    // Both validated items should appear in the Validated section
+    expect(valIds).toContain("top-validated");
     expect(valIds).toContain("only-validated");
   });
 });

@@ -54,7 +54,9 @@ export function computeDashboardTop3(
   profile: UserPreferenceProfile,
   now: number,
 ): BriefingItem[] {
-  const briefing = generateBriefing(content, profile, now);
+  // Exclude validated items — they appear in the Validated section
+  const fresh = content.filter(c => !c.validated);
+  const briefing = generateBriefing(fresh, profile, now);
   const seenKeys = new Set<string>();
   const deduped = briefing.priority.filter(bi => {
     const key = contentDedup(bi.item);
@@ -79,7 +81,7 @@ export function computeTopicSpotlight(
   if (highTopics.length === 0) return [];
 
   const top3Ids = new Set(top3.map(c => c.item.id));
-  const qualityItems = content.filter(c => c.verdict === "quality" && !c.flagged && !top3Ids.has(c.id));
+  const qualityItems = content.filter(c => c.verdict === "quality" && !c.flagged && !c.validated && !top3Ids.has(c.id));
 
   const dedupKeys = new Map<string, string>();
   for (const c of qualityItems) dedupKeys.set(c.id, contentDedup(c));
