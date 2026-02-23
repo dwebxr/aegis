@@ -28,6 +28,7 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
         Content to Evaluate
       </label>
       <textarea
+        data-testid="aegis-manual-textarea"
         value={text}
         onChange={e => setText(e.target.value)}
         placeholder="Paste content here for AI quality analysis..."
@@ -40,6 +41,7 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
       />
       <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 16, alignItems: "flex-end" }}>
         <button
+          data-testid="aegis-manual-analyze"
           onClick={handleGo}
           disabled={isAnalyzing || !text.trim()}
           style={{
@@ -61,7 +63,7 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
       </div>
 
       {result && (
-        <div style={{
+        <div data-testid="aegis-manual-result" style={{
           background: result.verdict === "quality" ? "rgba(52,211,153,0.05)" : "rgba(248,113,113,0.05)",
           border: `1px solid ${result.verdict === "quality" ? "rgba(52,211,153,0.2)" : "rgba(248,113,113,0.2)"}`,
           borderRadius: 14, padding: mobile ? 16 : 22, animation: "fadeIn .5s ease",
@@ -70,7 +72,7 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 22 }}>{result.verdict === "quality" ? "✅" : "🔥"}</span>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: result.verdict === "quality" ? "#34d399" : "#f87171", textTransform: "uppercase" }}>
+                <div data-testid="aegis-manual-verdict" style={{ fontSize: 14, fontWeight: 800, color: result.verdict === "quality" ? "#34d399" : "#f87171", textTransform: "uppercase" }}>
                   {result.verdict === "quality" ? "Quality" : "Slop"}
                 </div>
                 <div style={{ fontSize: 11, color: "#64748b" }}>

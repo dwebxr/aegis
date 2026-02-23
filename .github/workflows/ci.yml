@@ -49,9 +49,39 @@ jobs:
         name: Security audit (high — advisory)
         continue-on-error: true
 
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [lint-and-test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e -- --project=desktop-chrome
+        env:
+          NEXT_PUBLIC_CANISTER_ID: rluf3-eiaaa-aaaam-qgjuq-cai
+          NEXT_PUBLIC_IC_HOST: https://icp-api.io
+          NEXT_PUBLIC_INTERNET_IDENTITY_URL: https://identity.ic0.app
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
   build:
     runs-on: ubuntu-latest
-    needs: [lint-and-test, security-audit]
+    needs: [lint-and-test, security-audit, e2e]
     steps:
       - uses: actions/checkout@v4
 

@@ -129,7 +129,7 @@ const sectionLabel: React.CSSProperties = {
 };
 
 export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mobile }) => (
-  <div style={{
+  <div data-testid="aegis-landing-hero" style={{
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -155,7 +155,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
     </div>
 
     {/* Hero heading */}
-    <h1 style={{
+    <h1 data-testid="aegis-landing-heading" style={{
       fontSize: mobile ? 28 : 40,
       fontWeight: 800,
       lineHeight: 1.1,
@@ -199,6 +199,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
       width: mobile ? "100%" : "auto",
     }}>
       <button
+        data-testid="aegis-landing-try-demo"
         onClick={onTryDemo}
         style={{
           padding: `${space[3]}px ${space[8]}px`,
@@ -218,6 +219,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
         Try the Demo
       </button>
       <button
+        data-testid="aegis-landing-login"
         onClick={onLogin}
         style={{
           padding: `${space[1]}px ${space[4]}px`,

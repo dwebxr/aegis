@@ -407,7 +407,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   ], [onTabChange, exportCSV, exportJSON]);
 
   return (
-    <div style={{ animation: "fadeIn .4s ease" }}>
+    <div data-testid="aegis-dashboard" style={{ animation: "fadeIn .4s ease" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[2], flexWrap: "wrap", gap: space[2] }}>
         <h1 style={{ fontSize: mobile ? t.h1.mobileSz : t.h1.size, fontWeight: t.h1.weight, color: colors.text.primary, margin: 0 }}>
           Home
@@ -423,6 +423,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               return (
                 <button
                   key={mode}
+                  data-testid={`aegis-home-mode-${mode}`}
                   onClick={() => setHomeMode(mode)}
                   style={{
                     padding: `${space[2]}px ${space[3]}px`,
@@ -491,7 +492,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
       {homeMode === "feed" && (
         <>
-          <div style={{
+          <div data-testid="aegis-metrics-bar" style={{
             display: "flex", flexWrap: "wrap", alignItems: "center",
             gap: mobile ? space[3] : space[4],
             marginBottom: space[3],
@@ -543,6 +544,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               {(["quality", "all", "slop", "validated"] as const).map(v => (
                 <button
                   key={v}
+                  data-testid={`aegis-filter-${v}`}
                   onClick={() => setVerdictFilter(v)}
                   style={{
                     padding: `${space[1]}px ${space[3]}px`,
@@ -720,7 +722,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             marginBottom: space[4],
           }}>
           {/* Today's Top 3 — full width */}
-          <div style={{ gridColumn: mobile ? undefined : "1 / -1" }}>
+          <div data-testid="aegis-top3-section" style={{ gridColumn: mobile ? undefined : "1 / -1" }}>
             <div style={{
               fontSize: t.h3.size, fontWeight: t.h3.weight,
               color: colors.text.tertiary, marginBottom: space[3],

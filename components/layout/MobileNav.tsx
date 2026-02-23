@@ -29,7 +29,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
         {navItems.map(it => {
           const active = activeTab === it.id;
           return (
-            <button key={it.id} onClick={() => onTabChange(it.id)} title={it.description} style={{
+            <button key={it.id} data-testid={`aegis-nav-mobile-${it.id}`} onClick={() => onTabChange(it.id)} title={it.description} style={{
               display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
               background: "none", border: "none", cursor: "pointer",
               padding: `6px ${space[3]}px`, minHeight: 48, minWidth: 48,

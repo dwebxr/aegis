@@ -59,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
     {navItems.map(it => {
       const active = activeTab === it.id;
       return (
-        <button key={it.id} onClick={() => onTabChange(it.id)} style={{
+        <button key={it.id} data-testid={`aegis-nav-${it.id}`} onClick={() => onTabChange(it.id)} style={{
           display: "flex", alignItems: "center", gap: space[3],
           padding: collapsed ? `${space[3]}px 0` : `${space[3]}px ${space[4]}px`,
           marginBottom: space[1],
@@ -94,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
     )}
 
     {isAuthenticated && (
-      <button onClick={() => onTabChange("settings")} style={{
+      <button data-testid="aegis-nav-settings" onClick={() => onTabChange("settings")} style={{
         display: "flex", alignItems: "center", gap: space[2],
         padding: collapsed ? `${space[2]}px 0` : `${space[2]}px ${space[3]}px`,
         marginBottom: space[3],

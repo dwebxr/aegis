@@ -39,7 +39,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
         <Sidebar navItems={buildNavItems(20)} activeTab={activeTab} onTabChange={onTabChange} collapsed={tablet} />
       )}
 
-      <main style={{
+      <main data-testid="aegis-main-content" style={{
         flex: 1, overflow: "auto",
         padding: mobile ? `${space[4]}px ${space[4]}px 100px` : tablet ? `${space[6]}px ${space[6]}px` : `${space[10]}px ${space[12]}px`,
       }}>

@@ -68,7 +68,7 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onA
       )}
 
       <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
-        <h1 style={{
+        <h1 data-testid="aegis-incinerator-heading" style={{
           fontSize: mobile ? t.display.mobileSz : t.display.size,
           fontWeight: t.display.weight,
           lineHeight: t.display.lineHeight,

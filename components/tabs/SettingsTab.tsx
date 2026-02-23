@@ -255,7 +255,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
     <div>
       {/* Header */}
       <div style={{ marginBottom: mobile ? space[4] : space[6] }}>
-        <h1 style={{ fontSize: mobile ? t.h2.size : t.h1.size, fontWeight: 800, color: colors.text.primary, margin: 0, letterSpacing: -0.5 }}>
+        <h1 data-testid="aegis-settings-heading" style={{ fontSize: mobile ? t.h2.size : t.h1.size, fontWeight: 800, color: colors.text.primary, margin: 0, letterSpacing: -0.5 }}>
           Settings
         </h1>
         <p style={{ fontSize: t.body.mobileSz, color: colors.text.muted, margin: `${space[1]}px 0 0` }}>

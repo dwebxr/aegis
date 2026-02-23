@@ -11,7 +11,7 @@ export const DemoBanner: React.FC<{ mobile?: boolean }> = ({ mobile }) => {
   if (!isDemoMode || bannerDismissed) return null;
 
   return (
-    <div style={{
+    <div data-testid="aegis-demo-banner" style={{
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
@@ -60,6 +60,7 @@ export const DemoBanner: React.FC<{ mobile?: boolean }> = ({ mobile }) => {
           Login
         </button>
         <button
+          data-testid="aegis-demo-banner-dismiss"
           onClick={dismissBanner}
           style={{
             background: "none",
