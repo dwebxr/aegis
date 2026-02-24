@@ -12,9 +12,9 @@ function makeRequest(body: unknown): NextRequest {
 }
 
 describe("POST /api/analyze — userContext sanitization", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     _resetRateLimits();
-    _resetDailyBudget();
+    await _resetDailyBudget();
   });
 
   it("accepts valid userContext and uses it (heuristic tier fallback)", async () => {
@@ -167,9 +167,9 @@ describe("POST /api/analyze — userContext sanitization", () => {
 });
 
 describe("POST /api/analyze — text validation edge cases", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     _resetRateLimits();
-    _resetDailyBudget();
+    await _resetDailyBudget();
   });
 
   it("rejects text that is only whitespace", async () => {

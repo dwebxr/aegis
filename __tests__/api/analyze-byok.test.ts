@@ -16,9 +16,9 @@ function makeRequest(body: unknown, headers?: Record<string, string>): NextReque
 }
 
 describe("POST /api/analyze — BYOK (user API key)", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     _resetRateLimits();
-    _resetDailyBudget();
+    await _resetDailyBudget();
     // Ensure no server key
     delete process.env.ANTHROPIC_API_KEY;
   });
@@ -211,9 +211,9 @@ describe("POST /api/analyze — BYOK (user API key)", () => {
 });
 
 describe("POST /api/analyze — userContext sanitization", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     _resetRateLimits();
-    _resetDailyBudget();
+    await _resetDailyBudget();
     delete process.env.ANTHROPIC_API_KEY;
   });
 

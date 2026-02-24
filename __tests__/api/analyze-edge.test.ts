@@ -12,9 +12,9 @@ function makeRequest(body: unknown): NextRequest {
 }
 
 describe("POST /api/analyze — edge cases", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     _resetRateLimits();
-    _resetDailyBudget();
+    await _resetDailyBudget();
   });
 
   describe("input boundary conditions", () => {

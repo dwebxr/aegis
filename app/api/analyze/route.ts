@@ -49,11 +49,11 @@ export async function POST(request: NextRequest) {
     console.warn("[analyze] No API key available, using heuristic fallback");
     return NextResponse.json(heuristic);
   }
-  if (!isUserKey && !withinDailyBudget()) {
+  if (!isUserKey && !(await withinDailyBudget())) {
     console.warn("[analyze] Daily budget exhausted, using heuristic fallback");
     return NextResponse.json(heuristic);
   }
-  if (!isUserKey) recordApiCall();
+  if (!isUserKey) await recordApiCall();
 
   const allTopics = userContext
     ? [...userContext.recentTopics, ...userContext.highAffinityTopics].filter(Boolean)

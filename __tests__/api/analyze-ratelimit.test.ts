@@ -15,9 +15,9 @@ function makeRequest(text: string, ip = "10.0.0.1"): NextRequest {
 }
 
 describe("POST /api/analyze — rate limiting", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     _resetRateLimits();
-    _resetDailyBudget();
+    await _resetDailyBudget();
   });
 
   it("allows requests up to the limit (20 per minute)", async () => {
@@ -85,9 +85,9 @@ describe("POST /api/analyze — rate limiting", () => {
 describe("POST /api/analyze — daily budget", () => {
   const origEnv = process.env;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     _resetRateLimits();
-    _resetDailyBudget();
+    await _resetDailyBudget();
   });
 
   afterEach(() => {
