@@ -10,7 +10,7 @@ import { useSources } from "@/contexts/SourceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { parseGitHubRepo, parseBlueskyHandle, buildTopicFeedUrl } from "@/lib/sources/platformFeed";
-import { loadSourceStates, type SourceRuntimeState, getSourceHealth, getSourceKey } from "@/lib/ingestion/sourceState";
+import { loadSourceStates, resetSourceErrors, type SourceRuntimeState, getSourceHealth, getSourceKey } from "@/lib/ingestion/sourceState";
 import { relativeTime } from "@/lib/utils/scores";
 
 function isTimeout(err: unknown): boolean {
@@ -856,9 +856,23 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     )}
                     {/* Error message */}
                     {state && state.errorCount > 0 && (
-                      <div style={{ fontSize: t.tiny.size, color: colors.red[400], marginTop: 2 }}>
-                        {state.errorCount >= 5 ? "Auto-disabled: " : `Error (${state.errorCount}x): `}
-                        {state.lastError}
+                      <div style={{ fontSize: t.tiny.size, color: colors.red[400], marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                        <span>
+                          {state.errorCount >= 5 ? "Auto-disabled: " : `Error (${state.errorCount}x): `}
+                          {state.lastError}
+                        </span>
+                        {state.errorCount >= 5 && !isDemoMode && (
+                          <button
+                            onClick={() => { resetSourceErrors(stateKey); setSourceStates(loadSourceStates()); }}
+                            style={{
+                              background: "none", border: `1px solid ${colors.amber[400]}`, borderRadius: radii.sm,
+                              color: colors.amber[400], fontSize: t.tiny.size, fontWeight: 600,
+                              padding: "1px 6px", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                            }}
+                          >
+                            Retry
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

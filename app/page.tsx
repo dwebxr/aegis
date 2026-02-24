@@ -589,9 +589,9 @@ function AegisAppInner() {
       {isAuthenticated && !linkedAccount && !wotPromptDismissed && (
         <WoTPromptBanner onGoToSettings={() => setTab("settings")} onDismiss={dismissWotPrompt} />
       )}
-      <div style={{ display: tab === "dashboard" ? undefined : "none" }}>
+      {tab === "dashboard" && (
         <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={setTab} discoveries={discoveries} />
-      </div>
+      )}
       {tab === "briefing" && <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} onTabChange={setTab} />}
       {tab === "incinerator" && (
         <IncineratorTab

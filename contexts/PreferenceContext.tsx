@@ -149,8 +149,8 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     debouncedICSync(next);
   }, [debouncedSave, debouncedICSync]);
 
-  const isPersonalized = hasEnoughData(profile);
-  const userContext = isPersonalized ? getContext(profile) : null;
+  const isPersonalized = useMemo(() => hasEnoughData(profile), [profile]);
+  const userContext = useMemo(() => isPersonalized ? getContext(profile) : null, [profile, isPersonalized]);
 
   const value = useMemo(() => ({
     profile, userContext, isPersonalized, onValidate, onFlag,

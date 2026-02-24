@@ -275,44 +275,34 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, dashboardTop3]);
 
-  // Cascading cross-section deduplication: Top3 → Spotlight → Discoveries → Validated
-  const shownByTopSections = useMemo(() => {
-    const ids = new Set(dashboardTop3.map(c => c.item.id));
+  // Cascading cross-section deduplication: Top3 → Spotlight → Discoveries → Unreviewed → Validated
+  // Consolidated into a single memo to avoid 6-step intermediate Set allocations.
+  const { filteredDiscoveries, unreviewedQueue, dashboardValidated } = useMemo(() => {
+    // 1. Top sections: Top3 + Spotlight
+    const topIds = new Set(dashboardTop3.map(c => c.item.id));
     for (const group of dashboardTopicSpotlight) {
-      for (const item of group.items) ids.add(item.id);
+      for (const item of group.items) topIds.add(item.id);
     }
-    return ids;
-  }, [dashboardTop3, dashboardTopicSpotlight]);
 
-  const filteredDiscoveries = useMemo(() => {
-    return discoveries.filter(d => !shownByTopSections.has(d.item.id));
-  }, [discoveries, shownByTopSections]);
+    // 2. Discoveries (exclude items already in top sections)
+    const filtDisc = discoveries.filter(d => !topIds.has(d.item.id));
+    for (const d of filtDisc) topIds.add(d.item.id);
 
-  const allShownIds = useMemo(() => {
-    const ids = new Set(shownByTopSections);
-    for (const d of filteredDiscoveries) ids.add(d.item.id);
-    return ids;
-  }, [shownByTopSections, filteredDiscoveries]);
+    // 3. Unreviewed queue (exclude all shown so far)
+    const queue = computeUnreviewedQueue(contentRef.current, topIds);
+    for (const item of queue) topIds.add(item.id);
 
-  const unreviewedQueue = useMemo(() => {
-    return computeUnreviewedQueue(contentRef.current, allShownIds);
+    // 4. Validated (exclude everything above)
+    const validated = computeDashboardValidated(contentRef.current, topIds);
+
+    return { filteredDiscoveries: filtDisc, unreviewedQueue: queue, dashboardValidated: validated };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allShownIds]);
-
-  const allShownIdsWithQueue = useMemo(() => {
-    const ids = new Set(allShownIds);
-    for (const item of unreviewedQueue) ids.add(item.id);
-    return ids;
-  }, [allShownIds, unreviewedQueue]);
-
-  const dashboardValidated = useMemo(() => {
-    return computeDashboardValidated(contentRef.current, allShownIdsWithQueue);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allShownIdsWithQueue]);
+  }, [dashboardTop3, dashboardTopicSpotlight, discoveries]);
 
   const topicDistribution = useMemo(() => {
+    if (homeMode !== "dashboard") return null;
     return computeTopicDistribution(content);
-  }, [content]);
+  }, [content, homeMode]);
 
   const dashboardActivity = useMemo(() => {
     if (homeMode !== "dashboard") return null;
@@ -1268,14 +1258,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             }}>
               <span>&#x1F4CA;</span> Topic Breakdown
             </div>
-            {topicDistribution.length === 0 ? (
+            {(topicDistribution ?? []).length === 0 ? (
               <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
                 Add sources to see topic distribution.
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
-                {topicDistribution.map(entry => {
-                  const maxCount = topicDistribution[0].count;
+                {(topicDistribution ?? []).map(entry => {
+                  const maxCount = (topicDistribution ?? [])[0]?.count ?? 0;
                   const barWidth = maxCount > 0 ? Math.max((entry.count / maxCount) * 100, 8) : 0;
                   const barColor = entry.qualityRate >= 0.6 ? colors.cyan[400] : entry.qualityRate >= 0.3 ? colors.sky[400] : colors.orange[400];
                   return (

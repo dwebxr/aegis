@@ -22,6 +22,8 @@ export type SourceHealth = "healthy" | "degraded" | "error" | "disabled";
 
 export const BACKOFF_MS = [60_000, 300_000, 1_200_000, 3_600_000] as const;
 export const MAX_CONSECUTIVE_FAILURES = 5;
+/** After 6 hours, auto-disabled sources get a single retry attempt. */
+export const AUTO_RECOVERY_MS = 6 * 60 * 60 * 1000;
 
 export const BASE_CYCLE_MS = 2 * 60 * 1000;
 const MAX_INTERVAL_MS = 2 * 60 * 60 * 1000;

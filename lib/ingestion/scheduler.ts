@@ -11,6 +11,7 @@ import {
   computeAdaptiveInterval,
   resetSourceErrors,
   MAX_CONSECUTIVE_FAILURES,
+  AUTO_RECOVERY_MS,
   BASE_CYCLE_MS,
 } from "./sourceState";
 import type { ContentItem } from "@/lib/types/content";
@@ -195,6 +196,13 @@ export class IngestionScheduler {
 
         const key = getSourceKey(source.type, source.config);
         const state = this.getOrCreateState(key);
+
+        // Auto-recover disabled sources after AUTO_RECOVERY_MS (6h)
+        if (state.errorCount >= MAX_CONSECUTIVE_FAILURES && state.lastErrorAt > 0 && now - state.lastErrorAt >= AUTO_RECOVERY_MS) {
+          state.errorCount = MAX_CONSECUTIVE_FAILURES - 1; // allow one retry
+          state.nextFetchAt = 0;
+          this.persistStates();
+        }
 
         if (state.errorCount >= MAX_CONSECUTIVE_FAILURES) continue;
 

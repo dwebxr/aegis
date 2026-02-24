@@ -16,6 +16,7 @@ export interface SerendipityItem {
 const MAX_DISCOVERIES = 5;
 const NON_ASCII_RE = /[^\x00-\x7F]/g;
 const CONTENT_SERENDIPITY_QUALITY_THRESHOLD = 7.0;
+const COLD_START_QUALITY_THRESHOLD = 8.0;
 const TOPIC_NOVELTY_THRESHOLD = 0.15;
 
 /**
@@ -26,10 +27,12 @@ export function isContentSerendipity(
   item: ContentItem,
   profile: UserPreferenceProfile | undefined,
 ): boolean {
-  if (item.scores.composite <= CONTENT_SERENDIPITY_QUALITY_THRESHOLD) return false;
+  const isColdStart = !profile || !hasEnoughData(profile);
+  const threshold = isColdStart ? COLD_START_QUALITY_THRESHOLD : CONTENT_SERENDIPITY_QUALITY_THRESHOLD;
+  if (item.scores.composite <= threshold) return false;
 
-  // Cold start: treat all high-quality items as serendipity
-  if (!profile || !hasEnoughData(profile)) return true;
+  // Cold start: treat high-quality items as serendipity (stricter 8.0 bar)
+  if (isColdStart) return true;
 
   // Topic novelty: average affinity for item's topics is below threshold
   const topics = item.topics;
