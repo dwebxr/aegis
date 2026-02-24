@@ -341,6 +341,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
             { label: "Local LLM (Ollama)", on: ollamaConfig.enabled },
             { label: "Browser AI (WebLLM)", on: webllmOn },
             { label: "API Key (BYOK)", on: hasApiKey },
+            { label: "IC LLM (D2A Agent)", on: agentEnabled },
           ] as const).map(e => (
             <div key={e.label} style={{ display: "flex", alignItems: "center", gap: space[2] }}>
               <div style={{
@@ -354,7 +355,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
           ))}
         </div>
         <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
-          Pro requires at least one AI engine. Configure below.
+          Pro requires at least one AI engine or an active D2A Agent.
         </div>
       </div>
 

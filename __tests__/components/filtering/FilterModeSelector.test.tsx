@@ -23,6 +23,13 @@ jest.mock("@/contexts/AuthContext", () => ({
 let mockOllamaEnabled = false;
 let mockWebLLMEnabled = false;
 let mockUserApiKey: string | null = null;
+let mockAgentEnabled = false;
+
+jest.mock("@/contexts/AgentContext", () => ({
+  useAgent: () => ({
+    isEnabled: mockAgentEnabled,
+  }),
+}));
 
 jest.mock("@/lib/ollama/storage", () => ({
   isOllamaEnabled: () => mockOllamaEnabled,
@@ -41,6 +48,7 @@ describe("FilterModeSelector", () => {
     mockOllamaEnabled = false;
     mockWebLLMEnabled = false;
     mockUserApiKey = null;
+    mockAgentEnabled = false;
     mockSetFilterMode.mockClear();
   });
 
@@ -158,6 +166,22 @@ describe("FilterModeSelector", () => {
 
     it("locks Pro when authenticated but no AI source configured", () => {
       mockIsAuthenticated = true;
+      const html = renderToStaticMarkup(<FilterModeSelector mobile={false} />);
+      expect(html).toContain("disabled");
+      expect(html).toContain("AI setup required");
+    });
+
+    it("unlocks Pro when D2A Agent is enabled", () => {
+      mockIsAuthenticated = true;
+      mockAgentEnabled = true;
+      const html = renderToStaticMarkup(<FilterModeSelector />);
+      const disabledCount = (html.match(/disabled=""/g) || []).length;
+      expect(disabledCount).toBe(0);
+    });
+
+    it("locks Pro when authenticated but no AI source and no D2A Agent", () => {
+      mockIsAuthenticated = true;
+      mockAgentEnabled = false;
       const html = renderToStaticMarkup(<FilterModeSelector mobile={false} />);
       expect(html).toContain("disabled");
       expect(html).toContain("AI setup required");

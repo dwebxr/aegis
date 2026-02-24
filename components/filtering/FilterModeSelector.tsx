@@ -2,6 +2,7 @@
 import React, { useEffect } from "react";
 import { useFilterMode } from "@/contexts/FilterModeContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAgent } from "@/contexts/AgentContext";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { getUserApiKey } from "@/lib/apiKey/storage";
@@ -19,8 +20,9 @@ const MODES = [
 export const FilterModeSelector: React.FC<FilterModeSelectorProps> = ({ mobile }) => {
   const { filterMode, setFilterMode } = useFilterMode();
   const { isAuthenticated } = useAuth();
+  const { isEnabled: agentEnabled } = useAgent();
 
-  const hasAIScoring = isOllamaEnabled() || isWebLLMEnabled() || !!getUserApiKey();
+  const hasAIScoring = isOllamaEnabled() || isWebLLMEnabled() || !!getUserApiKey() || agentEnabled;
 
   // Auto-fallback: if Pro is persisted but conditions no longer met, revert to Lite
   useEffect(() => {
