@@ -6,7 +6,8 @@
  * migrate to Vercel KV or Redis.
  */
 
-const DAILY_BUDGET = parseInt((process.env.ANTHROPIC_DAILY_BUDGET || "500").trim(), 10);
+const _parsed = parseInt((process.env.ANTHROPIC_DAILY_BUDGET || "500").trim(), 10);
+const DAILY_BUDGET = Number.isNaN(_parsed) ? 500 : _parsed;
 let dailyApiCalls = 0;
 let dailyResetAt = Date.now() + 86_400_000;
 

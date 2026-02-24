@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
   let body: { principal?: string; title?: string; body?: string; url?: string; tag?: string };
   try {
     body = await request.json();
-  } catch {
+  } catch (err) {
+    console.warn("[push/send] JSON parse failed:", errMsg(err));
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 

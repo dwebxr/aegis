@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
   let formData: FormData;
   try {
     formData = await request.formData();
-  } catch {
+  } catch (err) {
+    console.warn("[upload/image] formData parse failed:", errMsg(err));
     return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 });
   }
 

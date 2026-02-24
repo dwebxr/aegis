@@ -205,17 +205,17 @@ describe("discoverFeed", () => {
   it("returns feedUrl from API response", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ feedUrl: "https://example.com/feed.xml" }),
+      json: async () => ({ feeds: [{ url: "https://example.com/feed.xml", type: "rss" }] }),
     });
 
     const result = await discoverFeed("example.com");
     expect(result).toBe("https://example.com/feed.xml");
   });
 
-  it("returns null when API returns no feedUrl", async () => {
+  it("returns null when API returns empty feeds", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ feedUrl: null }),
+      json: async () => ({ feeds: [] }),
     });
 
     const result = await discoverFeed("example.com");
@@ -245,7 +245,7 @@ describe("discoverFeed", () => {
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ feedUrl: "https://example.com/rss" }),
+      json: async () => ({ feeds: [{ url: "https://example.com/rss", type: "rss" }] }),
     });
 
     await discoverFeed("example.com");
@@ -254,16 +254,21 @@ describe("discoverFeed", () => {
     expect(data["example.com"].feedUrl).toBe("https://example.com/rss");
   });
 
-  it("calls API with correct URL format", async () => {
+  it("calls API with POST and correct body", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ feedUrl: null }),
+      json: async () => ({ feeds: [] }),
     });
 
     await discoverFeed("blog.example.com");
 
     expect(global.fetch).toHaveBeenCalledWith(
-      `/api/fetch/discover-feed?url=${encodeURIComponent("https://blog.example.com")}`,
+      "/api/fetch/discover-feed",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: "https://blog.example.com" }),
+      },
     );
   });
 });

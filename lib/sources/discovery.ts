@@ -90,17 +90,22 @@ export function dismissSuggestion(domain: string): void {
 
 export async function discoverFeed(domain: string): Promise<string | null> {
   try {
-    const resp = await fetch(`/api/fetch/discover-feed?url=${encodeURIComponent(`https://${domain}`)}`);
+    const resp = await fetch("/api/fetch/discover-feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: `https://${domain}` }),
+    });
     if (!resp.ok) return null;
     const data = await resp.json();
-    if (data.feedUrl && typeof data.feedUrl === "string") {
+    const feedUrl = data.feeds?.[0]?.url;
+    if (feedUrl && typeof feedUrl === "string") {
       // Cache the discovered feed URL
       const validations = loadDomainValidations();
       if (validations[domain]) {
-        validations[domain].feedUrl = data.feedUrl;
+        validations[domain].feedUrl = feedUrl;
         saveDomainValidations(validations);
       }
-      return data.feedUrl;
+      return feedUrl;
     }
     return null;
   } catch (err) {

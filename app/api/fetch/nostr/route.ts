@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
           try {
             const meta = JSON.parse(me.content);
             profiles[me.pubkey] = {
-              name: meta.display_name || meta.name || undefined,
-              picture: meta.picture || undefined,
+              name: typeof meta.display_name === "string" ? meta.display_name : typeof meta.name === "string" ? meta.name : undefined,
+              picture: typeof meta.picture === "string" ? meta.picture : undefined,
             };
           } catch (err) { console.warn("[fetch/nostr] Skipped malformed profile JSON:", errMsg(err)); }
         }
