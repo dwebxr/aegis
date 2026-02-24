@@ -589,7 +589,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     } catch (err) {
       console.error("[content] Failed to load from IC:", errMsg(err));
       setSyncStatus("offline");
-      addNotification("Could not load content history from IC", "error");
+      addNotification("IC sync unavailable — using local data", "error");
     }
   }, [isAuthenticated, principal, addNotification, backfillImageUrls]);
   loadFromICRef.current = loadFromIC;

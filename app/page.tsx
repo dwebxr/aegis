@@ -278,7 +278,7 @@ function AegisAppInner() {
         }
       } catch (err) {
         console.warn("[staking] Failed to init ledger/reputation:", errMsg(err));
-        addNotification("Could not load ICP balance", "error");
+        addNotification("IC sync unavailable — using local data", "error");
       }
     })();
 

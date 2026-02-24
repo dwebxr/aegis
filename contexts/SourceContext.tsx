@@ -106,7 +106,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         console.error("[sources] actor creation failed:", msg);
         setSyncStatus("error");
         setSyncError("Actor: " + msg);
-        addNotification("Could not connect to IC for source sync", "error");
+        addNotification("IC sync unavailable — using local data", "error");
         return;
       }
 
@@ -166,7 +166,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         console.error("[sources] IC query failed:", msg, err);
         setSyncStatus("error");
         setSyncError(msg);
-        addNotification("Failed to load sources from IC", "error");
+        addNotification("IC sync unavailable — using local data", "error");
       }
     };
     doSync().catch(err => {
