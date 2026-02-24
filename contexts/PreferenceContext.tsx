@@ -7,12 +7,13 @@ import { learn, getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { loadProfile, saveProfile, syncPreferencesToIC, loadPreferencesFromIC, mergeProfiles } from "@/lib/preferences/storage";
 import { clamp } from "@/lib/utils/math";
 import { errMsg } from "@/lib/utils/errors";
+import { trackDomainValidation } from "@/lib/sources/discovery";
 
 interface PreferenceState {
   profile: UserPreferenceProfile;
   userContext: UserContext | null;
   isPersonalized: boolean;
-  onValidate: (topics: string[], author: string, composite: number, verdict: "quality" | "slop") => void;
+  onValidate: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string) => void;
   onFlag: (topics: string[], author: string, composite: number, verdict: "quality" | "slop") => void;
   setTopicAffinity: (topic: string, value: number) => void;
   removeTopicAffinity: (topic: string) => void;
@@ -108,11 +109,12 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   const profileRef = useRef(profile);
   profileRef.current = profile;
 
-  const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop") => {
+  const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string) => {
     const next = learn(profileRef.current, { action: "validate", topics, author, composite, verdict });
     setProfile(next);
     debouncedSave(next);
     debouncedICSync(next);
+    trackDomainValidation(sourceUrl);
   }, [debouncedSave, debouncedICSync]);
 
   const onFlag = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop") => {

@@ -11,6 +11,8 @@ import { useFilterMode } from "@/contexts/FilterModeContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificationBadge";
 import {
   applyDashboardFilters,
   computeDashboardTop3,
@@ -25,6 +27,9 @@ import type { SerendipityItem } from "@/lib/filtering/serendipity";
 import { useKeyboardNav } from "@/hooks/useKeyboardNav";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import type { PaletteCommand } from "@/components/ui/CommandPalette";
+import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
+import { useSources } from "@/contexts/SourceContext";
+import { useDemo } from "@/contexts/DemoContext";
 
 function downloadFile(data: string, filename: string, mime: string) {
   const blob = new Blob([data], { type: mime });
@@ -185,6 +190,8 @@ interface DashboardTabProps {
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [] }) => {
   const { filterMode } = useFilterMode();
+  const { sources } = useSources();
+  const { isDemoMode } = useDemo();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop" | "validated">("quality");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -596,40 +603,42 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Syncing from Internet Computer</div>
             </div>
           ) : filteredContent.length === 0 ? (
-            <div style={{
-              textAlign: "center", padding: space[10],
-              color: colors.text.muted, background: colors.bg.surface,
-              borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
-              marginBottom: space[4],
-            }}>
-              <div style={{ fontSize: 32, marginBottom: space[3] }}>&#x1F50D;</div>
-              <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
-                {hasActiveFilter ? "No matching content" : "No content yet"}
-              </div>
-              <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>
-                {hasActiveFilter ? "Try adjusting your filters" : "Add sources to start filtering, or try the incinerator for manual evaluation"}
-              </div>
-              {!hasActiveFilter && onTabChange && (
-                <div style={{ display: "flex", gap: space[2], justifyContent: "center", marginTop: space[4], flexWrap: "wrap" }}>
-                  <button onClick={() => onTabChange("sources")} style={{
-                    padding: `${space[2]}px ${space[4]}px`, background: colors.bg.raised,
-                    border: `1px solid ${colors.border.emphasis}`, borderRadius: radii.md,
-                    color: colors.blue[400], fontSize: t.bodySm.size, fontWeight: 600,
-                    cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
-                  }}>
-                    Add Sources &rarr;
-                  </button>
-                  <button onClick={() => onTabChange("incinerator")} style={{
-                    padding: `${space[2]}px ${space[4]}px`, background: colors.bg.raised,
-                    border: `1px solid ${colors.border.emphasis}`, borderRadius: radii.md,
-                    color: colors.purple[400], fontSize: t.bodySm.size, fontWeight: 600,
-                    cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
-                  }}>
-                    Try Incinerator &rarr;
-                  </button>
+            <>
+              {hasActiveFilter ? (
+                <div style={{
+                  textAlign: "center", padding: space[10],
+                  color: colors.text.muted, background: colors.bg.surface,
+                  borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
+                  marginBottom: space[4],
+                }}>
+                  <div style={{ fontSize: 32, marginBottom: space[3] }}>&#x1F50D;</div>
+                  <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>No matching content</div>
+                  <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Try adjusting your filters</div>
+                </div>
+              ) : !isDemoMode ? (
+                <OnboardingFlow
+                  context={{
+                    sourcesCount: sources.length,
+                    contentCount: content.length,
+                    validatedCount: profile.totalValidated,
+                    flaggedCount: profile.totalFlagged,
+                  }}
+                  mobile={mobile}
+                  onTabChange={onTabChange}
+                />
+              ) : (
+                <div style={{
+                  textAlign: "center", padding: space[10],
+                  color: colors.text.muted, background: colors.bg.surface,
+                  borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
+                  marginBottom: space[4],
+                }}>
+                  <div style={{ fontSize: 32, marginBottom: space[3] }}>&#x1F50D;</div>
+                  <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>No content yet</div>
+                  <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Add sources to start filtering, or try the incinerator for manual evaluation</div>
                 </div>
               )}
-            </div>
+            </>
           ) : (
             <>
               {filteredContent.slice(0, showAllContent ? 50 : 5).map((it, i) => (
@@ -771,6 +780,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         }
                       />
                       <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
+                        {bi.classification !== "mixed" && (
+                          <div style={{ marginBottom: space[1] }}>
+                            <BriefingClassificationBadge classification={bi.classification} />
+                          </div>
+                        )}
                         <div style={{
                           fontSize: t.body.size, fontWeight: 700, color: colors.text.secondary,
                           overflow: "hidden", display: "-webkit-box",
@@ -977,6 +991,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   fontSize: t.caption.size, color: colors.text.muted,
                   background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
                 }}>{filteredDiscoveries.length}</span>
+                <InfoTooltip
+                  text="High-quality content from outside your usual topics or network. These items scored well but cover areas you haven't explored yet."
+                  mobile={mobile}
+                />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
                 {filteredDiscoveries.map(d => {

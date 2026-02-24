@@ -66,7 +66,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
-        run: npm run test:e2e -- --project=desktop-chrome
+        run: npm run test:e2e -- --project=desktop-chrome --project=mobile-chrome
         env:
           NEXT_PUBLIC_CANISTER_ID: rluf3-eiaaa-aaaam-qgjuq-cai
           NEXT_PUBLIC_IC_HOST: https://icp-api.io

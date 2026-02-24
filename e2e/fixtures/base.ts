@@ -1,5 +1,6 @@
 import { test as base } from "@playwright/test";
 import { setupApiMocks } from "./api-mocks";
+import { setupAuthMock } from "./auth-mock";
 import { LandingPage } from "../pages/landing.page";
 import { DashboardPage } from "../pages/dashboard.page";
 import { IncineratorPage } from "../pages/incinerator.page";
@@ -12,6 +13,7 @@ type Fixtures = {
   incineratorPage: IncineratorPage;
   sourcesPage: SourcesPage;
   navigationPage: NavigationPage;
+  authDashboardPage: DashboardPage;
 };
 
 /** Dismiss landing hero and wait for dashboard to appear */
@@ -84,6 +86,15 @@ export const test = base.extend<Fixtures>({
     await page.goto("/");
     await enterDemoMode(page);
     await use(new NavigationPage(page));
+  },
+
+  authDashboardPage: async ({ page }, use) => {
+    await setupAuthMock(page, true);
+    await setupApiMocks(page);
+    await page.goto("/");
+    // Auth mock bypasses landing, goes straight to authenticated state
+    await page.getByTestId("aegis-dashboard").waitFor({ state: "visible", timeout: 15_000 });
+    await use(new DashboardPage(page));
   },
 });
 

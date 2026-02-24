@@ -35,7 +35,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Test-only mock: allows E2E tests to simulate auth without real II.
+  // Dead-code eliminated in production builds via NODE_ENV check.
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = typeof window !== "undefined" ? (window as any) : undefined;
+    if (process.env.NODE_ENV !== "production" && w && w.__AEGIS_MOCK_AUTH !== undefined) {
+      const isAuth = !!w.__AEGIS_MOCK_AUTH;
+      setIsAuthenticated(isAuth);
+      if (isAuth) {
+        const mockPrincipalText = (w.__AEGIS_MOCK_PRINCIPAL as string) || "2vxsx-fae";
+        setPrincipal(Principal.fromText(mockPrincipalText));
+      }
+      setIsLoading(false);
+      return;
+    }
+
     AuthClient.create().then(async (client) => {
       setAuthClient(client);
       const authed = await client.isAuthenticated();

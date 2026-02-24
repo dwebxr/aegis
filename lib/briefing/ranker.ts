@@ -1,24 +1,46 @@
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
-import type { BriefingState, BriefingItem } from "./types";
+import type { BriefingState, BriefingItem, BriefingClassification } from "./types";
 
 const PRIORITY_COUNT = 5;
 const RECENCY_HALF_LIFE_HOURS = 7;
+const FAMILIAR_THRESHOLD = 0.5;
+const NOVEL_THRESHOLD = 0.15;
+const RECENT_TOPIC_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export function classifyItem(item: ContentItem, prefs: UserPreferenceProfile): BriefingClassification {
+  const topics = item.topics;
+  if (!topics || topics.length === 0) return "novel";
+  const avgAffinity = topics.reduce((sum, t) =>
+    sum + Math.abs(prefs.topicAffinities[t] ?? 0), 0) / topics.length;
+  if (avgAffinity > FAMILIAR_THRESHOLD) return "familiar";
+  if (avgAffinity < NOVEL_THRESHOLD) return "novel";
+  return "mixed";
+}
 
 function briefingScore(item: ContentItem, prefs: UserPreferenceProfile, now?: number): number {
   const baseScore = item.scores.composite;
+  const currentTime = now ?? Date.now();
 
   const topicRelevance = item.topics?.reduce((sum, t) =>
     sum + (prefs.topicAffinities[t] || 0), 0) || 0;
 
   const authorBoost = prefs.authorTrust[item.author]?.trust || 0;
 
-  const ageHours = ((now ?? Date.now()) - item.createdAt) / 3600000;
+  // recentTopics bonus: boost items whose topics match recently-seen topics
+  const recentBonus = item.topics?.reduce((sum, t) => {
+    const isRecent = prefs.recentTopics.some(rt =>
+      rt.topic === t && currentTime - rt.timestamp < RECENT_TOPIC_WINDOW_MS,
+    );
+    return sum + (isRecent ? 0.3 : 0);
+  }, 0) || 0;
+
+  const ageHours = (currentTime - item.createdAt) / 3600000;
   // Decay factor: ln(2)/RECENCY_HALF_LIFE_HOURS gives true half-life at RECENCY_HALF_LIFE_HOURS
   const decayRate = Math.LN2 / RECENCY_HALF_LIFE_HOURS;
   const recencyFactor = Math.exp(-decayRate * ageHours);
 
-  return (baseScore + topicRelevance * 2 + authorBoost) * recencyFactor;
+  return (baseScore + topicRelevance * 2 + authorBoost + recentBonus) * recencyFactor;
 }
 
 function serendipityScore(item: ContentItem, prefs: UserPreferenceProfile): number {
@@ -71,6 +93,7 @@ export function generateBriefing(
       item: best.item,
       briefingScore: best.score,
       isSerendipity: true,
+      classification: "novel",
     };
   }
 
@@ -84,6 +107,7 @@ export function generateBriefing(
       item: s.item,
       briefingScore: s.score,
       isSerendipity: false,
+      classification: classifyItem(s.item, prefs),
     })),
     serendipity,
     filteredOut,

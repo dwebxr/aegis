@@ -46,6 +46,14 @@ jest.mock("@/components/ui/D2ANetworkMini", () => ({
   D2ANetworkMini: () => null,
 }));
 
+jest.mock("@/contexts/SourceContext", () => ({
+  useSources: () => ({ sources: [] }),
+}));
+
+jest.mock("@/contexts/DemoContext", () => ({
+  useDemo: () => ({ isDemoMode: false }),
+}));
+
 const now = Date.now();
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {

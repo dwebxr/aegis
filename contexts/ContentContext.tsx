@@ -16,6 +16,7 @@ import { recordUseful, recordSlop } from "@/lib/d2a/reputation";
 import { recordPublishValidation, recordPublishFlag } from "@/lib/reputation/publishGate";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
+import { computeScoringCacheKey, computeProfileHash, lookupScoringCache, storeScoringCache } from "@/lib/scoring/cache";
 import { encodeEngineInReason, decodeEngineFromReason, encodeTopicsInReason, decodeTopicsFromReason } from "@/lib/scoring/types";
 import { syncBriefingToCanister } from "@/lib/briefing/sync";
 import type { BriefingState } from "@/lib/briefing/types";
@@ -120,7 +121,7 @@ interface ContentState {
 }
 
 type PreferenceCallbacks = {
-  onValidate?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop") => void;
+  onValidate?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string) => void;
   onFlag?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop") => void;
 };
 
@@ -258,6 +259,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   /** Run the full scoring cascade: Ollama → WebLLM → BYOK → IC LLM → Server → Heuristic. No side effects. */
   const scoreText = useCallback(async (text: string, userContext?: UserContext | null): Promise<AnalyzeResponse> => {
+    // Check scoring cache first
+    const profileHash = computeProfileHash(userContext);
+    const cacheKey = computeScoringCacheKey(text, userContext);
+    const cached = lookupScoringCache(cacheKey, profileHash);
+    if (cached) return cached;
+
     let result: AnalyzeResponse | null = null;
     const userApiKey = getUserApiKey();
     const topics = userContext
@@ -343,6 +350,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       result = { ...heuristicScores(text), scoredByAI: false, scoringEngine: "heuristic" as const };
     }
 
+    // Store in scoring cache
+    storeScoringCache(cacheKey, profileHash, result);
+
     return result;
   }, [isAuthenticated]);
 
@@ -397,7 +407,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     const item = contentRef.current.find(c => c.id === id);
     if (!item || item.validated) return;
     setContent(prev => prev.map(c => c.id === id ? { ...c, validated: true, validatedAt: c.validatedAt ?? Date.now() } : c));
-    preferenceCallbacks?.onValidate?.(item.topics || [], item.author, item.scores.composite, item.verdict);
+    preferenceCallbacks?.onValidate?.(item.topics || [], item.author, item.scores.composite, item.verdict, item.sourceUrl);
     if (item.source === "nostr" && item.nostrPubkey) recordUseful(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishValidation(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {

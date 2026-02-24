@@ -5,6 +5,8 @@ import { ShareBriefingModal } from "@/components/ui/ShareBriefingModal";
 import { ShareIcon } from "@/components/icons";
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificationBadge";
 import { useContent } from "@/contexts/ContentContext";
 import { colors, space, fonts, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
@@ -114,6 +116,11 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         <div>
           {briefing.priority.map((b, i) => (
             <div key={b.item.id} style={{ animation: `slideUp .3s ease ${i * 0.06}s both` }}>
+              {b.classification !== "mixed" && (
+                <div style={{ marginBottom: space[1], display: "flex", alignItems: "center" }}>
+                  <BriefingClassificationBadge classification={b.classification} />
+                </div>
+              )}
               <ContentCard
                 item={b.item}
                 variant="priority"
@@ -194,6 +201,10 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
             }}>
               {discoveries.length}
             </span>
+            <InfoTooltip
+              text="High-quality content from outside your usual topics or network. These items scored well but cover areas you haven't explored yet."
+              mobile={mobile}
+            />
           </div>
 
           {discoveries.map((d, i) => (

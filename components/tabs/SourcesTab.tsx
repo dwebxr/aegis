@@ -12,6 +12,7 @@ import { useDemo } from "@/contexts/DemoContext";
 import { parseGitHubRepo, parseBlueskyHandle, buildTopicFeedUrl } from "@/lib/sources/platformFeed";
 import { loadSourceStates, resetSourceErrors, type SourceRuntimeState, getSourceHealth, getSourceKey } from "@/lib/ingestion/sourceState";
 import { relativeTime } from "@/lib/utils/scores";
+import { getSuggestions, dismissSuggestion, discoverFeed as discoverFeedForDomain, type DomainValidation } from "@/lib/sources/discovery";
 
 function isTimeout(err: unknown): boolean {
   return err instanceof DOMException && err.name === "TimeoutError";
@@ -95,6 +96,23 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     const id = setInterval(refresh, 30_000);
     return () => clearInterval(id);
   }, []);
+
+  // Source auto-suggestions from validated domains
+  const [feedSuggestions, setFeedSuggestions] = useState<Array<DomainValidation & { discoveredFeedUrl?: string | null }>>([]);
+  useEffect(() => {
+    if (isDemoMode) return;
+    const existingUrls = sources.filter(s => s.type === "rss" && s.feedUrl).map(s => s.feedUrl!);
+    const suggestions = getSuggestions(existingUrls);
+    if (suggestions.length > 0) {
+      // Attempt feed discovery for each suggestion
+      Promise.all(suggestions.map(async s => ({
+        ...s,
+        discoveredFeedUrl: s.feedUrl || await discoverFeedForDomain(s.domain),
+      }))).then(setFeedSuggestions);
+    } else {
+      setFeedSuggestions([]);
+    }
+  }, [sources, isDemoMode]);
 
   // Feed auto-discovery
   const [discoveredFeeds, setDiscoveredFeeds] = useState<Array<{ url: string; title?: string; type?: string }>>([]);
@@ -789,6 +807,70 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             })}
         </div>
       </div>
+
+      {/* Source auto-suggestions */}
+      {feedSuggestions.length > 0 && (
+          <div style={{
+            background: "rgba(59,130,246,0.06)",
+            border: `1px solid rgba(59,130,246,0.15)`,
+            borderRadius: radii.lg,
+            padding: mobile ? space[4] : space[5],
+            marginBottom: space[4],
+          }}>
+            <div style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.blue[400], marginBottom: space[3] }}>
+              &#x1F4A1; Suggested Sources
+            </div>
+            {feedSuggestions.map(s => (
+              <div key={s.domain} style={{
+                display: "flex", alignItems: "center", gap: space[3],
+                padding: `${space[2]}px 0`,
+                borderTop: `1px solid ${colors.border.subtle}`,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, fontWeight: 600 }}>
+                    {s.domain}
+                  </div>
+                  <div style={{ fontSize: t.caption.size, color: colors.text.disabled }}>
+                    {s.count} validated items from this domain
+                  </div>
+                </div>
+                {s.discoveredFeedUrl ? (
+                  <button
+                    onClick={() => {
+                      addSource({ type: "rss", label: s.domain, feedUrl: s.discoveredFeedUrl!, enabled: true });
+                      setFeedSuggestions(prev => prev.filter(p => p.domain !== s.domain));
+                    }}
+                    style={{
+                      padding: `${space[1]}px ${space[3]}px`,
+                      background: colors.blue[400],
+                      border: "none", borderRadius: radii.sm,
+                      color: "#fff", fontSize: t.caption.size, fontWeight: 600,
+                      cursor: "pointer", fontFamily: "inherit",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Add Feed
+                  </button>
+                ) : (
+                  <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>No feed found</span>
+                )}
+                <button
+                  onClick={() => {
+                    dismissSuggestion(s.domain);
+                    setFeedSuggestions(prev => prev.filter(p => p.domain !== s.domain));
+                  }}
+                  style={{
+                    background: "none", border: "none",
+                    color: colors.text.disabled, fontSize: t.caption.size,
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
       {/* Saved Sources List */}
       {sources.length > 0 && (
