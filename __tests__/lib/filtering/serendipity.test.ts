@@ -51,6 +51,7 @@ function makeFilteredItem(
     wotScore,
     weightedComposite: item.scores.composite * 0.5,
     isWoTSerendipity: isSerendipity,
+    isContentSerendipity: false,
   };
 }
 
@@ -61,7 +62,7 @@ function makeResult(items: FilteredItem[]): FilterPipelineResult {
       totalInput: items.length,
       wotScoredCount: items.filter(fi => fi.wotScore !== null).length,
       aiScoredCount: 0,
-      serendipityCount: items.filter(fi => fi.isWoTSerendipity).length,
+      serendipityCount: items.filter(fi => fi.isWoTSerendipity || fi.isContentSerendipity).length,
       estimatedAPICost: 0,
       mode: "pro",
     },

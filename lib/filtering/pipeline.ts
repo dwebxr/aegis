@@ -3,6 +3,7 @@ import type { ContentItem } from "@/lib/types/content";
 import type { WoTGraph } from "@/lib/wot/types";
 import type { FilterConfig, FilteredItem, FilterPipelineResult, FilterPipelineStats } from "./types";
 import { calculateWoTScore, calculateWeightedScore, isWoTSerendipity } from "@/lib/wot/scorer";
+import { isContentSerendipity } from "./serendipity";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
 
 // Anthropic Claude Sonnet via /api/analyze — ~400 input tokens + ~100 output
@@ -40,9 +41,14 @@ export function runFilterPipeline(
       ? isWoTSerendipity(wotScore.trustScore, item.scores.composite)
       : false;
 
-    if (serendipity) stats.serendipityCount++;
+    // Content-based serendipity for non-WoT items (RSS/URL)
+    const contentSerendipity = !wotScore
+      ? isContentSerendipity(item, config.profile)
+      : false;
 
-    items.push({ item, wotScore, weightedComposite, isWoTSerendipity: serendipity });
+    if (serendipity || contentSerendipity) stats.serendipityCount++;
+
+    items.push({ item, wotScore, weightedComposite, isWoTSerendipity: serendipity, isContentSerendipity: contentSerendipity });
   }
 
   // Second pass over all content (incl. below-threshold): count AI-scored items and paid tiers for cost estimation

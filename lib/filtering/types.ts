@@ -1,5 +1,6 @@
 import type { ContentItem } from "@/lib/types/content";
 import type { WoTScore } from "@/lib/wot/types";
+import type { UserPreferenceProfile } from "@/lib/preferences/types";
 
 export type FilterMode = "lite" | "pro";
 
@@ -7,6 +8,7 @@ export interface FilterConfig {
   mode: FilterMode;
   wotEnabled: boolean;
   qualityThreshold: number;
+  profile?: UserPreferenceProfile;
 }
 
 export interface FilteredItem {
@@ -14,6 +16,7 @@ export interface FilteredItem {
   wotScore: WoTScore | null;
   weightedComposite: number;
   isWoTSerendipity: boolean;
+  isContentSerendipity: boolean;
 }
 
 export interface FilterPipelineResult {

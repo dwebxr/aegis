@@ -192,8 +192,9 @@ function AegisAppInner() {
       mode: filterMode,
       wotEnabled: !!wotGraph,
       qualityThreshold: profile.calibration.qualityThreshold,
+      profile,
     });
-  }, [content, wotGraph, filterMode, profile.calibration.qualityThreshold]);
+  }, [content, wotGraph, filterMode, profile]);
 
   const wotAdjustedContent = useMemo(() => {
     if (!pipelineResult) return content;

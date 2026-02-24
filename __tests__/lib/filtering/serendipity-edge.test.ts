@@ -51,6 +51,7 @@ function makeFilteredItem(
     wotScore,
     weightedComposite: item.scores.composite * 0.5,
     isWoTSerendipity: isSerendipity,
+    isContentSerendipity: false,
   };
 }
 
@@ -61,7 +62,7 @@ function makeResult(items: FilteredItem[]): FilterPipelineResult {
       totalInput: items.length,
       wotScoredCount: items.filter(fi => fi.wotScore !== null).length,
       aiScoredCount: 0,
-      serendipityCount: items.filter(fi => fi.isWoTSerendipity).length,
+      serendipityCount: items.filter(fi => fi.isWoTSerendipity || fi.isContentSerendipity).length,
       estimatedAPICost: 0,
       mode: "pro",
     },
@@ -260,6 +261,7 @@ describe("detectSerendipity — edge cases", () => {
       wotScore: makeWoTScore(),
       weightedComposite: 4,
       isWoTSerendipity: true,
+      isContentSerendipity: false,
     };
     const result = detectSerendipity(makeResult([fi]));
     expect(result[0].item).toBe(originalItem);
