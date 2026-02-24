@@ -29,7 +29,7 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 function makeBriefing(overrides: Partial<BriefingState> = {}): BriefingState {
   return {
     priority: [
-      { item: makeItem(), briefingScore: 9.2, isSerendipity: false },
+      { item: makeItem(), briefingScore: 9.2, isSerendipity: false, classification: "mixed" as const },
       {
         item: makeItem({
           id: "item-2",
@@ -41,7 +41,7 @@ function makeBriefing(overrides: Partial<BriefingState> = {}): BriefingState {
           sourceUrl: "https://example.com/web3",
         }),
         briefingScore: 7.5,
-        isSerendipity: false,
+        isSerendipity: false, classification: "mixed" as const,
       },
     ],
     serendipity: {
@@ -55,7 +55,7 @@ function makeBriefing(overrides: Partial<BriefingState> = {}): BriefingState {
         sourceUrl: undefined,
       }),
       briefingScore: 6.0,
-      isSerendipity: true,
+      isSerendipity: true, classification: "mixed" as const,
     },
     filteredOut: [],
     totalItems: 15,
@@ -134,7 +134,7 @@ describe("serializeBriefing", () => {
     const longText = "A".repeat(300);
     const briefing = makeBriefing({
       priority: [
-        { item: makeItem({ text: longText }), briefingScore: 8, isSerendipity: false },
+        { item: makeItem({ text: longText }), briefingScore: 8, isSerendipity: false, classification: "mixed" as const },
       ],
     });
     const result = serializeBriefing(briefing);
@@ -148,7 +148,7 @@ describe("serializeBriefing", () => {
     const manyTopics = Array.from({ length: 15 }, (_, i) => `topic${i}`);
     const briefing = makeBriefing({
       priority: [
-        { item: makeItem({ topics: manyTopics }), briefingScore: 8, isSerendipity: false },
+        { item: makeItem({ topics: manyTopics }), briefingScore: 8, isSerendipity: false, classification: "mixed" as const },
       ],
     });
     const result = serializeBriefing(briefing);

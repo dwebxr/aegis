@@ -12,20 +12,36 @@ const COLORS: Record<string, { bg: string; border: string; text: string }> = {
 interface NotificationToastProps {
   notifications: Notification[];
   mobile?: boolean;
+  onDismiss?: (id: number) => void;
 }
 
-export const NotificationToast: React.FC<NotificationToastProps> = ({ notifications, mobile }) => (
+export const NotificationToast: React.FC<NotificationToastProps> = ({ notifications, mobile, onDismiss }) => (
   <div style={{ position: "fixed", bottom: mobile ? 84 : space[5], right: mobile ? space[4] : space[5], display: "flex", flexDirection: "column", gap: 6, zIndex: 100 }}>
     {notifications.map(n => {
       const c = COLORS[n.type] || COLORS.info;
       return (
-        <div key={n.id} style={{
+        <div key={n.id} role="alert" style={{
           padding: `${space[3]}px ${space[4]}px`, borderRadius: radii.md,
           fontSize: t.bodySm.size, fontWeight: 600, animation: "fadeIn .3s ease",
           background: c.bg, border: `1px solid ${c.border}`, color: c.text,
           backdropFilter: "blur(12px)", boxShadow: shadows.md,
+          display: "flex", alignItems: "center", gap: space[2],
         }}>
-          {n.text}
+          <span style={{ flex: 1 }}>{n.text}</span>
+          {onDismiss && (
+            <button
+              onClick={() => onDismiss(n.id)}
+              aria-label="Dismiss notification"
+              style={{
+                background: "none", border: "none", color: c.text,
+                cursor: "pointer", fontSize: "1rem", fontWeight: 700,
+                padding: "0 2px", opacity: 0.7, fontFamily: "inherit",
+                lineHeight: 1,
+              }}
+            >
+              &times;
+            </button>
+          )}
         </div>
       );
     })}

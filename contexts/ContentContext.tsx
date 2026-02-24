@@ -240,7 +240,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         return changed ? next : prev;
       });
     };
-    const timestampTimer = setInterval(updateTimestamps, 30000);
+    const timestampTimer = setInterval(updateTimestamps, 60_000);
     const onVisible = () => {
       if (!document.hidden) {
         updateTimestamps();
@@ -358,6 +358,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     setIsAnalyzing(true);
     try {
       const result = await scoreText(text, userContext);
+      if (result.scoringEngine === "heuristic") {
+        addNotification("AI unavailable \u2014 scored with basic heuristics", "info");
+      }
 
       const evaluation: ContentItem = {
         id: uuidv4(),
@@ -500,7 +503,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         } catch (err) {
           console.debug("[content] Image backfill failed for", item.id, errMsg(err));
         }
-      }, i * 800));
+      }, i * 300));
     });
     return () => timers.forEach(clearTimeout);
   }, [isAuthenticated, principal]);

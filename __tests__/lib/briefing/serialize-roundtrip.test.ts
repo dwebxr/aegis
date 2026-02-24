@@ -29,7 +29,7 @@ function makeContentItem(overrides: Partial<ContentItem> = {}): ContentItem {
 }
 
 function makeBriefingItem(overrides: Partial<ContentItem> = {}, isSerendipity = false): BriefingItem {
-  return { item: makeContentItem(overrides), briefingScore: 8.5, isSerendipity };
+  return { item: makeContentItem(overrides), briefingScore: 8.5, isSerendipity, classification: "mixed" };
 }
 
 function makeBriefingState(overrides: Partial<BriefingState> = {}): BriefingState {

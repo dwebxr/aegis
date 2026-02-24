@@ -29,8 +29,8 @@ function makeContentItem(overrides: Partial<ContentItem> = {}): ContentItem {
 function makeBriefingState(overrides: Partial<BriefingState> = {}): BriefingState {
   return {
     priority: [
-      { item: makeContentItem(), briefingScore: 85, isSerendipity: false },
-      { item: makeContentItem({ id: "test-2", text: "Second item", topics: ["crypto"] }), briefingScore: 72, isSerendipity: false },
+      { item: makeContentItem(), briefingScore: 85, isSerendipity: false, classification: "mixed" as const },
+      { item: makeContentItem({ id: "test-2", text: "Second item", topics: ["crypto"] }), briefingScore: 72, isSerendipity: false, classification: "mixed" as const },
     ],
     serendipity: null,
     filteredOut: [],
@@ -64,7 +64,7 @@ describe("briefingToD2AResponse", () => {
   it("truncates title to 80 characters", () => {
     const longText = "A".repeat(200);
     const state = makeBriefingState({
-      priority: [{ item: makeContentItem({ text: longText }), briefingScore: 90, isSerendipity: false }],
+      priority: [{ item: makeContentItem({ text: longText }), briefingScore: 90, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].title).toHaveLength(80);
@@ -74,7 +74,7 @@ describe("briefingToD2AResponse", () => {
   it("preserves full content in content field", () => {
     const fullText = "Full article content here with lots of details";
     const state = makeBriefingState({
-      priority: [{ item: makeContentItem({ text: fullText }), briefingScore: 80, isSerendipity: false }],
+      priority: [{ item: makeContentItem({ text: fullText }), briefingScore: 80, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].content).toBe(fullText);
@@ -95,7 +95,7 @@ describe("briefingToD2AResponse", () => {
   it("handles missing V/C/L scores (undefined)", () => {
     const item = makeContentItem({ vSignal: undefined, cContext: undefined, lSlop: undefined });
     const state = makeBriefingState({
-      priority: [{ item, briefingScore: 80, isSerendipity: false }],
+      priority: [{ item, briefingScore: 80, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].scores.vSignal).toBeUndefined();
@@ -106,7 +106,7 @@ describe("briefingToD2AResponse", () => {
   it("handles missing sourceUrl with empty string fallback", () => {
     const item = makeContentItem({ sourceUrl: undefined });
     const state = makeBriefingState({
-      priority: [{ item, briefingScore: 80, isSerendipity: false }],
+      priority: [{ item, briefingScore: 80, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].sourceUrl).toBe("");
@@ -115,7 +115,7 @@ describe("briefingToD2AResponse", () => {
   it("handles missing topics with empty array fallback", () => {
     const item = makeContentItem({ topics: undefined });
     const state = makeBriefingState({
-      priority: [{ item, briefingScore: 80, isSerendipity: false }],
+      priority: [{ item, briefingScore: 80, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].topics).toEqual([]);
@@ -124,7 +124,7 @@ describe("briefingToD2AResponse", () => {
   it("returns serendipityPick when present", () => {
     const serendipityItem = makeContentItem({ id: "ser-1", text: "Serendipity find!" });
     const state = makeBriefingState({
-      serendipity: { item: serendipityItem, briefingScore: 60, isSerendipity: true },
+      serendipity: { item: serendipityItem, briefingScore: 60, isSerendipity: true, classification: "mixed" as const },
     });
     const result = briefingToD2AResponse(state);
     expect(result.serendipityPick).not.toBeNull();
@@ -176,8 +176,8 @@ describe("briefingToD2AResponse", () => {
     const item2 = makeContentItem({ id: "t2", topics: ["ai", "crypto"] });
     const state = makeBriefingState({
       priority: [
-        { item: item1, briefingScore: 80, isSerendipity: false },
-        { item: item2, briefingScore: 70, isSerendipity: false },
+        { item: item1, briefingScore: 80, isSerendipity: false, classification: "mixed" as const },
+        { item: item2, briefingScore: 70, isSerendipity: false, classification: "mixed" as const },
       ],
     });
     const result = briefingToD2AResponse(state);
@@ -191,7 +191,7 @@ describe("briefingToD2AResponse", () => {
   it("handles items with no topics (undefined)", () => {
     const item = makeContentItem({ topics: undefined });
     const state = makeBriefingState({
-      priority: [{ item, briefingScore: 80, isSerendipity: false }],
+      priority: [{ item, briefingScore: 80, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.meta.topics).toEqual([]);
@@ -223,7 +223,7 @@ describe("briefingToD2AResponse", () => {
     const items = Array.from({ length: 100 }, (_, i) => ({
       item: makeContentItem({ id: `item-${i}`, topics: [`topic-${i % 10}`] }),
       briefingScore: 50 + (i % 50),
-      isSerendipity: false,
+      isSerendipity: false, classification: "mixed" as const,
     }));
     const state = makeBriefingState({ priority: items, totalItems: 200 });
     const result = briefingToD2AResponse(state);
@@ -236,8 +236,8 @@ describe("briefingToD2AResponse", () => {
     const slopItem = makeContentItem({ id: "s1", verdict: "slop" });
     const state = makeBriefingState({
       priority: [
-        { item: qualityItem, briefingScore: 90, isSerendipity: false },
-        { item: slopItem, briefingScore: 20, isSerendipity: false },
+        { item: qualityItem, briefingScore: 90, isSerendipity: false, classification: "mixed" as const },
+        { item: slopItem, briefingScore: 20, isSerendipity: false, classification: "mixed" as const },
       ],
     });
     const result = briefingToD2AResponse(state);
@@ -248,7 +248,7 @@ describe("briefingToD2AResponse", () => {
   it("includes reason field from content item", () => {
     const item = makeContentItem({ reason: "Excellent depth of analysis" });
     const state = makeBriefingState({
-      priority: [{ item, briefingScore: 95, isSerendipity: false }],
+      priority: [{ item, briefingScore: 95, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].reason).toBe("Excellent depth of analysis");

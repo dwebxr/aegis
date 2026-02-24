@@ -46,11 +46,14 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   isAuthRef.current = isAuthenticated;
 
   useEffect(() => {
+    let cancelled = false;
+
     if (isAuthenticated && principalText && identity) {
       const local = loadProfile(principalText);
       setProfile(local);
 
       loadPreferencesFromIC(identity, principalText).then((icProfile) => {
+        if (cancelled) return;
         if (!icProfile) {
           // No IC data yet: push local to IC as initial backup (if non-empty)
           const hasData = local.totalValidated > 0 || local.totalFlagged > 0
@@ -71,11 +74,13 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
           });
         }
       }).catch((err) => {
-        console.warn("[prefs] IC preference load failed:", errMsg(err));
+        if (!cancelled) console.warn("[prefs] IC preference load failed:", errMsg(err));
       });
     } else {
       setProfile(emptyProfile);
     }
+
+    return () => { cancelled = true; };
   }, [isAuthenticated, principalText, identity]);
 
   const debouncedSave = useCallback((p: UserPreferenceProfile) => {

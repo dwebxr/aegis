@@ -155,7 +155,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 color: colors.purple[400], fontSize: t.bodySm.size, fontWeight: 600,
                 cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
               }}>
-                Go to Incinerator &rarr;
+                Start Evaluating &rarr;
               </button>
             </div>
           )}
@@ -304,6 +304,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         <div style={{ marginTop: space[5] }}>
           <button
             onClick={() => setShowFiltered(!showFiltered)}
+            aria-expanded={showFiltered}
             style={{
               width: "100%",
               display: "flex",

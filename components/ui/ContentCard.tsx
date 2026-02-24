@@ -148,7 +148,11 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
     <div
       id={`card-${item.id}`}
       data-source-url={item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) ? item.sourceUrl : undefined}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
       onClick={onToggle}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -321,7 +325,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
               </a>
             )}
             {isSlop && !isLarge ? (
-              <button disabled={item.validated} onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
+              <button disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
                 flex: 1, padding: `${space[2]}px ${space[3]}px`,
                 background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
                 border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
@@ -334,7 +338,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
               </button>
             ) : (
               <>
-                <button disabled={item.validated} onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
+                <button disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
                   flex: 1, padding: `${space[2]}px ${space[3]}px`,
                   background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
                   border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
@@ -345,7 +349,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
                 }}>
                   <CheckIcon /> {item.validated ? "Validated" : "Validate"}
                 </button>
-                <button disabled={item.flagged} onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
+                <button disabled={item.flagged} aria-label="Flag as slop" onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
                   flex: 1, padding: `${space[2]}px ${space[3]}px`,
                   background: item.flagged ? `${colors.red[400]}18` : colors.red.bg,
                   border: `1px solid ${colors.red.border}`, borderRadius: radii.md,

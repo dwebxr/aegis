@@ -30,7 +30,7 @@ afterAll(() => {
   global.fetch = originalFetch;
 });
 
-function getStoredData(): Record<string, { domain: string; count: number; dismissed: boolean; feedUrl?: string }> {
+function getStoredData(): Record<string, { domain: string; count: number; lastValidatedAt: number; dismissed: boolean; feedUrl?: string }> {
   const raw = store[STORAGE_KEY];
   if (!raw) return {};
   return JSON.parse(raw);

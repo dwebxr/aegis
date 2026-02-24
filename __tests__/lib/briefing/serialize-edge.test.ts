@@ -29,7 +29,7 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 function makeBriefing(overrides: Partial<BriefingState> = {}): BriefingState {
   return {
     priority: [
-      { item: makeItem(), briefingScore: 9.2, isSerendipity: false },
+      { item: makeItem(), briefingScore: 9.2, isSerendipity: false, classification: "mixed" as const },
     ],
     serendipity: null,
     filteredOut: [],
@@ -234,7 +234,7 @@ describe("serializeBriefing — edge cases", () => {
   it("handles item with empty text", () => {
     const briefing = makeBriefing({
       priority: [
-        { item: makeItem({ text: "" }), briefingScore: 7, isSerendipity: false },
+        { item: makeItem({ text: "" }), briefingScore: 7, isSerendipity: false, classification: "mixed" as const },
       ],
     });
     const result = serializeBriefing(briefing);
@@ -244,7 +244,7 @@ describe("serializeBriefing — edge cases", () => {
   it("handles item with no topics", () => {
     const briefing = makeBriefing({
       priority: [
-        { item: makeItem({ topics: undefined }), briefingScore: 7, isSerendipity: false },
+        { item: makeItem({ topics: undefined }), briefingScore: 7, isSerendipity: false, classification: "mixed" as const },
       ],
     });
     const result = serializeBriefing(briefing);
@@ -254,7 +254,7 @@ describe("serializeBriefing — edge cases", () => {
   it("handles item with no source URL", () => {
     const briefing = makeBriefing({
       priority: [
-        { item: makeItem({ sourceUrl: undefined }), briefingScore: 7, isSerendipity: false },
+        { item: makeItem({ sourceUrl: undefined }), briefingScore: 7, isSerendipity: false, classification: "mixed" as const },
       ],
     });
     const result = serializeBriefing(briefing);
@@ -264,7 +264,7 @@ describe("serializeBriefing — edge cases", () => {
   it("handles item with no reason", () => {
     const briefing = makeBriefing({
       priority: [
-        { item: makeItem({ reason: "" }), briefingScore: 7, isSerendipity: false },
+        { item: makeItem({ reason: "" }), briefingScore: 7, isSerendipity: false, classification: "mixed" as const },
       ],
     });
     const result = serializeBriefing(briefing);
@@ -275,12 +275,12 @@ describe("serializeBriefing — edge cases", () => {
   it("deduplicates topic tags across priority and serendipity", () => {
     const briefing = makeBriefing({
       priority: [
-        { item: makeItem({ topics: ["ai", "ml"] }), briefingScore: 9, isSerendipity: false },
+        { item: makeItem({ topics: ["ai", "ml"] }), briefingScore: 9, isSerendipity: false, classification: "mixed" as const },
       ],
       serendipity: {
         item: makeItem({ id: "s", topics: ["ai", "cooking"] }),
         briefingScore: 6,
-        isSerendipity: true,
+        isSerendipity: true, classification: "mixed" as const,
       },
     });
     const result = serializeBriefing(briefing);
@@ -320,7 +320,7 @@ describe("serializeBriefing — edge cases", () => {
               sourceUrl: "https://arxiv.org/paper123",
             }),
             briefingScore: 9.5,
-            isSerendipity: false,
+            isSerendipity: false, classification: "mixed" as const,
           },
           {
             item: makeItem({
@@ -332,7 +332,7 @@ describe("serializeBriefing — edge cases", () => {
               sourceUrl: "https://example.com/web3",
             }),
             briefingScore: 7.2,
-            isSerendipity: false,
+            isSerendipity: false, classification: "mixed" as const,
           },
         ],
         serendipity: {
@@ -345,7 +345,7 @@ describe("serializeBriefing — edge cases", () => {
             sourceUrl: undefined,
           }),
           briefingScore: 5.9,
-          isSerendipity: true,
+          isSerendipity: true, classification: "mixed" as const,
         },
         totalItems: 25,
       });

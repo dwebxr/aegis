@@ -244,4 +244,38 @@ describe("ContentCard — data-source-url attribute", () => {
     );
     expect(html).toContain("outline:");
   });
+
+  it("has role=button and tabIndex=0 on card root", () => {
+    const item = makeItem();
+    const html = renderToStaticMarkup(
+      <ContentCard item={item} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain('role="button"');
+    expect(html).toContain('tabindex="0"');
+  });
+
+  it("sets aria-expanded=true when expanded", () => {
+    const item = makeItem();
+    const html = renderToStaticMarkup(
+      <ContentCard item={item} expanded={true} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain('aria-expanded="true"');
+  });
+
+  it("sets aria-expanded=false when collapsed", () => {
+    const item = makeItem();
+    const html = renderToStaticMarkup(
+      <ContentCard item={item} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain('aria-expanded="false"');
+  });
+
+  it("has aria-label on validate and flag buttons when expanded", () => {
+    const item = makeItem();
+    const html = renderToStaticMarkup(
+      <ContentCard item={item} expanded={true} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain('aria-label="Validate content"');
+    expect(html).toContain('aria-label="Flag as slop"');
+  });
 });

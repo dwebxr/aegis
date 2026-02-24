@@ -90,6 +90,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    let cancelled = false;
     const local = loadSources(principalText);
     setSources(local);
 
@@ -97,8 +98,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       let actor: _SERVICE;
       try {
         actor = await createBackendActorAsync(identity);
+        if (cancelled) return;
         actorRef.current = actor;
       } catch (err) {
+        if (cancelled) return;
         const msg = errMsg(err);
         console.error("[sources] actor creation failed:", msg);
         setSyncStatus("error");
@@ -117,6 +120,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           const results = await Promise.allSettled(
             toDelete.map(id => actor.deleteSourceConfig(id))
           );
+          if (cancelled) return;
           results.forEach((res, idx) => {
             if (res.status === "fulfilled") pendingDeletes.delete(toDelete[idx]);
             else console.warn("[sources] pending delete failed:", toDelete[idx], errMsg(res.reason));
@@ -124,6 +128,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         }
 
         const icConfigs = await actor.getUserSourceConfigs(principal);
+        if (cancelled) return;
 
         const icSources = icConfigs.map(icToSaved)
           .filter((s): s is SavedSource => s !== null)
@@ -146,6 +151,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
               })
           )
         );
+        if (cancelled) return;
         if (pushFailed) {
           setSyncStatus("error");
           setSyncError("Some sources failed to sync to IC");
@@ -155,6 +161,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           setSyncError("");
         }
       } catch (err) {
+        if (cancelled) return;
         const msg = errMsg(err);
         console.error("[sources] IC query failed:", msg, err);
         setSyncStatus("error");
@@ -163,8 +170,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       }
     };
     doSync().catch(err => {
-      console.error("[sources] Unhandled doSync error:", errMsg(err));
+      if (!cancelled) console.error("[sources] Unhandled doSync error:", errMsg(err));
     });
+
+    return () => { cancelled = true; };
   }, [isAuthenticated, identity, principalText]);
 
   useEffect(() => {
@@ -332,14 +341,22 @@ function icToSaved(ic: SourceConfigEntry): SavedSource | null {
     console.warn(`[sources] Unknown sourceType "${ic.sourceType}" for source ${ic.id}, skipping`);
     return null;
   }
+  const label = typeof parsed.label === "string" ? parsed.label : ic.sourceType;
+  const feedUrl = typeof parsed.feedUrl === "string" ? parsed.feedUrl : undefined;
+  const relays = Array.isArray(parsed.relays) && parsed.relays.every((r: unknown) => typeof r === "string")
+    ? (parsed.relays as string[]) : undefined;
+  const pubkeys = Array.isArray(parsed.pubkeys) && parsed.pubkeys.every((p: unknown) => typeof p === "string")
+    ? (parsed.pubkeys as string[]) : undefined;
+  const createdAt = Number(ic.createdAt) / 1_000_000;
+
   return {
     id: ic.id,
     type: ic.sourceType,
-    label: (parsed.label as string) || ic.sourceType,
+    label,
     enabled: ic.enabled,
-    feedUrl: parsed.feedUrl as string | undefined,
-    relays: parsed.relays as string[] | undefined,
-    pubkeys: parsed.pubkeys as string[] | undefined,
-    createdAt: Number(ic.createdAt) / 1_000_000,
+    feedUrl,
+    relays,
+    pubkeys,
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
   };
 }

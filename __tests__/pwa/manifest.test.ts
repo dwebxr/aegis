@@ -1,7 +1,11 @@
+/**
+ * Structural guardrails — verify manifest.json contains required PWA fields.
+ * These are NOT behavior tests. They catch accidental breakage of PWA config.
+ */
 import * as fs from "fs";
 import * as path from "path";
 
-describe("PWA manifest.json", () => {
+describe("PWA manifest.json (structural)", () => {
   const manifestPath = path.resolve(__dirname, "../../public/manifest.json");
   let manifest: Record<string, unknown>;
 

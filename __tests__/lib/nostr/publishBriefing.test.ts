@@ -28,7 +28,7 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 function makeBriefing(): BriefingState {
   return {
     priority: [
-      { item: makeItem(), briefingScore: 8.5, isSerendipity: false },
+      { item: makeItem(), briefingScore: 8.5, isSerendipity: false, classification: "mixed" as const },
     ],
     serendipity: null,
     filteredOut: [],

@@ -36,7 +36,7 @@ describe("briefingToD2AResponse — edge cases", () => {
   it("handles text that is exactly 80 characters (no truncation needed)", () => {
     const text = "A".repeat(80);
     const state = makeBriefingState({
-      priority: [{ item: makeContentItem({ text }), briefingScore: 80, isSerendipity: false }],
+      priority: [{ item: makeContentItem({ text }), briefingScore: 80, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].title).toBe(text);
@@ -46,7 +46,7 @@ describe("briefingToD2AResponse — edge cases", () => {
   it("truncates text at 81 characters", () => {
     const text = "A".repeat(81);
     const state = makeBriefingState({
-      priority: [{ item: makeContentItem({ text }), briefingScore: 80, isSerendipity: false }],
+      priority: [{ item: makeContentItem({ text }), briefingScore: 80, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].title).toHaveLength(80);
@@ -55,7 +55,7 @@ describe("briefingToD2AResponse — edge cases", () => {
 
   it("handles single-character text", () => {
     const state = makeBriefingState({
-      priority: [{ item: makeContentItem({ text: "X" }), briefingScore: 50, isSerendipity: false }],
+      priority: [{ item: makeContentItem({ text: "X" }), briefingScore: 50, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].title).toBe("X");
@@ -64,7 +64,7 @@ describe("briefingToD2AResponse — edge cases", () => {
 
   it("handles empty string text", () => {
     const state = makeBriefingState({
-      priority: [{ item: makeContentItem({ text: "" }), briefingScore: 0, isSerendipity: false }],
+      priority: [{ item: makeContentItem({ text: "" }), briefingScore: 0, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].title).toBe("");
@@ -75,7 +75,7 @@ describe("briefingToD2AResponse — edge cases", () => {
     // Emoji is multi-byte but single character
     const text = "🎯".repeat(50); // 50 emoji characters
     const state = makeBriefingState({
-      priority: [{ item: makeContentItem({ text }), briefingScore: 80, isSerendipity: false }],
+      priority: [{ item: makeContentItem({ text }), briefingScore: 80, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     // slice(0, 80) on emoji string will give 80 emoji chars (each is 1 JS "character" but 2 UTF-16 units)
@@ -125,7 +125,7 @@ describe("briefingToD2AResponse — edge cases", () => {
   it("topics with special characters", () => {
     const item = makeContentItem({ topics: ["c++", "c#", "node.js", "AI/ML"] });
     const state = makeBriefingState({
-      priority: [{ item, briefingScore: 80, isSerendipity: false }],
+      priority: [{ item, briefingScore: 80, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.meta.topics).toContain("c++");
@@ -135,7 +135,7 @@ describe("briefingToD2AResponse — edge cases", () => {
   it("handles sourceUrl as empty string", () => {
     const item = makeContentItem({ sourceUrl: "" });
     const state = makeBriefingState({
-      priority: [{ item, briefingScore: 70, isSerendipity: false }],
+      priority: [{ item, briefingScore: 70, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].sourceUrl).toBe("");
@@ -146,7 +146,7 @@ describe("briefingToD2AResponse — edge cases", () => {
     const items = sources.map((s, i) => ({
       item: makeContentItem({ id: `s-${i}`, source: s }),
       briefingScore: 50 + i,
-      isSerendipity: false,
+      isSerendipity: false, classification: "mixed" as const,
     }));
     const state = makeBriefingState({ priority: items, totalItems: 5 });
     const result = briefingToD2AResponse(state);
@@ -157,7 +157,7 @@ describe("briefingToD2AResponse — edge cases", () => {
   it("V/C/L scores of 0 are preserved (not treated as undefined)", () => {
     const item = makeContentItem({ vSignal: 0, cContext: 0, lSlop: 0 });
     const state = makeBriefingState({
-      priority: [{ item, briefingScore: 30, isSerendipity: false }],
+      priority: [{ item, briefingScore: 30, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].scores.vSignal).toBe(0);
@@ -167,7 +167,7 @@ describe("briefingToD2AResponse — edge cases", () => {
 
   it("briefingScore of 0 is preserved", () => {
     const state = makeBriefingState({
-      priority: [{ item: makeContentItem(), briefingScore: 0, isSerendipity: false }],
+      priority: [{ item: makeContentItem(), briefingScore: 0, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].briefingScore).toBe(0);
@@ -175,7 +175,7 @@ describe("briefingToD2AResponse — edge cases", () => {
 
   it("briefingScore of 100 is preserved", () => {
     const state = makeBriefingState({
-      priority: [{ item: makeContentItem(), briefingScore: 100, isSerendipity: false }],
+      priority: [{ item: makeContentItem(), briefingScore: 100, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
     expect(result.items[0].briefingScore).toBe(100);
@@ -206,7 +206,7 @@ describe("syncBriefingToCanister — edge cases", () => {
         topics: Array.from({ length: 10 }, (_, j) => `topic-${j}`),
       }),
       briefingScore: 50 + (i % 50),
-      isSerendipity: false,
+      isSerendipity: false, classification: "mixed" as const,
     }));
     const state = makeBriefingState({ priority: items, totalItems: 200 });
     const mockActor = { saveLatestBriefing: jest.fn().mockResolvedValue(true) };

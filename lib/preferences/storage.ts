@@ -4,25 +4,54 @@ import { errMsg } from "@/lib/utils/errors";
 
 const KEY_PREFIX = "aegis_prefs_";
 
+/** Validate parsed JSON is a structurally valid UserPreferenceProfile. */
+export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+  const p = parsed as Record<string, unknown>;
+  if (p.version !== 1 || typeof p.principalId !== "string") return false;
+
+  // topicAffinities: Record<string, number>
+  if (typeof p.topicAffinities !== "object" || p.topicAffinities === null || Array.isArray(p.topicAffinities)) return false;
+  for (const v of Object.values(p.topicAffinities as Record<string, unknown>)) {
+    if (typeof v !== "number") return false;
+  }
+
+  // authorTrust: Record<string, AuthorTrust>
+  if (typeof p.authorTrust !== "object" || p.authorTrust === null || Array.isArray(p.authorTrust)) return false;
+  for (const v of Object.values(p.authorTrust as Record<string, unknown>)) {
+    if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+    const at = v as Record<string, unknown>;
+    if (typeof at.validates !== "number" || typeof at.flags !== "number" || typeof at.trust !== "number") return false;
+  }
+
+  // calibration
+  if (!p.calibration || typeof p.calibration !== "object" || Array.isArray(p.calibration)) return false;
+  if (typeof (p.calibration as Record<string, unknown>).qualityThreshold !== "number") return false;
+
+  // recentTopics: RecentTopic[]
+  if (!Array.isArray(p.recentTopics)) return false;
+  for (const rt of p.recentTopics as unknown[]) {
+    if (!rt || typeof rt !== "object") return false;
+    const r = rt as Record<string, unknown>;
+    if (typeof r.topic !== "string" || typeof r.timestamp !== "number") return false;
+  }
+
+  if (typeof p.totalValidated !== "number" || typeof p.totalFlagged !== "number") return false;
+  if (typeof p.lastUpdated !== "number") return false;
+
+  return true;
+}
+
 export function loadProfile(principalId: string): UserPreferenceProfile {
   if (typeof window === "undefined") return createEmptyProfile(principalId);
   try {
     const raw = localStorage.getItem(KEY_PREFIX + principalId);
     if (!raw) return createEmptyProfile(principalId);
     const parsed = JSON.parse(raw);
-    if (
-      !parsed ||
-      parsed.version !== 1 ||
-      parsed.principalId !== principalId ||
-      typeof parsed.topicAffinities !== "object" ||
-      typeof parsed.authorTrust !== "object" ||
-      !parsed.calibration ||
-      typeof parsed.calibration.qualityThreshold !== "number" ||
-      !Array.isArray(parsed.recentTopics)
-    ) {
+    if (!isValidProfile(parsed) || parsed.principalId !== principalId) {
       return createEmptyProfile(principalId);
     }
-    return parsed as UserPreferenceProfile;
+    return parsed;
   } catch (err) {
     console.warn("[prefs] Failed to load preference profile:", err);
     return createEmptyProfile(principalId);
@@ -78,21 +107,13 @@ export async function loadPreferencesFromIC(
     if (result.length === 0) return null;
 
     const parsed = JSON.parse(result[0].preferencesJson);
-    if (
-      !parsed ||
-      parsed.version !== 1 ||
-      typeof parsed.topicAffinities !== "object" ||
-      typeof parsed.authorTrust !== "object" ||
-      !parsed.calibration ||
-      typeof parsed.calibration.qualityThreshold !== "number" ||
-      !Array.isArray(parsed.recentTopics)
-    ) {
+    // Set principalId before validation so isValidProfile can check it
+    if (parsed && typeof parsed === "object") parsed.principalId = principalText;
+    if (!isValidProfile(parsed)) {
       console.warn("[prefs] IC preference data failed validation");
       return null;
     }
-
-    parsed.principalId = principalText;
-    return parsed as UserPreferenceProfile;
+    return parsed;
   } catch (err) {
     console.warn("[prefs] IC load failed:", errMsg(err));
     return null;

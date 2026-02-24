@@ -7,8 +7,27 @@ export interface Notification {
   type: "success" | "error" | "info";
 }
 
-const DEDUPE_WINDOW_MS = 5_000;
+export const DEDUPE_WINDOW_MS = 5_000;
 let nextId = 1;
+
+/** Pure function: returns true if this notification should be suppressed. Updates recentMap if not suppressed. */
+export function shouldSuppressDuplicate(
+  recentMap: Map<string, number>,
+  text: string,
+  type: Notification["type"],
+  now: number,
+): boolean {
+  if (type !== "error") return false;
+  const lastSeen = recentMap.get(text);
+  if (lastSeen !== undefined && now - lastSeen < DEDUPE_WINDOW_MS) return true;
+  recentMap.set(text, now);
+  return false;
+}
+
+/** Pure function: returns auto-dismiss duration in ms based on notification type. */
+export function computeDismissDuration(type: Notification["type"]): number {
+  return type === "error" ? 5000 : 2500;
+}
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -20,22 +39,21 @@ export function useNotifications() {
   }, []);
 
   const addNotification = useCallback((text: string, type: Notification["type"]) => {
-    // Suppress duplicate error notifications within the dedupe window
-    const now = Date.now();
-    if (type === "error") {
-      const lastSeen = recentRef.current.get(text);
-      if (lastSeen && now - lastSeen < DEDUPE_WINDOW_MS) return;
-      recentRef.current.set(text, now);
-    }
+    if (shouldSuppressDuplicate(recentRef.current, text, type, Date.now())) return;
 
     const id = nextId++;
     setNotifications(prev => [...prev, { id, text, type }]);
+    const duration = computeDismissDuration(type);
     const timer = setTimeout(() => {
       timersRef.current.delete(timer);
       setNotifications(prev => prev.filter(n => n.id !== id));
-    }, 2500);
+    }, duration);
     timersRef.current.add(timer);
   }, []);
 
-  return { notifications, addNotification };
+  const removeNotification = useCallback((id: number) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
+  return { notifications, addNotification, removeNotification };
 }

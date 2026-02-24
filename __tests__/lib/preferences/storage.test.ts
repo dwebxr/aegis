@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { loadProfile, saveProfile } from "@/lib/preferences/storage";
+import { loadProfile, saveProfile, isValidProfile } from "@/lib/preferences/storage";
 import { createEmptyProfile } from "@/lib/preferences/types";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 
@@ -70,6 +70,9 @@ describe("preferences/storage", () => {
         topicAffinities: {},
         authorTrust: {},
         recentTopics: [],
+        totalValidated: 0,
+        totalFlagged: 0,
+        lastUpdated: 1,
       }));
       const loaded = loadProfile("user-1");
       expect(loaded.calibration.qualityThreshold).toBe(4.0);
@@ -83,6 +86,57 @@ describe("preferences/storage", () => {
         authorTrust: {},
         calibration: { qualityThreshold: 4 },
         recentTopics: "not an array",
+        totalValidated: 0,
+        totalFlagged: 0,
+        lastUpdated: 1,
+      }));
+      const loaded = loadProfile("user-1");
+      expect(loaded.recentTopics).toEqual([]);
+    });
+
+    it("rejects topicAffinities with non-number values", () => {
+      localStorage.setItem("aegis_prefs_user-1", JSON.stringify({
+        version: 1,
+        principalId: "user-1",
+        topicAffinities: { ai: "high" },
+        authorTrust: {},
+        calibration: { qualityThreshold: 4 },
+        recentTopics: [],
+        totalValidated: 0,
+        totalFlagged: 0,
+        lastUpdated: 1,
+      }));
+      const loaded = loadProfile("user-1");
+      expect(loaded.topicAffinities).toEqual({}); // fresh empty
+    });
+
+    it("rejects authorTrust with invalid structure", () => {
+      localStorage.setItem("aegis_prefs_user-1", JSON.stringify({
+        version: 1,
+        principalId: "user-1",
+        topicAffinities: {},
+        authorTrust: { alice: "trusted" },
+        calibration: { qualityThreshold: 4 },
+        recentTopics: [],
+        totalValidated: 0,
+        totalFlagged: 0,
+        lastUpdated: 1,
+      }));
+      const loaded = loadProfile("user-1");
+      expect(loaded.authorTrust).toEqual({});
+    });
+
+    it("rejects recentTopics with invalid elements", () => {
+      localStorage.setItem("aegis_prefs_user-1", JSON.stringify({
+        version: 1,
+        principalId: "user-1",
+        topicAffinities: {},
+        authorTrust: {},
+        calibration: { qualityThreshold: 4 },
+        recentTopics: [{ topic: 123 }],
+        totalValidated: 0,
+        totalFlagged: 0,
+        lastUpdated: 1,
       }));
       const loaded = loadProfile("user-1");
       expect(loaded.recentTopics).toEqual([]);
@@ -138,6 +192,58 @@ describe("preferences/storage", () => {
       expect(saveProfile(profile)).toBe(false);
 
       Storage.prototype.setItem = originalSetItem;
+    });
+  });
+
+  describe("isValidProfile", () => {
+    const validBase = {
+      version: 1,
+      principalId: "user-1",
+      topicAffinities: { ai: 0.5 },
+      authorTrust: { alice: { validates: 3, flags: 0, trust: 0.6 } },
+      calibration: { qualityThreshold: 4 },
+      recentTopics: [{ topic: "ai", timestamp: 1000 }],
+      totalValidated: 10,
+      totalFlagged: 2,
+      lastUpdated: Date.now(),
+    };
+
+    it("accepts a valid profile", () => {
+      expect(isValidProfile(validBase)).toBe(true);
+    });
+
+    it("accepts empty collections", () => {
+      expect(isValidProfile({ ...validBase, topicAffinities: {}, authorTrust: {}, recentTopics: [] })).toBe(true);
+    });
+
+    it("rejects null", () => expect(isValidProfile(null)).toBe(false));
+    it("rejects string", () => expect(isValidProfile("hello")).toBe(false));
+    it("rejects array", () => expect(isValidProfile([])).toBe(false));
+
+    it("rejects topicAffinities with string value", () => {
+      expect(isValidProfile({ ...validBase, topicAffinities: { ai: "high" } })).toBe(false);
+    });
+
+    it("rejects authorTrust with string value", () => {
+      expect(isValidProfile({ ...validBase, authorTrust: { alice: "trusted" } })).toBe(false);
+    });
+
+    it("rejects authorTrust missing trust field", () => {
+      expect(isValidProfile({ ...validBase, authorTrust: { alice: { validates: 1, flags: 0 } } })).toBe(false);
+    });
+
+    it("rejects recentTopics with invalid element", () => {
+      expect(isValidProfile({ ...validBase, recentTopics: [{ topic: 123 }] })).toBe(false);
+    });
+
+    it("rejects missing totalValidated", () => {
+      const { totalValidated: _, ...rest } = validBase;
+      expect(isValidProfile(rest)).toBe(false);
+    });
+
+    it("rejects missing lastUpdated", () => {
+      const { lastUpdated: _, ...rest } = validBase;
+      expect(isValidProfile(rest)).toBe(false);
     });
   });
 

@@ -60,21 +60,23 @@ export function computeScoringCacheKey(text: string, userContext?: UserContext |
 }
 
 // Avoids repeated JSON.parse per scoring call.
-let _memCache: Record<string, ScoringCacheEntry> | null = null;
+let _memCache: Map<string, ScoringCacheEntry> | null = null;
 
-function getCache(): Record<string, ScoringCacheEntry> {
+function getCache(): Map<string, ScoringCacheEntry> {
   if (_memCache) return _memCache;
   if (typeof globalThis.localStorage === "undefined") {
-    _memCache = {};
+    _memCache = new Map();
     return _memCache;
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) { _memCache = {}; return _memCache; }
+    if (!raw) { _memCache = new Map(); return _memCache; }
     const parsed = JSON.parse(raw);
-    _memCache = (parsed && typeof parsed === "object") ? parsed as Record<string, ScoringCacheEntry> : {};
+    _memCache = (parsed && typeof parsed === "object")
+      ? new Map(Object.entries(parsed) as [string, ScoringCacheEntry][])
+      : new Map();
   } catch {
-    _memCache = {};
+    _memCache = new Map();
   }
   return _memCache;
 }
@@ -82,7 +84,7 @@ function getCache(): Record<string, ScoringCacheEntry> {
 function flushCache(): void {
   if (typeof globalThis.localStorage === "undefined" || !_memCache) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(_memCache));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(_memCache)));
   } catch (err) {
     console.warn("[scoring-cache] flushCache failed (quota?):", err);
   }
@@ -91,13 +93,13 @@ function flushCache(): void {
 /** Look up a cached scoring result. Returns null on miss or expired entry. */
 export function lookupScoringCache(key: string, profileHash: string): AnalyzeResponse | null {
   const cache = getCache();
-  const entry = cache[key];
+  const entry = cache.get(key);
   if (!entry || entry.profileHash !== profileHash) {
     cacheMisses++;
     return null;
   }
   if (Date.now() - entry.storedAt > TTL_MS) {
-    delete cache[key];
+    cache.delete(key);
     flushCache();
     cacheMisses++;
     return null;
@@ -108,13 +110,16 @@ export function lookupScoringCache(key: string, profileHash: string): AnalyzeRes
 
 export function storeScoringCache(key: string, profileHash: string, result: AnalyzeResponse): void {
   const cache = getCache();
-  cache[key] = { result, storedAt: Date.now(), profileHash };
+  cache.set(key, { result, storedAt: Date.now(), profileHash });
 
-  const keys = Object.keys(cache);
-  if (keys.length > MAX_ENTRIES) {
-    const sorted = keys.sort((a, b) => (cache[a].storedAt || 0) - (cache[b].storedAt || 0));
-    const toRemove = sorted.slice(0, keys.length - MAX_ENTRIES);
-    for (const k of toRemove) delete cache[k];
+  // Map preserves insertion order — FIFO prune oldest entries in O(excess)
+  if (cache.size > MAX_ENTRIES) {
+    const excess = cache.size - MAX_ENTRIES;
+    const iter = cache.keys();
+    for (let i = 0; i < excess; i++) {
+      const oldest = iter.next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
   }
 
   flushCache();
@@ -122,11 +127,11 @@ export function storeScoringCache(key: string, profileHash: string, result: Anal
 
 /** For diagnostics. */
 export function getScoringCacheStats(): { hits: number; misses: number; size: number } {
-  return { hits: cacheHits, misses: cacheMisses, size: Object.keys(getCache()).length };
+  return { hits: cacheHits, misses: cacheMisses, size: getCache().size };
 }
 
 export function clearScoringCache(): void {
-  _memCache = {};
+  _memCache = new Map();
   if (typeof globalThis.localStorage !== "undefined") {
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
   }

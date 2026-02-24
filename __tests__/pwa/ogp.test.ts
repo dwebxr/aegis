@@ -1,7 +1,11 @@
+/**
+ * Structural guardrails — verify OGP metadata exists in layout source.
+ * These are NOT behavior tests. They catch accidental removal of SEO/social tags.
+ */
 import * as fs from "fs";
 import * as path from "path";
 
-describe("OGP / Meta tags", () => {
+describe("OGP / Meta tags (structural)", () => {
   const layoutPath = path.resolve(__dirname, "../../app/layout.tsx");
   const ogImagePath = path.resolve(__dirname, "../../public/og-image.png");
   let layoutContent: string;

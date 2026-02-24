@@ -686,6 +686,26 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Mobile touch targets meet 48px accessibility minimum
 - Settings gear icon visible in collapsed sidebar mode
 - Inline agent settings on Dashboard — add/remove topic interests, adjust quality threshold slider
+- Offline page shows cached evaluation availability with "View Cached Dashboard" button
+- Heuristic fallback notification — users are informed when AI is unavailable and scoring falls back to heuristics
+- Error notifications persist 5 seconds (info/success remain 2.5s); all notifications have a dismiss button
+
+### Accessibility
+- Content cards: `role="button"`, `tabIndex={0}`, `aria-expanded` for keyboard-accessible expand/collapse
+- Validate/Flag buttons: `aria-label="Validate content"`, `aria-label="Flag as slop"`
+- Briefing filtered-out toggle: `aria-expanded` state
+- Notification toasts: dismiss button with `aria-label="Dismiss notification"`
+
+### Performance
+- Scoring cache uses `Map` (O(1) lookup) instead of `Record` with FIFO pruning via insertion order
+- Image backfill delay reduced from 800ms to 300ms per item (24s → 9s for 30 items)
+- Timestamp refresh interval increased from 30s to 60s (50% fewer re-renders)
+
+### Runtime Safety
+- Preference storage validates nested structures (topic affinities, author trust, calibration) before loading
+- IC-to-local data conversion validates types at runtime instead of unsafe `as` casts
+- useEffect async operations use cancellation flags to prevent stale state updates after unmount
+- Notification dedup logic extracted as pure testable functions (no re-implementation in tests)
 
 ### Multi-Source Ingestion
 - RSS/Atom feeds (YouTube, note.com, blogs — with thumbnail extraction, ETag conditional fetch)
@@ -720,7 +740,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (2997 tests, 183 suites) |
+| Test | Jest + ts-jest (3023 tests, 183 suites) |
 
 ## Project Structure
 
@@ -772,7 +792,7 @@ aegis/
 │   ├── preferences/
 │   │   ├── types.ts                     # UserPreferenceProfile, constants
 │   │   ├── engine.ts                    # learn(), getContext(), hasEnoughData()
-│   │   └── storage.ts                   # localStorage R/W
+│   │   └── storage.ts                   # localStorage R/W + structural validation
 │   ├── briefing/
 │   │   ├── ranker.ts                    # briefingScore, generateBriefing, serendipity
 │   │   ├── sync.ts                      # Sync briefing snapshot to IC canister
@@ -860,7 +880,7 @@ aegis/
 │   ├── useKeyboardNav.ts               # J/K/L/H/V/F/O keyboard navigation + Cmd+K palette
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 2997 tests across 183 suites
+├── __tests__/                           # 3023 tests across 183 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)

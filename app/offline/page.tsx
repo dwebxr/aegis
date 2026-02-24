@@ -20,24 +20,44 @@ export default function OfflinePage() {
       <h1 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "0.5rem" }}>
         You&apos;re offline
       </h1>
-      <p style={{ color: "#94a3b8", maxWidth: "24rem", marginBottom: "1.5rem" }}>
-        Aegis needs an internet connection to fetch and analyze content. Please check your connection and try again.
+      <p style={{ color: "#94a3b8", maxWidth: "24rem", marginBottom: "0.75rem" }}>
+        Aegis needs an internet connection to fetch and analyze content.
       </p>
-      <button
-        onClick={() => window.location.reload()}
-        style={{
-          padding: "0.625rem 1.5rem",
-          borderRadius: "0.5rem",
-          border: "1px solid #334155",
-          backgroundColor: "#1e293b",
-          color: "#e2e8f0",
-          cursor: "pointer",
-          fontSize: "0.875rem",
-          fontWeight: 500,
-        }}
-      >
-        Retry
-      </button>
+      <p style={{ color: "#64748b", fontSize: "0.875rem", maxWidth: "24rem", marginBottom: "1.5rem" }}>
+        Your cached evaluations are still available offline.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <button
+          onClick={() => { window.location.href = "/"; }}
+          style={{
+            padding: "0.625rem 1.5rem",
+            borderRadius: "0.5rem",
+            border: "1px solid #6366f1",
+            backgroundColor: "#312e81",
+            color: "#e2e8f0",
+            cursor: "pointer",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+          }}
+        >
+          View Cached Dashboard
+        </button>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            padding: "0.625rem 1.5rem",
+            borderRadius: "0.5rem",
+            border: "1px solid #334155",
+            backgroundColor: "#1e293b",
+            color: "#e2e8f0",
+            cursor: "pointer",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+          }}
+        >
+          Retry Connection
+        </button>
+      </div>
     </div>
   );
 }
