@@ -52,6 +52,25 @@ async function fetchAnalyze(
   }
 }
 
+/** Scoring tier helpers — each returns AnalyzeResponse on success, throws on failure (for Promise.any). */
+async function tryOllama(text: string, topics: string[]): Promise<AnalyzeResponse> {
+  const { scoreWithOllama } = await import("@/lib/ollama/engine");
+  const r = await scoreWithOllama(text, topics);
+  return { ...r, scoredByAI: true, scoringEngine: "ollama" as const };
+}
+
+async function tryWebLLM(text: string, topics: string[]): Promise<AnalyzeResponse> {
+  const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
+  const r = await scoreWithWebLLM(text, topics);
+  return { ...r, scoredByAI: true, scoringEngine: "webllm" as const };
+}
+
+async function tryBYOK(text: string, uc: UserContext | null | undefined, key: string): Promise<AnalyzeResponse> {
+  const data = await fetchAnalyze(text, uc, key);
+  if (!data) throw new Error("BYOK failed");
+  return { ...data, scoringEngine: "claude-byok" as const };
+}
+
 function loadCachedContent(): ContentItem[] {
   if (typeof globalThis.localStorage === "undefined") return [];
   try {
@@ -270,35 +289,21 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
       : [];
 
-    // Tier 0: Ollama (local LLM server)
-    if (isOllamaEnabled()) {
-      try {
-        const { scoreWithOllama } = await import("@/lib/ollama/engine");
-        const ollamaResult = await scoreWithOllama(text, topics);
-        result = { ...ollamaResult, scoredByAI: true, scoringEngine: "ollama" as const };
-      } catch (err) {
-        console.warn("[scoreText] Ollama failed, falling back:", errMsg(err));
-      }
-    }
+    // Tier 0-2: Run enabled local tiers in parallel (fastest wins)
+    const localTiers: Promise<AnalyzeResponse>[] = [];
+    if (isOllamaEnabled()) localTiers.push(tryOllama(text, topics));
+    if (isWebLLMEnabled()) localTiers.push(tryWebLLM(text, topics));
+    if (userApiKey) localTiers.push(tryBYOK(text, userContext, userApiKey));
 
-    // Tier 1: WebLLM (browser-local AI)
-    if (!result && isWebLLMEnabled()) {
+    if (localTiers.length > 0) {
       try {
-        const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
-        const webllmResult = await scoreWithWebLLM(text, topics);
-        result = { ...webllmResult, scoredByAI: true, scoringEngine: "webllm" as const };
+        result = await Promise.any(localTiers);
       } catch (err) {
-        console.warn("[scoreText] WebLLM failed, falling back:", errMsg(err));
-      }
-    }
-
-    // Tier 2: Claude API with user's own key (BYOK)
-    if (!result && userApiKey) {
-      const data = await fetchAnalyze(text, userContext, userApiKey);
-      if (data) {
-        result = { ...data, scoringEngine: "claude-byok" as const };
-      } else {
-        console.warn("[scoreText] BYOK failed, falling back to IC LLM");
+        // All local tiers failed — log aggregate and fall through
+        const reasons = err instanceof AggregateError
+          ? err.errors.map(e => errMsg(e)).join("; ")
+          : errMsg(err);
+        console.warn("[scoreText] All local tiers failed:", reasons);
       }
     }
 
