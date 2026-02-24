@@ -719,9 +719,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
             gap: space[4],
             marginBottom: space[4],
+            overflow: "hidden",
           }}>
           {/* Today's Top 3 — full width */}
-          <div data-testid="aegis-top3-section" style={{ gridColumn: mobile ? undefined : "1 / -1" }}>
+          <div data-testid="aegis-top3-section" style={{ gridColumn: mobile ? undefined : "1 / -1", minWidth: 0 }}>
             <div style={{
               fontSize: t.h3.size, fontWeight: t.h3.weight,
               color: colors.text.tertiary, marginBottom: space[3],
@@ -822,6 +823,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               border: `1px solid ${colors.border.subtle}`,
               borderRadius: radii.lg,
               padding: `${space[3]}px ${space[4]}px`,
+              minWidth: 0,
             }}>
               <div style={{
                 fontSize: t.bodySm.size, fontWeight: 600,
@@ -971,7 +973,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </div>
 
           {/* Right column: Discoveries + Validated */}
-          <div style={{ display: "flex", flexDirection: "column", gap: `${space[4]}px` }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: `${space[4]}px`, minWidth: 0 }}>
 
           {/* Discoveries */}
           {filteredDiscoveries.length > 0 && (
@@ -1363,7 +1365,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               <GearIcon s={16} />
               <span>Agent Settings</span>
               {!settingsOpen && (
-                <span style={{ color: colors.text.disabled, fontWeight: 400 }}>
+                <span style={{ color: colors.text.disabled, fontWeight: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
                   : {Object.entries(profile.topicAffinities).filter(([, v]) => v >= 0.2).length} interests
                   &middot; threshold {profile.calibration.qualityThreshold.toFixed(1)}
                   &middot; {profile.totalValidated + profile.totalFlagged} reviews
