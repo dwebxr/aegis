@@ -51,7 +51,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
     scoreBuckets[Math.max(0, Math.min(9, Math.floor(c.scores.composite)))]++;
   }
 
-  const accuracy = content.length > 0 ? ((qualCount / content.length) * 100).toFixed(1) : "0.0";
+  const accuracy = content.length > 0 ? ((qualCount / content.length) * 100).toFixed(1) : "--";
   const userReviewed = validatedCount + flaggedCount;
   const falsePositiveRate = qualCount > 0 ? ((falsePositives / qualCount) * 100).toFixed(1) : "--";
 

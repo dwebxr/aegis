@@ -40,26 +40,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
     setDismissed(true);
   };
 
-  const ctaAction = () => {
-    if (!onTabChange) return;
-    switch (current.id) {
-      case "add-sources":
-        onTabChange("sources");
-        break;
-      case "review-validate":
-        onTabChange("incinerator");
-        break;
-    }
-  };
-
-  const ctaLabel = (() => {
-    switch (current.id) {
-      case "add-sources": return "Add Sources \u2192";
-      case "wait-content": return null; // No CTA, just waiting
-      case "review-validate": return "Go to Incinerator \u2192";
-      case "personalized": return "View Dashboard \u2192";
-    }
-  })();
+  const ctaLabel = current.ctaLabel;
+  const ctaAction = () => { if (current.ctaTab && onTabChange) onTabChange(current.ctaTab); };
 
   return (
     <div style={{
@@ -104,7 +86,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
 
       {/* Current step */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: space[3] }}>
-        <span style={{ fontSize: 28 }}>{STEP_ICONS[currentIdx]}</span>
+        <span style={{ fontSize: 28 }}>{STEP_ICONS[currentIdx] ?? "\u2753"}</span>
         <div style={{ flex: 1 }}>
           <div style={{
             fontSize: t.h3.size, fontWeight: t.h3.weight,

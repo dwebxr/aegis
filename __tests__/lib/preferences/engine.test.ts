@@ -257,7 +257,7 @@ describe("learn", () => {
         recentTopics: Array.from({ length: 49 }, (_, i) => ({
           topic: `topic-${i}`,
           timestamp: Date.now() - (49 - i) * 1000,
-          weight: 1,
+
         })),
       });
       const next = learn(profile, {
@@ -357,13 +357,13 @@ describe("getContext", () => {
     const now = Date.now();
     const profile = makeProfile({
       recentTopics: [
-        { topic: "ai", timestamp: now - 1, weight: 1 },
-        { topic: "ai", timestamp: now, weight: 1 }, // duplicate
-        { topic: "ml", timestamp: now - 2, weight: 1 },
+        { topic: "ai", timestamp: now - 1 },
+        { topic: "ai", timestamp: now }, // duplicate
+        { topic: "ml", timestamp: now - 2 },
         ...Array.from({ length: 12 }, (_, i) => ({
           topic: `t${i}`,
           timestamp: now - 100 - i, // older than ai/ml
-          weight: 1,
+
         })),
       ],
     });

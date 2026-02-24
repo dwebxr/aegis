@@ -96,7 +96,7 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
       void syncPreferencesToIC(ident, p).catch(err => {
         console.warn("[prefs] IC debounced sync failed:", errMsg(err));
       });
-    }, 3000);
+    }, 3_000); // IC sync debounce: 3 seconds
   }, []);
 
   useEffect(() => {

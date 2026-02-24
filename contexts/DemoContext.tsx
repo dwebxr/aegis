@@ -40,19 +40,15 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
   // Reset banner on login
   useEffect(() => {
-    if (isAuthenticated) {
-      setBannerDismissed(false);
-      try {
-        sessionStorage.removeItem(DEMO_BANNER_KEY);
-      } catch { console.debug("[demo] sessionStorage unavailable"); }
-    }
+    if (isAuthenticated) setBannerDismissed(false);
   }, [isAuthenticated]);
 
   const value = useMemo(() => ({
     isDemoMode,
     bannerDismissed,
     dismissBanner,
-  }), [isDemoMode, bannerDismissed, dismissBanner]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- dismissBanner is stable (empty deps useCallback)
+  }), [isDemoMode, bannerDismissed]);
 
   return (
     <DemoContext.Provider value={value}>

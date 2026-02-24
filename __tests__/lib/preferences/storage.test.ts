@@ -147,7 +147,7 @@ describe("preferences/storage", () => {
       profile.topicAffinities = { ml: 0.9, politics: -0.3 };
       profile.authorTrust = { alice: { validates: 5, flags: 1, trust: 0.6 } };
       profile.calibration = { qualityThreshold: 5.0 };
-      profile.recentTopics = [{ topic: "ai", timestamp: 1000, weight: 0.8 }];
+      profile.recentTopics = [{ topic: "ai", timestamp: 1000 }];
       profile.totalValidated = 100;
       profile.totalFlagged = 25;
 

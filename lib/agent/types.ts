@@ -1,4 +1,5 @@
 import type { ContentManifest } from "@/lib/d2a/manifest";
+import type { ScoreBreakdown, Verdict } from "@/lib/types/content";
 
 export interface AgentProfile {
   nostrPubkey: string;
@@ -37,13 +38,8 @@ export interface D2AOfferPayload {
 export interface D2ADeliverPayload {
   text: string;
   author: string;
-  scores: {
-    originality: number;
-    insight: number;
-    credibility: number;
-    composite: number;
-  };
-  verdict: "quality" | "slop";
+  scores: ScoreBreakdown;
+  verdict: Verdict;
   topics: string[];
   vSignal?: number;
   cContext?: number;

@@ -54,28 +54,36 @@ export function computeProfileHash(userContext?: UserContext | null): string {
   return hexFromBytes(hash.slice(0, 8));
 }
 
-/** Compute the full cache key combining content fingerprint and profile hash. */
-export function computeScoringCacheKey(text: string, userContext?: UserContext | null): string {
-  return `${computeContentFingerprint(text)}:${computeProfileHash(userContext)}`;
+/** Compute the full cache key. Accepts optional pre-computed profileHash to avoid double hashing. */
+export function computeScoringCacheKey(text: string, userContext?: UserContext | null, precomputedHash?: string): string {
+  const ph = precomputedHash ?? computeProfileHash(userContext);
+  return `${computeContentFingerprint(text)}:${ph}`;
 }
 
-function loadCache(): Record<string, ScoringCacheEntry> {
-  if (typeof globalThis.localStorage === "undefined") return {};
+// In-memory layer: avoids repeated JSON.parse per scoring call.
+let _memCache: Record<string, ScoringCacheEntry> | null = null;
+
+function getCache(): Record<string, ScoringCacheEntry> {
+  if (_memCache) return _memCache;
+  if (typeof globalThis.localStorage === "undefined") {
+    _memCache = {};
+    return _memCache;
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
+    if (!raw) { _memCache = {}; return _memCache; }
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed as Record<string, ScoringCacheEntry>;
+    _memCache = (parsed && typeof parsed === "object") ? parsed as Record<string, ScoringCacheEntry> : {};
   } catch {
-    return {};
+    _memCache = {};
   }
+  return _memCache;
 }
 
-function saveCache(cache: Record<string, ScoringCacheEntry>): void {
-  if (typeof globalThis.localStorage === "undefined") return;
+function flushCache(): void {
+  if (typeof globalThis.localStorage === "undefined" || !_memCache) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(_memCache));
   } catch {
     // QuotaExceededError — silently degrade
   }
@@ -83,20 +91,15 @@ function saveCache(cache: Record<string, ScoringCacheEntry>): void {
 
 /** Look up a cached scoring result. Returns null on miss or expired entry. */
 export function lookupScoringCache(key: string, profileHash: string): AnalyzeResponse | null {
-  const cache = loadCache();
+  const cache = getCache();
   const entry = cache[key];
-  if (!entry) {
-    cacheMisses++;
-    return null;
-  }
-  if (entry.profileHash !== profileHash) {
+  if (!entry || entry.profileHash !== profileHash) {
     cacheMisses++;
     return null;
   }
   if (Date.now() - entry.storedAt > TTL_MS) {
-    // Expired — clean up
     delete cache[key];
-    saveCache(cache);
+    flushCache();
     cacheMisses++;
     return null;
   }
@@ -106,34 +109,30 @@ export function lookupScoringCache(key: string, profileHash: string): AnalyzeRes
 
 /** Store a scoring result in the cache. */
 export function storeScoringCache(key: string, profileHash: string, result: AnalyzeResponse): void {
-  const cache = loadCache();
+  const cache = getCache();
   cache[key] = { result, storedAt: Date.now(), profileHash };
 
   // FIFO pruning
   const keys = Object.keys(cache);
   if (keys.length > MAX_ENTRIES) {
-    // Sort by storedAt ascending and remove oldest
     const sorted = keys.sort((a, b) => (cache[a].storedAt || 0) - (cache[b].storedAt || 0));
     const toRemove = sorted.slice(0, keys.length - MAX_ENTRIES);
     for (const k of toRemove) delete cache[k];
   }
 
-  saveCache(cache);
+  flushCache();
 }
 
 /** Get cache stats for diagnostics. */
 export function getScoringCacheStats(): { hits: number; misses: number; size: number } {
-  const cache = loadCache();
-  return { hits: cacheHits, misses: cacheMisses, size: Object.keys(cache).length };
+  return { hits: cacheHits, misses: cacheMisses, size: Object.keys(getCache()).length };
 }
 
 /** Clear the entire scoring cache. */
 export function clearScoringCache(): void {
-  if (typeof globalThis.localStorage === "undefined") return;
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // ignore
+  _memCache = {};
+  if (typeof globalThis.localStorage !== "undefined") {
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
   }
   cacheHits = 0;
   cacheMisses = 0;

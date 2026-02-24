@@ -374,9 +374,9 @@ describe("getContext — edge cases", () => {
     const now = Date.now();
     const profile = makeProfile({
       recentTopics: [
-        { topic: "AI", timestamp: now, weight: 1 },
-        { topic: "AI", timestamp: now - 1000, weight: 1 },
-        { topic: "ML", timestamp: now - 2000, weight: 1 },
+        { topic: "AI", timestamp: now },
+        { topic: "AI", timestamp: now - 1000 },
+        { topic: "ML", timestamp: now - 2000 },
       ],
     });
     const ctx = getContext(profile);

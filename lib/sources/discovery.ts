@@ -68,10 +68,9 @@ export function trackDomainValidation(sourceUrl?: string): void {
 export function getSuggestions(existingFeedUrls: string[]): DomainValidation[] {
   const data = loadDomainValidations();
   const existingDomains = new Set(
-    existingFeedUrls.map(url => {
-      try { return normalizeDomain(new URL(url).hostname); }
-      catch { return ""; }
-    }).filter(Boolean),
+    existingFeedUrls
+      .map(url => extractDomain(url))
+      .filter((d): d is string => d !== null),
   );
 
   return Object.values(data).filter(d =>

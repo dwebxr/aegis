@@ -32,6 +32,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ text, mobile }) => {
       ref={wrapRef}
       className={mobile ? undefined : "aegis-tooltip-wrap"}
       onClick={mobile ? () => setOpen(v => !v) : undefined}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(v => !v); } }}
       style={{ position: "relative", display: "inline-flex", alignItems: "center", cursor: "help" }}
       role="button"
       aria-label="Info"

@@ -61,7 +61,7 @@ export class IngestionScheduler {
   private sourceStates: Map<string, SourceRuntimeState>;
   private dedup: ArticleDeduplicator;
   /** ETag / Last-Modified cache per source key */
-  private conditionalHeaders = new Map<string, { etag?: string; lastModified?: string }>();
+  private httpCacheHeaders = new Map<string, { etag?: string; lastModified?: string }>();
 
   constructor(callbacks: SchedulerCallbacks) {
     this.callbacks = callbacks;
@@ -183,13 +183,13 @@ export class IngestionScheduler {
       const now = Date.now();
       const cycleItems: ContentItem[] = [];
 
-      // Purge conditionalHeaders for sources no longer in the active list
+      // Purge httpCacheHeaders for sources no longer in the active list
       const activeKeys = new Set(sources.map(s => getSourceKey(s.type, s.config)));
       const staleKeys: string[] = [];
-      this.conditionalHeaders.forEach((_, key) => {
+      this.httpCacheHeaders.forEach((_, key) => {
         if (!activeKeys.has(key)) staleKeys.push(key);
       });
-      for (const key of staleKeys) this.conditionalHeaders.delete(key);
+      for (const key of staleKeys) this.httpCacheHeaders.delete(key);
 
       for (const source of sources) {
         if (!source.enabled) continue;
@@ -315,7 +315,7 @@ export class IngestionScheduler {
   private async fetchRSS(feedUrl: string, key: string): Promise<RawItem[]> {
     try {
       const body: Record<string, unknown> = { feedUrl, limit: 10 };
-      const cached = this.conditionalHeaders.get(key);
+      const cached = this.httpCacheHeaders.get(key);
       if (cached?.etag) body.etag = cached.etag;
       if (cached?.lastModified) body.lastModified = cached.lastModified;
 
@@ -332,7 +332,7 @@ export class IngestionScheduler {
       const data = await res.json();
 
       if (data.etag || data.lastModified) {
-        this.conditionalHeaders.set(key, { etag: data.etag, lastModified: data.lastModified });
+        this.httpCacheHeaders.set(key, { etag: data.etag, lastModified: data.lastModified });
       }
 
       // 304 Not Modified — no new content

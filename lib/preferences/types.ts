@@ -7,7 +7,6 @@ export interface AuthorTrust {
 export interface RecentTopic {
   topic: string;
   timestamp: number;
-  weight: number;
 }
 
 export interface ScoringCalibration {

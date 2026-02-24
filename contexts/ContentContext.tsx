@@ -261,7 +261,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const scoreText = useCallback(async (text: string, userContext?: UserContext | null): Promise<AnalyzeResponse> => {
     // Check scoring cache first
     const profileHash = computeProfileHash(userContext);
-    const cacheKey = computeScoringCacheKey(text, userContext);
+    const cacheKey = computeScoringCacheKey(text, userContext, profileHash);
     const cached = lookupScoringCache(cacheKey, profileHash);
     if (cached) return cached;
 

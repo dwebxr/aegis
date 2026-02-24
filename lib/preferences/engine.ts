@@ -24,8 +24,8 @@ const VALIDATE_TOPIC_DELTA = 0.1;
 const FLAG_TOPIC_DELTA = -0.05;
 const VALIDATE_AUTHOR_DELTA = 0.2;
 const FLAG_AUTHOR_DELTA = -0.3;
-const THRESHOLD_LOWER = -0.05; // borderline validate → lower threshold
-const THRESHOLD_RAISE = 0.1;   // quality-judged item flagged → raise threshold
+const THRESHOLD_LOWER_STEP = -0.05; // borderline validate → lower threshold
+const THRESHOLD_RAISE_STEP = 0.1;   // quality-judged item flagged → raise threshold
 const BORDERLINE_LOW = 3.5;
 const BORDERLINE_HIGH = 4.5;
 
@@ -52,10 +52,10 @@ export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPr
   }
 
   if (event.action === "validate" && event.composite >= BORDERLINE_LOW && event.composite <= BORDERLINE_HIGH) {
-    next.calibration.qualityThreshold = Math.max(1, next.calibration.qualityThreshold + THRESHOLD_LOWER);
+    next.calibration.qualityThreshold = Math.max(1, next.calibration.qualityThreshold + THRESHOLD_LOWER_STEP);
   }
   if (event.action === "flag" && event.verdict === "quality") {
-    next.calibration.qualityThreshold = Math.min(9, next.calibration.qualityThreshold + THRESHOLD_RAISE);
+    next.calibration.qualityThreshold = Math.min(9, next.calibration.qualityThreshold + THRESHOLD_RAISE_STEP);
   }
 
   if (event.action === "validate") {
@@ -65,7 +65,7 @@ export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPr
   }
 
   for (const topic of event.topics) {
-    next.recentTopics.push({ topic, timestamp: now, weight: 1 });
+    next.recentTopics.push({ topic, timestamp: now });
   }
   if (next.recentTopics.length > RECENT_TOPICS_MAX) {
     // Reverse to preserve insertion order as tiebreaker (newest-first),

@@ -21,6 +21,8 @@ export interface OnboardingStep {
   id: "add-sources" | "wait-content" | "review-validate" | "personalized";
   label: string;
   description: string;
+  ctaLabel?: string;
+  ctaTab?: string;
 }
 
 const STEPS: OnboardingStep[] = [
@@ -28,6 +30,8 @@ const STEPS: OnboardingStep[] = [
     id: "add-sources",
     label: "Add Sources",
     description: "Add RSS feeds, Nostr relays, or URLs to start receiving content.",
+    ctaLabel: "Add Sources \u2192",
+    ctaTab: "sources",
   },
   {
     id: "wait-content",
@@ -38,11 +42,14 @@ const STEPS: OnboardingStep[] = [
     id: "review-validate",
     label: "Review & Validate",
     description: "Validate quality items or flag slop to teach your agent your preferences.",
+    ctaLabel: "Go to Incinerator \u2192",
+    ctaTab: "incinerator",
   },
   {
     id: "personalized",
     label: "Personalized",
     description: "Your agent now understands your preferences. Briefings and Discoveries are personalized!",
+    ctaLabel: "View Dashboard \u2192",
   },
 ];
 
