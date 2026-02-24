@@ -12,6 +12,7 @@ import {
   calculateEffectiveTrust,
   getTrustTier,
   calculateDynamicFee,
+  _resetReputationCache,
   type PeerReputation,
 } from "@/lib/d2a/reputation";
 import { D2A_FEE_TRUSTED, D2A_FEE_KNOWN, D2A_FEE_UNKNOWN } from "@/lib/agent/protocol";
@@ -29,6 +30,7 @@ beforeAll(() => {
 });
 beforeEach(() => {
   Object.keys(store).forEach(k => delete store[k]);
+  _resetReputationCache();
 });
 
 describe("reputation scoring formula: score = useful - slop * 3", () => {

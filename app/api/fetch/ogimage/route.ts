@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   const { url } = body;
@@ -31,14 +31,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, {
-      signal: controller.signal,
+      signal: AbortSignal.timeout(8_000),
       headers: { "User-Agent": "Aegis/1.0 (OG Image Fetcher)" },
       redirect: "follow",
     });
-    clearTimeout(timeout);
 
     if (!res.ok) {
       return NextResponse.json({ imageUrl: null });

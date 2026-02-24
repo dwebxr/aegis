@@ -18,22 +18,35 @@ interface SerializedReputationStore {
   peers: Array<[string, PeerReputation]>;
 }
 
+// In-memory cache to avoid repeated JSON.parse on every call
+let _memCache: Map<string, PeerReputation> | null = null;
+
+/** Reset in-memory cache (for test isolation). */
+export function _resetReputationCache(): void { _memCache = null; }
+
 export function loadReputations(): Map<string, PeerReputation> {
-  if (typeof globalThis.localStorage === "undefined") return new Map();
+  if (_memCache) return _memCache;
+  if (typeof globalThis.localStorage === "undefined") {
+    _memCache = new Map();
+    return _memCache;
+  }
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return new Map();
+  if (!raw) { _memCache = new Map(); return _memCache; }
   try {
     const parsed: SerializedReputationStore = JSON.parse(raw);
-    if (parsed.version !== 1 || !Array.isArray(parsed.peers)) return new Map();
-    return new Map(parsed.peers);
+    if (parsed.version !== 1 || !Array.isArray(parsed.peers)) { _memCache = new Map(); return _memCache; }
+    _memCache = new Map(parsed.peers);
+    return _memCache;
   } catch {
     console.warn("[d2a-reputation] Corrupted localStorage data, resetting");
     localStorage.removeItem(STORAGE_KEY);
-    return new Map();
+    _memCache = new Map();
+    return _memCache;
   }
 }
 
 export function saveReputations(map: Map<string, PeerReputation>): void {
+  _memCache = map;
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     const store: SerializedReputationStore = {
@@ -48,8 +61,7 @@ export function saveReputations(map: Map<string, PeerReputation>): void {
 
 function getOrCreate(pubkey: string): { map: Map<string, PeerReputation>; rep: PeerReputation } {
   const map = loadReputations();
-  const existing = map.get(pubkey);
-  const rep = existing ?? {
+  const rep = map.get(pubkey) ?? {
     pubkey,
     useful: 0,
     slop: 0,

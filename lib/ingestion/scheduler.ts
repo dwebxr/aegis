@@ -185,11 +185,9 @@ export class IngestionScheduler {
 
       // Purge httpCacheHeaders for sources no longer in the active list
       const activeKeys = new Set(sources.map(s => getSourceKey(s.type, s.config)));
-      const staleKeys: string[] = [];
       this.httpCacheHeaders.forEach((_, key) => {
-        if (!activeKeys.has(key)) staleKeys.push(key);
+        if (!activeKeys.has(key)) this.httpCacheHeaders.delete(key);
       });
-      for (const key of staleKeys) this.httpCacheHeaders.delete(key);
 
       for (const source of sources) {
         if (!source.enabled) continue;

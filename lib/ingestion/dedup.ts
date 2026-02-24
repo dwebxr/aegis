@@ -3,7 +3,7 @@
  * Persisted to localStorage. Prevents re-scoring identical articles across cycles.
  */
 
-import { sha256 } from "@noble/hashes/sha2.js";
+import { computeContentFingerprint } from "@/lib/utils/hashing";
 
 const STORAGE_KEY = "aegis_article_dedup";
 const MAX_ENTRIES = 2000;
@@ -47,18 +47,8 @@ export class ArticleDeduplicator {
     }
   }
 
-  /** Normalize text and compute SHA-256 fingerprint (first 16 bytes as hex). */
   computeFingerprint(text: string): string {
-    const normalized = text
-      .toLowerCase()
-      .replace(/[^\w\s]/g, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 500);
-    const hash = sha256(new TextEncoder().encode(normalized));
-    return Array.from(hash.slice(0, 16))
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
+    return computeContentFingerprint(text);
   }
 
   reset(): void {

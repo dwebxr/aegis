@@ -68,9 +68,6 @@ export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPr
     next.recentTopics.push({ topic, timestamp: now });
   }
   if (next.recentTopics.length > RECENT_TOPICS_MAX) {
-    // Reverse to preserve insertion order as tiebreaker (newest-first),
-    // then stable-sort by timestamp so equal timestamps keep LIFO order.
-    next.recentTopics.reverse();
     next.recentTopics.sort((a, b) => b.timestamp - a.timestamp);
     next.recentTopics = next.recentTopics.slice(0, RECENT_TOPICS_MAX);
   }

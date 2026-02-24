@@ -9,6 +9,7 @@ import { heuristicScores } from "@/lib/ingestion/quickFilter";
 // Anthropic Claude Sonnet via /api/analyze — ~400 input tokens + ~100 output
 // Based on Sonnet 4 pricing: $3/MTok input + $15/MTok output
 const ESTIMATED_AI_COST_PER_CALL = 0.003;
+const PAID_ENGINES = new Set(["claude-byok", "claude-ic", "claude-server"]);
 
 export function runFilterPipeline(
   content: ContentItem[],
@@ -25,8 +26,14 @@ export function runFilterPipeline(
   };
 
   const items: FilteredItem[] = [];
+  let paidCount = 0;
 
   for (const item of content) {
+    // Count AI/paid scoring across all items (including below-threshold) for cost stats
+    const isAI = item.scoredByAI === true || (item.scoredByAI == null && !item.reason?.startsWith("Heuristic"));
+    if (isAI) stats.aiScoredCount++;
+    if (item.scoringEngine ? PAID_ENGINES.has(item.scoringEngine) : isAI) paidCount++;
+
     if (item.scores.composite < config.qualityThreshold) continue;
 
     let wotScore = null;
@@ -41,7 +48,6 @@ export function runFilterPipeline(
       ? isWoTSerendipity(wotScore.trustScore, item.scores.composite)
       : false;
 
-    // Content-based serendipity for non-WoT items (RSS/URL)
     const contentSerendipity = !wotScore
       ? isContentSerendipity(item, config.profile)
       : false;
@@ -51,21 +57,7 @@ export function runFilterPipeline(
     items.push({ item, wotScore, weightedComposite, isWoTSerendipity: serendipity, isContentSerendipity: contentSerendipity });
   }
 
-  // Second pass over all content (incl. below-threshold): count AI-scored items and paid tiers for cost estimation
-  let aiScoredCount = 0;
-  let paidCount = 0;
-  for (const c of content) {
-    const legacyAI = c.scoredByAI === true || (c.scoredByAI == null && !c.reason?.startsWith("Heuristic"));
-    if (legacyAI) aiScoredCount++;
-    if (c.scoringEngine) {
-      if (c.scoringEngine === "claude-byok" || c.scoringEngine === "claude-ic" || c.scoringEngine === "claude-server") paidCount++;
-    } else if (legacyAI) {
-      paidCount++;
-    }
-  }
-  stats.aiScoredCount = aiScoredCount;
   stats.estimatedAPICost = paidCount * ESTIMATED_AI_COST_PER_CALL;
-
   items.sort((a, b) => b.weightedComposite - a.weightedComposite);
 
   return { items, stats };

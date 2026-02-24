@@ -1,6 +1,8 @@
-import { sha256 } from "@noble/hashes/sha2.js";
 import type { ContentItem } from "@/lib/types/content";
 import { MIN_OFFER_SCORE } from "@/lib/agent/protocol";
+import { hashContent } from "@/lib/utils/hashing";
+
+export { hashContent };
 
 export interface ManifestEntry {
   hash: string;
@@ -14,14 +16,6 @@ export interface ContentManifest {
 }
 
 const MAX_MANIFEST_ENTRIES = 50;
-
-/** SHA-256 of text, take first 16 bytes, hex-encode → 32-char string */
-export function hashContent(text: string): string {
-  const fullHash = sha256(new TextEncoder().encode(text));
-  return Array.from(fullHash.slice(0, 16))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
 export function buildManifest(items: ContentItem[]): ContentManifest {
   const qualified = items

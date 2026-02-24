@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   const { feedUrl, limit: rawLimit, etag, lastModified } = body;
   const limit = typeof rawLimit === "number" && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 50) : 20;
@@ -92,63 +92,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: blocked }, { status: 400 });
   }
 
-  // Conditional request: manual fetch + parseString to support ETag/Last-Modified
-  if (etag || lastModified) {
-    try {
-      const headers: Record<string, string> = {
-        "User-Agent": "Aegis/2.0 Content Quality Filter",
-        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
-      };
-      if (etag) headers["If-None-Match"] = etag;
-      if (lastModified) headers["If-Modified-Since"] = lastModified;
-
-      const res = await fetch(feedUrl, {
-        headers,
-        signal: AbortSignal.timeout(10_000),
-      });
-
-      if (res.status === 304) {
-        return NextResponse.json({
-          feedTitle: "",
-          notModified: true,
-          etag: res.headers.get("etag") || etag,
-          lastModified: res.headers.get("last-modified") || lastModified,
-          items: [],
-        });
-      }
-
-      if (!res.ok) {
-        return NextResponse.json({ error: `Feed returned HTTP ${res.status}` }, { status: 502 });
-      }
-
-      const xml = await res.text();
-      const feed = await parser.parseString(xml);
-
-      const responseEtag = res.headers.get("etag") || undefined;
-      const responseLastModified = res.headers.get("last-modified") || undefined;
-
-      const items = buildItems(feed, limit);
-
-      return NextResponse.json({
-        feedTitle: feed.title || feedUrl,
-        etag: responseEtag,
-        lastModified: responseLastModified,
-        items,
-      });
-    } catch (err: unknown) {
-      return feedErrorResponse(err, feedUrl, "Conditional fetch failed");
-    }
-  }
-
-  // Standard fetch — use fetch + parseString (not parseURL) to handle 308 redirects
   try {
-    const res = await fetch(feedUrl, {
-      headers: {
-        "User-Agent": "Aegis/2.0 Content Quality Filter",
-        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
-      },
-      signal: AbortSignal.timeout(10_000),
-    });
+    const headers: Record<string, string> = {
+      "User-Agent": "Aegis/2.0 Content Quality Filter",
+      Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
+    };
+    if (etag) headers["If-None-Match"] = etag;
+    if (lastModified) headers["If-Modified-Since"] = lastModified;
+
+    const res = await fetch(feedUrl, { headers, signal: AbortSignal.timeout(10_000) });
+
+    if (res.status === 304) {
+      return NextResponse.json({
+        feedTitle: "",
+        notModified: true,
+        etag: res.headers.get("etag") || etag,
+        lastModified: res.headers.get("last-modified") || lastModified,
+        items: [],
+      });
+    }
 
     if (!res.ok) {
       return NextResponse.json({ error: `Feed returned HTTP ${res.status}` }, { status: 502 });
@@ -156,16 +118,15 @@ export async function POST(request: NextRequest) {
 
     const xml = await res.text();
     const feed = await parser.parseString(xml);
-    const items = buildItems(feed, limit);
 
     return NextResponse.json({
       feedTitle: feed.title || feedUrl,
       etag: res.headers.get("etag") || undefined,
       lastModified: res.headers.get("last-modified") || undefined,
-      items,
+      items: buildItems(feed, limit),
     });
   } catch (err: unknown) {
-    return feedErrorResponse(err, feedUrl, "Parse failed");
+    return feedErrorResponse(err, feedUrl, "Fetch/parse failed");
   }
 }
 

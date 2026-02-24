@@ -9,6 +9,7 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
+import { hexFromBytes, computeContentFingerprint } from "@/lib/utils/hashing";
 
 const STORAGE_KEY = "aegis-score-cache";
 const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -22,24 +23,6 @@ interface ScoringCacheEntry {
 
 let cacheHits = 0;
 let cacheMisses = 0;
-
-function hexFromBytes(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/** Normalize text and compute SHA-256 fingerprint (first 16 bytes as hex). Same as ArticleDeduplicator. */
-function computeContentFingerprint(text: string): string {
-  const normalized = text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 500);
-  const hash = sha256(new TextEncoder().encode(normalized));
-  return hexFromBytes(hash.slice(0, 16));
-}
 
 /** Compute a short hash of the user context to detect profile changes. */
 export function computeProfileHash(userContext?: UserContext | null): string {

@@ -111,13 +111,8 @@ export function serializeBriefing(
   lines.push("");
   lines.push("*Curated by [Aegis](https://aegis.dwebxr.xyz) — AI Content Quality Filter*");
 
-  const allTopics = new Set<string>();
-  for (const b of briefing.priority) {
-    for (const t of b.item.topics || []) allTopics.add(t);
-  }
-  if (briefing.serendipity) {
-    for (const t of briefing.serendipity.item.topics || []) allTopics.add(t);
-  }
+  const allItems = [...briefing.priority.map(b => b.item), ...(briefing.serendipity ? [briefing.serendipity.item] : [])];
+  const allTopics = new Set(allItems.flatMap(i => i.topics || []));
 
   const now = Math.floor(Date.now() / 1000);
   const tags: string[][] = [

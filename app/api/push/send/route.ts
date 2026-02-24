@@ -5,7 +5,7 @@ import { Principal } from "@dfinity/principal";
 import { idlFactory } from "@/lib/ic/declarations/idlFactory";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
-import { getCanisterId, getHost } from "@/lib/ic/agent";
+import { getCanisterId, getHost } from "@/lib/ic/config";
 import type { _SERVICE, PushSubscription } from "@/lib/ic/declarations/aegis_backend.did";
 
 export const maxDuration = 30;
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     body = await request.json();
   } catch (err) {
     console.warn("[push/send] JSON parse failed:", errMsg(err));
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   if (!body.principal) {

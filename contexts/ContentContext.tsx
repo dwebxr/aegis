@@ -220,6 +220,17 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const backfillCleanupRef = useRef<(() => void) | null>(null);
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
 
+  /** Fire-and-forget IC call with offline queue fallback. */
+  function syncToIC(promise: Promise<unknown>, actionType: "saveEvaluation" | "updateEvaluation", payload: unknown) {
+    void promise.catch(async (err: unknown) => {
+      console.warn("[content] IC sync failed:", errMsg(err));
+      setSyncStatus("offline");
+      await enqueueAction(actionType, payload);
+      setPendingActions(p => p + 1);
+      addNotification("Saved locally \u2014 will sync when online", "error");
+    });
+  }
+
   useEffect(() => {
     let stale = false;
     if (isAuthenticated && identity) {
@@ -455,13 +466,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       setContent(prev => truncatePreservingActioned([evaluation, ...prev]));
 
       if (actorRef.current && isAuthenticated && principal) {
-        void actorRef.current.saveEvaluation(toICEvaluation(evaluation, principal)).catch(async (err: unknown) => {
-          console.warn("[content] IC saveEvaluation failed:", errMsg(err));
-          setSyncStatus("offline");
-          await enqueueAction("saveEvaluation", { itemId: evaluation.id });
-          setPendingActions(p => p + 1);
-          addNotification("Evaluation saved locally — will sync when online", "error");
-        });
+        syncToIC(actorRef.current.saveEvaluation(toICEvaluation(evaluation, principal)), "saveEvaluation", { itemId: evaluation.id });
       }
 
       return result;
@@ -476,14 +481,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (item.source === "nostr" && item.nostrPubkey) recordUseful(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishValidation(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
-      void actorRef.current.updateEvaluation(id, true, item.flagged)
-        .catch(async (err: unknown) => {
-          console.warn("[content] IC updateEvaluation (validate) failed:", errMsg(err));
-          setSyncStatus("offline");
-          await enqueueAction("updateEvaluation", { id, validated: true, flagged: item.flagged });
-          setPendingActions(p => p + 1);
-          addNotification("Validation saved locally — will sync when online", "error");
-        });
+      syncToIC(actorRef.current.updateEvaluation(id, true, item.flagged), "updateEvaluation", { id, validated: true, flagged: item.flagged });
     }
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
 
@@ -495,14 +493,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (item.source === "nostr" && item.nostrPubkey) recordSlop(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishFlag(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
-      void actorRef.current.updateEvaluation(id, item.validated, true)
-        .catch(async (err: unknown) => {
-          console.warn("[content] IC updateEvaluation (flag) failed:", errMsg(err));
-          setSyncStatus("offline");
-          await enqueueAction("updateEvaluation", { id, validated: item.validated, flagged: true });
-          setPendingActions(p => p + 1);
-          addNotification("Flag saved locally — will sync when online", "error");
-        });
+      syncToIC(actorRef.current.updateEvaluation(id, item.validated, true), "updateEvaluation", { id, validated: item.validated, flagged: true });
     }
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
 
@@ -522,13 +513,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
       // IC save (fire-and-forget) — safe to call inside updater
       if (actorRef.current && isAuthenticated && principal) {
-        void actorRef.current.saveEvaluation(toICEvaluation(owned, principal)).catch(async (err: unknown) => {
-          console.warn("[content] IC save (addContent) failed:", errMsg(err));
-          setSyncStatus("offline");
-          await enqueueAction("saveEvaluation", { itemId: owned.id });
-          setPendingActions(p => p + 1);
-          addNotification("Content saved locally — will sync when online", "error");
-        });
+        syncToIC(actorRef.current.saveEvaluation(toICEvaluation(owned, principal)), "saveEvaluation", { itemId: owned.id });
       }
 
       return truncatePreservingActioned([owned, ...prev]);

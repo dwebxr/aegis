@@ -11,6 +11,7 @@ import {
   calculateEffectiveTrust,
   getTrustTier,
   calculateDynamicFee,
+  _resetReputationCache,
 } from "@/lib/d2a/reputation";
 import { D2A_FEE_TRUSTED, D2A_FEE_KNOWN, D2A_FEE_UNKNOWN } from "@/lib/agent/protocol";
 
@@ -19,6 +20,7 @@ const TEST_PK2 = "def456cafebabe";
 
 beforeEach(() => {
   localStorage.clear();
+  _resetReputationCache();
 });
 
 describe("loadReputations / saveReputations", () => {

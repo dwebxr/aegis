@@ -60,9 +60,6 @@ export async function POST(request: NextRequest) {
     : [];
   const prompt = buildScoringPrompt(text, allTopics.length > 0 ? allTopics : undefined, 5000);
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-
   let res: Response;
   try {
     res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -77,15 +74,12 @@ export async function POST(request: NextRequest) {
         max_tokens: 1000,
         messages: [{ role: "user", content: prompt }],
       }),
-      signal: controller.signal,
+      signal: AbortSignal.timeout(15_000),
     });
   } catch (err) {
-    clearTimeout(timeout);
     console.error("[analyze] Anthropic fetch failed:", errMsg(err));
     return NextResponse.json({ error: "Request failed", fallback: heuristic }, { status: 502 });
   }
-
-  clearTimeout(timeout);
 
   if (!res.ok) {
     console.error(`[analyze] Anthropic API returned ${res.status}`);

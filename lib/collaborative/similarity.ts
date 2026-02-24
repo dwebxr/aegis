@@ -47,36 +47,29 @@ export function computeTopicSimilarity(
     contribVector.set(t, (contribVector.get(t) || 0) + 1);
   }
 
-  // Compute cosine similarity
+  // Cosine similarity: only need to iterate each vector once.
+  // Dot product only has non-zero terms where both vectors are non-zero,
+  // so iterate user keys (checking contrib) for dot product + user magnitude,
+  // then iterate contrib keys for contrib magnitude.
   let dotProduct = 0;
   let userMagnitude = 0;
   let contribMagnitude = 0;
   const sharedTopics: string[] = [];
 
-  // Union of all topic keys
-  const allTopics = new Set<string>();
-  for (const k of Object.keys(userAffinities)) allTopics.add(k);
-  contribVector.forEach((_, k) => allTopics.add(k));
-
-  allTopics.forEach((topic) => {
-    const userVal = userAffinities[topic] ?? 0;
-    const contribVal = contribVector.get(topic.toLowerCase()) ?? 0;
-
-    // Only count positive affinities for similarity
-    const userPos = Math.max(0, userVal);
-    dotProduct += userPos * contribVal;
+  for (const topic of Object.keys(userAffinities)) {
+    const userPos = Math.max(0, userAffinities[topic]);
     userMagnitude += userPos * userPos;
-    contribMagnitude += contribVal * contribVal;
-
-    if (userVal > 0 && contribVal > 0) {
+    const contribVal = contribVector.get(topic) ?? 0;
+    if (userPos > 0 && contribVal > 0) {
+      dotProduct += userPos * contribVal;
       sharedTopics.push(topic);
     }
-  });
+  }
+
+  contribVector.forEach(val => { contribMagnitude += val * val; });
 
   const magnitude = Math.sqrt(userMagnitude) * Math.sqrt(contribMagnitude);
-  const similarity = magnitude > 0 ? dotProduct / magnitude : 0;
-
-  return { similarity, sharedTopics };
+  return { similarity: magnitude > 0 ? dotProduct / magnitude : 0, sharedTopics };
 }
 
 /**
