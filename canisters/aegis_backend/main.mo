@@ -1415,12 +1415,29 @@ persistent actor AegisBackend {
     };
   };
 
-  // Monthly maintenance timer: sweep surplus, return expired deposits & top-up cycles every 30 days
-  func monthlyMaintenance() : async () {
+  // Daily maintenance timer: resolve expired deposits, clean stale push subscriptions
+  func dailyMaintenance() : async () {
     // 1. Return expired deposits (30+ days without community verdict)
     await resolveExpiredDeposits();
 
-    // 2. Sweep surplus to protocol wallet or cycles
+    // 2. Clean up push subscriptions older than 90 days
+    let cutoff = Time.now() - 90 * 24 * 60 * 60 * 1_000_000_000; // 90 days in nanoseconds
+    for ((principal, subs) in pushSubscriptions.entries()) {
+      let fresh = Array.filter<Types.PushSubscription>(subs, func(s : Types.PushSubscription) : Bool {
+        s.createdAt > cutoff
+      });
+      if (fresh.size() == 0) {
+        pushSubscriptions.delete(principal);
+      } else if (fresh.size() < subs.size()) {
+        pushSubscriptions.put(principal, fresh);
+      };
+    };
+  };
+
+  ignore Timer.recurringTimer<system>(#seconds(24 * 60 * 60), dailyMaintenance);
+
+  // Monthly maintenance timer: sweep surplus & top-up cycles every 30 days
+  func monthlyMaintenance() : async () {
     let totalBalance = await ICP_LEDGER.icrc1_balance_of({
       owner = Principal.fromActor(AegisBackend); subaccount = null;
     });

@@ -20,6 +20,8 @@ import { computeScoringCacheKey, computeProfileHash, lookupScoringCache, storeSc
 import { encodeEngineInReason, decodeEngineFromReason, encodeTopicsInReason, decodeTopicsFromReason } from "@/lib/scoring/types";
 import { syncBriefingToCanister } from "@/lib/briefing/sync";
 import type { BriefingState } from "@/lib/briefing/types";
+import { enqueueAction, dequeueAll, removeAction, incrementRetries } from "@/lib/offline/actionQueue";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 const CONTENT_CACHE_KEY = "aegis-content-cache";
 const MAX_CACHED_ITEMS = 200;
@@ -137,6 +139,8 @@ interface ContentState {
   clearDemoContent: () => void;
   loadFromIC: () => Promise<void>;
   syncBriefing: (state: BriefingState, nostrPubkey?: string | null) => void;
+  pendingActions: number;
+  isOnline: boolean;
 }
 
 type PreferenceCallbacks = {
@@ -158,6 +162,8 @@ const ContentContext = createContext<ContentState>({
   clearDemoContent: () => {},
   loadFromIC: async () => {},
   syncBriefing: () => {},
+  pendingActions: 0,
+  isOnline: true,
 });
 
 const SOURCE_KEYS = ["rss", "url", "twitter", "nostr", "manual"] as const;
@@ -205,10 +211,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const [content, setContent] = useState<ContentItem[]>(() => loadCachedContent());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "offline">("idle");
+  const [pendingActions, setPendingActions] = useState(0);
   const actorRef = useRef<_SERVICE | null>(null);
   const contentRef = useRef(content);
   contentRef.current = content;
   const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const drainQueueRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const backfillCleanupRef = useRef<(() => void) | null>(null);
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
 
@@ -220,9 +228,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           if (stale) return; // identity changed during async creation
           actorRef.current = actor;
           setSyncStatus("idle");
-          // Actor is now ready — auto-load IC data
+          // Actor is now ready — auto-load IC data + drain offline queue
           loadFromICRef.current().catch((err: unknown) => {
             console.warn("[content] Auto-loadFromIC after actor creation failed:", errMsg(err));
+          });
+          drainQueueRef.current().catch((err: unknown) => {
+            console.warn("[content] Auto-drain offline queue failed:", errMsg(err));
           });
         })
         .catch((err: unknown) => {
@@ -238,6 +249,52 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     }
     return () => { stale = true; };
   }, [isAuthenticated, identity, addNotification]);
+
+  const drainOfflineQueue = useCallback(async () => {
+    const actor = actorRef.current;
+    if (!actor || !isAuthenticated || !principal) return;
+    const actions = await dequeueAll();
+    if (actions.length === 0) return;
+    console.info(`[offline-queue] Draining ${actions.length} pending action(s)`);
+    const MAX_RETRIES = 5;
+    for (const action of actions) {
+      if (action.retries >= MAX_RETRIES) {
+        console.warn(`[offline-queue] Dropping action ${action.id} after ${MAX_RETRIES} retries`);
+        await removeAction(action.id!);
+        continue;
+      }
+      try {
+        if (action.type === "updateEvaluation") {
+          const { id, validated, flagged } = action.payload as { id: string; validated: boolean; flagged: boolean };
+          await actor.updateEvaluation(id, validated, flagged);
+        } else if (action.type === "saveEvaluation") {
+          const { itemId } = action.payload as { itemId: string };
+          const item = contentRef.current.find(c => c.id === itemId);
+          if (item) {
+            await actor.saveEvaluation(toICEvaluation(item, principal));
+          }
+        }
+        await removeAction(action.id!);
+      } catch (err) {
+        console.warn(`[offline-queue] Replay failed for action ${action.id}:`, errMsg(err));
+        await incrementRetries(action.id!);
+      }
+    }
+    const remaining = await dequeueAll();
+    setPendingActions(remaining.length);
+    if (remaining.length === 0) {
+      setSyncStatus("synced");
+      console.info("[offline-queue] All pending actions synced");
+    }
+  }, [isAuthenticated, principal]);
+  drainQueueRef.current = drainOfflineQueue;
+
+  const isOnline = useOnlineStatus(drainOfflineQueue);
+
+  // Load pending count on mount
+  useEffect(() => {
+    dequeueAll().then(a => setPendingActions(a.length)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     saveCachedContent(content);
@@ -398,10 +455,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       setContent(prev => truncatePreservingActioned([evaluation, ...prev]));
 
       if (actorRef.current && isAuthenticated && principal) {
-        void actorRef.current.saveEvaluation(toICEvaluation(evaluation, principal)).catch((err: unknown) => {
+        void actorRef.current.saveEvaluation(toICEvaluation(evaluation, principal)).catch(async (err: unknown) => {
           console.warn("[content] IC saveEvaluation failed:", errMsg(err));
           setSyncStatus("offline");
-          addNotification("Evaluation saved locally but IC sync failed", "error");
+          await enqueueAction("saveEvaluation", { itemId: evaluation.id });
+          setPendingActions(p => p + 1);
+          addNotification("Evaluation saved locally — will sync when online", "error");
         });
       }
 
@@ -418,10 +477,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (item.source === "manual" && item.nostrPubkey) recordPublishValidation(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
       void actorRef.current.updateEvaluation(id, true, item.flagged)
-        .catch((err: unknown) => {
+        .catch(async (err: unknown) => {
           console.warn("[content] IC updateEvaluation (validate) failed:", errMsg(err));
           setSyncStatus("offline");
-          addNotification("Validation saved locally but IC sync failed", "error");
+          await enqueueAction("updateEvaluation", { id, validated: true, flagged: item.flagged });
+          setPendingActions(p => p + 1);
+          addNotification("Validation saved locally — will sync when online", "error");
         });
     }
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
@@ -435,10 +496,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (item.source === "manual" && item.nostrPubkey) recordPublishFlag(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
       void actorRef.current.updateEvaluation(id, item.validated, true)
-        .catch((err: unknown) => {
+        .catch(async (err: unknown) => {
           console.warn("[content] IC updateEvaluation (flag) failed:", errMsg(err));
           setSyncStatus("offline");
-          addNotification("Flag saved locally but IC sync failed", "error");
+          await enqueueAction("updateEvaluation", { id, validated: item.validated, flagged: true });
+          setPendingActions(p => p + 1);
+          addNotification("Flag saved locally — will sync when online", "error");
         });
     }
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
@@ -459,10 +522,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
       // IC save (fire-and-forget) — safe to call inside updater
       if (actorRef.current && isAuthenticated && principal) {
-        void actorRef.current.saveEvaluation(toICEvaluation(owned, principal)).catch((err: unknown) => {
+        void actorRef.current.saveEvaluation(toICEvaluation(owned, principal)).catch(async (err: unknown) => {
           console.warn("[content] IC save (addContent) failed:", errMsg(err));
           setSyncStatus("offline");
-          addNotification("Content saved locally but IC sync failed", "error");
+          await enqueueAction("saveEvaluation", { itemId: owned.id });
+          setPendingActions(p => p + 1);
+          addNotification("Content saved locally — will sync when online", "error");
         });
       }
 
@@ -608,9 +673,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated]);
 
   const value = useMemo(() => ({
-    content, isAnalyzing, syncStatus,
+    content, isAnalyzing, syncStatus, pendingActions, isOnline,
     analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent, loadFromIC, syncBriefing,
-  }), [content, isAnalyzing, syncStatus, analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent, loadFromIC, syncBriefing]);
+  }), [content, isAnalyzing, syncStatus, pendingActions, isOnline, analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent, loadFromIC, syncBriefing]);
 
   return (
     <ContentContext.Provider value={value}>

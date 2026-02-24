@@ -110,6 +110,22 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
+  // Periodic IC sync heartbeat — catches silently failed syncs every 10 minutes
+  const lastSyncedAtRef = useRef(0);
+  useEffect(() => {
+    if (!isAuthenticated || !identity) return;
+    const HEARTBEAT_MS = 10 * 60 * 1000; // 10 minutes
+    const interval = setInterval(() => {
+      const p = profileRef.current;
+      if (p.lastUpdated > lastSyncedAtRef.current) {
+        void syncPreferencesToIC(identity, p)
+          .then(() => { lastSyncedAtRef.current = p.lastUpdated; })
+          .catch(err => console.warn("[prefs] Heartbeat sync failed:", errMsg(err)));
+      }
+    }, HEARTBEAT_MS);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, identity]);
+
   const profileRef = useRef(profile);
   profileRef.current = profile;
 

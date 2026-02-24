@@ -176,6 +176,38 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated, principalText, identity, isEnabled, addContent, addNotification]);
 
+  // D2A event notifications — fires toasts for significant agent state transitions
+  const prevStateRef = useRef<AgentState>(defaultState);
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    const curr = agentState;
+    prevStateRef.current = curr;
+
+    // Skip if agent just became active (initial state flood)
+    if (!prev.isActive && curr.isActive) return;
+    // Skip if agent stopped
+    if (!curr.isActive) return;
+
+    if (curr.receivedItems > prev.receivedItems) {
+      const count = curr.receivedItems - prev.receivedItems;
+      addNotification(`Received ${count} item${count > 1 ? "s" : ""} from D2A peer`, "success");
+    }
+    if (curr.sentItems > prev.sentItems) {
+      const count = curr.sentItems - prev.sentItems;
+      addNotification(`Sent ${count} item${count > 1 ? "s" : ""} to D2A peer`, "success");
+    }
+    if (curr.d2aMatchCount > prev.d2aMatchCount) {
+      addNotification("D2A fee-paid match completed", "success");
+    }
+    if (curr.peers.length > prev.peers.length && prev.peers.length > 0) {
+      const newCount = curr.peers.length - prev.peers.length;
+      addNotification(`Discovered ${newCount} new D2A peer${newCount > 1 ? "s" : ""}`, "info");
+    }
+    if (curr.consecutiveErrors > 0 && curr.lastError && curr.lastError !== prev.lastError) {
+      addNotification(`D2A Agent error: ${curr.lastError.slice(0, 80)}`, "error");
+    }
+  }, [agentState, addNotification]);
+
   const value = useMemo(() => ({
     agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph,
   }), [agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph]);
