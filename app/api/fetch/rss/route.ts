@@ -38,8 +38,9 @@ function extractAttr(field: unknown, attr: string): string | undefined {
     const obj = field as Record<string, unknown>;
     // rss-parser wraps attrs in `$`: { $: { url: "...", type: "..." } }
     if (obj.$ && typeof obj.$ === "object") {
-      const attrs = obj.$ as Record<string, string>;
-      return attrs[attr];
+      const attrs = obj.$ as Record<string, unknown>;
+      const val = attrs[attr];
+      return typeof val === "string" ? val : undefined;
     }
     if (typeof obj[attr] === "string") return obj[attr] as string;
   }

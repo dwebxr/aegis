@@ -81,14 +81,20 @@ export async function getGlobalBriefingSummaries(
   for (const [principal, briefingJson, generatedAt] of result.items) {
     try {
       const parsed = JSON.parse(briefingJson) as D2ABriefingResponse;
-      if (typeof parsed !== "object" || parsed === null || !parsed.summary || !Array.isArray(parsed.items)) {
+      if (
+        typeof parsed !== "object" || parsed === null ||
+        !parsed.summary || typeof parsed.summary !== "object" ||
+        typeof parsed.summary.totalEvaluated !== "number" ||
+        !Array.isArray(parsed.items)
+      ) {
         continue;
       }
 
-      totalEvaluated += parsed.summary.totalEvaluated || 0;
-      totalQuality += (parsed.summary.totalEvaluated || 0) - (parsed.summary.totalBurned || 0);
+      totalEvaluated += parsed.summary.totalEvaluated;
+      totalQuality += parsed.summary.totalEvaluated - (parsed.summary.totalBurned || 0);
 
       for (const item of parsed.items) {
+        if (!item || typeof item !== "object") continue;
         for (const topic of item.topics || []) {
           topicCounts.set(topic, (topicCounts.get(topic) || 0) + 1);
         }
