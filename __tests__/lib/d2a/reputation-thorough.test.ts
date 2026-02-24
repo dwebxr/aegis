@@ -117,7 +117,8 @@ describe("persistence round-trip", () => {
 
   it("handles corrupted data gracefully (not an object)", () => {
     store["aegis-d2a-reputation"] = "\"just a string\"";
-    expect(() => loadReputations()).not.toThrow();
+    const map = loadReputations();
+    expect(map.size).toBe(0);
   });
 
   it("handles missing peers array", () => {

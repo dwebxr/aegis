@@ -107,7 +107,6 @@ export async function discoverPeers(
   }
   pool.destroy();
 
-  // Single-pass: parse events and deduplicate by pubkey (keep latest)
   const byPubkey = new Map<string, AgentProfile>();
 
   for (const ev of events) {

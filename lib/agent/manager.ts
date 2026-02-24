@@ -424,7 +424,6 @@ export class AgentManager {
     const effectiveTrust = calculateEffectiveTrust(wotScore, repScore);
     const tier = getTrustTier(effectiveTrust);
 
-    // Restricted tier = reject delivery silently
     if (tier === "restricted") return;
 
     const fee = calculateDynamicFee(tier);

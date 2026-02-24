@@ -20,7 +20,6 @@ interface ScoringCacheEntry {
   profileHash: string;
 }
 
-// In-memory stats (not persisted)
 let cacheHits = 0;
 let cacheMisses = 0;
 
@@ -60,7 +59,7 @@ export function computeScoringCacheKey(text: string, userContext?: UserContext |
   return `${computeContentFingerprint(text)}:${ph}`;
 }
 
-// In-memory layer: avoids repeated JSON.parse per scoring call.
+// Avoids repeated JSON.parse per scoring call.
 let _memCache: Record<string, ScoringCacheEntry> | null = null;
 
 function getCache(): Record<string, ScoringCacheEntry> {
@@ -84,8 +83,8 @@ function flushCache(): void {
   if (typeof globalThis.localStorage === "undefined" || !_memCache) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(_memCache));
-  } catch {
-    // QuotaExceededError — silently degrade
+  } catch (err) {
+    console.warn("[scoring-cache] flushCache failed (quota?):", err);
   }
 }
 
@@ -107,12 +106,10 @@ export function lookupScoringCache(key: string, profileHash: string): AnalyzeRes
   return entry.result;
 }
 
-/** Store a scoring result in the cache. */
 export function storeScoringCache(key: string, profileHash: string, result: AnalyzeResponse): void {
   const cache = getCache();
   cache[key] = { result, storedAt: Date.now(), profileHash };
 
-  // FIFO pruning
   const keys = Object.keys(cache);
   if (keys.length > MAX_ENTRIES) {
     const sorted = keys.sort((a, b) => (cache[a].storedAt || 0) - (cache[b].storedAt || 0));
@@ -123,12 +120,11 @@ export function storeScoringCache(key: string, profileHash: string, result: Anal
   flushCache();
 }
 
-/** Get cache stats for diagnostics. */
+/** For diagnostics. */
 export function getScoringCacheStats(): { hits: number; misses: number; size: number } {
   return { hits: cacheHits, misses: cacheMisses, size: Object.keys(getCache()).length };
 }
 
-/** Clear the entire scoring cache. */
 export function clearScoringCache(): void {
   _memCache = {};
   if (typeof globalThis.localStorage !== "undefined") {

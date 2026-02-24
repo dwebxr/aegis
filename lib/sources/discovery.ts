@@ -36,7 +36,8 @@ function loadDomainValidations(): Record<string, DomainValidation> {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return {};
     return parsed as Record<string, DomainValidation>;
-  } catch {
+  } catch (err) {
+    console.warn("[discovery] Corrupted domain validation data:", err);
     return {};
   }
 }
@@ -45,12 +46,11 @@ function saveDomainValidations(data: Record<string, DomainValidation>): void {
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    // QuotaExceededError
+  } catch (err) {
+    console.warn("[discovery] Failed to save domain validations:", err);
   }
 }
 
-/** Track a validated item's source URL domain. */
 export function trackDomainValidation(sourceUrl?: string): void {
   if (!sourceUrl) return;
   const domain = extractDomain(sourceUrl);
@@ -80,7 +80,6 @@ export function getSuggestions(existingFeedUrls: string[]): DomainValidation[] {
   );
 }
 
-/** Dismiss a domain suggestion permanently. */
 export function dismissSuggestion(domain: string): void {
   const data = loadDomainValidations();
   if (data[domain]) {
@@ -89,7 +88,6 @@ export function dismissSuggestion(domain: string): void {
   }
 }
 
-/** Attempt to discover an RSS feed for a domain via the API endpoint. */
 export async function discoverFeed(domain: string): Promise<string | null> {
   try {
     const resp = await fetch(`/api/fetch/discover-feed?url=${encodeURIComponent(`https://${domain}`)}`);
@@ -105,7 +103,8 @@ export async function discoverFeed(domain: string): Promise<string | null> {
       return data.feedUrl;
     }
     return null;
-  } catch {
+  } catch (err) {
+    console.warn("[discovery] Feed discovery failed for", domain, err);
     return null;
   }
 }

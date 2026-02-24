@@ -45,7 +45,6 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   const isAuthRef = useRef(isAuthenticated);
   isAuthRef.current = isAuthenticated;
 
-  // Load from localStorage immediately, then merge with IC async
   useEffect(() => {
     if (isAuthenticated && principalText && identity) {
       const local = loadProfile(principalText);

@@ -1,8 +1,3 @@
-/**
- * Onboarding state management with localStorage persistence.
- * Tracks which onboarding steps the user has seen/completed.
- */
-
 const STORAGE_KEY = "aegis-onboarding";
 
 export interface OnboardingState {
@@ -25,7 +20,7 @@ export interface OnboardingStep {
   ctaTab?: string;
 }
 
-const STEPS: OnboardingStep[] = [
+export const STEPS: OnboardingStep[] = [
   {
     id: "add-sources",
     label: "Add Sources",
@@ -52,10 +47,6 @@ const STEPS: OnboardingStep[] = [
     ctaLabel: "View Dashboard \u2192",
   },
 ];
-
-export function getSteps(): OnboardingStep[] {
-  return STEPS;
-}
 
 function isStepComplete(step: OnboardingStep, ctx: OnboardingContext): boolean {
   switch (step.id) {
@@ -106,7 +97,7 @@ export function dismissOnboarding(): void {
     const state = loadOnboardingState();
     state.dismissed = true;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // ignore
+  } catch (err) {
+    console.warn("[onboarding] Failed to persist dismiss state:", err);
   }
 }

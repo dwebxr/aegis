@@ -1,7 +1,3 @@
-/**
- * Pure computation functions extracted from DashboardTab.tsx.
- * Shared by the component (via useMemo) and unit tests.
- */
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { BriefingItem } from "@/lib/briefing/types";
@@ -12,7 +8,6 @@ export function contentDedup(item: ContentItem): string {
   return item.text.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
-/** Apply verdict and source filters to content list */
 export function applyDashboardFilters(
   content: ContentItem[],
   verdictFilter: "all" | "quality" | "slop" | "validated",
@@ -29,7 +24,6 @@ export function applyDashboardFilters(
   return items;
 }
 
-/** Build regex pattern cache for topic text-matching */
 export function buildTopicPatternCache(topics: string[]): Map<string, RegExp> {
   return new Map(topics.map(topic => {
     const escaped = topic.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -37,7 +31,6 @@ export function buildTopicPatternCache(topics: string[]): Map<string, RegExp> {
   }));
 }
 
-/** Check if a content item matches a topic by tag or text */
 export function matchesTopic(
   c: ContentItem,
   topic: string,
@@ -48,7 +41,6 @@ export function matchesTopic(
   return patternCache.get(topic)?.test(c.text) ?? false;
 }
 
-/** Compute Dashboard Top 3 with content-level dedup */
 export function computeDashboardTop3(
   content: ContentItem[],
   profile: UserPreferenceProfile,
@@ -177,14 +169,12 @@ export function computeUnreviewedQueue(
     .slice(0, 5);
 }
 
-/** Topic distribution entry */
 export interface TopicDistEntry {
   topic: string;
   count: number;
   qualityRate: number;
 }
 
-/** Compute topic frequency distribution across all content */
 export function computeTopicDistribution(
   content: ContentItem[],
 ): TopicDistEntry[] {

@@ -35,11 +35,15 @@ export function loadReputations(): Map<string, PeerReputation> {
 
 export function saveReputations(map: Map<string, PeerReputation>): void {
   if (typeof globalThis.localStorage === "undefined") return;
-  const store: SerializedReputationStore = {
-    version: 1,
-    peers: Array.from(map.entries()),
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  try {
+    const store: SerializedReputationStore = {
+      version: 1,
+      peers: Array.from(map.entries()),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  } catch (err) {
+    console.warn("[d2a-reputation] Failed to persist reputations:", err);
+  }
 }
 
 function getOrCreate(pubkey: string): { map: Map<string, PeerReputation>; rep: PeerReputation } {
@@ -108,6 +112,7 @@ export function getTrustTier(effectiveTrust: number): TrustTier {
   if (effectiveTrust >= 0.8) return "trusted";
   if (effectiveTrust >= 0.4) return "known";
   if (effectiveTrust >= 0) return "unknown";
+  // effectiveTrust < 0: not expected from calculateEffectiveTrust but handled defensively
   return "restricted";
 }
 

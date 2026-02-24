@@ -29,7 +29,7 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
       const briefing = await getLatestBriefing(principal);
       if (!briefing) {
         return withCors(
-          NextResponse.json({ error: "No briefing available", hint: "User has no briefing data yet" }, { status: 404 }),
+          NextResponse.json({ error: "No briefing available" }, { status: 404 }),
           origin,
         );
       }
@@ -44,7 +44,7 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
     const global = await getGlobalBriefingSummaries(offset, limit);
     if (!global) {
       return withCors(
-        NextResponse.json({ error: "No global briefings available", hint: "No users have opted into D2A yet" }, { status: 404 }),
+        NextResponse.json({ error: "No global briefings available" }, { status: 404 }),
         origin,
       );
     }

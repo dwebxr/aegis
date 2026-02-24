@@ -6,6 +6,7 @@ import {
   getSourceHealth,
   loadSourceStates,
   saveSourceStates,
+  resetSourceErrors,
   BACKOFF_MS,
   MAX_CONSECUTIVE_FAILURES,
   type SourceRuntimeState,
@@ -200,6 +201,80 @@ describe("sourceState — edge cases", () => {
       expect(a).toEqual(b);
       a.errorCount = 999;
       expect(b.errorCount).toBe(0);
+    });
+  });
+
+  describe("resetSourceErrors", () => {
+    it("resets errorCount, lastError, and nextFetchAt for existing key", () => {
+      const states: Record<string, SourceRuntimeState> = {
+        "rss:https://example.com/feed": {
+          ...defaultState(),
+          errorCount: 4,
+          lastError: "HTTP 503",
+          nextFetchAt: Date.now() + 3600000,
+          lastErrorAt: Date.now(),
+        },
+      };
+      saveSourceStates(states);
+
+      resetSourceErrors("rss:https://example.com/feed");
+
+      const loaded = loadSourceStates();
+      const state = loaded["rss:https://example.com/feed"];
+      expect(state.errorCount).toBe(0);
+      expect(state.lastError).toBe("");
+      expect(state.nextFetchAt).toBe(0);
+      // lastErrorAt is NOT cleared by resetSourceErrors
+      expect(state.lastErrorAt).toBeGreaterThan(0);
+    });
+
+    it("no-op when key does not exist in storage", () => {
+      saveSourceStates({});
+      expect(() => resetSourceErrors("nonexistent:key")).not.toThrow();
+      expect(loadSourceStates()).toEqual({});
+    });
+
+    it("no-op when errorCount is already 0", () => {
+      const states: Record<string, SourceRuntimeState> = {
+        "rss:https://healthy.com/feed": {
+          ...defaultState(),
+          errorCount: 0,
+          lastSuccessAt: Date.now(),
+        },
+      };
+      saveSourceStates(states);
+
+      resetSourceErrors("rss:https://healthy.com/feed");
+
+      const loaded = loadSourceStates();
+      expect(loaded["rss:https://healthy.com/feed"].errorCount).toBe(0);
+    });
+
+    it("does not affect other sources", () => {
+      const states: Record<string, SourceRuntimeState> = {
+        "rss:https://a.com/feed": {
+          ...defaultState(),
+          errorCount: 3,
+          lastError: "Error A",
+          nextFetchAt: 99999,
+        },
+        "rss:https://b.com/feed": {
+          ...defaultState(),
+          errorCount: 5,
+          lastError: "Error B",
+          nextFetchAt: 88888,
+        },
+      };
+      saveSourceStates(states);
+
+      resetSourceErrors("rss:https://a.com/feed");
+
+      const loaded = loadSourceStates();
+      // A should be reset
+      expect(loaded["rss:https://a.com/feed"].errorCount).toBe(0);
+      // B should be untouched
+      expect(loaded["rss:https://b.com/feed"].errorCount).toBe(5);
+      expect(loaded["rss:https://b.com/feed"].lastError).toBe("Error B");
     });
   });
 });

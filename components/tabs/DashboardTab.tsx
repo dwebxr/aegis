@@ -1322,8 +1322,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             )}
           </div>
 
-          </div>{/* end right column */}
-          </div>{/* end 2-col grid */}
+          </div>
+          </div>
 
           {/* Agent Knowledge — full width */}
           {agentContext && (

@@ -22,7 +22,6 @@ export function encodeTopicsInReason(reason: string, topics?: string[]): string 
   return `${reason} [topics:${topics.join(",")}]`;
 }
 
-/** Extract engine id from reason prefix. Returns cleanReason with prefix stripped. */
 export function decodeEngineFromReason(reason: string): { engine?: ScoringEngine; cleanReason: string } {
   const match = reason.match(/^\[([a-z-]+)\] /);
   if (match && match[1] in ENGINE_LABELS) {
@@ -32,7 +31,6 @@ export function decodeEngineFromReason(reason: string): { engine?: ScoringEngine
   return { engine: undefined, cleanReason: reason };
 }
 
-/** Extract topics from `[topics:tag1,tag2]` suffix in reason. */
 export function decodeTopicsFromReason(reason: string): { topics: string[]; cleanReason: string } {
   const match = reason.match(/ \[topics:([^\]]+)\]$/);
   if (!match) return { topics: [], cleanReason: reason };

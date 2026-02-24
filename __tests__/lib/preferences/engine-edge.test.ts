@@ -180,6 +180,66 @@ describe("learn — edge cases", () => {
       expect(profile.calibration.qualityThreshold).toBeGreaterThan(originalThreshold);
     });
 
+    it("lowers threshold at exact BORDERLINE_LOW boundary (3.5)", () => {
+      let profile = makeProfile();
+      const originalThreshold = profile.calibration.qualityThreshold;
+
+      profile = learn(profile, {
+        action: "validate",
+        topics: ["test"],
+        author: "author",
+        composite: 3.5, // exact lower boundary
+        verdict: "quality",
+      });
+
+      expect(profile.calibration.qualityThreshold).toBeLessThan(originalThreshold);
+    });
+
+    it("lowers threshold at exact BORDERLINE_HIGH boundary (4.5)", () => {
+      let profile = makeProfile();
+      const originalThreshold = profile.calibration.qualityThreshold;
+
+      profile = learn(profile, {
+        action: "validate",
+        topics: ["test"],
+        author: "author",
+        composite: 4.5, // exact upper boundary
+        verdict: "quality",
+      });
+
+      expect(profile.calibration.qualityThreshold).toBeLessThan(originalThreshold);
+    });
+
+    it("does NOT lower threshold at 3.49 (below BORDERLINE_LOW)", () => {
+      let profile = makeProfile();
+      const originalThreshold = profile.calibration.qualityThreshold;
+
+      profile = learn(profile, {
+        action: "validate",
+        topics: ["test"],
+        author: "author",
+        composite: 3.49,
+        verdict: "quality",
+      });
+
+      expect(profile.calibration.qualityThreshold).toBe(originalThreshold);
+    });
+
+    it("does NOT lower threshold at 4.51 (above BORDERLINE_HIGH)", () => {
+      let profile = makeProfile();
+      const originalThreshold = profile.calibration.qualityThreshold;
+
+      profile = learn(profile, {
+        action: "validate",
+        topics: ["test"],
+        author: "author",
+        composite: 4.51,
+        verdict: "quality",
+      });
+
+      expect(profile.calibration.qualityThreshold).toBe(originalThreshold);
+    });
+
     it("does NOT raise threshold when slop is flagged (expected behavior)", () => {
       let profile = makeProfile();
       const originalThreshold = profile.calibration.qualityThreshold;

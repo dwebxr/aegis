@@ -719,8 +719,8 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
-| Monitoring | Sentry (@sentry/nextjs, auth/cookie scrubbing, breadcrumb URL stripping, conditional on DSN) |
-| Test | Jest + ts-jest (2880 tests, 180 suites) |
+| Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
+| Test | Jest + ts-jest (2997 tests, 183 suites) |
 
 ## Project Structure
 
@@ -816,7 +816,7 @@ aegis/
 │   ├── ic/
 │   │   ├── config.ts                    # IC config getters (canister ID, host, derivation origin)
 │   │   ├── agent.ts                     # HttpAgent creation (re-exports config)
-│   │   ├── actor.ts                     # Canister actor factory (sync + async with syncTime)
+│   │   ├── actor.ts                     # Canister actor factory (async with syncTime)
 │   │   ├── icpLedger.ts                # ICP Ledger actor (ICRC-1/2 balance, approve, allowance)
 │   │   └── declarations/               # Candid types + IDL factory
 │   ├── api/
@@ -824,6 +824,7 @@ aegis/
 │   │   └── dailyBudget.ts              # Per-instance daily API budget (500 calls/day)
 │   ├── scoring/
 │   │   ├── types.ts                     # ScoringEngine type + ScoreParseResult interface
+│   │   ├── cache.ts                     # Scoring result cache (SHA-256 fingerprint, 24h TTL, FIFO)
 │   │   ├── prompt.ts                    # Shared V/C/L scoring prompt (used by all AI tiers)
 │   │   └── parseResponse.ts            # Shared JSON response parser (fence strip, clamp, composite)
 │   ├── ollama/
@@ -849,12 +850,17 @@ aegis/
 │       ├── math.ts                      # Shared clamp() utility
 │       ├── youtube.ts                   # YouTube video ID extraction + embed URL builder
 │       └── statusEmitter.ts            # Generic status emitter factory (used by Ollama/WebLLM engines)
+│   ├── onboarding/
+│   │   └── state.ts                     # Onboarding wizard state machine (step progression)
 │   └── sources/
+│       ├── discovery.ts                 # Source auto-discovery (domain validation tracking)
 │       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Google News)
 │       └── storage.ts                   # Source config localStorage R/W
 ├── hooks/
-│   └── useKeyboardNav.ts               # J/K/L/H/V/F/O keyboard navigation + Cmd+K palette
-├── __tests__/                           # 2880 tests across 180 suites
+│   ├── useKeyboardNav.ts               # J/K/L/H/V/F/O keyboard navigation + Cmd+K palette
+│   ├── usePushNotification.ts          # Web Push subscription management
+│   └── useNotifications.ts             # In-app toast notification system
+├── __tests__/                           # 2997 tests across 183 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -890,7 +896,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all 2880 tests
+npm test              # Run all tests
 npm run test:watch    # Watch mode
 ```
 

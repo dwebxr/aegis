@@ -38,7 +38,6 @@ export async function buildFollowGraph(
             "hop-timeout",
           );
 
-          // Deduplicate Kind:3 by author (keep latest)
           const byAuthor = new Map<string, (typeof events)[0]>();
           for (const ev of events) {
             const existing = byAuthor.get(ev.pubkey);

@@ -63,7 +63,6 @@ export async function POST(request: NextRequest) {
     }
     reader.cancel().catch(() => {}); // cleanup — errors here are non-critical
 
-    // Extract og:image
     const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
       || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
 

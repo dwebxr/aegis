@@ -1,4 +1,4 @@
-import { generateBriefing } from "@/lib/briefing/ranker";
+import { generateBriefing, classifyItem } from "@/lib/briefing/ranker";
 import { createEmptyProfile } from "@/lib/preferences/types";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
@@ -249,5 +249,167 @@ describe("generateBriefing", () => {
       const result = generateBriefing([oldItem, recentItem], makeProfile());
       expect(result.priority[0].item.id).toBe("recent");
     });
+  });
+
+  describe("recentTopics bonus in briefingScore", () => {
+    it("boosts items whose topics match recentTopics within 7-day window", () => {
+      const now = Date.now();
+      const profile = makeProfile({
+        recentTopics: [
+          { topic: "ai", timestamp: now - 1000 }, // very recent
+        ],
+      });
+      const matchingItem = makeItem({
+        id: "matching",
+        topics: ["ai"],
+        scores: { originality: 5, insight: 5, credibility: 5, composite: 5 },
+        createdAt: now,
+      });
+      const nonMatchingItem = makeItem({
+        id: "non-matching",
+        topics: ["crypto"],
+        scores: { originality: 5, insight: 5, credibility: 5, composite: 5 },
+        createdAt: now,
+      });
+      const result = generateBriefing([nonMatchingItem, matchingItem], profile, now);
+      // matching should rank higher due to recent topic bonus
+      expect(result.priority[0].item.id).toBe("matching");
+    });
+
+    it("no bonus for topics older than 7 days", () => {
+      const now = Date.now();
+      const eightDaysAgo = now - 8 * 24 * 60 * 60 * 1000;
+      const profile = makeProfile({
+        recentTopics: [
+          { topic: "ai", timestamp: eightDaysAgo }, // expired
+        ],
+      });
+      const item1 = makeItem({
+        id: "item1",
+        topics: ["ai"],
+        scores: { originality: 5, insight: 5, credibility: 5, composite: 5 },
+        createdAt: now,
+      });
+      const item2 = makeItem({
+        id: "item2",
+        topics: ["crypto"],
+        scores: { originality: 5, insight: 5, credibility: 5, composite: 5 },
+        createdAt: now,
+      });
+      const result = generateBriefing([item1, item2], profile, now);
+      // Both should have equal composite scores, no recent bonus → sorted by id tiebreaker
+      const scores = result.priority.map(p => p.briefingScore);
+      expect(scores[0]).toBeCloseTo(scores[1], 5);
+    });
+  });
+
+  describe("stable sort tiebreaker", () => {
+    it("sorts by id when briefingScore is tied", () => {
+      const now = Date.now();
+      const items = ["c", "a", "b"].map(id =>
+        makeItem({
+          id,
+          scores: { originality: 5, insight: 5, credibility: 5, composite: 7 },
+          createdAt: now,
+        })
+      );
+      const result = generateBriefing(items, makeProfile(), now);
+      const ids = result.priority.map(p => p.item.id);
+      // Equal scores → localeCompare by id → a, b, c
+      expect(ids).toEqual(["a", "b", "c"]);
+    });
+  });
+
+  describe("classification in generateBriefing output", () => {
+    it("assigns classification to priority items", () => {
+      const items = Array.from({ length: 3 }, () => makeItem());
+      const result = generateBriefing(items, makeProfile());
+      for (const p of result.priority) {
+        expect(["familiar", "novel", "mixed"]).toContain(p.classification);
+      }
+    });
+
+    it("serendipity item always has classification 'novel'", () => {
+      const items = Array.from({ length: 8 }, (_, i) =>
+        makeItem({ id: `item-${i}`, topics: [`topic-${i}`] })
+      );
+      const result = generateBriefing(items, makeProfile());
+      if (result.serendipity) {
+        expect(result.serendipity.classification).toBe("novel");
+      }
+    });
+  });
+});
+
+describe("classifyItem", () => {
+  it("returns 'novel' for item with no topics", () => {
+    const item = makeItem({ topics: undefined });
+    expect(classifyItem(item, makeProfile())).toBe("novel");
+  });
+
+  it("returns 'novel' for item with empty topics array", () => {
+    const item = makeItem({ topics: [] });
+    expect(classifyItem(item, makeProfile())).toBe("novel");
+  });
+
+  it("returns 'familiar' when avg |affinity| > 0.5", () => {
+    const profile = makeProfile({
+      topicAffinities: { "ai": 0.8, "ml": 0.7 },
+    });
+    const item = makeItem({ topics: ["ai", "ml"] });
+    expect(classifyItem(item, profile)).toBe("familiar");
+  });
+
+  it("returns 'mixed' when avg |affinity| is between 0.15 and 0.5", () => {
+    const profile = makeProfile({
+      topicAffinities: { "ai": 0.3, "ml": 0.2 },
+    });
+    const item = makeItem({ topics: ["ai", "ml"] });
+    expect(classifyItem(item, profile)).toBe("mixed");
+  });
+
+  it("returns 'novel' when avg |affinity| < 0.15", () => {
+    const profile = makeProfile({
+      topicAffinities: { "unknown-topic": 0.05 },
+    });
+    const item = makeItem({ topics: ["unknown-topic"] });
+    expect(classifyItem(item, profile)).toBe("novel");
+  });
+
+  it("uses absolute value of negative affinities", () => {
+    // Negative affinities still count as familiarity (user knows about it)
+    const profile = makeProfile({
+      topicAffinities: { "spam": -0.8, "scam": -0.7 },
+    });
+    const item = makeItem({ topics: ["spam", "scam"] });
+    // avg |affinity| = (0.8 + 0.7) / 2 = 0.75 > 0.5 → "familiar"
+    expect(classifyItem(item, profile)).toBe("familiar");
+  });
+
+  it("returns 'novel' when topics have no matching affinities", () => {
+    const profile = makeProfile({
+      topicAffinities: { "ai": 0.9 }, // high affinity but for different topic
+    });
+    const item = makeItem({ topics: ["gardening"] });
+    // gardening has no affinity → 0 → < 0.15 → "novel"
+    expect(classifyItem(item, profile)).toBe("novel");
+  });
+
+  it("boundary: avg |affinity| exactly at 0.5 is NOT familiar (> 0.5 required)", () => {
+    const profile = makeProfile({
+      topicAffinities: { "topic": 0.5 },
+    });
+    const item = makeItem({ topics: ["topic"] });
+    // 0.5 is NOT > 0.5, so not familiar → check < 0.15? No → "mixed"
+    expect(classifyItem(item, profile)).toBe("mixed");
+  });
+
+  it("boundary: avg |affinity| exactly at 0.15 is NOT novel (< 0.15 required)", () => {
+    const profile = makeProfile({
+      topicAffinities: { "topic": 0.15 },
+    });
+    const item = makeItem({ topics: ["topic"] });
+    // 0.15 is NOT < 0.15, so not novel → check > 0.5? No → "mixed"
+    expect(classifyItem(item, profile)).toBe("mixed");
   });
 });

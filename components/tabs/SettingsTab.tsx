@@ -77,7 +77,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
     available: false, loaded: false, loading: false, progress: 0,
   });
 
-  // Ollama state
   const [ollamaConfig, setOllamaConfigState] = useState<OllamaConfig>(() => getOllamaConfig());
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus>({
     connected: false, loading: false, models: [],
@@ -742,7 +741,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
   );
 };
 
-// Shared button styles
 const actionBtnStyle: React.CSSProperties = {
   padding: `${space[1]}px ${space[3]}px`,
   background: colors.bg.overlay,

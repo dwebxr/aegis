@@ -81,7 +81,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       });
   }
 
-  // Load sources from localStorage + IC on auth change
   useEffect(() => {
     if (!isAuthenticated || !identity || !principalText) {
       actorRef.current = null;
@@ -112,7 +111,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       try {
         const principal = identity.getPrincipal();
 
-        // Flush pending deletes before fetching IC state
         const pendingDeletes = pendingDeletesRef.current;
         if (pendingDeletes.size > 0) {
           const toDelete = Array.from(pendingDeletes);

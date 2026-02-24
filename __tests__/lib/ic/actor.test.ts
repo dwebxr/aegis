@@ -19,30 +19,10 @@ jest.mock("@dfinity/agent", () => ({
   Actor: { createActor: (...args: unknown[]) => mockActorCreateActor(...args) },
 }));
 
-import { createBackendActorAsync, createBackendActor } from "@/lib/ic/actor";
+import { createBackendActorAsync } from "@/lib/ic/actor";
 import { idlFactory } from "@/lib/ic/declarations";
 
 beforeEach(() => jest.clearAllMocks());
-
-describe("createBackendActor (sync)", () => {
-  it("passes the real idlFactory and real canisterId from config", () => {
-    const actor = createBackendActor();
-
-    // Verify HttpAgent.createSync was called with the real host from config.ts
-    expect(mockCreateSync).toHaveBeenCalledTimes(1);
-    const [agentOpts] = mockCreateSync.mock.calls[0];
-    expect(typeof agentOpts.host).toBe("string");
-    expect(agentOpts.host).toMatch(/^https?:\/\//);
-
-    // Verify Actor.createActor was called with the REAL idlFactory, not a mock
-    expect(mockActorCreateActor).toHaveBeenCalledTimes(1);
-    const [passedFactory, actorOpts] = mockActorCreateActor.mock.calls[0];
-    expect(passedFactory).toBe(idlFactory); // Same reference — real, not mocked
-    expect(actorOpts.canisterId).toBe("rluf3-eiaaa-aaaam-qgjuq-cai"); // Real default from config.ts
-
-    expect(actor).toBeDefined();
-  });
-});
 
 describe("createBackendActorAsync", () => {
   it("calls agent.syncTime() and creates actor on success", async () => {

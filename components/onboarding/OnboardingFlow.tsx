@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { colors, space, type as t, radii, transitions } from "@/styles/theme";
 import {
-  getSteps,
+  STEPS,
   computeCurrentStepIndex,
   computeCompletedCount,
   loadOnboardingState,
@@ -26,7 +26,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
     setDismissed(state.dismissed);
   }, []);
 
-  const steps = getSteps();
+  const steps = STEPS;
   const currentIdx = computeCurrentStepIndex(context);
   const completedCount = computeCompletedCount(context);
 

@@ -1,8 +1,4 @@
 /**
- * YouTube video ID extraction for embed rendering.
- */
-
-/**
  * Extract YouTube video ID from common URL patterns.
  *
  * Supported: watch?v=, youtu.be/, /shorts/, /embed/, /live/

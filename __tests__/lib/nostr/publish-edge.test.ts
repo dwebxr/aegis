@@ -1,6 +1,7 @@
-import { buildAegisTags, publishAndPartition } from "@/lib/nostr/publish";
+import { buildAegisTags, publishAndPartition, publishSignalToNostr } from "@/lib/nostr/publish";
 import { finalizeEvent } from "nostr-tools/pure";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
+import { DEFAULT_RELAYS } from "@/lib/nostr/types";
 
 describe("buildAegisTags — imageUrl (NIP-92 imeta)", () => {
   it("adds imeta tag when imageUrl is provided", () => {
@@ -90,5 +91,48 @@ describe("publishAndPartition — relay distribution", () => {
     const result = await publishAndPartition(signed, []);
     expect(result.published).toEqual([]);
     expect(result.failed).toEqual([]);
+  });
+
+  it("handles multiple relays with mixed results", async () => {
+    const signed = finalizeEvent(
+      { kind: 1, created_at: Math.floor(Date.now() / 1000), tags: [], content: "test" },
+      keys.sk,
+    );
+
+    // With fake relays, some or all may fail — but the structure is correct
+    const result = await publishAndPartition(signed, [
+      "wss://fake-relay-1.example.com",
+      "wss://fake-relay-2.example.com",
+    ]);
+    expect(result.published.length + result.failed.length).toBe(2);
+  });
+});
+
+describe("publishSignalToNostr — relay fallback", () => {
+  const keys = deriveNostrKeypairFromText("test-signal-relay");
+
+  it("uses DEFAULT_RELAYS when relayUrls is empty array", async () => {
+    const result = await publishSignalToNostr("test signal", keys.sk, [["t", "test"]], []);
+    // Should use DEFAULT_RELAYS — total should equal DEFAULT_RELAYS length
+    expect(result.relaysPublished.length + result.relaysFailed.length).toBe(DEFAULT_RELAYS.length);
+  });
+
+  it("uses DEFAULT_RELAYS when relayUrls is undefined", async () => {
+    const result = await publishSignalToNostr("test signal", keys.sk, [["t", "test"]], undefined);
+    expect(result.relaysPublished.length + result.relaysFailed.length).toBe(DEFAULT_RELAYS.length);
+  });
+
+  it("returns a valid eventId", async () => {
+    const result = await publishSignalToNostr("test signal", keys.sk, [["t", "test"]]);
+    expect(result.eventId).toBeTruthy();
+    expect(typeof result.eventId).toBe("string");
+    // Nostr event IDs are 64-char hex
+    expect(result.eventId).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("uses custom relayUrls when provided", async () => {
+    const customRelays = ["wss://custom-relay.example.com"];
+    const result = await publishSignalToNostr("test", keys.sk, [], customRelays);
+    expect(result.relaysPublished.length + result.relaysFailed.length).toBe(1);
   });
 });

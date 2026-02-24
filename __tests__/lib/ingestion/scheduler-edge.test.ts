@@ -382,4 +382,217 @@ describe("IngestionScheduler — edge cases", () => {
       expect(body.pubkeys).toEqual(["abc123"]);
     });
   });
+
+  describe("auto-recovery after AUTO_RECOVERY_MS (6h)", () => {
+    it("recovers auto-disabled source after 6 hours", async () => {
+      jest.useRealTimers();
+
+      const onNewContent = jest.fn();
+      const onSourceAutoDisabled = jest.fn();
+      const callbacks = makeCallbacks({
+        onNewContent,
+        onSourceAutoDisabled,
+        getSources: jest.fn().mockReturnValue([
+          { type: "rss", config: { feedUrl: "https://recover.example.com/feed" }, enabled: true },
+        ]),
+      });
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ error: "Unavailable" }),
+      });
+
+      const scheduler = new IngestionScheduler(callbacks);
+      const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
+
+      // Fail 5 times to auto-disable
+      for (let i = 0; i < 5; i++) {
+        const states = scheduler.getSourceStates();
+        const state = states.get("rss:https://recover.example.com/feed");
+        if (state) state.nextFetchAt = 0;
+        await runCycle();
+      }
+
+      expect(onSourceAutoDisabled).toHaveBeenCalledTimes(1);
+
+      // Source should be disabled now
+      const disabledState = scheduler.getSourceStates().get("rss:https://recover.example.com/feed")!;
+      expect(disabledState.errorCount).toBe(5);
+
+      // Simulate 6+ hours passing by setting lastErrorAt to 7 hours ago
+      disabledState.lastErrorAt = Date.now() - 7 * 60 * 60 * 1000;
+      disabledState.nextFetchAt = 0;
+
+      // Now the feed returns successfully
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ feedTitle: "Recovered", items: [] }),
+      });
+
+      await runCycle();
+
+      // errorCount should have been reduced to MAX_CONSECUTIVE_FAILURES - 1 = 4
+      // and then the successful fetch brings it to 0
+      const recoveredState = scheduler.getSourceStates().get("rss:https://recover.example.com/feed")!;
+      expect(recoveredState.errorCount).toBe(0);
+      expect(recoveredState.lastSuccessAt).toBeGreaterThan(0);
+    });
+
+    it("does NOT recover if less than 6 hours have passed", async () => {
+      jest.useRealTimers();
+
+      const callbacks = makeCallbacks({
+        getSources: jest.fn().mockReturnValue([
+          { type: "rss", config: { feedUrl: "https://no-recover.example.com/feed" }, enabled: true },
+        ]),
+      });
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ error: "Unavailable" }),
+      });
+
+      const scheduler = new IngestionScheduler(callbacks);
+      const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
+
+      // Fail 5 times to auto-disable
+      for (let i = 0; i < 5; i++) {
+        const states = scheduler.getSourceStates();
+        const state = states.get("rss:https://no-recover.example.com/feed");
+        if (state) state.nextFetchAt = 0;
+        await runCycle();
+      }
+
+      const state = scheduler.getSourceStates().get("rss:https://no-recover.example.com/feed")!;
+      // Only 1 hour ago — too soon for auto-recovery
+      state.lastErrorAt = Date.now() - 1 * 60 * 60 * 1000;
+
+      (global.fetch as jest.Mock).mockClear();
+      await runCycle();
+
+      // Source should still be disabled — no fetch attempted
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(state.errorCount).toBe(5);
+    });
+  });
+
+  describe("resetSourceState", () => {
+    it("clears error state for an in-memory source key", async () => {
+      jest.useRealTimers();
+
+      const callbacks = makeCallbacks({
+        getSources: jest.fn().mockReturnValue([
+          { type: "rss", config: { feedUrl: "https://reset.example.com/feed" }, enabled: true },
+        ]),
+      });
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({ error: "Error" }),
+      });
+
+      const scheduler = new IngestionScheduler(callbacks);
+      const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
+      await runCycle();
+
+      const state = scheduler.getSourceStates().get("rss:https://reset.example.com/feed")!;
+      expect(state.errorCount).toBe(1);
+
+      scheduler.resetSourceState("rss:https://reset.example.com/feed");
+
+      expect(state.errorCount).toBe(0);
+      expect(state.lastError).toBe("");
+      expect(state.nextFetchAt).toBe(0);
+    });
+
+    it("handles unknown key without crash", () => {
+      const callbacks = makeCallbacks();
+      const scheduler = new IngestionScheduler(callbacks);
+      expect(() => scheduler.resetSourceState("unknown:key")).not.toThrow();
+    });
+  });
+
+  describe("stale httpCacheHeaders purge", () => {
+    it("purges headers for removed sources", async () => {
+      jest.useRealTimers();
+
+      let sources = [
+        { type: "rss" as const, config: { feedUrl: "https://a.com/feed" }, enabled: true },
+        { type: "rss" as const, config: { feedUrl: "https://b.com/feed" }, enabled: true },
+      ];
+
+      const callbacks = makeCallbacks({
+        getSources: jest.fn().mockImplementation(() => sources),
+      });
+
+      // First fetch returns ETag headers for both sources
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ items: [], etag: '"etag-a"' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ items: [], etag: '"etag-b"' }),
+        });
+
+      const scheduler = new IngestionScheduler(callbacks);
+      const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
+      await runCycle();
+
+      // Remove source B
+      sources = [{ type: "rss" as const, config: { feedUrl: "https://a.com/feed" }, enabled: true }];
+
+      // Allow next fetch
+      const stateA = scheduler.getSourceStates().get("rss:https://a.com/feed");
+      if (stateA) stateA.nextFetchAt = 0;
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ items: [] }),
+      });
+
+      await runCycle();
+
+      // After cycle, the ETag for removed source B should be purged
+      // We can verify by re-adding source B and checking no ETag is sent
+      sources = [
+        { type: "rss" as const, config: { feedUrl: "https://a.com/feed" }, enabled: true },
+        { type: "rss" as const, config: { feedUrl: "https://b.com/feed" }, enabled: true },
+      ];
+
+      if (stateA) stateA.nextFetchAt = 0;
+      const stateB = scheduler.getSourceStates().get("rss:https://b.com/feed");
+      if (stateB) stateB.nextFetchAt = 0;
+
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ items: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ items: [] }),
+        });
+
+      await runCycle();
+
+      // Find the fetch call for source B
+      const bCalls = (global.fetch as jest.Mock).mock.calls.filter(
+        (c: [string, { body: string }]) => {
+          if (c[0] !== "/api/fetch/rss") return false;
+          const body = JSON.parse(c[1].body);
+          return body.feedUrl === "https://b.com/feed";
+        }
+      );
+      // Source B should NOT have ETag (it was purged)
+      if (bCalls.length > 0) {
+        const body = JSON.parse(bCalls[bCalls.length - 1][1].body);
+        expect(body.etag).toBeUndefined();
+      }
+    });
+  });
 });

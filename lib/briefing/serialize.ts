@@ -157,13 +157,11 @@ export function parseBriefingMarkdown(
       totalItems = parseInt(statsMatch[2], 10);
     }
 
-    // Detect serendipity section
     if (line.startsWith("## Serendipity Pick")) {
       inSerendipity = true;
       continue;
     }
 
-    // Detect priority section
     if (line.startsWith("## Priority Briefing")) {
       inSerendipity = false;
       continue;
@@ -190,7 +188,6 @@ export function parseBriefingMarkdown(
 
     if (!currentItem) continue;
 
-    // Score line
     const scoreMatch = line.match(/\*\*Score:\s*([\d.]+)\/10\*\*\s*\|\s*(?:Verdict:\s*(\w+)|Novelty)/);
     if (scoreMatch) {
       const parsed = parseFloat(scoreMatch[1]);
@@ -199,27 +196,23 @@ export function parseBriefingMarkdown(
       continue;
     }
 
-    // Blockquote = reason
     if (line.startsWith("> ")) {
       currentItem.reason = line.slice(2);
       continue;
     }
 
-    // Topics
     const topicMatch = line.match(/^Topics:\s*(.+)$/);
     if (topicMatch) {
       currentItem.topics = topicMatch[1].split(/\s+/).map(t => t.replace(/^#/, "")).filter(Boolean);
       continue;
     }
 
-    // Source link
     const sourceMatch = line.match(/^\[Source\]\((.+)\)$/);
     if (sourceMatch) {
       currentItem.sourceUrl = sourceMatch[1];
       continue;
     }
 
-    // Plain text (content body)
     if (line.trim() && !line.startsWith("#") && !line.startsWith("---") && !line.startsWith("*")) {
       if (currentItem.text) {
         currentItem.text += "\n" + line;
@@ -229,7 +222,6 @@ export function parseBriefingMarkdown(
     }
   }
 
-  // Push last item
   if (currentItem && currentItem.title) {
     items.push(finishItem(currentItem, inSerendipity));
   }

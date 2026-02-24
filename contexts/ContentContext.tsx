@@ -259,7 +259,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   /** Run the full scoring cascade: Ollama → WebLLM → BYOK → IC LLM → Server → Heuristic. No side effects. */
   const scoreText = useCallback(async (text: string, userContext?: UserContext | null): Promise<AnalyzeResponse> => {
-    // Check scoring cache first
     const profileHash = computeProfileHash(userContext);
     const cacheKey = computeScoringCacheKey(text, userContext, profileHash);
     const cached = lookupScoringCache(cacheKey, profileHash);
@@ -350,7 +349,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       result = { ...heuristicScores(text), scoredByAI: false, scoringEngine: "heuristic" as const };
     }
 
-    // Store in scoring cache
     storeScoringCache(cacheKey, profileHash, result);
 
     return result;
@@ -491,7 +489,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           setContent(prev => prev.map(c =>
             c.id === item.id && !c.imageUrl ? { ...c, imageUrl: data.imageUrl } : c,
           ));
-          // Persist to IC if authenticated
           if (actorRef.current && isAuthenticated) {
             const updated = contentRef.current.find(c => c.id === item.id);
             if (updated && principal) {

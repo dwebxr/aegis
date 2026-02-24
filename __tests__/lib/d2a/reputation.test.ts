@@ -197,6 +197,44 @@ describe("calculateDynamicFee", () => {
   });
 });
 
+describe("saveReputations — error handling", () => {
+  it("does not throw on QuotaExceededError and logs warning", () => {
+    const setItemSpy = jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("QuotaExceededError");
+    });
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+
+    const map = new Map();
+    map.set(TEST_PK, {
+      pubkey: TEST_PK, useful: 1, slop: 0, score: 1, blocked: false, updatedAt: 1000,
+    });
+
+    expect(() => saveReputations(map)).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[d2a-reputation] Failed to persist reputations:",
+      expect.any(DOMException),
+    );
+
+    setItemSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it("recordUseful does not throw when localStorage save fails", () => {
+    // Pre-seed data so loadReputations in getOrCreate() works before setItem breaks
+    recordUseful(TEST_PK);
+
+    const setItemSpy = jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("QuotaExceededError");
+    });
+    jest.spyOn(console, "warn").mockImplementation();
+
+    expect(() => recordUseful(TEST_PK)).not.toThrow();
+
+    setItemSpy.mockRestore();
+    jest.restoreAllMocks();
+  });
+});
+
 // ─── Edge cases ───
 
 describe("loadReputations — malformed data", () => {

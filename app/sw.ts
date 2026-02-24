@@ -12,17 +12,17 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // IC canister communication — never cache
+    // IC canister communication
     {
       matcher: /^https:\/\/.*\.(icp0\.io|ic0\.app|icp-api\.io)(\/|$)/,
       handler: new NetworkOnly(),
     },
-    // Internet Identity — never cache
+    // Internet Identity
     {
       matcher: /^https:\/\/identity\.ic0\.app/,
       handler: new NetworkOnly(),
     },
-    // API routes — never cache
+    // API routes
     {
       matcher: /\/api\//,
       handler: new NetworkOnly(),
@@ -42,7 +42,6 @@ const serwist = new Serwist({
   },
 });
 
-// Push notification handler
 self.addEventListener("push", (event: PushEvent) => {
   if (!event.data) return;
 
@@ -67,7 +66,6 @@ self.addEventListener("push", (event: PushEvent) => {
   );
 });
 
-// Notification click handler
 self.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
 

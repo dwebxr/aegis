@@ -82,7 +82,7 @@ describe("GET /api/d2a/briefing — individual path", () => {
     const res = await GET(makeRequest({ principal: "aaaaa-aa" }));
     expect(res.status).toBe(404);
     const data = await res.json();
-    expect(data.hint).toContain("no briefing data");
+    expect(data.error).toContain("No briefing available");
   });
 
   it("returns 200 with briefing when data exists", async () => {
@@ -170,7 +170,7 @@ describe("GET /api/d2a/briefing — global path", () => {
     const res = await GET(makeRequest());
     expect(res.status).toBe(404);
     const data = await res.json();
-    expect(data.hint).toContain("No users have opted into D2A");
+    expect(data.error).toContain("No global briefings available");
   });
 
   it("passes offset and limit query params", async () => {

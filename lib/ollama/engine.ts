@@ -31,8 +31,9 @@ export async function testOllamaConnection(
         : [];
       return { ok: true, models };
     }
-  } catch {
+  } catch (err) {
     // Fall through to OpenAI-compatible endpoint
+    console.debug("[ollama] Native /api/tags failed, trying OpenAI-compatible endpoint:", errMsg(err));
   }
 
   // Fallback: OpenAI-compatible /v1/models

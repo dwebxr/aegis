@@ -30,9 +30,7 @@ interface SerializedStore {
   entries: Array<[string, PublishReputation]>;
 }
 
-// ---------------------------------------------------------------------------
-// Persistence (mirrors lib/d2a/reputation.ts pattern)
-// ---------------------------------------------------------------------------
+// Persistence — mirrors lib/d2a/reputation.ts pattern
 
 export function loadPublishReputations(): Map<string, PublishReputation> {
   if (typeof globalThis.localStorage === "undefined") return new Map();
@@ -54,8 +52,8 @@ export function savePublishReputations(map: Map<string, PublishReputation>): voi
   try {
     const store: SerializedStore = { version: 1, entries: Array.from(map.entries()) };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  } catch {
-    // Quota exceeded or strict privacy mode
+  } catch (err) {
+    console.warn("[publishGate] Failed to save reputations:", err);
   }
 }
 
@@ -63,9 +61,7 @@ export function getPublishReputation(pubkey: string): PublishReputation | undefi
   return loadPublishReputations().get(pubkey);
 }
 
-// ---------------------------------------------------------------------------
 // Recovery
-// ---------------------------------------------------------------------------
 
 /**
  * Compute recovery-adjusted score without persisting.
@@ -80,9 +76,7 @@ export function applyReputationRecovery(rep: PublishReputation): PublishReputati
   return { ...rep, score: recovered };
 }
 
-// ---------------------------------------------------------------------------
 // Gate check
-// ---------------------------------------------------------------------------
 
 export function checkPublishGate(pubkey: string): PublishGateDecision {
   const rep = getPublishReputation(pubkey);
@@ -104,9 +98,7 @@ export function checkPublishGate(pubkey: string): PublishGateDecision {
   return { canPublish: false, requiresDeposit: false, reason: "Publishing suspended due to repeated low-quality signals." };
 }
 
-// ---------------------------------------------------------------------------
 // Reputation updates
-// ---------------------------------------------------------------------------
 
 function getOrCreate(pubkey: string): { map: Map<string, PublishReputation>; rep: PublishReputation } {
   const map = loadPublishReputations();
