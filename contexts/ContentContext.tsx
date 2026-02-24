@@ -428,24 +428,30 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
 
   const addContent = useCallback((item: ContentItem) => {
-    const isDuplicate = contentRef.current.some(c =>
-      (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
-      (!item.sourceUrl && c.text === item.text),
-    );
-    if (isDuplicate) return;
-
     const owned = (!item.owner && isAuthenticated && principal)
       ? { ...item, owner: principal.toText() }
       : item;
 
-    setContent(prev => truncatePreservingActioned([owned, ...prev]));
-    if (actorRef.current && isAuthenticated && principal) {
-      void actorRef.current.saveEvaluation(toICEvaluation(owned, principal)).catch((err: unknown) => {
-        console.warn("[content] IC save (addContent) failed:", errMsg(err));
-        setSyncStatus("offline");
-        addNotification("Content saved locally but IC sync failed", "error");
-      });
-    }
+    setContent(prev => {
+      // Dedup check inside updater so `prev` is always the latest state
+      // (contentRef.current can be stale when multiple addContent calls are batched)
+      const isDuplicate = prev.some(c =>
+        (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
+        (!item.sourceUrl && c.text === item.text),
+      );
+      if (isDuplicate) return prev;
+
+      // IC save (fire-and-forget) — safe to call inside updater
+      if (actorRef.current && isAuthenticated && principal) {
+        void actorRef.current.saveEvaluation(toICEvaluation(owned, principal)).catch((err: unknown) => {
+          console.warn("[content] IC save (addContent) failed:", errMsg(err));
+          setSyncStatus("offline");
+          addNotification("Content saved locally but IC sync failed", "error");
+        });
+      }
+
+      return truncatePreservingActioned([owned, ...prev]);
+    });
   }, [isAuthenticated, principal, addNotification]);
 
   const clearDemoContent = useCallback(() => {
