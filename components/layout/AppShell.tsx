@@ -3,7 +3,7 @@ import React from "react";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
-import { ShieldIcon, SearchIcon, FireIcon, RSSIcon, ChartIcon, D2AIcon } from "@/components/icons";
+import { ShieldIcon, SearchIcon, FireIcon, RSSIcon, D2AIcon } from "@/components/icons";
 import { colors, fonts, space } from "@/styles/theme";
 import type { NavItem } from "./Sidebar";
 
@@ -17,9 +17,8 @@ const NAV_CONFIG = [
   { id: "dashboard", Icon: ShieldIcon, label: "Home", description: "Your daily overview" },
   { id: "briefing", Icon: SearchIcon, label: "Briefing", description: "Top picks for you" },
   { id: "incinerator", Icon: FireIcon, label: "Burn", description: "Filter and publish" },
-  { id: "sources", Icon: RSSIcon, label: "Sources", description: "Add feeds and sources" },
-  { id: "analytics", Icon: ChartIcon, label: "Stats", description: "Usage and accuracy" },
   { id: "d2a", Icon: D2AIcon, label: "D2A", description: "Agent activity" },
+  { id: "sources", Icon: RSSIcon, label: "Sources", description: "Add feeds and sources" },
 ] as const;
 
 function buildNavItems(size: number): NavItem[] {

@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { GearIcon, GitHubIcon } from "@/components/icons";
+import { GearIcon, ChartIcon, GitHubIcon } from "@/components/icons";
 import { colors, space, type as t, radii, transitions, fonts, shadows } from "@/styles/theme";
 import type { NavItem } from "./Sidebar";
 
@@ -59,11 +59,24 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
             <button onClick={() => onTabChange("settings")} title="Settings" style={{
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 28, height: 28, padding: 0,
-              background: "transparent", border: `1px solid ${colors.border.subtle}`,
-              borderRadius: radii.sm, cursor: "pointer", color: colors.text.disabled,
+              background: activeTab === "settings" ? "rgba(37,99,235,0.12)" : "transparent",
+              border: `1px solid ${activeTab === "settings" ? "rgba(37,99,235,0.2)" : colors.border.subtle}`,
+              borderRadius: radii.sm, cursor: "pointer",
+              color: activeTab === "settings" ? colors.blue[400] : colors.text.disabled,
               transition: transitions.fast,
             }}>
               <GearIcon s={14} />
+            </button>
+            <button onClick={() => onTabChange("analytics")} title="Stats" style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 28, height: 28, padding: 0,
+              background: activeTab === "analytics" ? "rgba(37,99,235,0.12)" : "transparent",
+              border: `1px solid ${activeTab === "analytics" ? "rgba(37,99,235,0.2)" : colors.border.subtle}`,
+              borderRadius: radii.sm, cursor: "pointer",
+              color: activeTab === "analytics" ? colors.blue[400] : colors.text.disabled,
+              transition: transitions.fast,
+            }}>
+              <ChartIcon s={14} />
             </button>
           </>
         ) : (

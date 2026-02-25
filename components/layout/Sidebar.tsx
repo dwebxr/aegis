@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { fonts, colors, space, type as t, radii, transitions, shadows } from "@/styles/theme";
-import { ShieldIcon, GearIcon, GitHubIcon } from "@/components/icons";
+import { ShieldIcon, GearIcon, ChartIcon, GitHubIcon } from "@/components/icons";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserBadge } from "@/components/auth/UserBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -97,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
       <button data-testid="aegis-nav-settings" onClick={() => onTabChange("settings")} style={{
         display: "flex", alignItems: "center", gap: space[2],
         padding: collapsed ? `${space[2]}px 0` : `${space[2]}px ${space[3]}px`,
-        marginBottom: space[3],
+        marginBottom: space[1],
         background: activeTab === "settings" ? "rgba(37,99,235,0.12)" : "transparent",
         border: activeTab === "settings" ? `1px solid rgba(37,99,235,0.2)` : "1px solid transparent",
         borderRadius: radii.sm, cursor: "pointer", transition: transitions.fast, width: "100%",
@@ -109,6 +109,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         {!collapsed && <span style={{ fontSize: t.caption.size, fontWeight: activeTab === "settings" ? 700 : 500 }}>Settings</span>}
       </button>
     )}
+
+    <button data-testid="aegis-nav-analytics" onClick={() => onTabChange("analytics")} style={{
+      display: "flex", alignItems: "center", gap: space[2],
+      padding: collapsed ? `${space[2]}px 0` : `${space[2]}px ${space[3]}px`,
+      marginBottom: space[1],
+      background: activeTab === "analytics" ? "rgba(37,99,235,0.12)" : "transparent",
+      border: activeTab === "analytics" ? `1px solid rgba(37,99,235,0.2)` : "1px solid transparent",
+      borderRadius: radii.sm, cursor: "pointer", transition: transitions.fast, width: "100%",
+      color: activeTab === "analytics" ? colors.blue[400] : colors.text.disabled,
+      fontFamily: "inherit",
+      justifyContent: collapsed ? "center" : "flex-start",
+    }}>
+      <ChartIcon s={16} />
+      {!collapsed && <span style={{ fontSize: t.caption.size, fontWeight: activeTab === "analytics" ? 700 : 500 }}>Stats</span>}
+    </button>
 
     <a
       href="https://github.com/dwebxr/aegis"
