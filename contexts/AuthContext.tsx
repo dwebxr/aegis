@@ -7,6 +7,24 @@ import { getInternetIdentityUrl, getDerivationOrigin } from "@/lib/ic/agent";
 import { useNotify } from "./NotificationContext";
 import { errMsg } from "@/lib/utils/errors";
 
+/** Check if a DelegationIdentity's chain is still valid (not expired). */
+function isDelegationFresh(identity: Identity): boolean {
+  try {
+    // DelegationIdentity has getDelegation() but the type isn't exported in all versions
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const di = identity as any;
+    if (typeof di.getDelegation !== "function") return true;
+    const chain = di.getDelegation();
+    const nowNs = BigInt(Date.now()) * BigInt(1_000_000);
+    for (const { delegation } of chain.delegations) {
+      if (delegation.expiration < nowNs) return false;
+    }
+    return true;
+  } catch {
+    return true; // Can't check — assume valid
+  }
+}
+
 interface AuthState {
   isAuthenticated: boolean;
   identity: Identity | null;
@@ -54,11 +72,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     AuthClient.create().then(async (client) => {
       setAuthClient(client);
       const authed = await client.isAuthenticated();
-      setIsAuthenticated(authed);
       if (authed) {
         const id = client.getIdentity();
-        setIdentity(id);
-        setPrincipal(id.getPrincipal());
+        if (!isDelegationFresh(id)) {
+          console.warn("[auth] Delegation expired — logging out");
+          await client.logout();
+          setIsAuthenticated(false);
+          addNotification("Session expired — please log in again", "error");
+        } else {
+          setIsAuthenticated(true);
+          setIdentity(id);
+          setPrincipal(id.getPrincipal());
+        }
+      } else {
+        setIsAuthenticated(false);
       }
       setIsLoading(false);
     }).catch((err: unknown) => {
@@ -88,6 +115,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     });
   }, [authClient]);
+
+  // Listen for session-expired events from IC call handlers in other contexts
+  useEffect(() => {
+    const handler = () => {
+      if (!authClient) return;
+      authClient.logout().then(() => {
+        setIdentity(null);
+        setPrincipal(null);
+        setIsAuthenticated(false);
+        addNotification("Session expired — please log in again", "error");
+      }).catch(() => {});
+    };
+    window.addEventListener("aegis:session-expired", handler);
+    return () => window.removeEventListener("aegis:session-expired", handler);
+  }, [authClient, addNotification]);
 
   const logout = useCallback(async () => {
     if (!authClient) return;

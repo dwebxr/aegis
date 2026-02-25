@@ -9,7 +9,7 @@ import { createBackendActorAsync } from "@/lib/ic/actor";
 import { loadSources, saveSources } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
-import { errMsg } from "@/lib/utils/errors";
+import { errMsg, handleICSessionError } from "@/lib/utils/errors";
 import { getSourceKey, resetSourceErrors } from "@/lib/ingestion/sourceState";
 
 interface SourceState {
@@ -102,6 +102,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         actorRef.current = actor;
       } catch (err) {
         if (cancelled) return;
+        if (handleICSessionError(err)) return;
         const msg = errMsg(err);
         console.error("[sources] actor creation failed:", msg);
         setSyncStatus("error");
@@ -162,6 +163,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         if (cancelled) return;
+        if (handleICSessionError(err)) return;
         const msg = errMsg(err);
         console.error("[sources] IC query failed:", msg, err);
         setSyncStatus("error");

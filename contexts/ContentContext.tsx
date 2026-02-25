@@ -10,7 +10,7 @@ import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
-import { errMsg, errMsgShort } from "@/lib/utils/errors";
+import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
 import { withTimeout } from "@/lib/utils/timeout";
 import { recordUseful, recordSlop } from "@/lib/d2a/reputation";
 import { recordPublishValidation, recordPublishFlag } from "@/lib/reputation/publishGate";
@@ -648,6 +648,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       backfillCleanupRef.current?.();
       backfillCleanupRef.current = backfillImageUrls();
     } catch (err) {
+      if (handleICSessionError(err)) return;
       console.error("[content] Failed to load from IC:", errMsg(err));
       setSyncStatus("offline");
       addNotification(`IC sync unavailable — ${errMsgShort(err)}`, "error");
