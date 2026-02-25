@@ -1,9 +1,8 @@
 "use client";
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { ContentCard } from "@/components/ui/ContentCard";
-import { D2ABadge } from "@/components/ui/D2ABadge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { isD2AContent, extractD2ASenderPk } from "@/lib/d2a/activity";
+import { isD2AContent } from "@/lib/d2a/activity";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { formatICP } from "@/lib/ic/icpLedger";
 import { handleICSessionError } from "@/lib/utils/errors";
@@ -193,7 +192,6 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                 : "Enable D2A Agent in Settings to start exchanging content with peers."}
               action={!agentState?.isActive && onTabChange ? () => onTabChange("settings") : undefined}
               actionLabel="Go to Settings"
-              mobile={mobile}
             />
           )}
         </div>
@@ -249,7 +247,6 @@ export const D2ATab: React.FC<D2ATabProps> = ({
               subtitle="Validate quality content in the Burn tab to build your signal history."
               action={onTabChange ? () => onTabChange("incinerator") : undefined}
               actionLabel="Start Evaluating"
-              mobile={mobile}
             />
           )}
         </div>
@@ -263,7 +260,6 @@ export const D2ATab: React.FC<D2ATabProps> = ({
               emoji={"\uD83D\uDD12"}
               title="Login required"
               subtitle="Sign in with Internet Identity to view your D2A match records."
-              mobile={mobile}
             />
           ) : matchLoading && matches.length === 0 ? (
             <div style={{ ...surfaceCard(mobile), textAlign: "center", padding: space[10] }}>
@@ -345,7 +341,6 @@ export const D2ATab: React.FC<D2ATabProps> = ({
               emoji={"\u26A1"}
               title="No match records yet"
               subtitle="Fee-paid matches from D2A content exchanges will appear here."
-              mobile={mobile}
             />
           ) : null}
         </div>
@@ -355,9 +350,9 @@ export const D2ATab: React.FC<D2ATabProps> = ({
 };
 
 // Shared empty state component
-function EmptyState({ emoji, title, subtitle, action, actionLabel, mobile }: {
+function EmptyState({ emoji, title, subtitle, action, actionLabel }: {
   emoji: string; title: string; subtitle: string;
-  action?: () => void; actionLabel?: string; mobile?: boolean;
+  action?: () => void; actionLabel?: string;
 }) {
   return (
     <div style={{
