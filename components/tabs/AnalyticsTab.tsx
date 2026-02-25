@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { fonts, colors, space, type as t, radii, kpiLabelStyle } from "@/styles/theme";
+import { isD2AContent } from "@/lib/d2a/activity";
 import { ShieldIcon, FireIcon, ZapIcon } from "@/components/icons";
 import { StatCard } from "@/components/ui/StatCard";
 import { BarChart } from "@/components/ui/BarChart";
@@ -265,6 +266,25 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
               )}
             </div>
           )}
+
+          {/* Session Activity */}
+          <div style={surfaceCard(mobile)}>
+            <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.primary, marginBottom: space[4] }}>Session Activity</div>
+            <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr 1fr", gap: space[2] }}>
+              {[
+                ["Validated", String(validatedCount), colors.green[400]],
+                ["Flagged", String(flaggedCount), colors.red[400]],
+                ["D2A Received", String(content.filter(isD2AContent).length), colors.purple[400]],
+                ["D2A Sent", String(agentState?.sentItems ?? 0), colors.sky[400]],
+                ["Fee Matches", String(agentState?.d2aMatchCount ?? 0), colors.amber[400]],
+              ].map(([l, v, c]) => (
+                <div key={l} style={{ textAlign: "center", padding: `${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
+                  <div style={{ ...kpiLabelStyle, marginBottom: space[1] }}>{l}</div>
+                  <div style={{ fontSize: t.h2.size, fontWeight: 700, color: c, fontFamily: fonts.mono }}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

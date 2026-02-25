@@ -5,6 +5,8 @@ import { ScoreBar } from "./ScoreBar";
 import { Tooltip } from "./Tooltip";
 import { GLOSSARY } from "@/lib/glossary";
 import { CheckIcon, XCloseIcon } from "@/components/icons";
+import { D2ABadge } from "@/components/ui/D2ABadge";
+import { isD2AContent } from "@/lib/d2a/activity";
 import type { ContentItem } from "@/lib/types/content";
 
 type CardVariant = "default" | "priority" | "serendipity";
@@ -222,6 +224,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
           fontSize: t.caption.size, color: colors.text.muted,
           background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
         }}>{item.source}</span>
+        {isD2AContent(item) && <D2ABadge mobile={mobile} />}
         {variant !== "serendipity" && <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.timestamp}</span>}
         {variant === "priority" && <div style={{ flex: 1 }} />}
       </div>

@@ -9,6 +9,7 @@ import { IncineratorTab } from "@/components/tabs/IncineratorTab";
 import { SourcesTab } from "@/components/tabs/SourcesTab";
 import { AnalyticsTab } from "@/components/tabs/AnalyticsTab";
 import { SettingsTab } from "@/components/tabs/SettingsTab";
+import { D2ATab } from "@/components/tabs/D2ATab";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { useNotify } from "@/contexts/NotificationContext";
 import { useContent } from "@/contexts/ContentContext";
@@ -612,6 +613,7 @@ function AegisAppInner() {
       )}
       {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />}
       {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} pipelineStats={pipelineResult?.stats ?? null} />}
+      {tab === "d2a" && <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={setTab} />}
       {tab === "settings" && <SettingsTab mobile={mobile} onLinkChange={handleLinkAccount} />}
     </AppShell>
   );
