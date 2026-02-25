@@ -30,7 +30,8 @@ async function getKV(): Promise<KVStore | null> {
     const mod = await import("@vercel/kv");
     _kv = mod.kv;
     return _kv;
-  } catch {
+  } catch (err) {
+    console.warn("[dailyBudget] KV import failed, using in-memory fallback:", err);
     _kv = null;
     return null;
   }

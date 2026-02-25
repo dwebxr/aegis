@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit } from "@/lib/api/rateLimit";
+import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { blockPrivateUrl } from "@/lib/utils/url";
 import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 10;
 
-/**
- * Lightweight endpoint: fetch only the OG image URL from a page.
- * Returns { imageUrl: string | null }.
- */
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);
   if (limited) return limited;
+  const tooLarge = checkBodySize(request);
+  if (tooLarge) return tooLarge;
 
   let body;
   try {
@@ -50,15 +48,17 @@ export async function POST(request: NextRequest) {
     const MAX_BYTES = 50_000;
     let totalBytes = 0;
 
-    while (totalBytes < MAX_BYTES) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      totalBytes += value.length;
-      html += decoder.decode(value, { stream: true });
-      // Stop early if we've passed </head>
-      if (html.includes("</head>")) break;
+    try {
+      while (totalBytes < MAX_BYTES) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalBytes += value.length;
+        html += decoder.decode(value, { stream: true });
+        if (html.includes("</head>")) break;
+      }
+    } finally {
+      reader.cancel().catch((e) => console.debug("[fetch/ogimage] stream cancel:", e));
     }
-    reader.cancel().catch(() => {}); // cleanup — errors here are non-critical
 
     const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
       || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);

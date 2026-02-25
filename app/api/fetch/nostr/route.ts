@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit } from "@/lib/api/rateLimit";
+import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateRelay } from "@/lib/utils/url";
 import { withTimeout } from "@/lib/utils/timeout";
@@ -9,6 +9,8 @@ export const maxDuration = 30;
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 30, 60_000);
   if (limited) return limited;
+  const tooLarge = checkBodySize(request);
+  if (tooLarge) return tooLarge;
 
   let body;
   try {
@@ -29,6 +31,9 @@ export async function POST(request: NextRequest) {
   for (const relay of relays) {
     if (typeof relay !== "string") {
       return NextResponse.json({ error: `Invalid relay URL: must be a string` }, { status: 400 });
+    }
+    if (relay.length > 2000) {
+      return NextResponse.json({ error: "Relay URL exceeds 2000 character limit" }, { status: 400 });
     }
     const blocked = blockPrivateRelay(relay);
     if (blocked) {
@@ -58,11 +63,11 @@ export async function POST(request: NextRequest) {
   };
 
   if (pubkeys && Array.isArray(pubkeys) && pubkeys.length > 0) {
-    filter.authors = pubkeys;
+    filter.authors = pubkeys.slice(0, 50).filter((p): p is string => typeof p === "string" && p.length <= 128);
   }
 
   if (hashtags && Array.isArray(hashtags) && hashtags.length > 0) {
-    filter["#t"] = hashtags;
+    filter["#t"] = hashtags.slice(0, 30).filter((t): t is string => typeof t === "string" && t.length <= 100);
   }
 
   if (since && typeof since === "number") {

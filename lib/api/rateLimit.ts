@@ -42,6 +42,17 @@ export function _resetRateLimits(): void {
  * single instance but does not limit across distributed instances.
  * For stronger guarantees, migrate to Vercel KV or Redis.
  */
+const DEFAULT_MAX_BODY = 512_000; // 512KB
+
+/** Returns 413 if Content-Length exceeds maxBytes, null otherwise. */
+export function checkBodySize(request: NextRequest, maxBytes = DEFAULT_MAX_BODY): NextResponse | null {
+  const cl = request.headers.get("content-length");
+  if (cl && parseInt(cl, 10) > maxBytes) {
+    return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+  }
+  return null;
+}
+
 export function rateLimit(request: NextRequest, limit = 30, windowMs = 60_000): NextResponse | null {
   const ip = getClientIP(request);
   const now = Date.now();

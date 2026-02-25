@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit } from "@/lib/api/rateLimit";
+import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateUrl } from "@/lib/utils/url";
 import { detectPlatformFeed, extractYouTubeChannelId } from "@/lib/sources/platformFeed";
@@ -11,6 +11,8 @@ const COMMON_PATHS = ["/feed", "/rss", "/feed.xml", "/atom.xml", "/rss.xml", "/i
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 15, 60_000);
   if (limited) return limited;
+  const tooLarge = checkBodySize(request);
+  if (tooLarge) return tooLarge;
 
   let body;
   try {

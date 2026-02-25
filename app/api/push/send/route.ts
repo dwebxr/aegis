@@ -3,7 +3,7 @@ import webpush from "web-push";
 import { HttpAgent, Actor } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { idlFactory } from "@/lib/ic/declarations/idlFactory";
-import { rateLimit } from "@/lib/api/rateLimit";
+import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { getCanisterId, getHost } from "@/lib/ic/config";
 import type { _SERVICE, PushSubscription } from "@/lib/ic/declarations/aegis_backend.did";
@@ -21,6 +21,8 @@ if (process.env.VAPID_PRIVATE_KEY && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 5, 60_000);
   if (limited) return limited;
+  const tooLarge = checkBodySize(request);
+  if (tooLarge) return tooLarge;
 
   if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
     return NextResponse.json({ error: "Push not configured" }, { status: 503 });

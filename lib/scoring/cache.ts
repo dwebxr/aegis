@@ -58,7 +58,8 @@ function getCache(): Map<string, ScoringCacheEntry> {
     _memCache = (parsed && typeof parsed === "object")
       ? new Map(Object.entries(parsed) as [string, ScoringCacheEntry][])
       : new Map();
-  } catch {
+  } catch (err) {
+    console.debug("[scoring-cache] localStorage parse failed, starting fresh:", err);
     _memCache = new Map();
   }
   return _memCache;
@@ -116,7 +117,7 @@ export function getScoringCacheStats(): { hits: number; misses: number; size: nu
 export function clearScoringCache(): void {
   _memCache = new Map();
   if (typeof globalThis.localStorage !== "undefined") {
-    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.debug("[scoring-cache] clear failed:", err); }
   }
   cacheHits = 0;
   cacheMisses = 0;

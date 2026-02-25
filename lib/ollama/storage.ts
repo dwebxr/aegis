@@ -25,8 +25,8 @@ export function setOllamaConfig(config: OllamaConfig): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-  } catch {
-    // Quota exceeded or strict privacy mode
+  } catch (err) {
+    console.debug("[ollama] Failed to save config (quota?):", err);
   }
 }
 

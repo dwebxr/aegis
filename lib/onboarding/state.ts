@@ -86,7 +86,8 @@ export function loadOnboardingState(): OnboardingState {
       return parsed as OnboardingState;
     }
     return { dismissed: false, firstSeenAt: Date.now() };
-  } catch {
+  } catch (err) {
+    console.debug("[onboarding] Failed to parse state, using default:", err);
     return { dismissed: false, firstSeenAt: Date.now() };
   }
 }

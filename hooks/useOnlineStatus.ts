@@ -2,10 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
-/**
- * Tracks browser online/offline state and fires a callback when connectivity
- * is restored. Useful for triggering offline queue replay.
- */
 export function useOnlineStatus(onReconnect?: () => void): boolean {
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true,

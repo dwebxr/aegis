@@ -4,7 +4,8 @@ export function getUserApiKey(): string | null {
   if (typeof globalThis.localStorage === "undefined") return null;
   try {
     return localStorage.getItem(STORAGE_KEY);
-  } catch {
+  } catch (err) {
+    console.debug("[apiKey] localStorage read failed:", err);
     return null;
   }
 }
@@ -16,8 +17,8 @@ export function setUserApiKey(key: string): void {
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, key);
-  } catch {
-    // Quota exceeded or strict privacy mode
+  } catch (err) {
+    console.debug("[apiKey] Failed to save key (quota?):", err);
   }
 }
 
@@ -25,8 +26,8 @@ export function clearUserApiKey(): void {
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Strict privacy mode
+  } catch (err) {
+    console.debug("[apiKey] Failed to clear key:", err);
   }
 }
 

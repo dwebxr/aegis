@@ -123,7 +123,8 @@ Browser                                  Internet Computer (Mainnet)
    2.  Anthropic Claude (premium, V/C/L) or BYOK
    3.  Heuristic fallback (client-side)
    + Per-IP API rate limiting (5-60 req/min per route)
-   + Per-instance daily API budget (500 calls/day)
+   + Request body size limits (64KB–512KB per route)
+   + Daily API budget (500 calls/day, Vercel KV shared or per-instance fallback)
 
    WoT Filter Pipeline (Pro mode):
    Content → Quality threshold → WoT scoring (Nostr social graph)
@@ -706,6 +707,16 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - IC-to-local data conversion validates types at runtime instead of unsafe `as` casts
 - useEffect async operations use cancellation flags to prevent stale state updates after unmount
 - Notification dedup logic extracted as pure testable functions (no re-implementation in tests)
+- ReadableStream readers wrapped in try-finally for guaranteed cleanup on error (ogimage)
+- All localStorage catch blocks log diagnostically (no silent swallowing)
+
+### API Hardening
+- Request body size limits on all POST routes (64KB for analyze, 512KB default)
+- Nostr relay URL length cap (2000 chars), pubkey array cap (50), hashtag array cap (30)
+- SSRF protection via `blockPrivateUrl` / `blockPrivateRelay` on all external-facing routes
+- Security headers: `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`, `Permissions-Policy`
+- Dependencies pinned (no `^` ranges) for reproducible builds
+- Daily API budget shared across Vercel instances via Vercel KV (Redis), with in-memory fallback
 
 ### Multi-Source Ingestion
 - RSS/Atom feeds (YouTube, note.com, blogs — with thumbnail extraction, ETag conditional fetch)
@@ -740,7 +751,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (3023 tests, 183 suites) |
+| Test | Jest + ts-jest (3161 tests, 192 suites) |
 
 ## Project Structure
 
@@ -840,8 +851,8 @@ aegis/
 │   │   ├── icpLedger.ts                # ICP Ledger actor (ICRC-1/2 balance, approve, allowance)
 │   │   └── declarations/               # Candid types + IDL factory
 │   ├── api/
-│   │   ├── rateLimit.ts                 # Per-IP rate limiter for API routes (5-60 req/min per route)
-│   │   └── dailyBudget.ts              # Per-instance daily API budget (500 calls/day)
+│   │   ├── rateLimit.ts                 # Per-IP rate limiter + body size guard for API routes
+│   │   └── dailyBudget.ts              # Daily API budget (Vercel KV shared, in-memory fallback)
 │   ├── scoring/
 │   │   ├── types.ts                     # ScoringEngine type + ScoreParseResult interface
 │   │   ├── cache.ts                     # Scoring result cache (SHA-256 fingerprint, 24h TTL, FIFO)
@@ -879,8 +890,9 @@ aegis/
 ├── hooks/
 │   ├── useKeyboardNav.ts               # J/K/L/H/V/F/O keyboard navigation + Cmd+K palette
 │   ├── usePushNotification.ts          # Web Push subscription management
+│   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 3023 tests across 183 suites
+├── __tests__/                           # 3161 tests across 192 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -946,6 +958,10 @@ X402_RECEIVER_ADDRESS=0x...           # EVM address for USDC payments
 X402_NETWORK=eip155:84532             # Base Sepolia (or eip155:8453 for mainnet)
 X402_PRICE=$0.01                      # Per-briefing price
 X402_FACILITATOR_URL=https://x402.org/facilitator
+
+# Vercel KV / Upstash Redis (optional — falls back to in-memory per-instance)
+KV_REST_API_URL=...               # Vercel KV REST endpoint
+KV_REST_API_TOKEN=...             # Vercel KV auth token
 
 # Sentry Error Tracking (optional — no-op if DSN not set)
 NEXT_PUBLIC_SENTRY_DSN=...            # Sentry DSN for error tracking

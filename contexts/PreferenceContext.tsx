@@ -80,7 +80,18 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
       setProfile(emptyProfile);
     }
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      // Flush pending debounced IC sync before auth state changes.
+      // `identity` is captured from this closure (valid when effect was created).
+      if (icSyncTimeoutRef.current && identity) {
+        clearTimeout(icSyncTimeoutRef.current);
+        icSyncTimeoutRef.current = null;
+        void syncPreferencesToIC(identity, profileRef.current).catch(err => {
+          console.warn("[prefs] IC flush-on-auth-change failed:", errMsg(err));
+        });
+      }
+    };
   }, [isAuthenticated, principalText, identity]);
 
   const debouncedSave = useCallback((p: UserPreferenceProfile) => {

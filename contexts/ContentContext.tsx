@@ -304,7 +304,13 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   // Load pending count on mount
   useEffect(() => {
-    dequeueAll().then(a => setPendingActions(a.length)).catch(() => {});
+    let cancelled = false;
+    dequeueAll().then(a => {
+      if (!cancelled) setPendingActions(a.length);
+    }).catch((err) => {
+      console.warn("[content] Failed to load pending action count:", errMsg(err));
+    });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {

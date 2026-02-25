@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TwitterApi } from "twitter-api-v2";
-import { rateLimit } from "@/lib/api/rateLimit";
+import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { withTimeout } from "@/lib/utils/timeout";
 
@@ -9,6 +9,8 @@ export const maxDuration = 30;
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 30, 60_000);
   if (limited) return limited;
+  const tooLarge = checkBodySize(request);
+  if (tooLarge) return tooLarge;
 
   let body;
   try {
