@@ -52,7 +52,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ text, mobile }) => {
         style={{
           position: "absolute",
           top: "calc(100% + 6px)",
-          left: 0,
+          ...(mobile ? { right: 0 } : { left: 0 }),
           background: colors.bg.raised,
           border: `1px solid ${colors.border.emphasis}`,
           borderRadius: radii.sm,
@@ -62,7 +62,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ text, mobile }) => {
           lineHeight: 1.5,
           whiteSpace: "normal",
           width: "max-content",
-          maxWidth: 260,
+          maxWidth: mobile ? "calc(100vw - 32px)" : 260,
           zIndex: 100,
           pointerEvents: mobile ? "auto" : "none",
           opacity: mobile ? (open ? 1 : 0) : 0,
