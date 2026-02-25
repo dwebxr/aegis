@@ -69,12 +69,15 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
     } catch {
       // Fallback for older browsers
       const input = document.createElement("input");
-      input.value = shareUrl;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand("copy");
-      document.body.removeChild(input);
-      resetCopied();
+      try {
+        input.value = shareUrl;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        resetCopied();
+      } finally {
+        input.parentNode?.removeChild(input);
+      }
     }
   };
 

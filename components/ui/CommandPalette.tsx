@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { SearchIcon } from "@/components/icons";
 import { colors, space, type as t, radii, transitions, fonts } from "@/styles/theme";
 
@@ -20,9 +20,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, c
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = query
-    ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase()))
-    : commands;
+  const filtered = useMemo(() =>
+    query ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase())) : commands,
+    [query, commands],
+  );
 
   useEffect(() => {
     if (open) {

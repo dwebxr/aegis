@@ -1,7 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react";
 import { useAuth } from "./AuthContext";
-export { DEMO_SOURCES } from "@/lib/demo/sources";
 
 const DEMO_BANNER_KEY = "aegis_demo_banner_dismissed";
 

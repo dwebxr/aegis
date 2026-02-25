@@ -2,6 +2,11 @@
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { GearIcon, ChartIcon, GitHubIcon } from "@/components/icons";
+
+const footerButtons = [
+  { id: "settings", icon: <GearIcon s={14} />, title: "Settings" },
+  { id: "analytics", icon: <ChartIcon s={14} />, title: "Stats" },
+];
 import { colors, space, type as t, radii, transitions, fonts, shadows } from "@/styles/theme";
 import type { NavItem } from "./Sidebar";
 
@@ -56,28 +61,22 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
               <span style={{ fontSize: t.caption.size, color: colors.green[400], fontFamily: fonts.mono }}>{short}</span>
               <span>Logout</span>
             </button>
-            <button onClick={() => onTabChange("settings")} title="Settings" style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 28, height: 28, padding: 0,
-              background: activeTab === "settings" ? "rgba(37,99,235,0.12)" : "transparent",
-              border: `1px solid ${activeTab === "settings" ? "rgba(37,99,235,0.2)" : colors.border.subtle}`,
-              borderRadius: radii.sm, cursor: "pointer",
-              color: activeTab === "settings" ? colors.blue[400] : colors.text.disabled,
-              transition: transitions.fast,
-            }}>
-              <GearIcon s={14} />
-            </button>
-            <button onClick={() => onTabChange("analytics")} title="Stats" style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 28, height: 28, padding: 0,
-              background: activeTab === "analytics" ? "rgba(37,99,235,0.12)" : "transparent",
-              border: `1px solid ${activeTab === "analytics" ? "rgba(37,99,235,0.2)" : colors.border.subtle}`,
-              borderRadius: radii.sm, cursor: "pointer",
-              color: activeTab === "analytics" ? colors.blue[400] : colors.text.disabled,
-              transition: transitions.fast,
-            }}>
-              <ChartIcon s={14} />
-            </button>
+            {footerButtons.map(btn => {
+              const active = activeTab === btn.id;
+              return (
+                <button key={btn.id} onClick={() => onTabChange(btn.id)} title={btn.title} style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 28, height: 28, padding: 0,
+                  background: active ? "rgba(37,99,235,0.12)" : "transparent",
+                  border: `1px solid ${active ? "rgba(37,99,235,0.2)" : colors.border.subtle}`,
+                  borderRadius: radii.sm, cursor: "pointer",
+                  color: active ? colors.blue[400] : colors.text.disabled,
+                  transition: transitions.fast,
+                }}>
+                  {btn.icon}
+                </button>
+              );
+            })}
           </>
         ) : (
           <button onClick={login} style={{

@@ -125,7 +125,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPrincipal(null);
         setIsAuthenticated(false);
         addNotification("Session expired — please log in again", "error");
-      }).catch(() => {});
+      }).catch((err: unknown) => {
+        console.warn("[auth] Session logout failed:", errMsg(err));
+      });
     };
     window.addEventListener("aegis:session-expired", handler);
     return () => window.removeEventListener("aegis:session-expired", handler);

@@ -20,6 +20,11 @@ interface SidebarProps {
   collapsed: boolean;
 }
 
+const footerNav = [
+  { id: "settings", icon: <GearIcon s={16} />, label: "Settings", authOnly: true },
+  { id: "analytics", icon: <ChartIcon s={16} />, label: "Stats", authOnly: false },
+];
+
 export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChange, collapsed }) => {
   const { isAuthenticated } = useAuth();
   return (
@@ -93,37 +98,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
       </div>
     )}
 
-    {isAuthenticated && (
-      <button data-testid="aegis-nav-settings" onClick={() => onTabChange("settings")} style={{
-        display: "flex", alignItems: "center", gap: space[2],
-        padding: collapsed ? `${space[2]}px 0` : `${space[2]}px ${space[3]}px`,
-        marginBottom: space[1],
-        background: activeTab === "settings" ? "rgba(37,99,235,0.12)" : "transparent",
-        border: activeTab === "settings" ? `1px solid rgba(37,99,235,0.2)` : "1px solid transparent",
-        borderRadius: radii.sm, cursor: "pointer", transition: transitions.fast, width: "100%",
-        color: activeTab === "settings" ? colors.blue[400] : colors.text.disabled,
-        fontFamily: "inherit",
-        justifyContent: collapsed ? "center" : "flex-start",
-      }}>
-        <GearIcon s={16} />
-        {!collapsed && <span style={{ fontSize: t.caption.size, fontWeight: activeTab === "settings" ? 700 : 500 }}>Settings</span>}
-      </button>
-    )}
-
-    <button data-testid="aegis-nav-analytics" onClick={() => onTabChange("analytics")} style={{
-      display: "flex", alignItems: "center", gap: space[2],
-      padding: collapsed ? `${space[2]}px 0` : `${space[2]}px ${space[3]}px`,
-      marginBottom: space[1],
-      background: activeTab === "analytics" ? "rgba(37,99,235,0.12)" : "transparent",
-      border: activeTab === "analytics" ? `1px solid rgba(37,99,235,0.2)` : "1px solid transparent",
-      borderRadius: radii.sm, cursor: "pointer", transition: transitions.fast, width: "100%",
-      color: activeTab === "analytics" ? colors.blue[400] : colors.text.disabled,
-      fontFamily: "inherit",
-      justifyContent: collapsed ? "center" : "flex-start",
-    }}>
-      <ChartIcon s={16} />
-      {!collapsed && <span style={{ fontSize: t.caption.size, fontWeight: activeTab === "analytics" ? 700 : 500 }}>Stats</span>}
-    </button>
+    {footerNav.filter(n => !n.authOnly || isAuthenticated).map(n => {
+      const active = activeTab === n.id;
+      return (
+        <button key={n.id} data-testid={`aegis-nav-${n.id}`} onClick={() => onTabChange(n.id)} style={{
+          display: "flex", alignItems: "center", gap: space[2],
+          padding: collapsed ? `${space[2]}px 0` : `${space[2]}px ${space[3]}px`,
+          marginBottom: space[1],
+          background: active ? "rgba(37,99,235,0.12)" : "transparent",
+          border: active ? `1px solid rgba(37,99,235,0.2)` : "1px solid transparent",
+          borderRadius: radii.sm, cursor: "pointer", transition: transitions.fast, width: "100%",
+          color: active ? colors.blue[400] : colors.text.disabled,
+          fontFamily: "inherit",
+          justifyContent: collapsed ? "center" : "flex-start",
+        }}>
+          {n.icon}
+          {!collapsed && <span style={{ fontSize: t.caption.size, fontWeight: active ? 700 : 500 }}>{n.label}</span>}
+        </button>
+      );
+    })}
 
     <a
       href="https://github.com/dwebxr/aegis"

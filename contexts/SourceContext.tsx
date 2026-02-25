@@ -9,7 +9,7 @@ import { createBackendActorAsync } from "@/lib/ic/actor";
 import { loadSources, saveSources } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
-import { errMsg, handleICSessionError } from "@/lib/utils/errors";
+import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
 import { getSourceKey, resetSourceErrors } from "@/lib/ingestion/sourceState";
 
 interface SourceState {
@@ -107,7 +107,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         console.error("[sources] actor creation failed:", msg);
         setSyncStatus("error");
         setSyncError("Actor: " + msg);
-        addNotification(`IC sync unavailable — ${msg.length > 120 ? msg.slice(0, 117) + "..." : msg}`, "error");
+        addNotification(`IC sync unavailable — ${errMsgShort(err)}`, "error");
         return;
       }
 
@@ -164,11 +164,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         if (cancelled) return;
         if (handleICSessionError(err)) return;
-        const msg = errMsg(err);
-        console.error("[sources] IC query failed:", msg, err);
+        console.error("[sources] IC query failed:", errMsg(err), err);
         setSyncStatus("error");
-        setSyncError(msg);
-        addNotification(`IC sync unavailable — ${msg.length > 120 ? msg.slice(0, 117) + "..." : msg}`, "error");
+        setSyncError(errMsg(err));
+        addNotification(`IC sync unavailable — ${errMsgShort(err)}`, "error");
       }
     };
     doSync().catch(err => {

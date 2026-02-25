@@ -31,44 +31,33 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function enqueueAction(type: QueuedActionType, payload: unknown): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
+/** Run a transactional operation against the store, auto-closing the DB on completion. */
+function withDB<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest | void): Promise<T> {
+  return openDB().then(db => new Promise<T>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, mode);
     const store = tx.objectStore(STORE_NAME);
+    const req = fn(store);
+    tx.oncomplete = () => { db.close(); resolve(req ? req.result : undefined as T); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  }));
+}
+
+export function enqueueAction(type: QueuedActionType, payload: unknown): Promise<void> {
+  return withDB("readwrite", store => {
     store.add({ type, payload, createdAt: Date.now(), retries: 0 } satisfies Omit<QueuedAction, "id">);
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
-export async function dequeueAll(): Promise<QueuedAction[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.getAll();
-    request.onsuccess = () => { db.close(); resolve(request.result); };
-    request.onerror = () => { db.close(); reject(request.error); };
-  });
+export function dequeueAll(): Promise<QueuedAction[]> {
+  return withDB("readonly", store => store.getAll());
 }
 
-export async function removeAction(id: number): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    store.delete(id);
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
+export function removeAction(id: number): Promise<void> {
+  return withDB("readwrite", store => { store.delete(id); });
 }
 
-export async function incrementRetries(id: number): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
+export function incrementRetries(id: number): Promise<void> {
+  return withDB("readwrite", store => {
     const getReq = store.get(id);
     getReq.onsuccess = () => {
       const action = getReq.result as QueuedAction | undefined;
@@ -77,29 +66,13 @@ export async function incrementRetries(id: number): Promise<void> {
         store.put(action);
       }
     };
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
-export async function clearQueue(): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    store.clear();
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
+export function clearQueue(): Promise<void> {
+  return withDB("readwrite", store => { store.clear(); });
 }
 
-export async function queueSize(): Promise<number> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.count();
-    request.onsuccess = () => { db.close(); resolve(request.result); };
-    request.onerror = () => { db.close(); reject(request.error); };
-  });
+export function queueSize(): Promise<number> {
+  return withDB("readonly", store => store.count());
 }

@@ -225,8 +225,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     void promise.catch(async (err: unknown) => {
       console.warn("[content] IC sync failed:", errMsg(err));
       setSyncStatus("offline");
-      await enqueueAction(actionType, payload);
-      setPendingActions(p => p + 1);
+      try {
+        await enqueueAction(actionType, payload);
+        setPendingActions(p => p + 1);
+      } catch (qErr) {
+        console.error("[content] Failed to enqueue offline action:", errMsg(qErr));
+      }
       addNotification("Saved locally \u2014 will sync when online", "error");
     });
   }
