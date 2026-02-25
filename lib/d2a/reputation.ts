@@ -26,26 +26,21 @@ export function _resetReputationCache(): void { _memCache = null; }
 
 export function loadReputations(): Map<string, PeerReputation> {
   if (_memCache) return _memCache;
-  if (typeof globalThis.localStorage === "undefined") {
-    _memCache = new Map();
-    return _memCache;
+  if (typeof globalThis.localStorage !== "undefined") {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed: SerializedReputationStore = JSON.parse(raw);
+        if (parsed.version === 1 && Array.isArray(parsed.peers)) {
+          return (_memCache = new Map(parsed.peers));
+        }
+      }
+    } catch {
+      console.warn("[d2a-reputation] Corrupted localStorage data, resetting");
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }
-  let raw: string | null;
-  try {
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch { _memCache = new Map(); return _memCache; }
-  if (!raw) { _memCache = new Map(); return _memCache; }
-  try {
-    const parsed: SerializedReputationStore = JSON.parse(raw);
-    if (parsed.version !== 1 || !Array.isArray(parsed.peers)) { _memCache = new Map(); return _memCache; }
-    _memCache = new Map(parsed.peers);
-    return _memCache;
-  } catch {
-    console.warn("[d2a-reputation] Corrupted localStorage data, resetting");
-    localStorage.removeItem(STORAGE_KEY);
-    _memCache = new Map();
-    return _memCache;
-  }
+  return (_memCache = new Map());
 }
 
 export function saveReputations(map: Map<string, PeerReputation>): void {

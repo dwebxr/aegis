@@ -1,6 +1,5 @@
 import type { ContentItem } from "@/lib/types/content";
 
-/** Check if a content item was received via D2A exchange. */
 export function isD2AContent(item: ContentItem): boolean {
   return typeof item.reason === "string" && item.reason.startsWith("Received via D2A from ");
 }

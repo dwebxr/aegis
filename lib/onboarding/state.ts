@@ -69,7 +69,6 @@ export function computeCurrentStepIndex(ctx: OnboardingContext): number {
   return -1;
 }
 
-/** Returns how many steps are completed. */
 export function computeCompletedCount(ctx: OnboardingContext): number {
   return STEPS.filter(s => isStepComplete(s, ctx)).length;
 }
