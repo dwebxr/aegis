@@ -106,7 +106,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         console.error("[sources] actor creation failed:", msg);
         setSyncStatus("error");
         setSyncError("Actor: " + msg);
-        addNotification(`IC sync unavailable — ${msg}`, "error");
+        addNotification(`IC sync unavailable — ${msg.length > 120 ? msg.slice(0, 117) + "..." : msg}`, "error");
         return;
       }
 
@@ -166,7 +166,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         console.error("[sources] IC query failed:", msg, err);
         setSyncStatus("error");
         setSyncError(msg);
-        addNotification(`IC sync unavailable — ${msg}`, "error");
+        addNotification(`IC sync unavailable — ${msg.length > 120 ? msg.slice(0, 117) + "..." : msg}`, "error");
       }
     };
     doSync().catch(err => {

@@ -10,7 +10,7 @@ import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
-import { errMsg } from "@/lib/utils/errors";
+import { errMsg, errMsgShort } from "@/lib/utils/errors";
 import { withTimeout } from "@/lib/utils/timeout";
 import { recordUseful, recordSlop } from "@/lib/d2a/reputation";
 import { recordPublishValidation, recordPublishFlag } from "@/lib/reputation/publishGate";
@@ -650,7 +650,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     } catch (err) {
       console.error("[content] Failed to load from IC:", errMsg(err));
       setSyncStatus("offline");
-      addNotification(`IC sync unavailable — ${errMsg(err)}`, "error");
+      addNotification(`IC sync unavailable — ${errMsgShort(err)}`, "error");
     }
   }, [isAuthenticated, principal, addNotification, backfillImageUrls]);
   loadFromICRef.current = loadFromIC;

@@ -42,7 +42,7 @@ import { Principal } from "@dfinity/principal";
 import { getCanisterId } from "@/lib/ic/agent";
 import type { UserReputation } from "@/lib/ic/declarations";
 import type { AnalyzeResponse } from "@/lib/types/api";
-import { errMsg } from "@/lib/utils/errors";
+import { errMsg, errMsgShort } from "@/lib/utils/errors";
 import { checkPublishGate, type PublishGateDecision } from "@/lib/reputation/publishGate";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -278,7 +278,7 @@ function AegisAppInner() {
         }
       } catch (err) {
         console.warn("[staking] Failed to init ledger/reputation:", errMsg(err));
-        addNotification(`IC sync unavailable — ${errMsg(err)}`, "error");
+        addNotification(`IC sync unavailable — ${errMsgShort(err)}`, "error");
       }
     })();
 
