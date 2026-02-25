@@ -41,11 +41,12 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 
 const briefing: BriefingState = {
   priority: [
-    { item: makeItem({ id: "p1" }), briefingScore: 8, reasons: ["High quality"] },
-    { item: makeItem({ id: "p2" }), briefingScore: 7, reasons: ["Relevant"] },
+    { item: makeItem({ id: "p1" }), briefingScore: 8, isSerendipity: false, classification: "familiar" },
+    { item: makeItem({ id: "p2" }), briefingScore: 7, isSerendipity: false, classification: "novel" },
   ],
-  serendipity: { item: makeItem({ id: "s1" }), briefingScore: 5, reasons: ["Surprising"] },
+  serendipity: { item: makeItem({ id: "s1" }), briefingScore: 5, isSerendipity: true, classification: "novel" },
   filteredOut: [makeItem({ id: "f1" })],
+  totalItems: 4,
   generatedAt: Date.now(),
 };
 

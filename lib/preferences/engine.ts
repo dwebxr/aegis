@@ -68,8 +68,8 @@ export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPr
     next.recentTopics.push({ topic, timestamp: now });
   }
   if (next.recentTopics.length > RECENT_TOPICS_MAX) {
-    next.recentTopics.sort((a, b) => b.timestamp - a.timestamp);
-    next.recentTopics = next.recentTopics.slice(0, RECENT_TOPICS_MAX);
+    // Entries are pushed chronologically — keep the tail (newest)
+    next.recentTopics = next.recentTopics.slice(-RECENT_TOPICS_MAX);
   }
 
   next.lastUpdated = now;
