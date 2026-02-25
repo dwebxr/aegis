@@ -30,7 +30,10 @@ export function loadReputations(): Map<string, PeerReputation> {
     _memCache = new Map();
     return _memCache;
   }
-  const raw = localStorage.getItem(STORAGE_KEY);
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch { _memCache = new Map(); return _memCache; }
   if (!raw) { _memCache = new Map(); return _memCache; }
   try {
     const parsed: SerializedReputationStore = JSON.parse(raw);

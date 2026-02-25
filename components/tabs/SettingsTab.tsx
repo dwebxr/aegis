@@ -178,15 +178,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
   }, [ollamaConfig.endpoint, addNotification]);
 
   useEffect(() => {
-    const saved = localStorage.getItem(LS_PUSH_FREQ_KEY);
-    if (saved && PUSH_FREQ_OPTIONS.some(o => o.value === saved)) {
-      setPushFreq(saved as PushFrequency);
-    }
+    try {
+      const saved = localStorage.getItem(LS_PUSH_FREQ_KEY);
+      if (saved && PUSH_FREQ_OPTIONS.some(o => o.value === saved)) {
+        setPushFreq(saved as PushFrequency);
+      }
+    } catch { /* Safari private mode */ }
   }, []);
 
   const handleFreqChange = (value: PushFrequency) => {
     setPushFreq(value);
-    localStorage.setItem(LS_PUSH_FREQ_KEY, value);
+    try { localStorage.setItem(LS_PUSH_FREQ_KEY, value); } catch { /* Safari private mode */ }
   };
 
   const handleCopy = async (text: string, label: string) => {

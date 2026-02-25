@@ -3,8 +3,6 @@
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
 
-const isDev = process.env.NODE_ENV === "development";
-
 export default function Error({
   error,
   reset,
@@ -20,11 +18,11 @@ export default function Error({
     <div style={{ padding: 40, background: "#0a0f1e", color: "#e2e8f0", minHeight: "100vh", fontFamily: "monospace" }}>
       <h2 style={{ color: "#f87171" }}>Something went wrong</h2>
       <pre style={{ background: "#1e293b", padding: 16, borderRadius: 8, overflow: "auto", fontSize: 13, whiteSpace: "pre-wrap" }}>
-        {isDev ? error.message : "An unexpected error occurred. Please try again."}
+        {error.message || "An unexpected error occurred. Please try again."}
       </pre>
-      {isDev && error.stack && (
+      {error.stack && (
         <details style={{ marginTop: 12 }}>
-          <summary style={{ cursor: "pointer", color: "#64748b" }}>Stack trace</summary>
+          <summary style={{ cursor: "pointer", color: "#64748b" }}>Details</summary>
           <pre style={{ background: "#1e293b", padding: 16, borderRadius: 8, overflow: "auto", fontSize: 11, marginTop: 8, whiteSpace: "pre-wrap" }}>
             {error.stack}
           </pre>

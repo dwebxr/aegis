@@ -34,7 +34,10 @@ interface SerializedStore {
 
 export function loadPublishReputations(): Map<string, PublishReputation> {
   if (typeof globalThis.localStorage === "undefined") return new Map();
-  const raw = localStorage.getItem(STORAGE_KEY);
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch { return new Map(); }
   if (!raw) return new Map();
   try {
     const parsed: SerializedStore = JSON.parse(raw);

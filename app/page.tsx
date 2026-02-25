@@ -319,22 +319,24 @@ function AegisAppInner() {
       },
       onCycleComplete: (count, items) => {
         const pt = principalTextRef.current;
-        if (!pt || !localStorage.getItem("aegis-push-enabled")) return;
-        // Throttle based on user-selected frequency (Settings tab)
-        const freq = localStorage.getItem("aegis-push-frequency") || "1x_day";
-        if (freq === "off") return;
-        if (freq !== "realtime") {
-          const throttleMs = PUSH_THROTTLE[freq] || PUSH_THROTTLE["1x_day"];
-          const lastPush = Number(localStorage.getItem("aegis-push-last") || "0");
-          if (Date.now() - lastPush < throttleMs) return;
-        }
+        try {
+          if (!pt || !localStorage.getItem("aegis-push-enabled")) return;
+          // Throttle based on user-selected frequency (Settings tab)
+          const freq = localStorage.getItem("aegis-push-frequency") || "1x_day";
+          if (freq === "off") return;
+          if (freq !== "realtime") {
+            const throttleMs = PUSH_THROTTLE[freq] || PUSH_THROTTLE["1x_day"];
+            const lastPush = Number(localStorage.getItem("aegis-push-last") || "0");
+            if (Date.now() - lastPush < throttleMs) return;
+          }
+        } catch { return; /* Safari private mode — skip push */ }
         const quality = items.filter(i => i.verdict === "quality");
         const preview = (quality.length > 0 ? quality : items)
           .slice(0, 3)
           .map(i => `${i.verdict === "quality" ? "\u2713" : "\u2717"} ${i.text.slice(0, 60).replace(/\n/g, " ")}`)
           .join("\n");
         const summary = `${count} item${count > 1 ? "s" : ""} scored`;
-        localStorage.setItem("aegis-push-last", String(Date.now()));
+        try { localStorage.setItem("aegis-push-last", String(Date.now())); } catch { /* ignore */ }
         void fetch("/api/push/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

@@ -11,8 +11,10 @@ const STORAGE_KEY = "aegis-filter-mode";
 
 function loadPersistedMode(): FilterMode {
   if (typeof globalThis.localStorage === "undefined") return "lite";
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "pro" || stored === "lite") return stored;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "pro" || stored === "lite") return stored;
+  } catch { /* Safari private mode or storage disabled */ }
   return "lite";
 }
 

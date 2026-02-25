@@ -18,9 +18,17 @@ export default function GlobalError({
     <html lang="en">
       <body style={{ padding: 40, background: "#0a0f1e", color: "#e2e8f0", minHeight: "100vh", fontFamily: "monospace", margin: 0 }}>
         <h2 style={{ color: "#f87171" }}>Something went wrong</h2>
-        <p style={{ color: "#94a3b8" }}>
-          An unexpected error occurred. Please try again.
-        </p>
+        <pre style={{ background: "#1e293b", padding: 16, borderRadius: 8, overflow: "auto", fontSize: 13, whiteSpace: "pre-wrap" }}>
+          {error.message || "An unexpected error occurred. Please try again."}
+        </pre>
+        {error.stack && (
+          <details style={{ marginTop: 12 }}>
+            <summary style={{ cursor: "pointer", color: "#64748b" }}>Details</summary>
+            <pre style={{ background: "#1e293b", padding: 16, borderRadius: 8, overflow: "auto", fontSize: 11, marginTop: 8, whiteSpace: "pre-wrap" }}>
+              {error.stack}
+            </pre>
+          </details>
+        )}
         {error.digest && (
           <p style={{ fontSize: 11, color: "#64748b" }}>
             Error ID: {error.digest}
