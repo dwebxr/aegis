@@ -33,6 +33,13 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
 
+  // Deduplicate discoveries against priority + serendipity items
+  const dedupedDiscoveries = useMemo(() => {
+    const briefingIds = new Set(briefing.priority.map(b => b.item.id));
+    if (briefing.serendipity) briefingIds.add(briefing.serendipity.item.id);
+    return discoveries.filter(d => !briefingIds.has(d.item.id));
+  }, [discoveries, briefing.priority, briefing.serendipity]);
+
   // Stable key: only changes when the actual briefing composition changes
   const briefingSyncKey = useMemo(
     () => briefing.priority.map(b => b.item.id).join(",") + "|" + (briefing.serendipity?.item.id ?? ""),
@@ -46,7 +53,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
     }
   }, [briefingSyncKey, syncBriefing, nostrKeys?.pk]);
 
-  const insightCount = briefing.priority.length + (briefing.serendipity ? 1 : 0) + discoveries.length;
+  const insightCount = briefing.priority.length + (briefing.serendipity ? 1 : 0) + dedupedDiscoveries.length;
   const canShare = nostrKeys && briefing.priority.length > 0;
 
   return (
@@ -176,7 +183,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         </div>
       )}
 
-      {discoveries.length > 0 && (
+      {dedupedDiscoveries.length > 0 && (
         <div style={{ marginTop: space[4] }}>
           <div style={{
             display: "flex",
@@ -199,7 +206,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
               padding: "2px 8px",
               borderRadius: radii.sm,
             }}>
-              {discoveries.length}
+              {dedupedDiscoveries.length}
             </span>
             <InfoTooltip
               text="High-quality content from outside your usual topics or network. These items scored well but cover areas you haven't explored yet."
@@ -207,7 +214,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
             />
           </div>
 
-          {discoveries.map((d, i) => (
+          {dedupedDiscoveries.map((d, i) => (
             <div key={d.item.id} style={{
               animation: `slideUp .3s ease ${(briefing.priority.length + 1 + i) * 0.06}s both`,
               marginBottom: space[2],
