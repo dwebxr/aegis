@@ -92,7 +92,7 @@ Browser                                  Internet Computer (Mainnet)
 │                                   │    │  (Motoko)                │
 │  Tabs:                            │    │                          │
 │    Dashboard / Briefing / Burn    │◄──►│  - Evaluation storage    │
-│    Sources / Analytics            │    │  - User profiles         │
+│    Sources / Analytics / D2A      │    │  - User profiles         │
 │                                   │    │  - Source configs        │
 │  API Routes:                      │    │  - Quality deposits/rep  │
 │    POST /api/analyze              │    │  - D2A match records     │
@@ -751,7 +751,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (3161 tests, 192 suites) |
+| Test | Jest + ts-jest (3227 tests, 198 suites) |
 
 ## Project Structure
 
@@ -783,10 +783,11 @@ aegis/
 │           └── discover-feed/route.ts   # RSS feed auto-discovery from any URL
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
-│   ├── tabs/                            # Dashboard (Top3, Spotlight, Discoveries, YouTube embed), Briefing, Incinerator, Sources, Analytics
-│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner, CommandPalette
+│   ├── tabs/                            # Dashboard (Top3, Spotlight, Discoveries, YouTube embed), Briefing, Incinerator, Sources, Analytics, D2A Activity
+│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner, CommandPalette, ShareBriefingModal, D2ABadge, D2ANetworkMini, AgentStatusBadge, StatCard, ScoreRing, MiniChart, BarChart, BriefingClassificationBadge, IncineratorViz, NotificationToggle, DemoBanner
 │   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
 │   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
+│   ├── onboarding/                      # OnboardingFlow (guided setup wizard)
 │   ├── sources/                         # ManualInput
 │   ├── auth/                            # LoginButton, UserBadge
 │   └── Providers.tsx                    # Notification + Auth + Content + Preference + Source + FilterMode + Agent
@@ -806,11 +807,13 @@ aegis/
 │   │   └── storage.ts                   # localStorage R/W + structural validation
 │   ├── briefing/
 │   │   ├── ranker.ts                    # briefingScore, generateBriefing, serendipity
+│   │   ├── serialize.ts                 # Briefing → NIP-23 long-form content serializer
 │   │   ├── sync.ts                      # Sync briefing snapshot to IC canister
 │   │   └── types.ts                     # BriefingState, BriefingItem
 │   ├── dashboard/
 │   │   └── utils.ts                     # Shared dashboard computation (top3, spotlight, activity, validation)
 │   ├── d2a/
+│   │   ├── activity.ts                  # D2A content detection + sender extraction helpers
 │   │   ├── manifest.ts                  # Content manifest + SHA-256 hashing + diff logic
 │   │   ├── reputation.ts               # Local peer reputation tracker (behavioral trust)
 │   │   ├── types.ts                     # D2ABriefingResponse, D2ABriefingItem
@@ -872,18 +875,22 @@ aegis/
 │   ├── apiKey/
 │   │   └── storage.ts                   # BYOK API key storage (localStorage, never sent to server)
 │   ├── types/                           # ContentItem, API response types, source types
-│   └── utils/
+│   ├── utils/
 │       ├── scores.ts                    # Score computation + relativeTime
 │       ├── errors.ts                    # errMsg() shared error formatter
+│       ├── hashing.ts                   # SHA-256 content fingerprinting (dedup + manifest)
 │       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       ├── csv.ts                       # CSV export (RFC-compliant escaping)
 │       ├── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
 │       ├── math.ts                      # Shared clamp() utility
 │       ├── youtube.ts                   # YouTube video ID extraction + embed URL builder
 │       └── statusEmitter.ts            # Generic status emitter factory (used by Ollama/WebLLM engines)
+│   ├── offline/
+│   │   └── actionQueue.ts              # IndexedDB-backed queue for IC operations during offline
 │   ├── onboarding/
 │   │   └── state.ts                     # Onboarding wizard state machine (step progression)
 │   └── sources/
+│       ├── catalog.ts                   # Source catalog (preset feeds + Quick Add definitions)
 │       ├── discovery.ts                 # Source auto-discovery (domain validation tracking)
 │       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Google News)
 │       └── storage.ts                   # Source config localStorage R/W
@@ -892,7 +899,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 3161 tests across 192 suites
+├── __tests__/                           # 3227 tests across 198 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
