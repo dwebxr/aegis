@@ -57,7 +57,7 @@ function getCache(): Map<string, ScoringCacheEntry> {
         }
       }
     } catch (err) {
-      console.debug("[scoring-cache] localStorage parse failed, starting fresh:", err);
+      console.warn("[scoring-cache] localStorage parse failed, starting fresh:", err);
     }
   }
   return (_memCache = new Map());
@@ -114,7 +114,7 @@ export function getScoringCacheStats(): { hits: number; misses: number; size: nu
 export function clearScoringCache(): void {
   _memCache = new Map();
   if (typeof globalThis.localStorage !== "undefined") {
-    try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.debug("[scoring-cache] clear failed:", err); }
+    try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.warn("[scoring-cache] clear failed:", err); }
   }
   cacheHits = 0;
   cacheMisses = 0;
