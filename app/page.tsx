@@ -278,7 +278,7 @@ function AegisAppInner() {
         }
       } catch (err) {
         console.warn("[staking] Failed to init ledger/reputation:", errMsg(err));
-        addNotification("IC sync unavailable — using local data", "error");
+        addNotification(`IC sync unavailable — ${errMsg(err)}`, "error");
       }
     })();
 

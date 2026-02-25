@@ -650,7 +650,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     } catch (err) {
       console.error("[content] Failed to load from IC:", errMsg(err));
       setSyncStatus("offline");
-      addNotification("IC sync unavailable — using local data", "error");
+      addNotification(`IC sync unavailable — ${errMsg(err)}`, "error");
     }
   }, [isAuthenticated, principal, addNotification, backfillImageUrls]);
   loadFromICRef.current = loadFromIC;
