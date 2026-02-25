@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
   const checks: Record<string, string> = {};
 
   checks.anthropicKey = process.env.ANTHROPIC_API_KEY?.trim() ? "configured" : "missing";
+  checks.sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim() ? "configured" : "missing";
+  checks.kvStore = process.env.KV_REST_API_URL?.trim() ? "configured" : "missing (budget per-instance)";
 
   const canisterId = getCanisterId();
   checks.canisterId = canisterId;
@@ -32,7 +34,9 @@ export async function GET(request: NextRequest) {
     checks.icCanister = "unreachable";
   }
 
-  const allOk = checks.anthropicKey === "configured" && checks.icCanister === "reachable";
+  const allOk = checks.anthropicKey === "configured"
+    && checks.icCanister === "reachable"
+    && checks.sentryDsn === "configured";
 
   return NextResponse.json({
     status: allOk ? "ok" : "degraded",

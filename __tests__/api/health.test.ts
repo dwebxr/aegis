@@ -62,17 +62,42 @@ describe("GET /api/health", () => {
     expect(data.checks.anthropicKey).toBe("missing");
   });
 
-  it("reports 'ok' when ANTHROPIC_API_KEY configured and IC reachable", async () => {
-    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key" };
+  it("reports 'ok' when all checks pass", async () => {
+    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key", NEXT_PUBLIC_SENTRY_DSN: "https://test@sentry.io/1" };
     const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.status).toBe("ok");
     expect(data.checks.anthropicKey).toBe("configured");
     expect(data.checks.icCanister).toBe("reachable");
+    expect(data.checks.sentryDsn).toBe("configured");
+  });
+
+  it("reports 'degraded' when SENTRY_DSN is missing", async () => {
+    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key" };
+    delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.status).toBe("degraded");
+    expect(data.checks.sentryDsn).toBe("missing");
+  });
+
+  it("reports kvStore status", async () => {
+    process.env = { ...origEnv, KV_REST_API_URL: "https://kv.vercel.com" };
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.checks.kvStore).toBe("configured");
+  });
+
+  it("reports kvStore missing without KV_REST_API_URL", async () => {
+    process.env = { ...origEnv };
+    delete process.env.KV_REST_API_URL;
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.checks.kvStore).toBe("missing (budget per-instance)");
   });
 
   it("reports 'degraded' when IC canister is unreachable", async () => {
-    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key" };
+    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key", NEXT_PUBLIC_SENTRY_DSN: "https://test@sentry.io/1" };
     fetchMock.mockRejectedValue(new Error("Connection refused"));
     const res = await GET(makeRequest());
     const data = await res.json();
@@ -81,7 +106,7 @@ describe("GET /api/health", () => {
   });
 
   it("reports IC error on non-400/non-OK response", async () => {
-    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key" };
+    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key", NEXT_PUBLIC_SENTRY_DSN: "https://test@sentry.io/1" };
     fetchMock.mockResolvedValue({ status: 500, ok: false });
     const res = await GET(makeRequest());
     const data = await res.json();
