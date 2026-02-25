@@ -41,7 +41,14 @@ const HEALTH_COLORS: Record<string, string> = {
   degraded: colors.amber[400],
   error: colors.red[400],
   disabled: colors.text.disabled,
+  rate_limited: colors.sky[400],
 };
+
+function formatRetryCountdown(until: number): string {
+  const diffSec = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+  if (diffSec < 60) return `${diffSec}s`;
+  return `${Math.ceil(diffSec / 60)} min`;
+}
 
 export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, mobile }) => {
   const { sources, syncStatus, syncError, addSource, removeSource, toggleSource, updateSource } = useSources();
@@ -89,11 +96,9 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     [sources],
   );
 
-  const [sourceStates, setSourceStates] = useState<Record<string, SourceRuntimeState>>({});
+  const [sourceStates, setSourceStates] = useState<Record<string, SourceRuntimeState>>(loadSourceStates);
   useEffect(() => {
-    const refresh = () => setSourceStates(loadSourceStates());
-    refresh();
-    const id = setInterval(refresh, 30_000);
+    const id = setInterval(() => setSourceStates(loadSourceStates()), 30_000);
     return () => clearInterval(id);
   }, []);
 
@@ -909,7 +914,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                       background: s.enabled ? healthColor : colors.border.default,
                       flexShrink: 0, padding: 0,
                     }}
-                    title={s.enabled ? `${health} — click to disable` : "Enable"}
+                    title={s.enabled ? (health === "rate_limited" ? "Rate limited — retrying soon" : `${health} — click to disable`) : "Enable"}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
@@ -936,8 +941,14 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                         )}
                       </div>
                     )}
-                    {/* Error message */}
-                    {state && state.errorCount > 0 && (
+                    {/* Rate limit notice — friendly, non-alarming */}
+                    {state && health === "rate_limited" && (
+                      <div style={{ fontSize: t.tiny.size, color: colors.sky[400], marginTop: 2 }}>
+                        Rate limited — retries automatically in {formatRetryCountdown(state.rateLimitedUntil)}
+                      </div>
+                    )}
+                    {/* Error message (only when NOT rate-limited) */}
+                    {state && state.errorCount > 0 && health !== "rate_limited" && (
                       <div style={{ fontSize: t.tiny.size, color: colors.red[400], marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
                         <span>
                           {state.errorCount >= 5 ? "Auto-disabled: " : `Error (${state.errorCount}x): `}

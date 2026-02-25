@@ -16,9 +16,11 @@ export interface SourceRuntimeState {
   nextFetchAt: number;
   averageScore: number;
   totalItemsScored: number;
+  /** Timestamp until which this source is rate-limited (0 = not limited) */
+  rateLimitedUntil: number;
 }
 
-export type SourceHealth = "healthy" | "degraded" | "error" | "disabled";
+export type SourceHealth = "healthy" | "degraded" | "error" | "disabled" | "rate_limited";
 
 export const BACKOFF_MS = [60_000, 300_000, 1_200_000, 3_600_000] as const;
 export const MAX_CONSECUTIVE_FAILURES = 5;
@@ -42,6 +44,7 @@ export function defaultState(): SourceRuntimeState {
     nextFetchAt: 0,
     averageScore: 0,
     totalItemsScored: 0,
+    rateLimitedUntil: 0,
   };
 }
 
@@ -85,7 +88,13 @@ export function loadSourceStates(): Record<string, SourceRuntimeState> {
 
     const result: Record<string, SourceRuntimeState> = {};
     for (const [key, value] of Object.entries(parsed)) {
-      result[key] = isValidState(value) ? value : defaultState();
+      if (isValidState(value)) {
+        // Backfill rateLimitedUntil for pre-existing data
+        if (typeof value.rateLimitedUntil !== "number") value.rateLimitedUntil = 0;
+        result[key] = value;
+      } else {
+        result[key] = defaultState();
+      }
     }
     return result;
   } catch (err) {
@@ -107,10 +116,11 @@ export function saveSourceStates(states: Record<string, SourceRuntimeState>): vo
 export function resetSourceErrors(key: string): void {
   const states = loadSourceStates();
   const state = states[key];
-  if (state && state.errorCount > 0) {
+  if (state && (state.errorCount > 0 || state.rateLimitedUntil > 0)) {
     state.errorCount = 0;
     state.lastError = "";
     state.nextFetchAt = 0;
+    state.rateLimitedUntil = 0;
     saveSourceStates(states);
   }
 }
@@ -134,6 +144,7 @@ export function computeAdaptiveInterval(state: SourceRuntimeState): number {
 }
 
 export function getSourceHealth(state: SourceRuntimeState): SourceHealth {
+  if (state.rateLimitedUntil > Date.now()) return "rate_limited";
   if (state.errorCount >= MAX_CONSECUTIVE_FAILURES) return "disabled";
   if (state.errorCount >= 3) return "error";
   if (state.errorCount >= 1) return "degraded";

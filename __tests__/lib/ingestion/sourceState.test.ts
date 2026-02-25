@@ -3,6 +3,7 @@ import {
   getSourceKey,
   loadSourceStates,
   saveSourceStates,
+  resetSourceErrors,
   computeBackoffDelay,
   computeAdaptiveInterval,
   getSourceHealth,
@@ -163,6 +164,56 @@ describe("sourceState", () => {
     it("returns disabled for >= MAX_CONSECUTIVE_FAILURES", () => {
       expect(getSourceHealth({ ...defaultState(), errorCount: MAX_CONSECUTIVE_FAILURES })).toBe("disabled");
       expect(getSourceHealth({ ...defaultState(), errorCount: 10 })).toBe("disabled");
+    });
+
+    it("returns rate_limited when rateLimitedUntil is in the future", () => {
+      expect(getSourceHealth({ ...defaultState(), rateLimitedUntil: Date.now() + 60_000 })).toBe("rate_limited");
+    });
+
+    it("returns normal health when rateLimitedUntil is in the past", () => {
+      expect(getSourceHealth({ ...defaultState(), rateLimitedUntil: Date.now() - 1000 })).toBe("healthy");
+    });
+
+    it("rate_limited takes priority over error states", () => {
+      expect(getSourceHealth({
+        ...defaultState(),
+        errorCount: 3,
+        rateLimitedUntil: Date.now() + 60_000,
+      })).toBe("rate_limited");
+    });
+  });
+
+  describe("rate limit state", () => {
+    it("defaultState includes rateLimitedUntil = 0", () => {
+      expect(defaultState().rateLimitedUntil).toBe(0);
+    });
+
+    it("round-trips rateLimitedUntil through localStorage", () => {
+      const until = Date.now() + 120_000;
+      const states: Record<string, SourceRuntimeState> = {
+        "rss:test": { ...defaultState(), rateLimitedUntil: until },
+      };
+      saveSourceStates(states);
+      const loaded = loadSourceStates();
+      expect(loaded["rss:test"].rateLimitedUntil).toBe(until);
+    });
+
+    it("backfills rateLimitedUntil for legacy data missing the field", () => {
+      const legacy = { ...defaultState() };
+      delete (legacy as Record<string, unknown>).rateLimitedUntil;
+      store["aegis_source_states"] = JSON.stringify({ "rss:legacy": legacy });
+      const loaded = loadSourceStates();
+      expect(loaded["rss:legacy"].rateLimitedUntil).toBe(0);
+    });
+
+    it("resetSourceErrors clears rateLimitedUntil", () => {
+      const states: Record<string, SourceRuntimeState> = {
+        "rss:rl": { ...defaultState(), rateLimitedUntil: Date.now() + 60_000 },
+      };
+      saveSourceStates(states);
+      resetSourceErrors("rss:rl");
+      const loaded = loadSourceStates();
+      expect(loaded["rss:rl"].rateLimitedUntil).toBe(0);
     });
   });
 });

@@ -106,6 +106,7 @@ export class IngestionScheduler {
       state.errorCount = 0;
       state.lastError = "";
       state.nextFetchAt = 0;
+      state.rateLimitedUntil = 0;
       this.persistStates();
     } else {
       // Also reset in localStorage for cases where scheduler hasn't loaded the key yet
@@ -124,6 +125,23 @@ export class IngestionScheduler {
 
   private persistStates(): void {
     saveSourceStates(Object.fromEntries(this.sourceStates));
+  }
+
+  private handleFetchError(res: Response, key: string): void {
+    if (res.status === 429) {
+      const raw = parseInt(res.headers.get("Retry-After") || "60", 10);
+      this.recordRateLimit(key, isNaN(raw) ? 60 : raw);
+    } else {
+      this.recordSourceError(key, `HTTP ${res.status}`);
+    }
+  }
+
+  private recordRateLimit(key: string, retryAfterSec: number): void {
+    const state = this.getOrCreateState(key);
+    const retryMs = Math.max(retryAfterSec * 1000, 60_000);
+    state.rateLimitedUntil = Date.now() + retryMs;
+    state.nextFetchAt = Date.now() + retryMs;
+    this.persistStates();
   }
 
   private recordSourceError(key: string, error: string): void {
@@ -324,7 +342,7 @@ export class IngestionScheduler {
         signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
-        this.recordSourceError(key, `HTTP ${res.status}`);
+        this.handleFetchError(res, key);
         return [];
       }
       const data = await res.json();
@@ -360,7 +378,7 @@ export class IngestionScheduler {
         signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
-        this.recordSourceError(key, `HTTP ${res.status}`);
+        this.handleFetchError(res, key);
         return [];
       }
       const data = await res.json();
@@ -392,7 +410,7 @@ export class IngestionScheduler {
         signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
-        this.recordSourceError(key, `HTTP ${res.status}`);
+        this.handleFetchError(res, key);
         return [];
       }
       const data = await res.json();
