@@ -91,6 +91,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const [quickAddLoading, setQuickAddLoading] = useState(false);
   const [quickAddError, setQuickAddError] = useState("");
   const [resolvedFarcaster, setResolvedFarcaster] = useState<{ fid: number; username: string } | null>(null);
+  const [resolvedPlatform, setResolvedPlatform] = useState<QuickAddId | null>(null);
 
   // Popular Sources catalog
   const [catalogFilter, setCatalogFilter] = useState<CatalogCategory | "all">("all");
@@ -219,14 +220,15 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const handleSaveRss = () => {
     if (!rssResult) return;
     const label = rssResult.feedTitle || rssInput;
+    const platform = resolvedPlatform || undefined;
     let added: boolean;
     if (resolvedFarcaster) {
-      added = addSource({ type: "farcaster", label, feedUrl: rssInput, fid: resolvedFarcaster.fid, username: resolvedFarcaster.username, enabled: true });
+      added = addSource({ type: "farcaster", label, feedUrl: rssInput, fid: resolvedFarcaster.fid, username: resolvedFarcaster.username, platform: "farcaster", enabled: true });
     } else {
-      added = addSource({ type: "rss", label, feedUrl: rssInput, enabled: true });
+      added = addSource({ type: "rss", label, feedUrl: rssInput, platform, enabled: true });
     }
     if (!added) { setRssError("This feed is already saved"); return; }
-    setRssInput(""); setRssResult(null); setResolvedFarcaster(null);
+    setRssInput(""); setRssResult(null); setResolvedFarcaster(null); setResolvedPlatform(null);
   };
 
   const handleSaveNostr = () => {
@@ -342,6 +344,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
           return;
         }
         setRssResult({ ...data, feedTitle: data.feedTitle || label });
+        setResolvedPlatform(quickAddMode as QuickAddId);
         // Only clear quick add form after successful validation
         setQuickAddMode("");
         setQuickAddInput("");
@@ -539,6 +542,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                 onChange={e => {
                   setRssInput(e.target.value);
                   setDiscoveredFeeds([]);
+                  setResolvedPlatform(null);
                 }}
                 placeholder="https://example.com/feed.xml \u2014 blogs, podcasts, any RSS/Atom feed"
                 style={{ ...inputStyle, flex: 1 }}
@@ -567,7 +571,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     {discoveredFeeds.map((f, i) => (
                       <button
                         key={i}
-                        onClick={() => { setRssInput(f.url); setDiscoveredFeeds([]); }}
+                        onClick={() => { setRssInput(f.url); setDiscoveredFeeds([]); setResolvedPlatform(null); }}
                         style={{
                           padding: `${space[1]}px ${space[3]}px`,
                           background: `${colors.amber[400]}15`,
@@ -599,7 +603,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     {QUICK_ADD_PRESETS.map(p => (
                       <button
                         key={p.id}
-                        onClick={() => { setQuickAddMode(quickAddMode === p.id ? "" : p.id); setQuickAddInput(""); setQuickAddError(""); setRssError(""); setResolvedFarcaster(null); }}
+                        onClick={() => { setQuickAddMode(quickAddMode === p.id ? "" : p.id); setQuickAddInput(""); setQuickAddError(""); setRssError(""); setResolvedFarcaster(null); setResolvedPlatform(null); }}
                         style={{
                           display: "flex", alignItems: "center", gap: 4,
                           padding: `${space[1]}px ${space[3]}px`, borderRadius: radii.sm,
@@ -1014,10 +1018,12 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     )}
                   </div>
                   <span style={{
-                    fontSize: t.tiny.size, fontWeight: 700, color: s.type === "rss" ? colors.amber[400] : colors.purple[400],
+                    fontSize: t.tiny.size, fontWeight: 700,
+                    color: QUICK_ADD_PRESETS.find(p => p.id === (s.platform || s.type))?.color
+                      || (s.type === "rss" ? colors.amber[400] : colors.purple[400]),
                     textTransform: "uppercase", letterSpacing: 1,
                   }}>
-                    {s.type}
+                    {s.platform || s.type}
                   </span>
                   {!isDemoMode && <button
                     onClick={() => editingId === s.id ? cancelEdit() : startEdit(s)}

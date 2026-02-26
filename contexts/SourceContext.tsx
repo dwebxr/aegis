@@ -334,6 +334,7 @@ function savedToIC(s: SavedSource, owner: import("@dfinity/principal").Principal
   if (s.pubkeys) config.pubkeys = s.pubkeys;
   if (s.fid) config.fid = s.fid;
   if (s.username) config.username = s.username;
+  if (s.platform) config.platform = s.platform;
   return {
     id: s.id,
     owner,
@@ -362,11 +363,13 @@ function icToSaved(ic: SourceConfigEntry): SavedSource | null {
     ? (parsed.pubkeys as string[]) : undefined;
   const fid = typeof parsed.fid === "number" ? parsed.fid : undefined;
   const username = typeof parsed.username === "string" ? parsed.username : undefined;
+  const platform = typeof parsed.platform === "string" ? parsed.platform as SavedSource["platform"] : undefined;
   const createdAt = Number(ic.createdAt) / 1_000_000;
 
   return {
     id: ic.id,
     type: ic.sourceType as SavedSource["type"],
+    platform,
     label,
     enabled: ic.enabled,
     feedUrl,

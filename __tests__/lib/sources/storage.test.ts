@@ -143,6 +143,36 @@ describe("sources/storage", () => {
       expect(loaded[0].createdAt).toBe(1234567890123);
     });
 
+    it("preserves platform field through save/load cycle", () => {
+      const sources = [
+        makeFakeSource({ id: "yt-1", label: "YouTube Channel", platform: "youtube" }),
+        makeFakeSource({ id: "bs-1", label: "Bluesky: @user", platform: "bluesky" }),
+        makeFakeSource({ id: "plain-1", label: "Plain RSS" }),
+      ];
+      saveSources("p-1", sources);
+      const loaded = loadSources("p-1");
+      expect(loaded[0].platform).toBe("youtube");
+      expect(loaded[1].platform).toBe("bluesky");
+      expect(loaded[2].platform).toBeUndefined();
+    });
+
+    it("preserves farcaster source with platform, fid, and username", () => {
+      const source = makeFakeSource({
+        id: "fc-1",
+        type: "farcaster",
+        label: "Farcaster: @vitalik",
+        platform: "farcaster",
+        fid: 5650,
+        username: "vitalik",
+      });
+      saveSources("p-1", [source]);
+      const loaded = loadSources("p-1");
+      expect(loaded[0].type).toBe("farcaster");
+      expect(loaded[0].platform).toBe("farcaster");
+      expect(loaded[0].fid).toBe(5650);
+      expect(loaded[0].username).toBe("vitalik");
+    });
+
     it("handles large number of sources", () => {
       const sources = Array.from({ length: 50 }, (_, i) =>
         makeFakeSource({ id: `src-${i}`, label: `Feed ${i}` })
