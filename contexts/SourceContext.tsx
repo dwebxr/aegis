@@ -20,7 +20,7 @@ interface SourceState {
   removeSource: (id: string) => void;
   toggleSource: (id: string) => void;
   updateSource: (id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => void;
-  getSchedulerSources: () => Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }>;
+  getSchedulerSources: () => Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean }>;
 }
 
 const SourceContext = createContext<SourceState>({
@@ -195,6 +195,8 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     } else if (partial.type === "nostr" && partial.relays) {
       const key = [...partial.relays].sort().join(",");
       if (existing.some(s => s.type === "nostr" && s.relays && [...s.relays].sort().join(",") === key)) return false;
+    } else if (partial.type === "farcaster" && partial.fid) {
+      if (existing.some(s => s.type === "farcaster" && s.fid === partial.fid)) return false;
     }
     const source: SavedSource = { ...partial, id: uuidv4(), createdAt: Date.now() };
     setSources(prev => {
@@ -214,6 +216,8 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       const config: Record<string, string> = {};
       if (toRemove.feedUrl) config.feedUrl = toRemove.feedUrl;
       if (toRemove.relays) config.relays = toRemove.relays.join(",");
+      if (toRemove.fid) config.fid = String(toRemove.fid);
+      if (toRemove.username) config.username = toRemove.username;
       resetSourceErrors(getSourceKey(toRemove.type, config));
     }
     setSources(prev => {
@@ -281,8 +285,8 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     queueMicrotask(() => { if (updated) saveToIC(updated); });
   }, [persist, isDemoMode]);
 
-  const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }> => {
-    const result: Array<{ type: "rss" | "url" | "nostr"; config: Record<string, string>; enabled: boolean }> = [];
+  const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean }> => {
+    const result: Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean }> = [];
     for (const s of sources) {
       if (!s.enabled) continue;
       if (s.type === "rss" && s.feedUrl) {
@@ -294,6 +298,12 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
             relays: (s.relays || []).join(","),
             pubkeys: (s.pubkeys || []).join(","),
           },
+          enabled: true,
+        });
+      } else if (s.type === "farcaster" && s.fid) {
+        result.push({
+          type: "farcaster",
+          config: { fid: String(s.fid), username: s.username || "" },
           enabled: true,
         });
       }
@@ -322,6 +332,8 @@ function savedToIC(s: SavedSource, owner: import("@dfinity/principal").Principal
   if (s.feedUrl) config.feedUrl = s.feedUrl;
   if (s.relays) config.relays = s.relays;
   if (s.pubkeys) config.pubkeys = s.pubkeys;
+  if (s.fid) config.fid = s.fid;
+  if (s.username) config.username = s.username;
   return {
     id: s.id,
     owner,
@@ -338,7 +350,7 @@ function icToSaved(ic: SourceConfigEntry): SavedSource | null {
     console.warn(`[sources] Corrupted configJson for source ${ic.id}, skipping:`, err);
     return null;
   }
-  if (ic.sourceType !== "rss" && ic.sourceType !== "nostr") {
+  if (ic.sourceType !== "rss" && ic.sourceType !== "nostr" && ic.sourceType !== "farcaster") {
     console.warn(`[sources] Unknown sourceType "${ic.sourceType}" for source ${ic.id}, skipping`);
     return null;
   }
@@ -348,16 +360,20 @@ function icToSaved(ic: SourceConfigEntry): SavedSource | null {
     ? (parsed.relays as string[]) : undefined;
   const pubkeys = Array.isArray(parsed.pubkeys) && parsed.pubkeys.every((p: unknown) => typeof p === "string")
     ? (parsed.pubkeys as string[]) : undefined;
+  const fid = typeof parsed.fid === "number" ? parsed.fid : undefined;
+  const username = typeof parsed.username === "string" ? parsed.username : undefined;
   const createdAt = Number(ic.createdAt) / 1_000_000;
 
   return {
     id: ic.id,
-    type: ic.sourceType,
+    type: ic.sourceType as SavedSource["type"],
     label,
     enabled: ic.enabled,
     feedUrl,
     relays,
     pubkeys,
+    fid,
+    username,
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
   };
 }

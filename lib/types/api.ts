@@ -61,3 +61,20 @@ export interface FetchNostrResponse {
     tags: string[][];
   }>;
 }
+
+export interface FetchFarcasterResponse {
+  fid?: number;
+  displayName?: string;
+  pfpUrl?: string;
+  username?: string;
+  items?: Array<{
+    text: string;
+    author: string;
+    avatar?: string;
+    sourceUrl?: string;
+    imageUrl?: string;
+    timestamp?: number;
+  }>;
+  feedTitle?: string;
+  warning?: string;
+}

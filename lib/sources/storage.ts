@@ -14,7 +14,7 @@ export function loadSources(principalId: string): SavedSource[] {
       (s): s is SavedSource =>
         s &&
         typeof s.id === "string" &&
-        (s.type === "rss" || s.type === "nostr") &&
+        (s.type === "rss" || s.type === "nostr" || s.type === "farcaster") &&
         typeof s.enabled === "boolean" &&
         typeof s.label === "string" &&
         typeof s.createdAt === "number",

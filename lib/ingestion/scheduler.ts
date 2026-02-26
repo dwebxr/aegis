@@ -36,7 +36,7 @@ const MAX_TEXT_LENGTH = 2000;
 const MAX_DISPLAY_TEXT = 300;
 
 interface SchedulerSource {
-  type: "rss" | "url" | "nostr";
+  type: "rss" | "url" | "nostr" | "farcaster";
   config: Record<string, string>;
   enabled: boolean;
 }
@@ -322,6 +322,8 @@ export class IngestionScheduler {
         );
       case "url":
         return this.fetchURL(source.config.url, key);
+      case "farcaster":
+        return this.fetchFarcaster(source.config.fid, source.config.username, key);
       default:
         console.warn(`[scheduler] Unknown source type: ${source.type}`);
         return [];
@@ -430,6 +432,34 @@ export class IngestionScheduler {
     }
   }
 
+  private async fetchFarcaster(fid: string, username: string, key: string): Promise<RawItem[]> {
+    try {
+      const res = await fetch("/api/fetch/farcaster", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "feed", fid: Number(fid), limit: 20 }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!res.ok) {
+        this.handleFetchError(res, key);
+        return [];
+      }
+      const data = await res.json();
+      return (data.items || []).map((item: { text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string }) => ({
+        text: item.text.slice(0, MAX_TEXT_LENGTH),
+        author: item.author || username || `fid:${fid}`,
+        avatar: item.avatar,
+        sourceUrl: item.sourceUrl,
+        imageUrl: item.imageUrl,
+      }));
+    } catch (err) {
+      const msg = errMsg(err);
+      console.error("[scheduler] Farcaster fetch failed:", msg);
+      this.recordSourceError(key, msg);
+      return [];
+    }
+  }
+
   private async scoreItem(
     raw: RawItem,
     userContext: UserContext | null,
@@ -447,7 +477,7 @@ export class IngestionScheduler {
         id: uuidv4(),
         owner: "",
         author: raw.author,
-        avatar: raw.avatar || (sourceType === "nostr" ? "\uD83D\uDD2E" : "\uD83D\uDCE1"),
+        avatar: raw.avatar || (sourceType === "nostr" ? "\uD83D\uDD2E" : sourceType === "farcaster" ? "\uD83D\uDFE3" : "\uD83D\uDCE1"),
         text: raw.text.slice(0, MAX_DISPLAY_TEXT),
         source: sourceType,
         sourceUrl: raw.sourceUrl,

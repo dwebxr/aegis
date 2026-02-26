@@ -114,6 +114,22 @@ export function parseMastodonAccount(input: string): { username: string; instanc
   return { error: "Enter as @user@instance (e.g. @user@mastodon.social) or a profile URL" };
 }
 
+/** Parse Farcaster user from Warpcast URL, @username, or bare username.
+ *  Returns `{ username }` or `{ error }`. */
+export function parseFarcasterUser(input: string): { username: string } | { error: string } {
+  const trimmed = input.trim();
+
+  // Warpcast URL: https://warpcast.com/username
+  const urlMatch = trimmed.match(/^https?:\/\/(?:www\.)?warpcast\.com\/([A-Za-z0-9._-]+)\/?$/);
+  if (urlMatch) return { username: urlMatch[1] };
+
+  // @username or bare username (Farcaster allows letters, numbers, hyphens, dots)
+  const handle = trimmed.replace(/^@/, "");
+  if (/^[A-Za-z0-9._-]{1,20}$/.test(handle)) return { username: handle };
+
+  return { error: "Enter as @username or a Warpcast URL (e.g. @vitalik)" };
+}
+
 export function buildTopicFeedUrl(keywords: string): string {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(keywords)}&hl=en`;
 }

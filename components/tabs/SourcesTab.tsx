@@ -9,7 +9,7 @@ import type { FetchURLResponse, FetchRSSResponse, FetchTwitterResponse, FetchNos
 import { useSources } from "@/contexts/SourceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemo } from "@/contexts/DemoContext";
-import { parseGitHubRepo, parseBlueskyHandle, parseRedditSubreddit, parseMastodonAccount, buildTopicFeedUrl } from "@/lib/sources/platformFeed";
+import { parseGitHubRepo, parseBlueskyHandle, parseRedditSubreddit, parseMastodonAccount, parseFarcasterUser, buildTopicFeedUrl } from "@/lib/sources/platformFeed";
 import { loadSourceStates, resetSourceErrors, type SourceRuntimeState, getSourceHealth, getSourceKey } from "@/lib/ingestion/sourceState";
 import { relativeTime } from "@/lib/utils/scores";
 import { getSuggestions, dismissSuggestion, discoverFeed as discoverFeedForDomain, type DomainValidation } from "@/lib/sources/discovery";
@@ -24,7 +24,7 @@ interface SourcesTabProps {
   mobile?: boolean;
 }
 
-type QuickAddId = "youtube" | "topic" | "github" | "bluesky" | "reddit" | "mastodon";
+type QuickAddId = "youtube" | "topic" | "github" | "bluesky" | "reddit" | "mastodon" | "farcaster";
 
 const QUICK_ADD_PRESETS: ReadonlyArray<{
   id: QuickAddId; icon: string; label: string; color: string;
@@ -36,6 +36,7 @@ const QUICK_ADD_PRESETS: ReadonlyArray<{
   { id: "bluesky", icon: "\uD83E\uDD8B", label: "Bluesky", color: colors.sky[400], formLabel: "Bluesky Handle", placeholder: "@handle.bsky.social", hint: "Subscribes to this account\u2019s posts via Bluesky native RSS" },
   { id: "reddit", icon: "\uD83D\uDCAC", label: "Reddit", color: colors.orange[400], formLabel: "Subreddit Name", placeholder: "r/programming or subreddit name", hint: "Subscribes to subreddit posts via Reddit native RSS" },
   { id: "mastodon", icon: "\uD83D\uDC18", label: "Mastodon", color: colors.purple[400], formLabel: "Mastodon Account", placeholder: "@user@mastodon.social or profile URL", hint: "Subscribes to posts via Mastodon native RSS (works with any instance)" },
+  { id: "farcaster", icon: "\uD83D\uDFE3", label: "Farcaster", color: colors.purple[600], formLabel: "Farcaster Username", placeholder: "@username or https://warpcast.com/username", hint: "Subscribes to casts via Farcaster Hub API (free, no API key needed)" },
 ];
 
 const HEALTH_COLORS: Record<string, string> = {
@@ -89,12 +90,13 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const [quickAddInput, setQuickAddInput] = useState("");
   const [quickAddLoading, setQuickAddLoading] = useState(false);
   const [quickAddError, setQuickAddError] = useState("");
+  const [resolvedFarcaster, setResolvedFarcaster] = useState<{ fid: number; username: string } | null>(null);
 
   // Popular Sources catalog
   const [catalogFilter, setCatalogFilter] = useState<CatalogCategory | "all">("all");
   const [justAddedIds, setJustAddedIds] = useState<Set<string>>(new Set());
   const addedFeedUrls = useMemo(
-    () => new Set(sources.filter(s => s.type === "rss" && s.feedUrl).map(s => s.feedUrl!)),
+    () => new Set(sources.filter(s => (s.type === "rss" || s.type === "farcaster") && s.feedUrl).map(s => s.feedUrl!)),
     [sources],
   );
 
@@ -216,9 +218,15 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
 
   const handleSaveRss = () => {
     if (!rssResult) return;
-    const added = addSource({ type: "rss", label: rssResult.feedTitle || rssInput, feedUrl: rssInput, enabled: true });
+    const label = rssResult.feedTitle || rssInput;
+    let added: boolean;
+    if (resolvedFarcaster) {
+      added = addSource({ type: "farcaster", label, feedUrl: rssInput, fid: resolvedFarcaster.fid, username: resolvedFarcaster.username, enabled: true });
+    } else {
+      added = addSource({ type: "rss", label, feedUrl: rssInput, enabled: true });
+    }
     if (!added) { setRssError("This feed is already saved"); return; }
-    setRssInput(""); setRssResult(null);
+    setRssInput(""); setRssResult(null); setResolvedFarcaster(null);
   };
 
   const handleSaveNostr = () => {
@@ -288,6 +296,26 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
           if ("error" in acct) { setQuickAddError(acct.error); return; }
           feedUrl = `https://${acct.instance}/@${acct.username}.rss`;
           label = `@${acct.username}@${acct.instance}`;
+          break;
+        }
+        case "farcaster": {
+          const parsed = parseFarcasterUser(input);
+          if ("error" in parsed) { setQuickAddError(parsed.error); return; }
+          const resolveRes = await fetch("/api/fetch/farcaster", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "resolve", username: parsed.username }),
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!resolveRes.ok) {
+            const err = await resolveRes.json().catch(() => ({}));
+            setQuickAddError(err.error || "User not found on Farcaster");
+            return;
+          }
+          const { fid, displayName } = await resolveRes.json();
+          setResolvedFarcaster({ fid, username: parsed.username });
+          feedUrl = `https://feeds.fcstr.xyz/rss/user/${fid}`;
+          label = displayName ? `Farcaster: ${displayName} (@${parsed.username})` : `Farcaster: @${parsed.username}`;
           break;
         }
         default:
@@ -571,7 +599,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     {QUICK_ADD_PRESETS.map(p => (
                       <button
                         key={p.id}
-                        onClick={() => { setQuickAddMode(quickAddMode === p.id ? "" : p.id); setQuickAddInput(""); setQuickAddError(""); setRssError(""); }}
+                        onClick={() => { setQuickAddMode(quickAddMode === p.id ? "" : p.id); setQuickAddInput(""); setQuickAddError(""); setRssError(""); setResolvedFarcaster(null); }}
                         style={{
                           display: "flex", alignItems: "center", gap: 4,
                           padding: `${space[1]}px ${space[3]}px`, borderRadius: radii.sm,

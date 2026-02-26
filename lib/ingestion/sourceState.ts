@@ -56,6 +56,8 @@ export function getSourceKey(type: string, config: Record<string, string>): stri
       return `nostr:${config.relays || "unknown"}`;
     case "url":
       return `url:${config.url || "unknown"}`;
+    case "farcaster":
+      return `farcaster:${config.fid || config.username || "unknown"}`;
     default:
       return `${type}:unknown`;
   }

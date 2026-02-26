@@ -21,7 +21,7 @@ Aegis is **free to use** for content filtering. No wallet, no deposit, no setup 
 1. **Open** https://aegis.dwebxr.xyz — Demo mode starts immediately with preset feeds
 2. **Browse** the Dashboard — 3 preset RSS feeds (Hacker News, CoinDesk, The Verge) are auto-fetched and scored
 3. **Login** with Internet Identity — unlocks custom sources, Pro mode, and publishing
-4. **Add Sources** in the Sources tab — use Quick Add presets (YouTube, Topic, GitHub, Bluesky, Reddit, Mastodon) or paste any RSS/Atom feed URL
+4. **Add Sources** in the Sources tab — use Quick Add presets (YouTube, Topic, GitHub, Bluesky, Reddit, Mastodon, Farcaster) or paste any RSS/Atom feed URL
 5. **(Optional)** Link your Nostr npub in Settings — enables WoT trust graph and free D2A with trusted peers
 
 ### Three Modes: Demo → Lite → Pro
@@ -97,7 +97,8 @@ Browser                                  Internet Computer (Mainnet)
 │  API Routes:                      │    │  - Quality deposits/rep  │
 │    POST /api/analyze              │    │  - D2A match records     │
 │    POST /api/fetch/{url,rss,      │    │  - IC LLM scoring        │
-│      twitter,nostr,discover-feed} │    │  - Engagement index      │
+│      twitter,nostr,farcaster,    │    │  - Engagement index      │
+│      discover-feed}              │    │                          │
 │                                   │    │  Internet Identity auth  │
 │  Client-side:                     │    └─────────┬────────────────┘
 │    WoT filter pipeline            │              │
@@ -721,9 +722,10 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 ### Multi-Source Ingestion
 - RSS/Atom feeds (YouTube, note.com, blogs — with thumbnail extraction, ETag conditional fetch)
 - Feed auto-discovery from any blog/site URL
-- Quick Add presets: YouTube channel, Google News topic, GitHub releases, Bluesky account, Reddit subreddit, Mastodon account — auto-generates RSS feed URL from a platform URL or handle
-- Platform URL detection: YouTube `/channel/UCxxx`, `@handle`, `/c/name`; GitHub `owner/repo`; Bluesky `profile/handle`
+- Quick Add presets: YouTube channel, Google News topic, GitHub releases, Bluesky account, Reddit subreddit, Mastodon account, Farcaster user — auto-generates feed URL from a platform URL or handle
+- Platform URL detection: YouTube `/channel/UCxxx`, `@handle`, `/c/name`; GitHub `owner/repo`; Bluesky `profile/handle`; Farcaster `@username` or Warpcast URL
 - Nostr relay queries (by pubkey or global)
+- Farcaster Hub API (Pinata) — free username resolution + cast fetching, no API key required
 - Direct URL article extraction
 - X (Twitter) API search
 - Article-level dedup (URL + content fingerprint SHA-256) to avoid redundant API calls
@@ -751,7 +753,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (3470 tests, 204 suites) |
+| Test | Jest + ts-jest (3507 tests, 206 suites) |
 
 ## Project Structure
 
@@ -778,6 +780,7 @@ aegis/
 │           ├── rss/route.ts             # RSS feed parsing (ETag/Last-Modified conditional)
 │           ├── twitter/route.ts         # X API search
 │           ├── nostr/route.ts           # Nostr relay query
+│           ├── farcaster/route.ts      # Farcaster Hub API proxy (resolve + feed)
 │           ├── ogimage/route.ts        # OG image URL extraction (thumbnail backfill)
 │           ├── briefing/route.ts       # Shared briefing fetch (Nostr NIP-23)
 │           └── discover-feed/route.ts   # RSS feed auto-discovery from any URL
@@ -892,14 +895,14 @@ aegis/
 │   └── sources/
 │       ├── catalog.ts                   # Source catalog (preset feeds + Quick Add definitions)
 │       ├── discovery.ts                 # Source auto-discovery (domain validation tracking)
-│       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Reddit, Mastodon, Google News)
+│       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Reddit, Mastodon, Farcaster, Google News)
 │       └── storage.ts                   # Source config localStorage R/W
 ├── hooks/
 │   ├── useKeyboardNav.ts               # J/K/L/H/V/F/O keyboard navigation + Cmd+K palette
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 3470 tests across 204 suites
+├── __tests__/                           # 3507 tests across 206 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)

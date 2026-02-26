@@ -1,6 +1,6 @@
 export type Verdict = "quality" | "slop";
 
-export type ContentSource = "manual" | "rss" | "url" | "twitter" | "nostr";
+export type ContentSource = "manual" | "rss" | "url" | "twitter" | "nostr" | "farcaster";
 
 export interface ScoreBreakdown {
   originality: number;

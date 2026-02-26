@@ -65,7 +65,7 @@ export function runFilterPipeline(
 
 export function scoreItemWithHeuristics(
   raw: { text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string; nostrPubkey?: string },
-  sourceType: "rss" | "url" | "nostr",
+  sourceType: "rss" | "url" | "nostr" | "farcaster",
 ): ContentItem {
   const h = heuristicScores(raw.text);
 
