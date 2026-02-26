@@ -3,6 +3,8 @@ import {
   extractYouTubeChannelId,
   parseGitHubRepo,
   parseBlueskyHandle,
+  parseRedditSubreddit,
+  parseMastodonAccount,
   buildTopicFeedUrl,
 } from "@/lib/sources/platformFeed";
 
@@ -174,6 +176,93 @@ describe("detectPlatformFeed", () => {
     });
   });
 
+  describe("Reddit", () => {
+    it("detects /r/subreddit", () => {
+      const result = detectPlatformFeed(u("https://reddit.com/r/programming"));
+      expect(result).not.toBeNull();
+      expect(result!.feeds[0]).toEqual({
+        url: "https://www.reddit.com/r/programming/.rss",
+        title: "r/programming",
+        type: "rss",
+      });
+    });
+
+    it("detects /r/subreddit with trailing slash", () => {
+      const result = detectPlatformFeed(u("https://reddit.com/r/programming/"));
+      expect(result).not.toBeNull();
+      expect(result!.feeds[0].url).toBe("https://www.reddit.com/r/programming/.rss");
+    });
+
+    it("detects www.reddit.com", () => {
+      const result = detectPlatformFeed(u("https://www.reddit.com/r/javascript"));
+      expect(result).not.toBeNull();
+      expect(result!.feeds[0].url).toBe("https://www.reddit.com/r/javascript/.rss");
+    });
+
+    it("detects old.reddit.com", () => {
+      const result = detectPlatformFeed(u("https://old.reddit.com/r/rust"));
+      expect(result).not.toBeNull();
+      expect(result!.feeds[0].url).toBe("https://www.reddit.com/r/rust/.rss");
+    });
+
+    it("handles subreddit with underscores", () => {
+      const result = detectPlatformFeed(u("https://reddit.com/r/machine_learning"));
+      expect(result).not.toBeNull();
+      expect(result!.feeds[0].title).toBe("r/machine_learning");
+    });
+
+    it("rejects deep subreddit paths (/r/sub/comments/...)", () => {
+      expect(detectPlatformFeed(u("https://reddit.com/r/programming/comments/abc123"))).toBeNull();
+    });
+
+    it("rejects Reddit home page", () => {
+      expect(detectPlatformFeed(u("https://reddit.com/"))).toBeNull();
+    });
+
+    it("rejects /user/ paths", () => {
+      expect(detectPlatformFeed(u("https://reddit.com/user/someone"))).toBeNull();
+    });
+  });
+
+  describe("Mastodon", () => {
+    it("detects /@username on mastodon.social", () => {
+      const result = detectPlatformFeed(u("https://mastodon.social/@gargron"));
+      expect(result).not.toBeNull();
+      expect(result!.feeds[0]).toEqual({
+        url: "https://mastodon.social/@gargron.rss",
+        title: "@gargron@mastodon.social",
+        type: "rss",
+      });
+    });
+
+    it("detects /@username with trailing slash", () => {
+      const result = detectPlatformFeed(u("https://mastodon.social/@gargron/"));
+      expect(result).not.toBeNull();
+      expect(result!.feeds[0].url).toBe("https://mastodon.social/@gargron.rss");
+    });
+
+    it("detects on mstdn.jp instance", () => {
+      const result = detectPlatformFeed(u("https://mstdn.jp/@user123"));
+      expect(result).not.toBeNull();
+      expect(result!.feeds[0].url).toBe("https://mstdn.jp/@user123.rss");
+      expect(result!.feeds[0].title).toBe("@user123@mstdn.jp");
+    });
+
+    it("detects on custom instance", () => {
+      const result = detectPlatformFeed(u("https://infosec.exchange/@security_researcher"));
+      expect(result).not.toBeNull();
+      expect(result!.feeds[0].url).toBe("https://infosec.exchange/@security_researcher.rss");
+    });
+
+    it("rejects deep paths (/@user/12345)", () => {
+      expect(detectPlatformFeed(u("https://mastodon.social/@gargron/12345"))).toBeNull();
+    });
+
+    it("rejects non-@ paths", () => {
+      expect(detectPlatformFeed(u("https://mastodon.social/explore"))).toBeNull();
+    });
+  });
+
   describe("non-matching URLs", () => {
     it("returns null for generic websites", () => {
       expect(detectPlatformFeed(u("https://example.com/blog"))).toBeNull();
@@ -183,12 +272,12 @@ describe("detectPlatformFeed", () => {
       expect(detectPlatformFeed(u("https://twitter.com/elonmusk"))).toBeNull();
     });
 
-    it("returns null for Reddit", () => {
-      expect(detectPlatformFeed(u("https://reddit.com/r/programming"))).toBeNull();
+    it("returns null for unsupported Reddit paths", () => {
+      expect(detectPlatformFeed(u("https://reddit.com/user/someone"))).toBeNull();
     });
 
-    it("returns null for Mastodon", () => {
-      expect(detectPlatformFeed(u("https://mastodon.social/@user"))).toBeNull();
+    it("returns null for Mastodon deep paths", () => {
+      expect(detectPlatformFeed(u("https://mastodon.social/@user/12345"))).toBeNull();
     });
   });
 });
@@ -386,6 +475,93 @@ describe("parseBlueskyHandle", () => {
 
   it("strips @ from handle with subdomain", () => {
     expect(parseBlueskyHandle("@user.example.com")).toBe("user.example.com");
+  });
+});
+
+describe("parseRedditSubreddit", () => {
+  it("parses bare subreddit name", () => {
+    expect(parseRedditSubreddit("programming")).toBe("programming");
+  });
+
+  it("parses r/name shorthand", () => {
+    expect(parseRedditSubreddit("r/programming")).toBe("programming");
+  });
+
+  it("parses /r/name shorthand", () => {
+    expect(parseRedditSubreddit("/r/programming")).toBe("programming");
+  });
+
+  it("parses full reddit.com URL", () => {
+    expect(parseRedditSubreddit("https://reddit.com/r/javascript")).toBe("javascript");
+  });
+
+  it("parses www.reddit.com URL", () => {
+    expect(parseRedditSubreddit("https://www.reddit.com/r/rust")).toBe("rust");
+  });
+
+  it("parses old.reddit.com URL", () => {
+    expect(parseRedditSubreddit("https://old.reddit.com/r/netsec")).toBe("netsec");
+  });
+
+  it("handles subreddit with underscores", () => {
+    expect(parseRedditSubreddit("machine_learning")).toBe("machine_learning");
+  });
+
+  it("handles subreddit with numbers", () => {
+    expect(parseRedditSubreddit("r/web3")).toBe("web3");
+  });
+
+  it("trims whitespace", () => {
+    expect(parseRedditSubreddit("  r/programming  ")).toBe("programming");
+  });
+});
+
+describe("parseMastodonAccount", () => {
+  it("parses @user@instance", () => {
+    expect(parseMastodonAccount("@gargron@mastodon.social")).toEqual({ username: "gargron", instance: "mastodon.social" });
+  });
+
+  it("parses user@instance (without leading @)", () => {
+    expect(parseMastodonAccount("gargron@mastodon.social")).toEqual({ username: "gargron", instance: "mastodon.social" });
+  });
+
+  it("parses full profile URL", () => {
+    expect(parseMastodonAccount("https://mastodon.social/@gargron")).toEqual({ username: "gargron", instance: "mastodon.social" });
+  });
+
+  it("parses URL with trailing slash", () => {
+    expect(parseMastodonAccount("https://mastodon.social/@gargron/")).toEqual({ username: "gargron", instance: "mastodon.social" });
+  });
+
+  it("parses custom instance URL", () => {
+    expect(parseMastodonAccount("https://infosec.exchange/@researcher")).toEqual({ username: "researcher", instance: "infosec.exchange" });
+  });
+
+  it("parses Japanese instance", () => {
+    expect(parseMastodonAccount("@user@mstdn.jp")).toEqual({ username: "user", instance: "mstdn.jp" });
+  });
+
+  it("handles underscores in username", () => {
+    expect(parseMastodonAccount("@my_user@mastodon.social")).toEqual({ username: "my_user", instance: "mastodon.social" });
+  });
+
+  it("trims whitespace", () => {
+    expect(parseMastodonAccount("  @user@mastodon.social  ")).toEqual({ username: "user", instance: "mastodon.social" });
+  });
+
+  it("returns error for bare username without instance", () => {
+    const result = parseMastodonAccount("gargron");
+    expect(result).toHaveProperty("error");
+  });
+
+  it("returns error for empty string", () => {
+    const result = parseMastodonAccount("");
+    expect(result).toHaveProperty("error");
+  });
+
+  it("returns error for @user without instance", () => {
+    const result = parseMastodonAccount("@gargron");
+    expect(result).toHaveProperty("error");
   });
 });
 

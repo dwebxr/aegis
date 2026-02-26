@@ -9,7 +9,7 @@ import type { FetchURLResponse, FetchRSSResponse, FetchTwitterResponse, FetchNos
 import { useSources } from "@/contexts/SourceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemo } from "@/contexts/DemoContext";
-import { parseGitHubRepo, parseBlueskyHandle, buildTopicFeedUrl } from "@/lib/sources/platformFeed";
+import { parseGitHubRepo, parseBlueskyHandle, parseRedditSubreddit, parseMastodonAccount, buildTopicFeedUrl } from "@/lib/sources/platformFeed";
 import { loadSourceStates, resetSourceErrors, type SourceRuntimeState, getSourceHealth, getSourceKey } from "@/lib/ingestion/sourceState";
 import { relativeTime } from "@/lib/utils/scores";
 import { getSuggestions, dismissSuggestion, discoverFeed as discoverFeedForDomain, type DomainValidation } from "@/lib/sources/discovery";
@@ -24,7 +24,7 @@ interface SourcesTabProps {
   mobile?: boolean;
 }
 
-type QuickAddId = "youtube" | "topic" | "github" | "bluesky";
+type QuickAddId = "youtube" | "topic" | "github" | "bluesky" | "reddit" | "mastodon";
 
 const QUICK_ADD_PRESETS: ReadonlyArray<{
   id: QuickAddId; icon: string; label: string; color: string;
@@ -34,6 +34,8 @@ const QUICK_ADD_PRESETS: ReadonlyArray<{
   { id: "topic", icon: "\uD83D\uDCF0", label: "Topic", color: colors.amber[400], formLabel: "Search Keywords", placeholder: "AI safety, machine learning", hint: "Creates a Google News RSS feed for these keywords" },
   { id: "github", icon: "", label: "GitHub", color: colors.text.secondary, formLabel: "GitHub Repository", placeholder: "owner/repo or https://github.com/owner/repo", hint: "Subscribes to release notifications for this repository" },
   { id: "bluesky", icon: "\uD83E\uDD8B", label: "Bluesky", color: colors.sky[400], formLabel: "Bluesky Handle", placeholder: "@handle.bsky.social", hint: "Subscribes to this account\u2019s posts via Bluesky native RSS" },
+  { id: "reddit", icon: "\uD83D\uDCAC", label: "Reddit", color: colors.orange[400], formLabel: "Subreddit Name", placeholder: "r/programming or subreddit name", hint: "Subscribes to subreddit posts via Reddit native RSS" },
+  { id: "mastodon", icon: "\uD83D\uDC18", label: "Mastodon", color: colors.purple[400], formLabel: "Mastodon Account", placeholder: "@user@mastodon.social or profile URL", hint: "Subscribes to posts via Mastodon native RSS (works with any instance)" },
 ];
 
 const HEALTH_COLORS: Record<string, string> = {
@@ -272,6 +274,20 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
           const handle = parseBlueskyHandle(input);
           feedUrl = `https://bsky.app/profile/${handle}/rss`;
           label = `Bluesky: @${handle}`;
+          break;
+        }
+        case "reddit": {
+          const sub = parseRedditSubreddit(input);
+          if (!sub) { setQuickAddError("Please enter a valid subreddit name"); return; }
+          feedUrl = `https://www.reddit.com/r/${sub}/.rss`;
+          label = `r/${sub}`;
+          break;
+        }
+        case "mastodon": {
+          const acct = parseMastodonAccount(input);
+          if ("error" in acct) { setQuickAddError(acct.error); return; }
+          feedUrl = `https://${acct.instance}/@${acct.username}.rss`;
+          label = `@${acct.username}@${acct.instance}`;
           break;
         }
         default:

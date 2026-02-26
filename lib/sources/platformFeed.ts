@@ -25,11 +25,29 @@ export function detectPlatformFeed(parsed: URL): PlatformFeedResult | null {
     }
   }
 
+  // Reddit: /r/subreddit → native RSS feed
+  if (host === "reddit.com" || host === "old.reddit.com") {
+    const subMatch = parsed.pathname.match(/^\/r\/([A-Za-z0-9_]+)\/?$/);
+    if (subMatch) {
+      const sub = subMatch[1];
+      return { feeds: [{ url: `https://www.reddit.com/r/${sub}/.rss`, title: `r/${sub}`, type: "rss" }] };
+    }
+  }
+
   // Bluesky: /profile/handle → native RSS feed
   if (host === "bsky.app") {
     const handleMatch = parsed.pathname.match(/^\/profile\/([^/]+)\/?$/);
     if (handleMatch) {
       return { feeds: [{ url: `https://bsky.app/profile/${handleMatch[1]}/rss`, title: `Bluesky: @${handleMatch[1]}`, type: "rss" }] };
+    }
+  }
+
+  // Mastodon: /@username on any instance → native RSS feed
+  {
+    const userMatch = parsed.pathname.match(/^\/@([A-Za-z0-9_]+)\/?$/);
+    if (userMatch) {
+      const user = userMatch[1];
+      return { feeds: [{ url: `${parsed.origin}/@${user}.rss`, title: `@${user}@${host}`, type: "rss" }] };
     }
   }
 
@@ -68,6 +86,34 @@ export function parseBlueskyHandle(input: string): string {
   handle = handle.replace(/^@/, "");
   if (!handle.includes(".") && !handle.startsWith("did:")) handle += ".bsky.social";
   return handle;
+}
+
+/** Normalize subreddit from URL, r/name, /r/name, or bare name. */
+export function parseRedditSubreddit(input: string): string {
+  let name = input.trim();
+  if (name.includes("reddit.com/r/")) {
+    const match = name.match(/reddit\.com\/r\/([A-Za-z0-9_]+)/);
+    if (match) name = match[1];
+  } else {
+    name = name.replace(/^\/?(r\/)?/, "");
+  }
+  return name;
+}
+
+/** Parse Mastodon account from URL or @user@instance notation.
+ *  Returns `{ username, instance }` or `{ error }`. */
+export function parseMastodonAccount(input: string): { username: string; instance: string } | { error: string } {
+  const trimmed = input.trim();
+
+  // Full URL: https://mastodon.social/@user
+  const urlMatch = trimmed.match(/^https?:\/\/([^/]+)\/@([A-Za-z0-9_]+)\/?$/);
+  if (urlMatch) return { instance: urlMatch[1], username: urlMatch[2] };
+
+  // @user@instance or user@instance
+  const atMatch = trimmed.replace(/^@/, "").match(/^([A-Za-z0-9_]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})$/);
+  if (atMatch) return { username: atMatch[1], instance: atMatch[2] };
+
+  return { error: "Enter as @user@instance (e.g. @user@mastodon.social) or a profile URL" };
 }
 
 export function buildTopicFeedUrl(keywords: string): string {
