@@ -223,7 +223,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
         <span style={{
           fontSize: t.caption.size, color: colors.text.muted,
           background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
-        }}>{item.source}</span>
+        }}>{item.platform || item.source}</span>
         {isD2AContent(item) && <D2ABadge mobile={mobile} />}
         {variant !== "serendipity" && <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.timestamp}</span>}
         {variant === "priority" && <div style={{ flex: 1 }} />}

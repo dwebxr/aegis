@@ -638,6 +638,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
               cContext: l.cContext ?? cached.cContext,
               lSlop: l.lSlop ?? cached.lSlop,
               imageUrl: l.imageUrl ?? cached.imageUrl,
+              platform: l.platform ?? cached.platform,
             };
           });
           const loadedIds = new Set(loaded.map(l => l.id));

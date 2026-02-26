@@ -38,4 +38,6 @@ export interface ContentItem extends ContentEvaluation {
   scoredByAI?: boolean;
   /** Which scoring engine produced the scores */
   scoringEngine?: import("@/lib/scoring/types").ScoringEngine;
+  /** Original platform (e.g. "youtube", "bluesky") for RSS-type items. Omitted for direct nostr. */
+  platform?: import("@/lib/types/sources").SourcePlatform;
 }

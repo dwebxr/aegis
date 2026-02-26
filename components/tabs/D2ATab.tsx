@@ -213,7 +213,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[1], flexWrap: "wrap" }}>
                       <span style={{ fontWeight: 700, color: colors.text.secondary, fontFamily: fonts.mono, fontSize: t.bodySm.size }}>{item.author}</span>
-                      <span style={{ fontSize: t.caption.size, color: colors.text.muted, background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm }}>{item.source}</span>
+                      <span style={{ fontSize: t.caption.size, color: colors.text.muted, background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm }}>{item.platform || item.source}</span>
                       <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.timestamp}</span>
                     </div>
                     <p style={{

@@ -39,6 +39,7 @@ interface SchedulerSource {
   type: "rss" | "url" | "nostr" | "farcaster";
   config: Record<string, string>;
   enabled: boolean;
+  platform?: import("@/lib/types/sources").SourcePlatform;
 }
 
 interface SchedulerCallbacks {
@@ -242,8 +243,8 @@ export class IngestionScheduler {
 
         for (const raw of toScore) {
           const scored = this.callbacks.getSkipAI?.()
-            ? scoreItemWithHeuristics(raw, source.type)
-            : await this.scoreItem(raw, userContext, source.type);
+            ? scoreItemWithHeuristics(raw, source.type, source.platform)
+            : await this.scoreItem(raw, userContext, source.type, source.platform);
           if (scored) {
             this.dedup.markSeen(raw.sourceUrl, raw.text);
             scores.push(scored.scores.composite);
@@ -464,6 +465,7 @@ export class IngestionScheduler {
     raw: RawItem,
     userContext: UserContext | null,
     sourceType: SchedulerSource["type"],
+    platform?: SchedulerSource["platform"],
   ): Promise<ContentItem | null> {
     try {
       if (!this.callbacks.scoreFn) {
@@ -501,6 +503,7 @@ export class IngestionScheduler {
         lSlop: result.lSlop,
         scoredByAI: result.scoringEngine !== "heuristic",
         scoringEngine: result.scoringEngine,
+        platform,
       };
     } catch (err) {
       console.error("[scheduler] Score item failed:", errMsg(err));

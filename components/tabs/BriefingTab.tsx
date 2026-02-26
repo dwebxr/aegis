@@ -257,7 +257,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                     fontSize: t.caption.size, color: colors.text.muted,
                     background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
                   }}>
-                    {d.item.source}
+                    {d.item.platform || d.item.source}
                   </span>
                 </div>
 

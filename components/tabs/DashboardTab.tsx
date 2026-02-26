@@ -98,7 +98,7 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
       ) : (
         <>
           <span style={{ fontSize: gradeSize, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
-          <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.source}</span>
+          <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.platform || item.source}</span>
         </>
       )}
       {overlay && (
@@ -799,7 +799,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                           marginBottom: space[3],
                         }}>
-                          {item.author} &middot; {item.source} &middot; {item.timestamp}
+                          {item.author} &middot; {item.platform || item.source} &middot; {item.timestamp}
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                           <ScorePill gr={gr} tag={tag} />
@@ -1150,7 +1150,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             marginBottom: space[2],
                           }}>
-                            {item.author} &middot; {item.source}
+                            {item.author} &middot; {item.platform || item.source}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                             <ScorePill gr={gr} tag={tag} />
@@ -1243,7 +1243,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             marginBottom: space[2],
                           }}>
-                            {item.author} &middot; {item.source}
+                            {item.author} &middot; {item.platform || item.source}
                             {item.validatedAt && (
                               <> &middot; {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</>
                             )}

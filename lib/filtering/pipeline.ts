@@ -66,6 +66,7 @@ export function runFilterPipeline(
 export function scoreItemWithHeuristics(
   raw: { text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string; nostrPubkey?: string },
   sourceType: "rss" | "url" | "nostr" | "farcaster",
+  platform?: import("@/lib/types/sources").SourcePlatform,
 ): ContentItem {
   const h = heuristicScores(raw.text);
 
@@ -93,5 +94,6 @@ export function scoreItemWithHeuristics(
     timestamp: "just now",
     scoredByAI: false,
     scoringEngine: "heuristic",
+    platform,
   };
 }

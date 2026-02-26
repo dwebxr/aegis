@@ -21,7 +21,7 @@ interface SourceState {
   removeSource: (id: string) => void;
   toggleSource: (id: string) => void;
   updateSource: (id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => void;
-  getSchedulerSources: () => Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean }>;
+  getSchedulerSources: () => Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform }>;
 }
 
 const SourceContext = createContext<SourceState>({
@@ -293,12 +293,12 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     queueMicrotask(() => { if (updated) saveToIC(updated); });
   }, [persist, isDemoMode]);
 
-  const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean }> => {
-    const result: Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean }> = [];
+  const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform }> => {
+    const result: Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform }> = [];
     for (const s of sources) {
       if (!s.enabled) continue;
       if (s.type === "rss" && s.feedUrl) {
-        result.push({ type: "rss", config: { feedUrl: s.feedUrl }, enabled: true });
+        result.push({ type: "rss", config: { feedUrl: s.feedUrl }, enabled: true, platform: s.platform });
       } else if (s.type === "nostr") {
         result.push({
           type: "nostr",
@@ -313,6 +313,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           type: "farcaster",
           config: { fid: String(s.fid), username: s.username || "" },
           enabled: true,
+          platform: "farcaster",
         });
       }
     }
