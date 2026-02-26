@@ -90,14 +90,12 @@ export function parseBlueskyHandle(input: string): string {
 
 /** Normalize subreddit from URL, r/name, /r/name, or bare name. */
 export function parseRedditSubreddit(input: string): string {
-  let name = input.trim();
-  if (name.includes("reddit.com/r/")) {
-    const match = name.match(/reddit\.com\/r\/([A-Za-z0-9_]+)/);
-    if (match) name = match[1];
-  } else {
-    name = name.replace(/^\/?(r\/)?/, "");
+  const trimmed = input.trim();
+  if (trimmed.includes("reddit.com/r/")) {
+    const match = trimmed.match(/reddit\.com\/r\/([A-Za-z0-9_]+)/);
+    return match ? match[1] : "";
   }
-  return name;
+  return trimmed.replace(/^\/?(r\/)?/, "");
 }
 
 /** Parse Mastodon account from URL or @user@instance notation.

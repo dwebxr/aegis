@@ -514,6 +514,14 @@ describe("parseRedditSubreddit", () => {
   it("trims whitespace", () => {
     expect(parseRedditSubreddit("  r/programming  ")).toBe("programming");
   });
+
+  it("returns empty for reddit.com URL with no subreddit", () => {
+    expect(parseRedditSubreddit("https://reddit.com/r/")).toBe("");
+  });
+
+  it("returns empty for bare r/ with no name", () => {
+    expect(parseRedditSubreddit("r/")).toBe("");
+  });
 });
 
 describe("parseMastodonAccount", () => {
