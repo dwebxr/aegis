@@ -6,8 +6,9 @@ import { useDemo } from "./DemoContext";
 import { DEMO_SOURCES } from "@/lib/demo/sources";
 import { useNotify } from "./NotificationContext";
 import { createBackendActorAsync } from "@/lib/ic/actor";
-import { loadSources, saveSources } from "@/lib/sources/storage";
+import { loadSources, saveSources, inferPlatform } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
+import { SOURCE_PLATFORMS } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
 import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
 import { getSourceKey, resetSourceErrors } from "@/lib/ingestion/sourceState";
@@ -137,7 +138,14 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         let localOnly: SavedSource[] = [];
         setSources(prev => {
           const icIds = new Set(icSources.map(s => s.id));
+          const localById = new Map(prev.map(s => [s.id, s]));
           localOnly = prev.filter(s => !icIds.has(s.id));
+          // Backfill platform on IC sources: prefer local platform, then infer
+          for (const ic of icSources) {
+            if (!ic.platform) {
+              ic.platform = localById.get(ic.id)?.platform || inferPlatform(ic) || undefined;
+            }
+          }
           const merged = [...icSources, ...localOnly];
           saveSources(principalText, merged);
           return merged;
@@ -363,7 +371,8 @@ function icToSaved(ic: SourceConfigEntry): SavedSource | null {
     ? (parsed.pubkeys as string[]) : undefined;
   const fid = typeof parsed.fid === "number" ? parsed.fid : undefined;
   const username = typeof parsed.username === "string" ? parsed.username : undefined;
-  const platform = typeof parsed.platform === "string" ? parsed.platform as SavedSource["platform"] : undefined;
+  const platform = typeof parsed.platform === "string" && SOURCE_PLATFORMS.has(parsed.platform)
+    ? parsed.platform as SavedSource["platform"] : undefined;
   const createdAt = Number(ic.createdAt) / 1_000_000;
 
   return {

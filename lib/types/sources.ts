@@ -1,5 +1,7 @@
 export type SourcePlatform = "youtube" | "topic" | "github" | "bluesky" | "reddit" | "mastodon" | "farcaster";
 
+export const SOURCE_PLATFORMS: ReadonlySet<string> = new Set<SourcePlatform>(["youtube", "topic", "github", "bluesky", "reddit", "mastodon", "farcaster"]);
+
 export interface SavedSource {
   id: string;
   type: "rss" | "nostr" | "farcaster";

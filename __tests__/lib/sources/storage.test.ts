@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { loadSources, saveSources } from "@/lib/sources/storage";
+import { loadSources, saveSources, inferPlatform } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
 
 function makeFakeSource(overrides: Partial<SavedSource> = {}): SavedSource {
@@ -185,11 +185,16 @@ describe("sources/storage", () => {
   });
 
   describe("platform migration (backfill)", () => {
-    it("infers youtube from feedUrl", () => {
+    it("infers youtube from youtube.com feedUrl", () => {
       const raw = [makeFakeSource({ id: "yt", feedUrl: "https://www.youtube.com/feeds/videos.xml?channel_id=UC123" })];
       localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
-      const loaded = loadSources("p-1");
-      expect(loaded[0].platform).toBe("youtube");
+      expect(loadSources("p-1")[0].platform).toBe("youtube");
+    });
+
+    it("infers youtube from youtu.be feedUrl", () => {
+      const raw = [makeFakeSource({ id: "yt2", feedUrl: "https://youtu.be/feeds/videos.xml?channel_id=UC456" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      expect(loadSources("p-1")[0].platform).toBe("youtube");
     });
 
     it("infers bluesky from feedUrl", () => {
@@ -266,6 +271,32 @@ describe("sources/storage", () => {
       expect(loaded[0].platform).toBe("youtube");
       expect(loaded[1].platform).toBe("bluesky");
       expect(loaded[2].platform).toBeUndefined();
+    });
+  });
+
+  describe("inferPlatform (direct)", () => {
+    it("returns farcaster for type farcaster", () => {
+      expect(inferPlatform(makeFakeSource({ type: "farcaster" }))).toBe("farcaster");
+    });
+
+    it("returns undefined for nostr type", () => {
+      expect(inferPlatform(makeFakeSource({ type: "nostr" }))).toBeUndefined();
+    });
+
+    it("detects fcstr.xyz RSS feed as farcaster", () => {
+      expect(inferPlatform(makeFakeSource({ feedUrl: "https://feeds.fcstr.xyz/rss/user/5650" }))).toBe("farcaster");
+    });
+
+    it("detects mastodon from URL pattern only", () => {
+      expect(inferPlatform(makeFakeSource({ label: "Some User", feedUrl: "https://fosstodon.org/@user.rss" }))).toBe("mastodon");
+    });
+
+    it("detects mastodon from label pattern only", () => {
+      expect(inferPlatform(makeFakeSource({ label: "@user@fosstodon.org", feedUrl: "https://fosstodon.org/feed" }))).toBe("mastodon");
+    });
+
+    it("returns undefined for unrecognized RSS source", () => {
+      expect(inferPlatform(makeFakeSource({ feedUrl: "https://blog.example.com/rss", label: "Blog" }))).toBeUndefined();
     });
   });
 });
