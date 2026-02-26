@@ -1,7 +1,3 @@
-/**
- * Structural guardrails — verify OGP metadata exists in layout source.
- * These are NOT behavior tests. They catch accidental removal of SEO/social tags.
- */
 import * as fs from "fs";
 import * as path from "path";
 

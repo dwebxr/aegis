@@ -1,7 +1,3 @@
-/**
- * Tests for D2A event notification logic.
- * Verifies that significant agent state transitions produce the correct notifications.
- */
 import type { AgentState } from "@/lib/agent/types";
 
 /**

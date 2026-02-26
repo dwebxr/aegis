@@ -1,7 +1,3 @@
-/**
- * Thorough tests for withTimeout — timer cleanup, rejection handling,
- * concurrent races, and edge cases.
- */
 import { withTimeout } from "@/lib/utils/timeout";
 
 describe("withTimeout — basic behavior", () => {

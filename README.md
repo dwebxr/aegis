@@ -751,7 +751,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (3279 tests, 200 suites) |
+| Test | Jest + ts-jest (3470 tests, 204 suites) |
 
 ## Project Structure
 
@@ -817,7 +817,7 @@ aegis/
 │   │   ├── manifest.ts                  # Content manifest + SHA-256 hashing + diff logic
 │   │   ├── reputation.ts               # Local peer reputation tracker (behavioral trust)
 │   │   ├── types.ts                     # D2ABriefingResponse, D2ABriefingItem
-│   │   ├── cors.ts                      # CORS headers for external AI agent access
+│   │   ├── cors.ts                      # CORS headers for D2A API (configurable via D2A_CORS_ORIGINS)
 │   │   ├── x402Server.ts               # x402 resource server config (ExactEvmScheme)
 │   │   └── briefingProvider.ts          # Briefing data provider (IC canister fetch)
 │   ├── wot/
@@ -899,7 +899,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 3279 tests across 200 suites
+├── __tests__/                           # 3470 tests across 204 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -959,6 +959,9 @@ NEXT_PUBLIC_INTERNET_IDENTITY_URL=https://identity.internetcomputer.org
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=...      # VAPID public key
 VAPID_PRIVATE_KEY=...                 # VAPID private key
 VAPID_SUBJECT=mailto:admin@example.com
+
+# D2A CORS (optional — defaults to ICP canister + aegis.dwebxr.xyz)
+D2A_CORS_ORIGINS=https://example.com,https://other.com
 
 # x402 D2A Payment Gateway (optional)
 X402_RECEIVER_ADDRESS=0x...           # EVM address for USDC payments

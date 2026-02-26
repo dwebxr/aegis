@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const ALLOWED_ORIGINS = [
-  "https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io",
-  "https://aegis.dwebxr.xyz",
-];
+const ALLOWED_ORIGINS: string[] = process.env.D2A_CORS_ORIGINS
+  ? process.env.D2A_CORS_ORIGINS.split(",").map(o => o.trim()).filter(Boolean)
+  : ["https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io", "https://aegis.dwebxr.xyz"];
 
 const STATIC_CORS: Record<string, string> = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",

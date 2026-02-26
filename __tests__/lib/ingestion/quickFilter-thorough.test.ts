@@ -1,8 +1,3 @@
-/**
- * Thorough tests for quickFilter heuristic scoring — signal detection,
- * boundary conditions, and scoring formula verification.
- * Tests real code paths through heuristicScores.
- */
 import { heuristicScores, quickSlopFilter } from "@/lib/ingestion/quickFilter";
 
 describe("heuristicScores — signal detection", () => {

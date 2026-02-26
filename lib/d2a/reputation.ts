@@ -18,7 +18,6 @@ interface SerializedReputationStore {
   peers: Array<[string, PeerReputation]>;
 }
 
-// In-memory cache to avoid repeated JSON.parse on every call
 let _memCache: Map<string, PeerReputation> | null = null;
 
 /** Reset in-memory cache (for test isolation). */

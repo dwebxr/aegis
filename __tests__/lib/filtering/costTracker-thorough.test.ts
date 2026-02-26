@@ -1,7 +1,3 @@
-/**
- * Thorough tests for costTracker — accumulation, pruning, monthly summaries,
- * time-saved calculation, and persistence edge cases.
- */
 import {
   recordFilterRun,
   getDailyCost,

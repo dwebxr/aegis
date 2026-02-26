@@ -1,8 +1,3 @@
-/**
- * Tests for notification deduplication and timing logic.
- * Tests import and call REAL production functions — no reimplementation.
- */
-
 import {
   shouldSuppressDuplicate,
   computeDismissDuration,

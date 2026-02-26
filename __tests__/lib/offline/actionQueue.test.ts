@@ -1,7 +1,3 @@
-/**
- * Tests for the IndexedDB-backed offline action queue.
- * Uses fake-indexeddb for Node.js environment.
- */
 import "fake-indexeddb/auto";
 import {
   enqueueAction,

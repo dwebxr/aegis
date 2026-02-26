@@ -49,6 +49,7 @@ export function loadProfile(principalId: string): UserPreferenceProfile {
     if (!raw) return createEmptyProfile(principalId);
     const parsed = JSON.parse(raw);
     if (!isValidProfile(parsed) || parsed.principalId !== principalId) {
+      console.warn("[prefs] Stored profile failed validation for", principalId.slice(0, 12), "— resetting to empty");
       return createEmptyProfile(principalId);
     }
     return parsed;

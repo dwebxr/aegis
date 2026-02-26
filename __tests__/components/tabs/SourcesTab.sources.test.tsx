@@ -2,11 +2,6 @@
  * @jest-environment jsdom
  */
 
-/**
- * Tests for SourcesTab source list rendering, health indicators, and demo mode.
- * Each describe block has its own mock configuration for different source states.
- */
-
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { TextEncoder, TextDecoder } = require("util");

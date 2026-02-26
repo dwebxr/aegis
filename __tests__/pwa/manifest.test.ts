@@ -1,7 +1,3 @@
-/**
- * Structural guardrails — verify manifest.json contains required PWA fields.
- * These are NOT behavior tests. They catch accidental breakage of PWA config.
- */
 import * as fs from "fs";
 import * as path from "path";
 

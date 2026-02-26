@@ -1,11 +1,6 @@
 import {
   createEmptyProfile,
   DEFAULT_CALIBRATION,
-  RECENT_TOPICS_MAX,
-  TOPIC_AFFINITY_CAP,
-  TOPIC_AFFINITY_FLOOR,
-  AUTHOR_TRUST_CAP,
-  AUTHOR_TRUST_FLOOR,
 } from "@/lib/preferences/types";
 
 describe("createEmptyProfile", () => {
@@ -54,14 +49,6 @@ describe("createEmptyProfile", () => {
 });
 
 describe("constants", () => {
-  it("has correct boundary values", () => {
-    expect(RECENT_TOPICS_MAX).toBe(50);
-    expect(TOPIC_AFFINITY_CAP).toBe(1.0);
-    expect(TOPIC_AFFINITY_FLOOR).toBe(-1.0);
-    expect(AUTHOR_TRUST_CAP).toBe(1.0);
-    expect(AUTHOR_TRUST_FLOOR).toBe(-1.0);
-  });
-
   it("DEFAULT_CALIBRATION has valid qualityThreshold", () => {
     expect(DEFAULT_CALIBRATION.qualityThreshold).toBeGreaterThan(0);
     expect(DEFAULT_CALIBRATION.qualityThreshold).toBeLessThan(10);

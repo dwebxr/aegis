@@ -1,7 +1,3 @@
-/**
- * Thorough tests for scoring/types — engine encode/decode roundtrip,
- * all engine identifiers, edge cases in reason parsing.
- */
 import {
   encodeEngineInReason,
   decodeEngineFromReason,

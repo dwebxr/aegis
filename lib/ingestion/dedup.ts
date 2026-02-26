@@ -11,7 +11,6 @@ const MAX_ENTRIES = 2000;
 export class ArticleDeduplicator {
   private urls: Set<string>;
   private fingerprints: Set<string>;
-  /** Insertion-order tracking for FIFO pruning */
   private insertionOrder: string[];
   private dirty = false;
 

@@ -1,8 +1,3 @@
-/**
- * Thorough tests for ArticleDeduplicator — boundary conditions,
- * persistence, pruning, and fingerprint normalization.
- * Exercises real code paths (no mocking of the class under test).
- */
 import { ArticleDeduplicator } from "@/lib/ingestion/dedup";
 
 // localStorage mock

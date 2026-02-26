@@ -1,7 +1,3 @@
-/**
- * Structural guardrails — verify offline page source contains required elements.
- * These are NOT behavior tests. They catch accidental deletion of key content.
- */
 import * as fs from "fs";
 import * as path from "path";
 

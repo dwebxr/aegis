@@ -1,9 +1,4 @@
-/**
- * Extract YouTube video ID from common URL patterns.
- *
- * Supported: watch?v=, youtu.be/, /shorts/, /embed/, /live/
- * Returns null for non-YouTube URLs, channels, playlists, etc.
- */
+/** Extract YouTube video ID from common URL patterns. */
 export function extractYouTubeVideoId(url: string): string | null {
   let parsed: URL;
   try {

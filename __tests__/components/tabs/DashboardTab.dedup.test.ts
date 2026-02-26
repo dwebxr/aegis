@@ -1,13 +1,3 @@
-/**
- * Tests for Dashboard content dedup and ranking stability.
- *
- * Covers:
- * - contentDedup key generation (normalization, edge cases)
- * - Cross-section dedup (Top3 → Spotlight → Discoveries → Validated)
- * - Within-topic iterative dedup
- * - briefingNowRef pinning (stable rankings across recomputation)
- * - Cascading dedup chain integrity
- */
 import { contentDedup, computeDashboardTop3, computeTopicSpotlight, computeDashboardValidated } from "@/lib/dashboard/utils";
 import { createEmptyProfile } from "@/lib/preferences/types";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";

@@ -1,13 +1,3 @@
-/**
- * Edge case and boundary condition tests for dashboard utility functions.
- *
- * Covers:
- * - computeTopicDistribution: isolated counting, empty topics, duplicates, quality rate
- * - computeUnreviewedQueue: empty candidates, all-excluded, sort order
- * - computeDashboardTop3/TopicSpotlight: all-validated inputs
- * - computeDashboardValidated: empty input, sort order
- * - contentDedup: collision scenarios
- */
 import {
   computeTopicDistribution,
   computeUnreviewedQueue,

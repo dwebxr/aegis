@@ -1,7 +1,3 @@
-/**
- * Thorough tests for publish gate — reputation scoring, deposit thresholds,
- * natural recovery, and gate decisions with boundary values.
- */
 import {
   recordPublishValidation,
   recordPublishFlag,

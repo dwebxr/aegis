@@ -100,7 +100,6 @@ export function computeTopicSpotlight(
   }).filter(Boolean) as Array<{ topic: string; items: ContentItem[] }>;
 }
 
-/** Activity stats for the dashboard Recent Activity section */
 export interface DashboardActivityStats {
   qualityCount: number;
   slopCount: number;
@@ -147,7 +146,6 @@ export function computeDashboardActivity(
   };
 }
 
-/** Compute validated items for the Saved for Later section, excluding shown items */
 export function computeDashboardValidated(
   content: ContentItem[],
   excludeIds: Set<string>,
@@ -158,7 +156,6 @@ export function computeDashboardValidated(
     .slice(0, 5);
 }
 
-/** Compute unreviewed quality items for the review queue, excluding shown items */
 export function computeUnreviewedQueue(
   content: ContentItem[],
   excludeIds: Set<string>,

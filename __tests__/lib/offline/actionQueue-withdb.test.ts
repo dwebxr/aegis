@@ -1,8 +1,3 @@
-/**
- * Tests for the withDB refactored actionQueue.
- * Validates that the withDB helper correctly handles transactions.
- * Uses fake-indexeddb for real IndexedDB operations in Node.js.
- */
 import "fake-indexeddb/auto";
 import {
   enqueueAction,

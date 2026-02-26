@@ -1,7 +1,3 @@
-/**
- * Tests for shared SHA-256 hashing utilities.
- * Exercises real @noble/hashes code paths — no mocking.
- */
 import { hexFromBytes, computeContentFingerprint, hashContent } from "@/lib/utils/hashing";
 
 describe("hexFromBytes", () => {

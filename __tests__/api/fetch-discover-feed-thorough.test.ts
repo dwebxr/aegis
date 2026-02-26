@@ -1,8 +1,3 @@
-/**
- * Thorough edge-case and integration tests for the discover-feed API route.
- * Tests HTTP error responses, oversized content, link tag limits,
- * YouTube HTML fallback, platform detection integration, and concurrent behavior.
- */
 import { POST } from "@/app/api/fetch/discover-feed/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";

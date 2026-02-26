@@ -42,8 +42,15 @@ export function computeScoringCacheKey(text: string, userContext?: UserContext |
   return `${computeContentFingerprint(text)}:${ph}`;
 }
 
-// Avoids repeated JSON.parse per scoring call.
 let _memCache: Map<string, ScoringCacheEntry> | null = null;
+
+function isValidEntry(v: unknown): v is ScoringCacheEntry {
+  if (!v || typeof v !== "object") return false;
+  const e = v as Record<string, unknown>;
+  return typeof e.storedAt === "number"
+    && typeof e.profileHash === "string"
+    && e.result != null && typeof e.result === "object";
+}
 
 function getCache(): Map<string, ScoringCacheEntry> {
   if (_memCache) return _memCache;
@@ -53,7 +60,17 @@ function getCache(): Map<string, ScoringCacheEntry> {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object") {
-          return (_memCache = new Map(Object.entries(parsed) as [string, ScoringCacheEntry][]));
+          const validated = new Map<string, ScoringCacheEntry>();
+          let dropped = 0;
+          for (const [k, v] of Object.entries(parsed)) {
+            if (isValidEntry(v)) {
+              validated.set(k, v);
+            } else {
+              dropped++;
+            }
+          }
+          if (dropped > 0) console.warn(`[scoring-cache] Dropped ${dropped} corrupt entries on load`);
+          return (_memCache = validated);
         }
       }
     } catch (err) {

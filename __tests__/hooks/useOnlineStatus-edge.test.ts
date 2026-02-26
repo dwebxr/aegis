@@ -1,10 +1,6 @@
 /**
  * @jest-environment jsdom
  */
-/**
- * Edge case tests for useOnlineStatus hook.
- * Covers rapid toggling, callback replacement, multiple event cycles.
- */
 import { renderHook, act } from "@testing-library/react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 

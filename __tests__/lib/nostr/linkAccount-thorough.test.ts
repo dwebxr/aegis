@@ -1,8 +1,3 @@
-/**
- * Thorough tests for nostr/linkAccount — input validation, error handling,
- * persistence, and parseICSettings.
- * Tests real code paths without mocking the functions under test.
- */
 import {
   resolveNostrInput,
   maskNpub,

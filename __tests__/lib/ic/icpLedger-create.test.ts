@@ -1,9 +1,6 @@
-/**
- * Tests for ICP Ledger actor creation — exercises real agent.ts + config.ts code.
- * Only the external @dfinity/agent library is mocked (no actual IC connection).
- * Previous version was a LARP: mocked @/lib/ic/agent entirely,
- * then asserted on mock call counts — tested the mock, not the code.
- */
+// Only @dfinity/agent is mocked (no actual IC connection).
+// Previous version was a LARP: mocked @/lib/ic/agent entirely,
+// then asserted on mock call counts — tested the mock, not the code.
 
 const mockSyncTime = jest.fn().mockResolvedValue(undefined);
 const mockFetchRootKey = jest.fn().mockResolvedValue(undefined);

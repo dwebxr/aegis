@@ -1,8 +1,3 @@
-/**
- * Shared SHA-256 hashing utilities.
- * Consolidates fingerprint logic used by scoring cache, dedup, and D2A manifest.
- */
-
 import { sha256 } from "@noble/hashes/sha2.js";
 
 export function hexFromBytes(bytes: Uint8Array): string {

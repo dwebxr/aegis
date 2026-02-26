@@ -1,8 +1,3 @@
-/**
- * Edge case tests for scoring cache — SSR, eviction boundaries, corrupted data.
- * Extends the core cache tests with additional coverage.
- */
-
 const store: Record<string, string> = {};
 Object.defineProperty(globalThis, "localStorage", {
   value: {
@@ -178,6 +173,99 @@ describe("scoring cache — profile hash edge cases", () => {
   it("cache key with null context uses 'none' as profileHash", () => {
     const key = computeScoringCacheKey("text", null);
     expect(key).toContain(":none");
+  });
+});
+
+describe("scoring cache — entry-level corruption recovery (cold load)", () => {
+  // Tests the isValidEntry() validation added in LARP fix.
+  // Uses jest.isolateModules() to get a fresh module with _memCache = null,
+  // so getCache() actually reads and validates from localStorage.
+
+  function freshCache(seedData: Record<string, unknown>) {
+    store["aegis-score-cache"] = JSON.stringify(seedData);
+    let mod: typeof import("@/lib/scoring/cache");
+    jest.isolateModules(() => {
+      mod = require("@/lib/scoring/cache");
+    });
+    return mod!;
+  }
+
+  it("drops entries missing storedAt field, keeps valid ones", () => {
+    const spy = jest.spyOn(console, "warn").mockImplementation();
+    const mod = freshCache({
+      "good:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 7 } },
+      "bad:h": { profileHash: "h", result: { composite: 5 } },
+    });
+
+    expect(mod.lookupScoringCache("good:h", "h")).not.toBeNull();
+    expect(mod.lookupScoringCache("bad:h", "h")).toBeNull();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("Dropped 1 corrupt"));
+    spy.mockRestore();
+  });
+
+  it("drops entries missing profileHash field", () => {
+    const spy = jest.spyOn(console, "warn").mockImplementation();
+    const mod = freshCache({
+      "good:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 7 } },
+      "bad:h": { storedAt: Date.now(), result: { composite: 5 } },
+    });
+
+    mod.lookupScoringCache("good:h", "h"); // triggers getCache
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("Dropped 1 corrupt"));
+    spy.mockRestore();
+  });
+
+  it("drops entries with null result", () => {
+    const spy = jest.spyOn(console, "warn").mockImplementation();
+    const mod = freshCache({
+      "bad:h": { storedAt: Date.now(), profileHash: "h", result: null },
+    });
+
+    expect(mod.lookupScoringCache("bad:h", "h")).toBeNull();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("Dropped 1 corrupt"));
+    spy.mockRestore();
+  });
+
+  it("drops entries that are plain strings instead of objects", () => {
+    const spy = jest.spyOn(console, "warn").mockImplementation();
+    const mod = freshCache({
+      "good:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 7 } },
+      "bad:h": "not an object",
+    });
+
+    expect(mod.lookupScoringCache("good:h", "h")).not.toBeNull();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("Dropped 1 corrupt"));
+    spy.mockRestore();
+  });
+
+  it("drops multiple corrupt entries in a single load", () => {
+    const spy = jest.spyOn(console, "warn").mockImplementation();
+    const mod = freshCache({
+      "valid-1:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 1 } },
+      "corrupt-1:h": { storedAt: "not-a-number", profileHash: "h", result: {} },
+      "corrupt-2:h": null,
+      "corrupt-3:h": 42,
+      "valid-2:h": { storedAt: Date.now(), profileHash: "h", result: { verdict: "ok" } },
+    });
+
+    expect(mod.lookupScoringCache("valid-1:h", "h")).not.toBeNull();
+    expect(mod.lookupScoringCache("valid-2:h", "h")).not.toBeNull();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("Dropped 3 corrupt"));
+    spy.mockRestore();
+  });
+
+  it("keeps all entries when none are corrupt (no warning logged)", () => {
+    const spy = jest.spyOn(console, "warn").mockImplementation();
+    const mod = freshCache({
+      "a:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 1 } },
+      "b:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 2 } },
+    });
+
+    expect(mod.lookupScoringCache("a:h", "h")).not.toBeNull();
+    expect(mod.lookupScoringCache("b:h", "h")).not.toBeNull();
+    expect(spy).not.toHaveBeenCalledWith(expect.stringContaining("Dropped"));
+    expect(mod.getScoringCacheStats().size).toBe(2);
+    spy.mockRestore();
   });
 });
 

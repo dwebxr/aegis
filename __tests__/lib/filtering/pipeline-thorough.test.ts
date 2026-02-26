@@ -1,8 +1,3 @@
-/**
- * Thorough tests for filter pipeline — real code paths through
- * runFilterPipeline and scoreItemWithHeuristics.
- * Tests WoT integration, cost estimation, serendipity, sorting, and edge cases.
- */
 import { runFilterPipeline, scoreItemWithHeuristics } from "@/lib/filtering/pipeline";
 import type { ContentItem } from "@/lib/types/content";
 import type { WoTGraph, WoTNode } from "@/lib/wot/types";

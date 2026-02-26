@@ -19,9 +19,9 @@ export async function getLatestBriefing(principalText?: string): Promise<D2ABrie
     if (
       typeof parsed !== "object" || parsed === null ||
       typeof parsed.generatedAt !== "string" ||
-      !parsed.summary || typeof parsed.summary.totalEvaluated !== "number" ||
+      typeof parsed.summary?.totalEvaluated !== "number" ||
       !Array.isArray(parsed.items) ||
-      !parsed.meta || !Array.isArray(parsed.meta.topics)
+      !Array.isArray(parsed.meta?.topics)
     ) {
       console.warn("[briefingProvider] Briefing JSON has unexpected shape, ignoring");
       return null;
@@ -83,10 +83,10 @@ export async function getGlobalBriefingSummaries(
       const parsed = JSON.parse(briefingJson) as D2ABriefingResponse;
       if (
         typeof parsed !== "object" || parsed === null ||
-        !parsed.summary || typeof parsed.summary !== "object" ||
-        typeof parsed.summary.totalEvaluated !== "number" ||
+        typeof parsed.summary?.totalEvaluated !== "number" ||
         !Array.isArray(parsed.items)
       ) {
+        console.warn("[briefingProvider] Skipped malformed briefing from", principal.toText().slice(0, 12));
         continue;
       }
 

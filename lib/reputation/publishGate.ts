@@ -37,7 +37,7 @@ export function loadPublishReputations(): Map<string, PublishReputation> {
   let raw: string | null;
   try {
     raw = localStorage.getItem(STORAGE_KEY);
-  } catch { return new Map(); }
+  } catch { console.warn("[publishGate] localStorage read failed"); return new Map(); }
   if (!raw) return new Map();
   try {
     const parsed: SerializedStore = JSON.parse(raw);

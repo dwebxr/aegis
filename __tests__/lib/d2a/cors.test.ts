@@ -120,3 +120,49 @@ describe("withCors", () => {
     expect(result).toBe(response);
   });
 });
+
+describe("D2A_CORS_ORIGINS env var", () => {
+  const origEnv = process.env;
+
+  afterEach(() => {
+    process.env = origEnv;
+    jest.resetModules();
+  });
+
+  it("uses custom origins from env var", () => {
+    process.env = { ...origEnv, D2A_CORS_ORIGINS: "https://custom.example.com,https://other.example.com" };
+    jest.isolateModules(() => {
+      const { corsOptionsResponse: corsFn } = require("@/lib/d2a/cors");
+      const req = new NextRequest("http://localhost/api/d2a/info", {
+        method: "GET",
+        headers: { origin: "https://custom.example.com" },
+      });
+      const res = corsFn(req);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://custom.example.com");
+    });
+  });
+
+  it("rejects default origins when env var overrides them", () => {
+    process.env = { ...origEnv, D2A_CORS_ORIGINS: "https://only-this.example.com" };
+    jest.isolateModules(() => {
+      const { corsOptionsResponse: corsFn } = require("@/lib/d2a/cors");
+      const req = new NextRequest("http://localhost/api/d2a/info", {
+        method: "GET",
+        headers: { origin: "https://aegis.dwebxr.xyz" },
+      });
+      const res = corsFn(req);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    });
+  });
+
+  it("trims whitespace and ignores empty entries", () => {
+    process.env = { ...origEnv, D2A_CORS_ORIGINS: " https://a.com , , https://b.com " };
+    jest.isolateModules(() => {
+      const { withCors: corsFn } = require("@/lib/d2a/cors");
+      const res1 = corsFn(NextResponse.json({}), "https://a.com");
+      expect(res1.headers.get("Access-Control-Allow-Origin")).toBe("https://a.com");
+      const res2 = corsFn(NextResponse.json({}), "https://b.com");
+      expect(res2.headers.get("Access-Control-Allow-Origin")).toBe("https://b.com");
+    });
+  });
+});

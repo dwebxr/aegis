@@ -30,8 +30,9 @@ export async function GET(request: NextRequest) {
     // 400 = canister reachable but bad request (expected with empty body)
     // 200 = canister reachable
     checks.icCanister = icRes.status === 400 || icRes.ok ? "reachable" : `error (${icRes.status})`;
-  } catch {
+  } catch (err) {
     checks.icCanister = "unreachable";
+    console.warn("[health] IC canister check failed:", err instanceof Error ? err.message : String(err));
   }
 
   const allOk = checks.anthropicKey === "configured"

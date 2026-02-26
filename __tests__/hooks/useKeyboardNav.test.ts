@@ -1,11 +1,6 @@
 /**
  * @jest-environment jsdom
  */
-
-/**
- * Behavioral tests for useKeyboardNav hook — uses createRoot + act to render
- * the hook, dispatches real KeyboardEvents on document, and verifies callbacks.
- */
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react";

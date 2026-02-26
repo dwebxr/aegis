@@ -1,8 +1,3 @@
-/**
- * Edge case tests for IndexedDB-backed offline action queue.
- * Covers concurrency, large payloads, non-existent IDs, and boundary conditions.
- * Uses fake-indexeddb for real IndexedDB operations in Node.js.
- */
 import "fake-indexeddb/auto";
 import {
   enqueueAction,

@@ -281,10 +281,6 @@ persistent actor AegisBackend {
     initCertCache();
   };
 
-  // ──────────────────────────────────────
-  // Helper: ensure caller is authenticated
-  // ──────────────────────────────────────
-
   func requireAuth(caller : Principal) : Bool {
     not Principal.isAnonymous(caller);
   };
@@ -1224,10 +1220,6 @@ persistent actor AegisBackend {
     validationRatio * avgComposite;
   };
 
-  // ──────────────────────────────────────
-  // Push Notification Subscriptions
-  // ──────────────────────────────────────
-
   let MAX_PUSH_SUBS_PER_USER : Nat = 5;
 
   public shared(msg) func registerPushSubscription(
@@ -1685,10 +1677,6 @@ persistent actor AegisBackend {
     });
     true;
   };
-
-  // ──────────────────────────────────────
-  // User Preferences (cross-device preference profile sync)
-  // ──────────────────────────────────────
 
   public query func getUserPreferences(p : Principal) : async ?Types.UserPreferences {
     userPreferences.get(p);

@@ -1,7 +1,3 @@
-/**
- * Thorough tests for D2A content manifest — hash consistency,
- * buildManifest filtering, diffManifest set operations, decodeManifest validation.
- */
 import { hashContent, buildManifest, diffManifest, decodeManifest, type ContentManifest } from "@/lib/d2a/manifest";
 import type { ContentItem } from "@/lib/types/content";
 

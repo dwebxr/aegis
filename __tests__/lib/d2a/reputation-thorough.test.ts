@@ -1,7 +1,3 @@
-/**
- * Thorough tests for D2A peer reputation — scoring math, blocking threshold,
- * trust tier boundaries, dynamic fees, and persistence.
- */
 import {
   recordUseful,
   recordSlop,

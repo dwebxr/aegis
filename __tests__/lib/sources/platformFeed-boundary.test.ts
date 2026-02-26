@@ -1,7 +1,3 @@
-/**
- * Boundary condition, edge case, and robustness tests for platformFeed parsers.
- * Complements the main platformFeed.test.ts with adversarial/unusual inputs.
- */
 import {
   detectPlatformFeed,
   extractYouTubeChannelId,

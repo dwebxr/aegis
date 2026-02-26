@@ -1,6 +1,3 @@
-/**
- * Tests for lib/nostr/types.ts — constants and mergeRelays utility.
- */
 import {
   KIND_TEXT_NOTE,
   KIND_LONG_FORM,

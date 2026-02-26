@@ -1,9 +1,3 @@
-/**
- * Tests for agent discovery — verifies single-pass dedup behavior,
- * resonance calculation, and edge cases in peer parsing.
- * Uses mocked SimplePool to exercise real discovery logic.
- */
-
 // Mock nostr-tools/pool
 const mockQuerySync = jest.fn();
 const mockDestroy = jest.fn();

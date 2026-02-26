@@ -1,4 +1,15 @@
+jest.mock("nostr-tools/pool", () => ({
+  SimplePool: jest.fn().mockImplementation(() => ({
+    publish: jest.fn((...args: unknown[]) => {
+      const urls = args[0] as string[];
+      return urls.map(() => Promise.reject(new Error("mock: no real connection")));
+    }),
+    destroy: jest.fn(),
+  })),
+}));
+
 import { buildAegisTags, publishAndPartition, publishSignalToNostr } from "@/lib/nostr/publish";
+import { SimplePool } from "nostr-tools/pool";
 import { finalizeEvent } from "nostr-tools/pure";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { DEFAULT_RELAYS } from "@/lib/nostr/types";
@@ -65,20 +76,21 @@ describe("buildAegisTags — boundary conditions", () => {
 describe("publishAndPartition — relay distribution", () => {
   const keys = deriveNostrKeypairFromText("test-publish-partition");
 
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("returns published and failed lists", async () => {
     const signed = finalizeEvent(
       { kind: 1, created_at: Math.floor(Date.now() / 1000), tags: [], content: "test" },
       keys.sk,
     );
 
-    // Without real relays, all should fail
     const result = await publishAndPartition(signed, ["wss://fake-relay.example.com"]);
-    // We can't guarantee the result since it depends on network, but structure should be correct
     expect(result).toHaveProperty("published");
     expect(result).toHaveProperty("failed");
     expect(Array.isArray(result.published)).toBe(true);
     expect(Array.isArray(result.failed)).toBe(true);
-    // Total should equal input relay count
     expect(result.published.length + result.failed.length).toBe(1);
   });
 
@@ -94,45 +106,96 @@ describe("publishAndPartition — relay distribution", () => {
   });
 
   it("handles multiple relays with mixed results", async () => {
+    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
+      publish: jest.fn((...args: unknown[]) => {
+        const urls = args[0] as string[];
+        return urls.map((_, i) => i === 0 ? Promise.resolve() : Promise.reject(new Error("timeout")));
+      }),
+      destroy: jest.fn(),
+    }) as unknown as SimplePool);
+
     const signed = finalizeEvent(
       { kind: 1, created_at: Math.floor(Date.now() / 1000), tags: [], content: "test" },
       keys.sk,
     );
 
-    // With fake relays, some or all may fail — but the structure is correct
     const result = await publishAndPartition(signed, [
-      "wss://fake-relay-1.example.com",
-      "wss://fake-relay-2.example.com",
+      "wss://ok-relay.example.com",
+      "wss://fail-relay.example.com",
     ]);
-    expect(result.published.length + result.failed.length).toBe(2);
+    expect(result.published).toEqual(["wss://ok-relay.example.com"]);
+    expect(result.failed).toEqual(["wss://fail-relay.example.com"]);
+  });
+
+  it("calls pool.destroy() after publish", async () => {
+    const mockDestroy = jest.fn();
+    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
+      publish: jest.fn().mockReturnValue([Promise.resolve()]),
+      destroy: mockDestroy,
+    }) as unknown as SimplePool);
+
+    const signed = finalizeEvent(
+      { kind: 1, created_at: Math.floor(Date.now() / 1000), tags: [], content: "test" },
+      keys.sk,
+    );
+
+    await publishAndPartition(signed, ["wss://relay.example.com"]);
+    expect(mockDestroy).toHaveBeenCalled();
   });
 });
 
 describe("publishSignalToNostr — relay fallback", () => {
   const keys = deriveNostrKeypairFromText("test-signal-relay");
 
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("uses DEFAULT_RELAYS when relayUrls is empty array", async () => {
-    const result = await publishSignalToNostr("test signal", keys.sk, [["t", "test"]], []);
-    // Should use DEFAULT_RELAYS — total should equal DEFAULT_RELAYS length
-    expect(result.relaysPublished.length + result.relaysFailed.length).toBe(DEFAULT_RELAYS.length);
+    const mockPublish = jest.fn((...args: unknown[]) => {
+      const urls = args[0] as string[];
+      return urls.map(() => Promise.reject(new Error("mock")));
+    });
+    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
+      publish: mockPublish,
+      destroy: jest.fn(),
+    }) as unknown as SimplePool);
+
+    await publishSignalToNostr("test signal", keys.sk, [["t", "test"]], []);
+    expect(mockPublish).toHaveBeenCalledWith(DEFAULT_RELAYS, expect.anything());
   });
 
   it("uses DEFAULT_RELAYS when relayUrls is undefined", async () => {
-    const result = await publishSignalToNostr("test signal", keys.sk, [["t", "test"]], undefined);
-    expect(result.relaysPublished.length + result.relaysFailed.length).toBe(DEFAULT_RELAYS.length);
+    const mockPublish = jest.fn((...args: unknown[]) => {
+      const urls = args[0] as string[];
+      return urls.map(() => Promise.reject(new Error("mock")));
+    });
+    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
+      publish: mockPublish,
+      destroy: jest.fn(),
+    }) as unknown as SimplePool);
+
+    await publishSignalToNostr("test signal", keys.sk, [["t", "test"]], undefined);
+    expect(mockPublish).toHaveBeenCalledWith(DEFAULT_RELAYS, expect.anything());
   });
 
   it("returns a valid eventId", async () => {
     const result = await publishSignalToNostr("test signal", keys.sk, [["t", "test"]]);
     expect(result.eventId).toBeTruthy();
     expect(typeof result.eventId).toBe("string");
-    // Nostr event IDs are 64-char hex
     expect(result.eventId).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("uses custom relayUrls when provided", async () => {
+    const mockPublish = jest.fn().mockReturnValue([Promise.resolve()]);
+    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
+      publish: mockPublish,
+      destroy: jest.fn(),
+    }) as unknown as SimplePool);
+
     const customRelays = ["wss://custom-relay.example.com"];
     const result = await publishSignalToNostr("test", keys.sk, [], customRelays);
-    expect(result.relaysPublished.length + result.relaysFailed.length).toBe(1);
+    expect(mockPublish).toHaveBeenCalledWith(customRelays, expect.anything());
+    expect(result.relaysPublished).toEqual(customRelays);
   });
 });

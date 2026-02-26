@@ -2,15 +2,8 @@
  * @jest-environment jsdom
  */
 
-/**
- * Comprehensive Quick Add flow tests for SourcesTab.
- * Tests all 6 preset types: YouTube, Topic, GitHub, Bluesky, Reddit, Mastodon.
- * Covers parser integration, feed URL construction, label generation,
- * error validation, and component rendering.
- *
- * Note: Quick Add UI is inside the RSS tab panel (not visible on default URL tab).
- * We test the parser-to-feed-URL integration directly and verify the component renders.
- */
+// Note: Quick Add UI is inside the RSS tab panel (not visible on default URL tab).
+// We test the parser-to-feed-URL integration directly and verify the component renders.
 
 // Polyfill TextEncoder for react-dom/server in jsdom environment
 if (typeof globalThis.TextEncoder === "undefined") {
@@ -336,6 +329,103 @@ describe("SourcesTab — Quick Add: YouTube flow", () => {
     const input = "https://youtube.com/channel/UCddiUEpeqJcYeBxX1IVBKvQ";
     const ytUrl = input.startsWith("http") ? input : `https://www.youtube.com/${input}`;
     expect(ytUrl).toBe("https://youtube.com/channel/UCddiUEpeqJcYeBxX1IVBKvQ");
+  });
+});
+
+// ─── Quick Add: full addSource payload verification ───
+// These tests verify the exact payload shape that handleQuickAdd constructs
+// for addSource(), ensuring parser output → feedUrl + label + type is correct.
+
+describe("SourcesTab — Quick Add: addSource payload construction", () => {
+  const {
+    parseGitHubRepo,
+    parseBlueskyHandle,
+    parseRedditSubreddit,
+    parseMastodonAccount,
+    buildTopicFeedUrl,
+  } = require("@/lib/sources/platformFeed");
+
+  // Replicate the exact payload logic from handleQuickAdd for each preset
+
+  it("GitHub: produces correct addSource payload", () => {
+    const parsed = parseGitHubRepo("vercel/next.js");
+    expect("error" in parsed).toBe(false);
+    const feedUrl = `https://github.com/${parsed.owner}/${parsed.repo}/releases.atom`;
+    const label = `${parsed.owner}/${parsed.repo} Releases`;
+    const payload = { type: "rss" as const, feedUrl, label, enabled: true };
+
+    expect(payload).toEqual({
+      type: "rss",
+      feedUrl: "https://github.com/vercel/next.js/releases.atom",
+      label: "vercel/next.js Releases",
+      enabled: true,
+    });
+  });
+
+  it("Bluesky: produces correct addSource payload", () => {
+    const handle = parseBlueskyHandle("@jay");
+    const feedUrl = `https://bsky.app/profile/${handle}/rss`;
+    const label = `Bluesky: @${handle}`;
+    const payload = { type: "rss" as const, feedUrl, label, enabled: true };
+
+    expect(payload).toEqual({
+      type: "rss",
+      feedUrl: "https://bsky.app/profile/jay.bsky.social/rss",
+      label: "Bluesky: @jay.bsky.social",
+      enabled: true,
+    });
+  });
+
+  it("Reddit: produces correct addSource payload", () => {
+    const sub = parseRedditSubreddit("r/programming");
+    expect(sub).toBeTruthy(); // not empty = valid
+    const feedUrl = `https://www.reddit.com/r/${sub}/.rss`;
+    const label = `r/${sub}`;
+    const payload = { type: "rss" as const, feedUrl, label, enabled: true };
+
+    expect(payload).toEqual({
+      type: "rss",
+      feedUrl: "https://www.reddit.com/r/programming/.rss",
+      label: "r/programming",
+      enabled: true,
+    });
+  });
+
+  it("Mastodon: produces correct addSource payload", () => {
+    const acct = parseMastodonAccount("@gargron@mastodon.social");
+    expect("error" in acct).toBe(false);
+    const feedUrl = `https://${acct.instance}/@${acct.username}.rss`;
+    const label = `@${acct.username}@${acct.instance}`;
+    const payload = { type: "rss" as const, feedUrl, label, enabled: true };
+
+    expect(payload).toEqual({
+      type: "rss",
+      feedUrl: "https://mastodon.social/@gargron.rss",
+      label: "@gargron@mastodon.social",
+      enabled: true,
+    });
+  });
+
+  it("Topic: produces correct addSource payload", () => {
+    const keyword = "AI safety";
+    const feedUrl = buildTopicFeedUrl(keyword);
+    const label = `Topic: ${keyword}`;
+    const payload = { type: "rss" as const, feedUrl, label, enabled: true };
+
+    expect(payload).toEqual({
+      type: "rss",
+      feedUrl: "https://news.google.com/rss/search?q=AI%20safety&hl=en",
+      label: "Topic: AI safety",
+      enabled: true,
+    });
+  });
+
+  it("YouTube: produces correct discover-feed request URL", () => {
+    const input = "@Veritasium";
+    const ytUrl = input.startsWith("http") ? input : `https://www.youtube.com/${input}`;
+    // handleQuickAdd sends this to /api/fetch/discover-feed
+    expect(ytUrl).toBe("https://www.youtube.com/@Veritasium");
+    // After discover-feed resolves, addSource gets the returned feedUrl
   });
 });
 

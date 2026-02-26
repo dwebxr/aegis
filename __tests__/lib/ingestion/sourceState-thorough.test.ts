@@ -1,7 +1,3 @@
-/**
- * Thorough tests for sourceState — backoff calculation, adaptive intervals,
- * health classification boundaries, key generation, and persistence.
- */
 import {
   defaultState,
   getSourceKey,

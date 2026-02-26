@@ -1,10 +1,5 @@
-/**
- * Tests for the Vercel KV (Redis) code path in dailyBudget.
- * The base test file only exercises the in-memory fallback because
- * KV_REST_API_URL is unset. This file mocks @vercel/kv to verify
- * the Redis-backed path: atomic INCR, TTL on first key, 90% warning,
- * and graceful fallback when the import fails.
- */
+// Tests the KV (Redis) code path — the base test file only exercises the
+// in-memory fallback because KV_REST_API_URL is unset.
 
 describe("dailyBudget — KV code path", () => {
   const mockStore = {

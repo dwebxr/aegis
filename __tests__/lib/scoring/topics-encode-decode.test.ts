@@ -1,7 +1,3 @@
-/**
- * Tests for topic encoding/decoding in reason strings.
- * These functions preserve topics through IC canister roundtrips.
- */
 import {
   encodeTopicsInReason,
   decodeTopicsFromReason,

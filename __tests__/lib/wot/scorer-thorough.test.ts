@@ -1,7 +1,3 @@
-/**
- * Thorough tests for WoT scorer — trust formula boundary conditions,
- * division safety, weighted score math, serendipity detection.
- */
 import {
   calculateWoTScore,
   calculateWeightedScore,

@@ -36,7 +36,7 @@ function loadRecords(): Record<string, DailyCostRecord> {
     for (const [key, val] of Object.entries(parsed)) {
       const r = val as Record<string, unknown>;
       if (
-        r && typeof r === "object" &&
+        typeof r === "object" && r !== null &&
         typeof r.date === "string" &&
         typeof r.articlesEvaluated === "number" &&
         typeof r.articlesPassedWoT === "number" &&

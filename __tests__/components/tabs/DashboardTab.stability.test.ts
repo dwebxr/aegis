@@ -1,15 +1,6 @@
 /**
  * @jest-environment jsdom
  */
-/**
- * Tests for Dashboard ranking stability across tab switches and time.
- *
- * Covers:
- * - briefingNowRef pinning: time reference updates only on profile change
- * - Tab switch stability: Feed→Dashboard toggle produces identical rankings
- * - Recency decay isolation: old content doesn't suddenly resurface
- * - display:none mounting: verifies the pattern preserves React state
- */
 import React, { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react";
