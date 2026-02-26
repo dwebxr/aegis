@@ -183,4 +183,89 @@ describe("sources/storage", () => {
       expect(loaded[49].id).toBe("src-49");
     });
   });
+
+  describe("platform migration (backfill)", () => {
+    it("infers youtube from feedUrl", () => {
+      const raw = [makeFakeSource({ id: "yt", feedUrl: "https://www.youtube.com/feeds/videos.xml?channel_id=UC123" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      const loaded = loadSources("p-1");
+      expect(loaded[0].platform).toBe("youtube");
+    });
+
+    it("infers bluesky from feedUrl", () => {
+      const raw = [makeFakeSource({ id: "bs", feedUrl: "https://bsky.app/profile/alice.bsky.social/rss" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      expect(loadSources("p-1")[0].platform).toBe("bluesky");
+    });
+
+    it("infers reddit from feedUrl", () => {
+      const raw = [makeFakeSource({ id: "rd", feedUrl: "https://www.reddit.com/r/programming/.rss" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      expect(loadSources("p-1")[0].platform).toBe("reddit");
+    });
+
+    it("infers github from feedUrl ending .atom", () => {
+      const raw = [makeFakeSource({ id: "gh", feedUrl: "https://github.com/anthropics/claude-code/releases.atom" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      expect(loadSources("p-1")[0].platform).toBe("github");
+    });
+
+    it("infers topic from Google News feedUrl", () => {
+      const raw = [makeFakeSource({ id: "t1", feedUrl: "https://news.google.com/rss/search?q=AI+safety" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      expect(loadSources("p-1")[0].platform).toBe("topic");
+    });
+
+    it("infers topic from label prefix", () => {
+      const raw = [makeFakeSource({ id: "t2", label: "Topic: machine learning", feedUrl: "https://other.example.com/rss" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      expect(loadSources("p-1")[0].platform).toBe("topic");
+    });
+
+    it("infers mastodon from label pattern @user@instance", () => {
+      const raw = [makeFakeSource({ id: "md", label: "@gargron@mastodon.social", feedUrl: "https://mastodon.social/@gargron.rss" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      expect(loadSources("p-1")[0].platform).toBe("mastodon");
+    });
+
+    it("infers farcaster from type", () => {
+      const raw = [makeFakeSource({ id: "fc", type: "farcaster", label: "Farcaster: @vitalik", fid: 5650 })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      expect(loadSources("p-1")[0].platform).toBe("farcaster");
+    });
+
+    it("does not overwrite existing platform", () => {
+      const raw = [makeFakeSource({ id: "yt", feedUrl: "https://www.youtube.com/feeds/videos.xml?channel_id=UC123", platform: "youtube" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      expect(loadSources("p-1")[0].platform).toBe("youtube");
+    });
+
+    it("leaves unknown RSS sources without platform", () => {
+      const raw = [makeFakeSource({ id: "x", feedUrl: "https://blog.example.com/feed.xml", label: "Some Blog" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      expect(loadSources("p-1")[0].platform).toBeUndefined();
+    });
+
+    it("persists migrated platform back to localStorage", () => {
+      const raw = [makeFakeSource({ id: "yt", feedUrl: "https://www.youtube.com/feeds/videos.xml?channel_id=UC123" })];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      loadSources("p-1");
+      // Second load should have platform already persisted
+      const reloaded = JSON.parse(localStorage.getItem("aegis_sources_p-1")!);
+      expect(reloaded[0].platform).toBe("youtube");
+    });
+
+    it("migrates multiple sources in one pass", () => {
+      const raw = [
+        makeFakeSource({ id: "yt", feedUrl: "https://www.youtube.com/feeds/videos.xml?channel_id=UC123" }),
+        makeFakeSource({ id: "bs", feedUrl: "https://bsky.app/profile/alice.bsky.social/rss" }),
+        makeFakeSource({ id: "plain", feedUrl: "https://example.com/feed.xml", label: "Blog" }),
+      ];
+      localStorage.setItem("aegis_sources_p-1", JSON.stringify(raw));
+      const loaded = loadSources("p-1");
+      expect(loaded[0].platform).toBe("youtube");
+      expect(loaded[1].platform).toBe("bluesky");
+      expect(loaded[2].platform).toBeUndefined();
+    });
+  });
 });
