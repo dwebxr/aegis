@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
         .filter(m => m.data.type === "MESSAGE_TYPE_CAST_ADD" && m.data.castAddBody)
         .map(m => {
           const cast = m.data.castAddBody!;
-          const hash = m.hash.startsWith("0x") ? m.hash.slice(2) : m.hash;
+          const hash = m.hash.startsWith("0x") ? m.hash.slice(0, 10) : "0x" + m.hash.slice(0, 8);
           return {
             text: cast.text,
             author: displayName,

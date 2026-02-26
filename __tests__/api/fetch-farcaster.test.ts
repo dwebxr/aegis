@@ -149,7 +149,7 @@ describe("POST /api/fetch/farcaster", () => {
       expect(data.items[0].text).toBe("Hello Farcaster!");
       expect(data.items[0].author).toBe("Vitalik");
       expect(data.items[0].imageUrl).toBe("https://example.com/image.jpg");
-      expect(data.items[0].sourceUrl).toBe("https://warpcast.com/vitalik/abc123def456");
+      expect(data.items[0].sourceUrl).toBe("https://warpcast.com/vitalik/0xabc123de");
       expect(data.items[1].text).toBe("Another cast");
       expect(data.items[1].imageUrl).toBeUndefined();
       expect(data.feedTitle).toContain("vitalik");
