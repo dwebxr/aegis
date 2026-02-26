@@ -9,7 +9,7 @@ import type { FetchURLResponse, FetchRSSResponse, FetchTwitterResponse, FetchNos
 import { useSources } from "@/contexts/SourceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemo } from "@/contexts/DemoContext";
-import { parseGitHubRepo, parseBlueskyHandle, parseTwitterHandle, buildTopicFeedUrl } from "@/lib/sources/platformFeed";
+import { parseGitHubRepo, parseBlueskyHandle, buildTopicFeedUrl } from "@/lib/sources/platformFeed";
 import { loadSourceStates, resetSourceErrors, type SourceRuntimeState, getSourceHealth, getSourceKey } from "@/lib/ingestion/sourceState";
 import { relativeTime } from "@/lib/utils/scores";
 import { getSuggestions, dismissSuggestion, discoverFeed as discoverFeedForDomain, type DomainValidation } from "@/lib/sources/discovery";
@@ -24,7 +24,7 @@ interface SourcesTabProps {
   mobile?: boolean;
 }
 
-type QuickAddId = "youtube" | "topic" | "github" | "bluesky" | "twitter";
+type QuickAddId = "youtube" | "topic" | "github" | "bluesky";
 
 const QUICK_ADD_PRESETS: ReadonlyArray<{
   id: QuickAddId; icon: string; label: string; color: string;
@@ -34,7 +34,6 @@ const QUICK_ADD_PRESETS: ReadonlyArray<{
   { id: "topic", icon: "\uD83D\uDCF0", label: "Topic", color: colors.amber[400], formLabel: "Search Keywords", placeholder: "AI safety, machine learning", hint: "Creates a Google News RSS feed for these keywords" },
   { id: "github", icon: "", label: "GitHub", color: colors.text.secondary, formLabel: "GitHub Repository", placeholder: "owner/repo or https://github.com/owner/repo", hint: "Subscribes to release notifications for this repository" },
   { id: "bluesky", icon: "\uD83E\uDD8B", label: "Bluesky", color: colors.sky[400], formLabel: "Bluesky Handle", placeholder: "@handle.bsky.social", hint: "Subscribes to this account\u2019s posts via Bluesky native RSS" },
-  { id: "twitter", icon: "\uD835\uDD4F", label: "X (Twitter)", color: colors.text.secondary, formLabel: "X (Twitter) Handle", placeholder: "@username or https://x.com/username", hint: "Converts X posts to RSS feed via RSSHub (no API key required)" },
 ];
 
 const HEALTH_COLORS: Record<string, string> = {
@@ -273,13 +272,6 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
           const handle = parseBlueskyHandle(input);
           feedUrl = `https://bsky.app/profile/${handle}/rss`;
           label = `Bluesky: @${handle}`;
-          break;
-        }
-        case "twitter": {
-          const handle = parseTwitterHandle(input);
-          if (!handle) { setQuickAddError("Please enter a valid X handle"); return; }
-          feedUrl = `https://rsshub.app/twitter/user/${handle}`;
-          label = `X: @${handle}`;
           break;
         }
         default:

@@ -3,7 +3,6 @@ import {
   extractYouTubeChannelId,
   parseGitHubRepo,
   parseBlueskyHandle,
-  parseTwitterHandle,
   buildTopicFeedUrl,
 } from "@/lib/sources/platformFeed";
 
@@ -175,80 +174,13 @@ describe("detectPlatformFeed", () => {
     });
   });
 
-  describe("Twitter/X", () => {
-    it("detects x.com handle and returns RSSHub URL", () => {
-      const result = detectPlatformFeed(u("https://x.com/elonmusk"));
-      expect(result).not.toBeNull();
-      expect(result!.feeds).toHaveLength(1);
-      expect(result!.feeds[0]).toEqual({
-        url: "https://rsshub.app/twitter/user/elonmusk",
-        title: "X: @elonmusk",
-        type: "rss",
-      });
-    });
-
-    it("detects twitter.com handle", () => {
-      const result = detectPlatformFeed(u("https://twitter.com/user123"));
-      expect(result).not.toBeNull();
-      expect(result!.feeds[0].url).toBe("https://rsshub.app/twitter/user/user123");
-    });
-
-    it("detects handle with trailing slash", () => {
-      const result = detectPlatformFeed(u("https://x.com/elonmusk/"));
-      expect(result).not.toBeNull();
-      expect(result!.feeds[0].url).toBe("https://rsshub.app/twitter/user/elonmusk");
-    });
-
-    it("strips www. prefix", () => {
-      const result = detectPlatformFeed(u("https://www.x.com/elonmusk"));
-      expect(result).not.toBeNull();
-      expect(result!.feeds[0].url).toContain("elonmusk");
-    });
-
-    it("rejects reserved path: /home", () => {
-      expect(detectPlatformFeed(u("https://x.com/home"))).toBeNull();
-    });
-
-    it("rejects reserved path: /explore", () => {
-      expect(detectPlatformFeed(u("https://x.com/explore"))).toBeNull();
-    });
-
-    it("rejects reserved path: /notifications", () => {
-      expect(detectPlatformFeed(u("https://x.com/notifications"))).toBeNull();
-    });
-
-    it("rejects reserved path: /messages", () => {
-      expect(detectPlatformFeed(u("https://x.com/messages"))).toBeNull();
-    });
-
-    it("rejects reserved path: /search", () => {
-      expect(detectPlatformFeed(u("https://x.com/search"))).toBeNull();
-    });
-
-    it("rejects reserved path: /settings", () => {
-      expect(detectPlatformFeed(u("https://x.com/settings"))).toBeNull();
-    });
-
-    it("rejects reserved path: /i", () => {
-      expect(detectPlatformFeed(u("https://x.com/i"))).toBeNull();
-    });
-
-    it("rejects reserved path: /compose", () => {
-      expect(detectPlatformFeed(u("https://x.com/compose"))).toBeNull();
-    });
-
-    it("rejects deep path /user/status/123", () => {
-      expect(detectPlatformFeed(u("https://x.com/elonmusk/status/123456"))).toBeNull();
-    });
-
-    it("rejects x.com root", () => {
-      expect(detectPlatformFeed(u("https://x.com/"))).toBeNull();
-    });
-  });
-
   describe("non-matching URLs", () => {
     it("returns null for generic websites", () => {
       expect(detectPlatformFeed(u("https://example.com/blog"))).toBeNull();
+    });
+
+    it("returns null for Twitter/X", () => {
+      expect(detectPlatformFeed(u("https://twitter.com/elonmusk"))).toBeNull();
     });
 
     it("returns null for Reddit", () => {
@@ -454,42 +386,6 @@ describe("parseBlueskyHandle", () => {
 
   it("strips @ from handle with subdomain", () => {
     expect(parseBlueskyHandle("@user.example.com")).toBe("user.example.com");
-  });
-});
-
-describe("parseTwitterHandle", () => {
-  it("strips @ prefix", () => {
-    expect(parseTwitterHandle("@elonmusk")).toBe("elonmusk");
-  });
-
-  it("returns bare username as-is", () => {
-    expect(parseTwitterHandle("username")).toBe("username");
-  });
-
-  it("extracts handle from x.com URL", () => {
-    expect(parseTwitterHandle("https://x.com/elonmusk")).toBe("elonmusk");
-  });
-
-  it("extracts handle from twitter.com URL", () => {
-    expect(parseTwitterHandle("https://twitter.com/user123")).toBe("user123");
-  });
-
-  it("extracts handle from x.com URL with query params", () => {
-    expect(parseTwitterHandle("https://x.com/elonmusk?ref=home")).toBe("elonmusk");
-  });
-
-  it("handles x.com URL with trailing slash", () => {
-    // The regex [^/?\s]+ stops at /, so trailing slash is excluded
-    expect(parseTwitterHandle("https://x.com/user/")).toBe("user");
-  });
-
-  it("trims whitespace", () => {
-    expect(parseTwitterHandle("  @elonmusk  ")).toBe("elonmusk");
-  });
-
-  it("handles @ with URL (strips @ from extracted handle)", () => {
-    // URL extraction takes precedence, @ only stripped if still present
-    expect(parseTwitterHandle("https://x.com/@elonmusk")).toBe("elonmusk");
   });
 });
 
