@@ -25,6 +25,15 @@ export function detectPlatformFeed(parsed: URL): PlatformFeedResult | null {
     }
   }
 
+  // X (Twitter): /handle → RSSHub RSS feed (no API key required)
+  if (host === "twitter.com" || host === "x.com") {
+    const handleMatch = parsed.pathname.match(/^\/([^/?\s]+)\/?$/);
+    if (handleMatch && !["home", "explore", "notifications", "messages", "search", "settings", "i", "compose"].includes(handleMatch[1])) {
+      const handle = handleMatch[1];
+      return { feeds: [{ url: `https://rsshub.app/twitter/user/${handle}`, title: `X: @${handle}`, type: "rss" }] };
+    }
+  }
+
   // Bluesky: /profile/handle → native RSS feed
   if (host === "bsky.app") {
     const handleMatch = parsed.pathname.match(/^\/profile\/([^/]+)\/?$/);
@@ -68,6 +77,16 @@ export function parseBlueskyHandle(input: string): string {
   handle = handle.replace(/^@/, "");
   if (!handle.includes(".") && !handle.startsWith("did:")) handle += ".bsky.social";
   return handle;
+}
+
+/** Normalize X (Twitter) handle from URL, @handle, or bare username. */
+export function parseTwitterHandle(input: string): string {
+  let handle = input;
+  if (handle.includes("twitter.com/") || handle.includes("x.com/")) {
+    const match = handle.match(/(?:twitter\.com|x\.com)\/([^/?\s]+)/);
+    if (match) handle = match[1];
+  }
+  return handle.trim().replace(/^@/, "");
 }
 
 export function buildTopicFeedUrl(keywords: string): string {
