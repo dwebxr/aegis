@@ -38,6 +38,7 @@ type PushFrequency = typeof PUSH_FREQ_OPTIONS[number]["value"];
 
 interface SettingsTabProps {
   mobile?: boolean;
+  linkedAccount?: LinkedNostrAccount | null;
   onLinkChange?: (account: LinkedNostrAccount | null) => void;
 }
 
@@ -57,7 +58,7 @@ const sectionTitle: React.CSSProperties = {
   letterSpacing: 0.3,
 };
 
-export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }) => {
+export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, linkedAccount, onLinkChange }) => {
   const { isAuthenticated, principalText, login } = useAuth();
   const { isEnabled: agentEnabled } = useAgent();
   const { isSubscribed } = usePushNotification();
@@ -309,7 +310,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, onLinkChange }
       {onLinkChange && (
         <div style={cardStyle(mobile)}>
           <div style={sectionTitle}>Nostr Account</div>
-          <NostrAccountLink mobile={mobile} onLinkChange={onLinkChange} />
+          <NostrAccountLink mobile={mobile} account={linkedAccount} onLinkChange={onLinkChange} />
         </div>
       )}
 

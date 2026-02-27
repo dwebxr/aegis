@@ -11,11 +11,14 @@ import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 
 interface NostrAccountLinkProps {
   mobile?: boolean;
+  /** Externally-controlled account state (e.g. after IC hydration). Overrides internal state when provided. */
+  account?: LinkedNostrAccount | null;
   onLinkChange: (account: LinkedNostrAccount | null) => void;
 }
 
-export const NostrAccountLink: React.FC<NostrAccountLinkProps> = ({ mobile, onLinkChange }) => {
-  const [account, setAccount] = useState<LinkedNostrAccount | null>(() => getLinkedAccount());
+export const NostrAccountLink: React.FC<NostrAccountLinkProps> = ({ mobile, account: externalAccount, onLinkChange }) => {
+  const [internalAccount, setInternalAccount] = useState<LinkedNostrAccount | null>(() => getLinkedAccount());
+  const account = externalAccount !== undefined ? externalAccount : internalAccount;
   const [input, setInput] = useState("");
   const [linking, setLinking] = useState(false);
   const [progress, setProgress] = useState("");
@@ -28,7 +31,7 @@ export const NostrAccountLink: React.FC<NostrAccountLinkProps> = ({ mobile, onLi
     setLinking(true);
     try {
       const linked = await linkNostrAccount(input.trim(), setProgress);
-      setAccount(linked);
+      setInternalAccount(linked);
       setInput("");
       onLinkChange(linked);
     } catch (e) {
@@ -45,7 +48,7 @@ export const NostrAccountLink: React.FC<NostrAccountLinkProps> = ({ mobile, onLi
       return;
     }
     clearLinkedAccount();
-    setAccount(null);
+    setInternalAccount(null);
     setConfirmUnlink(false);
     onLinkChange(null);
   }, [confirmUnlink, onLinkChange]);
