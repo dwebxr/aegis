@@ -75,6 +75,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
   const [subTab, setSubTab] = useState<SubTab>("exchanges");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showAllLogs, setShowAllLogs] = useState(false);
+  const [npubCopied, setNpubCopied] = useState(false);
 
   // Match records from IC canister
   const [matches, setMatches] = useState<D2AMatchRecord[]>([]);
@@ -172,12 +173,48 @@ export const D2ATab: React.FC<D2ATabProps> = ({
           }} />
           <div style={{ flex: 1, minWidth: 120 }}>
             <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginBottom: 2 }}>Agent Identity</div>
-            <code style={{
-              fontFamily: fonts.mono, fontSize: t.bodySm.size,
-              color: colors.purple[400], letterSpacing: "0.02em",
-            }}>
-              {(() => { try { return maskNpub(npubEncode(agentState.myPubkey!)); } catch { return agentState.myPubkey?.slice(0, 12) + "\u2026"; } })()}
-            </code>
+            <div style={{ display: "flex", alignItems: "center", gap: space[2], position: "relative" }}>
+              <code style={{
+                fontFamily: fonts.mono, fontSize: t.bodySm.size,
+                color: colors.purple[400], letterSpacing: "0.02em",
+              }}>
+                {(() => { try { return maskNpub(npubEncode(agentState.myPubkey!)); } catch { return agentState.myPubkey?.slice(0, 12) + "\u2026"; } })()}
+              </code>
+              <button
+                onClick={() => {
+                  try {
+                    const fullNpub = npubEncode(agentState.myPubkey!);
+                    navigator.clipboard.writeText(fullNpub).then(() => {
+                      setNpubCopied(true);
+                      setTimeout(() => setNpubCopied(false), 2000);
+                    });
+                  } catch {
+                    // npubEncode failed — nothing to copy
+                  }
+                }}
+                style={{
+                  background: "none", border: `1px solid ${colors.border.default}`,
+                  borderRadius: radii.sm, padding: "1px 6px",
+                  fontSize: 10, color: npubCopied ? colors.green[400] : colors.text.muted,
+                  cursor: "pointer", transition: transitions.fast,
+                  fontFamily: fonts.sans, lineHeight: 1.4,
+                }}
+              >
+                {npubCopied ? "Copied!" : "Copy npub"}
+              </button>
+              {npubCopied && (
+                <div style={{
+                  position: "absolute", top: "100%", left: 0, marginTop: 4,
+                  background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
+                  borderRadius: radii.sm, padding: "4px 8px",
+                  fontFamily: fonts.mono, fontSize: 10, color: colors.purple[400],
+                  whiteSpace: "nowrap", zIndex: 10,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                }}>
+                  {(() => { try { return npubEncode(agentState.myPubkey!); } catch { return ""; } })()}
+                </div>
+              )}
+            </div>
           </div>
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             <span style={{
