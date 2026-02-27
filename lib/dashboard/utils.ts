@@ -2,6 +2,14 @@ import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { BriefingItem } from "@/lib/briefing/types";
 import { generateBriefing } from "@/lib/briefing/ranker";
+import { extractYouTubeVideoId } from "@/lib/utils/youtube";
+
+/** True if item has an image or a YouTube video (matches ThumbnailArea display logic). */
+function hasVisualContent(item: ContentItem): boolean {
+  if (item.imageUrl) return true;
+  if (item.sourceUrl && extractYouTubeVideoId(item.sourceUrl)) return true;
+  return false;
+}
 
 /** Content-level dedup key: same article may have different IDs/URLs across sources */
 export function contentDedup(item: ContentItem): string {
@@ -85,7 +93,12 @@ export function computeTopicSpotlight(
   return highTopics.map(topic => {
     const sorted = qualityItems
       .filter(c => matchesTopic(c, topic, topicPatterns) && !usedIds.has(c.id))
-      .sort((a, b) => b.scores.composite - a.scores.composite || a.id.localeCompare(b.id));
+      .sort((a, b) => {
+        const va = hasVisualContent(a) ? 1 : 0;
+        const vb = hasVisualContent(b) ? 1 : 0;
+        if (va !== vb) return vb - va;
+        return b.scores.composite - a.scores.composite || a.id.localeCompare(b.id);
+      });
     const topicItems: ContentItem[] = [];
     for (const c of sorted) {
       const key = dedupKeys.get(c.id)!;

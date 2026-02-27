@@ -278,6 +278,75 @@ describe("computeTopicSpotlight — validated exclusion", () => {
   });
 });
 
+// ─── computeTopicSpotlight — visual hero prioritization ───
+
+describe("computeTopicSpotlight — visual hero prioritization", () => {
+  const now = Date.now();
+  const profile = makeProfile({ ai: 0.8 });
+
+  // Filler items to occupy Top3 so spotlight candidates aren't absorbed
+  const fillers = Array.from({ length: 3 }, (_, i) =>
+    makeItem({
+      id: `filler-${i}`,
+      text: `Top filler content number ${i} unique`,
+      topics: ["other"],
+      scores: { originality: 20, insight: 20, credibility: 20, composite: 20 },
+    }),
+  );
+
+  it("image item becomes hero over higher-scoring text-only item", () => {
+    const items = [
+      ...fillers,
+      makeItem({ id: "text-high", text: "High score AI article no image", topics: ["ai"], scores: { originality: 9, insight: 9, credibility: 9, composite: 9 } }),
+      makeItem({ id: "img-low", text: "Lower score AI article with image", topics: ["ai"], imageUrl: "https://example.com/photo.jpg", scores: { originality: 6, insight: 6, credibility: 6, composite: 6 } }),
+    ];
+    const top3 = computeDashboardTop3(items, profile, now);
+    const spotlight = computeTopicSpotlight(items, profile, top3);
+    const aiGroup = spotlight.find(g => g.topic === "ai");
+    expect(aiGroup).toBeDefined();
+    expect(aiGroup!.items[0].id).toBe("img-low");
+  });
+
+  it("YouTube URL item becomes hero over higher-scoring text-only item", () => {
+    const items = [
+      ...fillers,
+      makeItem({ id: "text-high", text: "High score AI article no video", topics: ["ai"], scores: { originality: 9, insight: 9, credibility: 9, composite: 9 } }),
+      makeItem({ id: "yt-low", text: "Lower score AI video content", topics: ["ai"], sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", scores: { originality: 5, insight: 5, credibility: 5, composite: 5 } }),
+    ];
+    const top3 = computeDashboardTop3(items, profile, now);
+    const spotlight = computeTopicSpotlight(items, profile, top3);
+    const aiGroup = spotlight.find(g => g.topic === "ai");
+    expect(aiGroup).toBeDefined();
+    expect(aiGroup!.items[0].id).toBe("yt-low");
+  });
+
+  it("without visual items, falls back to composite score order", () => {
+    const items = [
+      ...fillers,
+      makeItem({ id: "low", text: "Low score AI article text only", topics: ["ai"], scores: { originality: 4, insight: 4, credibility: 4, composite: 4 } }),
+      makeItem({ id: "high", text: "High score AI article text only", topics: ["ai"], scores: { originality: 8, insight: 8, credibility: 8, composite: 8 } }),
+    ];
+    const top3 = computeDashboardTop3(items, profile, now);
+    const spotlight = computeTopicSpotlight(items, profile, top3);
+    const aiGroup = spotlight.find(g => g.topic === "ai");
+    expect(aiGroup).toBeDefined();
+    expect(aiGroup!.items[0].id).toBe("high");
+  });
+
+  it("among visual items, higher composite wins hero", () => {
+    const items = [
+      ...fillers,
+      makeItem({ id: "img-low", text: "Low visual AI article", topics: ["ai"], imageUrl: "https://example.com/a.jpg", scores: { originality: 5, insight: 5, credibility: 5, composite: 5 } }),
+      makeItem({ id: "img-high", text: "High visual AI article", topics: ["ai"], imageUrl: "https://example.com/b.jpg", scores: { originality: 9, insight: 9, credibility: 9, composite: 9 } }),
+    ];
+    const top3 = computeDashboardTop3(items, profile, now);
+    const spotlight = computeTopicSpotlight(items, profile, top3);
+    const aiGroup = spotlight.find(g => g.topic === "ai");
+    expect(aiGroup).toBeDefined();
+    expect(aiGroup!.items[0].id).toBe("img-high");
+  });
+});
+
 // ─── computeDashboardValidated edge cases ───
 
 describe("computeDashboardValidated — edge cases", () => {
