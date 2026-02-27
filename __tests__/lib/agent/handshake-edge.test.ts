@@ -179,3 +179,74 @@ describe("isHandshakeExpired — boundary conditions", () => {
     }
   });
 });
+
+describe("parseD2AMessage — payload validation", () => {
+  const sk1 = new Uint8Array(32).fill(1);
+  const pk1 = getPublicKey(sk1);
+  const sk2 = new Uint8Array(32).fill(2);
+  const pk2 = getPublicKey(sk2);
+
+  it("rejects offer with missing topic field", () => {
+    const bad = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { score: 5, contentPreview: "x" } };
+    const encrypted = encryptMessage(JSON.stringify(bad), sk1, pk2);
+    expect(parseD2AMessage(encrypted, sk2, pk1)).toBeNull();
+  });
+
+  it("rejects offer with missing score field", () => {
+    const bad = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "ai", contentPreview: "x" } };
+    const encrypted = encryptMessage(JSON.stringify(bad), sk1, pk2);
+    expect(parseD2AMessage(encrypted, sk2, pk1)).toBeNull();
+  });
+
+  it("rejects offer with wrong score type", () => {
+    const bad = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "ai", score: "high", contentPreview: "x" } };
+    const encrypted = encryptMessage(JSON.stringify(bad), sk1, pk2);
+    expect(parseD2AMessage(encrypted, sk2, pk1)).toBeNull();
+  });
+
+  it("rejects deliver with missing text field", () => {
+    const bad = { type: "deliver", fromPubkey: pk1, toPubkey: pk2, payload: { author: "A", verdict: "quality", topics: ["ai"] } };
+    const encrypted = encryptMessage(JSON.stringify(bad), sk1, pk2);
+    expect(parseD2AMessage(encrypted, sk2, pk1)).toBeNull();
+  });
+
+  it("rejects deliver with missing topics array", () => {
+    const bad = { type: "deliver", fromPubkey: pk1, toPubkey: pk2, payload: { text: "t", author: "A", verdict: "quality" } };
+    const encrypted = encryptMessage(JSON.stringify(bad), sk1, pk2);
+    expect(parseD2AMessage(encrypted, sk2, pk1)).toBeNull();
+  });
+
+  it("rejects deliver with topics as string instead of array", () => {
+    const bad = { type: "deliver", fromPubkey: pk1, toPubkey: pk2, payload: { text: "t", author: "A", verdict: "quality", topics: "ai" } };
+    const encrypted = encryptMessage(JSON.stringify(bad), sk1, pk2);
+    expect(parseD2AMessage(encrypted, sk2, pk1)).toBeNull();
+  });
+
+  it("accepts valid offer payload", () => {
+    const msg: D2AMessage = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "ai", score: 8, contentPreview: "test" } };
+    const encrypted = encryptMessage(JSON.stringify(msg), sk1, pk2);
+    const parsed = parseD2AMessage(encrypted, sk2, pk1);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.type).toBe("offer");
+    expect(parsed!.payload).toEqual({ topic: "ai", score: 8, contentPreview: "test" });
+  });
+
+  it("accepts valid deliver payload", () => {
+    const msg: D2AMessage = {
+      type: "deliver", fromPubkey: pk1, toPubkey: pk2,
+      payload: { text: "content", author: "Author", scores: { originality: 5, insight: 5, credibility: 5, composite: 5 }, verdict: "quality", topics: ["ai"] },
+    };
+    const encrypted = encryptMessage(JSON.stringify(msg), sk1, pk2);
+    const parsed = parseD2AMessage(encrypted, sk2, pk1);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.type).toBe("deliver");
+  });
+
+  it("accept/reject ignore payload content and return empty object", () => {
+    const msg = { type: "accept", fromPubkey: pk1, toPubkey: pk2, payload: { extra: "data" } };
+    const encrypted = encryptMessage(JSON.stringify(msg), sk1, pk2);
+    const parsed = parseD2AMessage(encrypted, sk2, pk1);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.payload).toEqual({});
+  });
+});

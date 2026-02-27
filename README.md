@@ -655,6 +655,14 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Profile stored in localStorage (primary) with IC canister sync
 - After 3+ feedback events, AI scoring becomes personalized
 
+### D2A Activity Tab
+- **Agent Business Card** — displays IC-derived Nostr npub (masked), status badge, peer count, and sent/received stats
+- **Real-time Activity Log** — presence broadcasts, peer discovery, offer/accept/reject/deliver events with type-specific icons and relative timestamps (collapsible, 5 default / 20 expanded, capped at 50 entries)
+- **Rich Empty States** with dynamic progress checklist (identity → broadcasting → discovering peers → negotiating) and actionable guidance
+- Published tab description clarifies that validated quality items serve as D2A curation signals
+- D2A message payload validation — type guards enforce correct payload shape per message type (offer, deliver, accept, reject)
+- D2A protocol types use discriminated union (`D2AOfferMessage | D2AAcceptMessage | D2ARejectMessage | D2ADeliverMessage`) for compile-time type safety
+
 ### Dashboard & Briefing
 - **Top 3 + Topic Spotlight** hero cards with 16:9 thumbnails and inline Validate/Flag buttons
 - YouTube content auto-embeds as playable iframe in hero cards (Top3, Spotlight hero)
@@ -683,7 +691,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Landing hero for new visitors with feature overview and "Explore Demo" / "Login" CTAs
 - Terminology tooltips on hover for domain-specific terms (V-Signal, C-Context, L-Slop, WoT, D2A, Serendipity, etc.)
 - Centralized glossary of 12 terms — importable from `lib/glossary.ts`
-- Actionable empty states: Dashboard and Briefing link to Sources / Incinerator when no content exists
+- Actionable empty states: Dashboard, Briefing, and D2A Activity link to Sources / Incinerator / Settings when no content exists
 - Sidebar navigation descriptions updated for clarity; active state with stronger visual indicator
 - Mobile touch targets meet 48px accessibility minimum
 - Settings gear icon visible in collapsed sidebar mode
@@ -707,7 +715,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Preference storage validates nested structures (topic affinities, author trust, calibration) before loading
 - IC-to-local data conversion validates types at runtime instead of unsafe `as` casts
 - useEffect async operations use cancellation flags to prevent stale state updates after unmount
-- Notification dedup logic extracted as pure testable functions (no re-implementation in tests)
+- Notification dedup logic and D2A checklist logic extracted as pure testable functions (no re-implementation in tests)
 - ReadableStream readers wrapped in try-finally for guaranteed cleanup on error (ogimage)
 - All localStorage catch blocks log diagnostically (no silent swallowing)
 
@@ -753,7 +761,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (3528 tests, 206 suites) |
+| Test | Jest + ts-jest (3561 tests, 208 suites) |
 
 ## Project Structure
 
@@ -800,7 +808,7 @@ aegis/
 │   ├── ContentContext.tsx               # Content CRUD + IC sync + error notifications
 │   ├── PreferenceContext.tsx            # Preference learning lifecycle
 │   ├── SourceContext.tsx                # RSS/Nostr source management + IC sync
-│   ├── AgentContext.tsx                 # D2A agent lifecycle + error notifications
+│   ├── AgentContext.tsx                 # D2A agent lifecycle + activity log + error notifications
 │   ├── FilterModeContext.tsx            # Lite/Pro filter mode (persisted to localStorage)
 │   └── DemoContext.tsx                  # Demo mode for unauthenticated users
 ├── lib/
@@ -847,9 +855,9 @@ aegis/
 │   ├── agent/
 │   │   ├── protocol.ts                  # D2A constants (kinds, tags, thresholds, timings)
 │   │   ├── discovery.ts                 # Presence broadcast + peer discovery + Jaccard resonance
-│   │   ├── handshake.ts                # Offer/accept/reject/deliver messaging
-│   │   ├── manager.ts                   # AgentManager orchestrator (lifecycle + error recovery)
-│   │   └── types.ts                     # AgentProfile, HandshakeState, D2AMessage
+│   │   ├── handshake.ts                # Offer/accept/reject/deliver messaging + payload validation
+│   │   ├── manager.ts                   # AgentManager orchestrator (lifecycle + error recovery + activity log)
+│   │   └── types.ts                     # AgentProfile, HandshakeState, D2AMessage (discriminated union), ActivityLogEntry
 │   ├── ic/
 │   │   ├── config.ts                    # IC config getters (canister ID, host, derivation origin)
 │   │   ├── agent.ts                     # HttpAgent creation (re-exports config)
@@ -902,7 +910,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 3528 tests across 206 suites
+├── __tests__/                           # 3561 tests across 208 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)

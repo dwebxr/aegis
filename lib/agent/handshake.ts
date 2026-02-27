@@ -11,23 +11,26 @@ import {
   HANDSHAKE_TIMEOUT_MS,
 } from "./protocol";
 
+const D2A_TAG_MAP: Record<D2AMessage["type"], string> = {
+  offer: TAG_D2A_OFFER,
+  accept: TAG_D2A_ACCEPT,
+  reject: TAG_D2A_REJECT,
+  deliver: TAG_D2A_DELIVER,
+};
+
 async function sendD2AMessage(
   sk: Uint8Array,
-  myPubkey: string,
   peerPubkey: string,
-  type: D2AMessage["type"],
-  tag: string,
-  payload: D2AMessage["payload"],
+  message: D2AMessage,
   relayUrls: string[],
 ): Promise<{ published: string[]; failed: string[] }> {
-  const message: D2AMessage = { type, fromPubkey: myPubkey, toPubkey: peerPubkey, payload };
   const encrypted = encryptMessage(JSON.stringify(message), sk, peerPubkey);
 
   const signed = finalizeEvent(
     {
       kind: KIND_EPHEMERAL,
       created_at: Math.floor(Date.now() / 1000),
-      tags: [["p", peerPubkey], ["d2a", tag]],
+      tags: [["p", peerPubkey], ["d2a", D2A_TAG_MAP[message.type]]],
       content: encrypted,
     },
     sk,
@@ -35,7 +38,7 @@ async function sendD2AMessage(
 
   const result = await publishAndPartition(signed, relayUrls);
   if (result.published.length === 0) {
-    throw new Error(`D2A ${type} to ${peerPubkey.slice(0, 8)}... failed on all ${relayUrls.length} relays`);
+    throw new Error(`D2A ${message.type} to ${peerPubkey.slice(0, 8)}... failed on all ${relayUrls.length} relays`);
   }
   return result;
 }
@@ -47,7 +50,7 @@ export async function sendOffer(
   offer: D2AOfferPayload,
   relayUrls: string[],
 ): Promise<HandshakeState> {
-  await sendD2AMessage(sk, myPubkey, peerPubkey, "offer", TAG_D2A_OFFER, offer, relayUrls);
+  await sendD2AMessage(sk, peerPubkey, { type: "offer", fromPubkey: myPubkey, toPubkey: peerPubkey, payload: offer }, relayUrls);
   return {
     peerId: peerPubkey,
     phase: "offered",
@@ -60,22 +63,37 @@ export async function sendOffer(
 export async function sendAccept(
   sk: Uint8Array, myPubkey: string, peerPubkey: string, relayUrls: string[],
 ): Promise<{ published: string[]; failed: string[] }> {
-  return sendD2AMessage(sk, myPubkey, peerPubkey, "accept", TAG_D2A_ACCEPT, {}, relayUrls);
+  return sendD2AMessage(sk, peerPubkey, { type: "accept", fromPubkey: myPubkey, toPubkey: peerPubkey, payload: {} }, relayUrls);
 }
 
 export async function sendReject(
   sk: Uint8Array, myPubkey: string, peerPubkey: string, relayUrls: string[],
 ): Promise<{ published: string[]; failed: string[] }> {
-  return sendD2AMessage(sk, myPubkey, peerPubkey, "reject", TAG_D2A_REJECT, {}, relayUrls);
+  return sendD2AMessage(sk, peerPubkey, { type: "reject", fromPubkey: myPubkey, toPubkey: peerPubkey, payload: {} }, relayUrls);
 }
 
 export async function deliverContent(
   sk: Uint8Array, myPubkey: string, peerPubkey: string, content: D2ADeliverPayload, relayUrls: string[],
 ): Promise<{ published: string[]; failed: string[] }> {
-  return sendD2AMessage(sk, myPubkey, peerPubkey, "deliver", TAG_D2A_DELIVER, content, relayUrls);
+  return sendD2AMessage(sk, peerPubkey, { type: "deliver", fromPubkey: myPubkey, toPubkey: peerPubkey, payload: content }, relayUrls);
 }
 
 const VALID_D2A_TYPES = new Set<D2AMessage["type"]>(["offer", "accept", "reject", "deliver"]);
+
+function isValidOfferPayload(p: unknown): p is D2AOfferPayload {
+  return !!p && typeof p === "object" &&
+    typeof (p as D2AOfferPayload).topic === "string" &&
+    typeof (p as D2AOfferPayload).score === "number" &&
+    typeof (p as D2AOfferPayload).contentPreview === "string";
+}
+
+function isValidDeliverPayload(p: unknown): p is D2ADeliverPayload {
+  return !!p && typeof p === "object" &&
+    typeof (p as D2ADeliverPayload).text === "string" &&
+    typeof (p as D2ADeliverPayload).author === "string" &&
+    typeof (p as D2ADeliverPayload).verdict === "string" &&
+    Array.isArray((p as D2ADeliverPayload).topics);
+}
 
 export function parseD2AMessage(
   encryptedContent: string,
@@ -98,7 +116,28 @@ export function parseD2AMessage(
       return null;
     }
 
-    return parsed as D2AMessage;
+    const { type, fromPubkey, toPubkey, payload } = parsed;
+
+    switch (type) {
+      case "offer":
+        if (!isValidOfferPayload(payload)) {
+          console.warn("[handshake] Invalid offer payload from", senderPk.slice(0, 8) + "...");
+          return null;
+        }
+        return { type, fromPubkey, toPubkey, payload };
+      case "deliver":
+        if (!isValidDeliverPayload(payload)) {
+          console.warn("[handshake] Invalid deliver payload from", senderPk.slice(0, 8) + "...");
+          return null;
+        }
+        return { type, fromPubkey, toPubkey, payload };
+      case "accept":
+        return { type, fromPubkey, toPubkey, payload: {} };
+      case "reject":
+        return { type, fromPubkey, toPubkey, payload: {} };
+      default:
+        return null;
+    }
   } catch (err) {
     console.warn("[handshake] Failed to parse D2A message from", senderPk.slice(0, 8) + "...:", err instanceof SyntaxError ? "invalid JSON" : "decrypt failed");
     return null;

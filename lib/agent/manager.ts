@@ -6,7 +6,7 @@ import type { Filter } from "nostr-tools/filter";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { ContentItem } from "@/lib/types/content";
 import type { WoTGraph } from "@/lib/wot/types";
-import type { AgentProfile, AgentState, HandshakeState, D2AOfferPayload, D2ADeliverPayload } from "./types";
+import type { AgentProfile, AgentState, HandshakeState, D2AOfferPayload, D2ADeliverPayload, ActivityLogEntry, ActivityLogType } from "./types";
 import { broadcastPresence, discoverPeers, calculateResonance } from "./discovery";
 import { sendOffer, sendAccept, sendReject, deliverContent, parseD2AMessage, isHandshakeExpired } from "./handshake";
 import {
@@ -15,6 +15,7 @@ import {
   DISCOVERY_POLL_INTERVAL_MS,
   PEER_EXPIRY_MS,
   MIN_OFFER_SCORE,
+  MAX_ACTIVITY_LOG,
 } from "./protocol";
 import type { SubCloser } from "nostr-tools/pool";
 import { errMsg } from "@/lib/utils/errors";
@@ -50,6 +51,8 @@ export class AgentManager {
   private d2aMatchCount = 0;
   private consecutiveErrors = 0;
   private lastError?: string;
+  private activityLog: ActivityLogEntry[] = [];
+  private logIdCounter = 0;
 
   private presenceInterval: ReturnType<typeof setTimeout> | null = null;
   private discoveryInterval: ReturnType<typeof setTimeout> | null = null;
@@ -168,6 +171,7 @@ export class AgentManager {
       d2aMatchCount: this.d2aMatchCount,
       consecutiveErrors: this.consecutiveErrors,
       lastError: this.lastError,
+      activityLog: [...this.activityLog],
     };
   }
 
@@ -178,7 +182,7 @@ export class AgentManager {
   private recordError(msg: string): void {
     this.consecutiveErrors++;
     this.lastError = msg;
-    this.emitState();
+    this.addLog("error", msg);
   }
 
   private clearErrors(): void {
@@ -187,6 +191,18 @@ export class AgentManager {
       this.lastError = undefined;
       this.emitState();
     }
+  }
+
+  private addLog(type: ActivityLogType, message: string, peerId?: string): void {
+    this.activityLog.unshift({
+      id: `log-${++this.logIdCounter}`,
+      timestamp: Date.now(),
+      type,
+      message,
+      peerId,
+    });
+    if (this.activityLog.length > MAX_ACTIVITY_LOG) this.activityLog.length = MAX_ACTIVITY_LOG;
+    this.emitState();
   }
 
   private async broadcastMyPresence(): Promise<void> {
@@ -199,6 +215,7 @@ export class AgentManager {
 
     const content = this.callbacks.getContent();
     await broadcastPresence(this.sk, interests, 5, this.relayUrls, this.principalId, content);
+    this.addLog("presence", "Broadcast presence to relays");
   }
 
   private cleanupStaleHandshakes(): void {
@@ -236,7 +253,11 @@ export class AgentManager {
     for (const peer of discovered) {
       this.peers.set(peer.nostrPubkey, peer);
     }
-    this.emitState();
+    if (discovered.length > 0) {
+      this.addLog("discovery", `Discovered ${discovered.length} peer${discovered.length > 1 ? "s" : ""}`);
+    } else {
+      this.emitState();
+    }
 
     const content = this.callbacks.getContent();
     const offerCandidates = content.filter(c =>
@@ -274,7 +295,7 @@ export class AgentManager {
             this.sk, this.pk, peer.nostrPubkey, offer, this.relayUrls,
           );
           this.handshakes.set(peer.nostrPubkey, handshake);
-          this.emitState();
+          this.addLog("offer_sent", `Offered '${offer.topic}' to peer`, peer.nostrPubkey);
         } catch (err) {
           console.warn("[agent] sendOffer failed:", errMsg(err));
         }
@@ -305,7 +326,7 @@ export class AgentManager {
 
     switch (message.type) {
       case "offer":
-        await this.handleOffer(senderPk, message.payload as D2AOfferPayload);
+        await this.handleOffer(senderPk, message.payload);
         break;
       case "accept":
         await this.handleAccept(senderPk);
@@ -314,7 +335,7 @@ export class AgentManager {
         this.handleReject(senderPk);
         break;
       case "deliver":
-        await this.handleDelivery(senderPk, message.payload as D2ADeliverPayload);
+        await this.handleDelivery(senderPk, message.payload);
         break;
     }
   }
@@ -322,6 +343,7 @@ export class AgentManager {
   private async handleOffer(senderPk: string, offer: D2AOfferPayload): Promise<void> {
     const prefs = this.callbacks.getPrefs();
     const topicAffinity = (prefs.topicAffinities || {})[offer.topic] ?? 0;
+    this.addLog("offer_received", `Received offer: ${offer.topic}`, senderPk);
 
     try {
       if (topicAffinity > 0 && offer.score >= 6) {
@@ -333,6 +355,7 @@ export class AgentManager {
           offeredScore: offer.score,
           startedAt: Date.now(),
         });
+        this.addLog("accept", `Accepted offer: ${offer.topic}`, senderPk);
       } else {
         await sendReject(this.sk, this.pk, senderPk, this.relayUrls);
         this.handshakes.set(senderPk, {
@@ -343,11 +366,12 @@ export class AgentManager {
           startedAt: Date.now(),
           completedAt: Date.now(),
         });
+        this.addLog("reject", `Rejected offer: ${offer.topic}`, senderPk);
       }
     } catch (err) {
+      this.addLog("error", `Failed to respond to offer: ${errMsg(err)}`, senderPk);
       console.warn("[agent] handleOffer relay send failed:", errMsg(err));
     }
-    this.emitState();
   }
 
   private async handleAccept(senderPk: string): Promise<void> {
@@ -387,12 +411,13 @@ export class AgentManager {
       handshake.phase = "completed";
       handshake.completedAt = Date.now();
       this.sentItems++;
+      this.addLog("deliver", "Delivered content to peer", senderPk);
     } catch (err) {
+      this.addLog("error", `Content delivery failed: ${errMsg(err)}`, senderPk);
       console.warn("[agent] deliverContent failed:", errMsg(err));
       handshake.phase = "rejected";
       handshake.completedAt = Date.now();
     }
-    this.emitState();
   }
 
   private handleReject(senderPk: string): void {
@@ -400,8 +425,8 @@ export class AgentManager {
     if (handshake) {
       handshake.phase = "rejected";
       handshake.completedAt = Date.now();
+      this.addLog("reject", `Peer rejected offer: ${handshake.offeredTopic}`, senderPk);
     }
-    this.emitState();
   }
 
   private async handleDelivery(senderPk: string, payload: D2ADeliverPayload): Promise<void> {
@@ -451,6 +476,7 @@ export class AgentManager {
 
     this.callbacks.onNewContent(item);
     this.receivedItems++;
+    this.addLog("received", "Received content from peer", senderPk);
 
     const handshake = this.handshakes.get(senderPk);
     if (handshake) {

@@ -22,12 +22,32 @@ export interface HandshakeState {
   completedAt?: number;
 }
 
-export interface D2AMessage {
-  type: "offer" | "accept" | "reject" | "deliver";
+interface D2AMessageBase {
   fromPubkey: string;
   toPubkey: string;
-  payload: D2AOfferPayload | D2ADeliverPayload | Record<string, never>;
 }
+
+export interface D2AOfferMessage extends D2AMessageBase {
+  type: "offer";
+  payload: D2AOfferPayload;
+}
+
+export interface D2AAcceptMessage extends D2AMessageBase {
+  type: "accept";
+  payload: Record<string, never>;
+}
+
+export interface D2ARejectMessage extends D2AMessageBase {
+  type: "reject";
+  payload: Record<string, never>;
+}
+
+export interface D2ADeliverMessage extends D2AMessageBase {
+  type: "deliver";
+  payload: D2ADeliverPayload;
+}
+
+export type D2AMessage = D2AOfferMessage | D2AAcceptMessage | D2ARejectMessage | D2ADeliverMessage;
 
 export interface D2AOfferPayload {
   topic: string;
@@ -46,6 +66,18 @@ export interface D2ADeliverPayload {
   lSlop?: number;
 }
 
+export type ActivityLogType =
+  | "presence" | "discovery" | "offer_sent" | "offer_received"
+  | "accept" | "reject" | "deliver" | "received" | "error";
+
+export interface ActivityLogEntry {
+  id: string;
+  timestamp: number;
+  type: ActivityLogType;
+  message: string;
+  peerId?: string;
+}
+
 export interface AgentState {
   isActive: boolean;
   myPubkey: string | null;
@@ -56,4 +88,5 @@ export interface AgentState {
   d2aMatchCount: number;
   consecutiveErrors: number;
   lastError?: string;
+  activityLog: ActivityLogEntry[];
 }

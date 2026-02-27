@@ -43,6 +43,7 @@ const baseState: AgentState = {
   sentItems: 0,
   d2aMatchCount: 0,
   consecutiveErrors: 0,
+  activityLog: [],
 };
 
 describe("D2A event notifications", () => {

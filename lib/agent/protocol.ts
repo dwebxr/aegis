@@ -17,6 +17,8 @@ export const DISCOVERY_POLL_INTERVAL_MS = 60 * 1000;
 export const RESONANCE_THRESHOLD = 0.3;
 export const MIN_OFFER_SCORE = 7.0;
 
+export const MAX_ACTIVITY_LOG = 50;
+
 export const D2A_FEE_TRUSTED = 0;          // Free (WoT-backed peers)
 export const D2A_FEE_KNOWN = 100_000;     // 0.001 ICP
 export const D2A_FEE_UNKNOWN = 200_000;   // 0.002 ICP

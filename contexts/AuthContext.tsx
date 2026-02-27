@@ -7,21 +7,30 @@ import { getInternetIdentityUrl, getDerivationOrigin } from "@/lib/ic/agent";
 import { useNotify } from "./NotificationContext";
 import { errMsg } from "@/lib/utils/errors";
 
+interface DelegationChain {
+  delegations: Array<{ delegation: { expiration: bigint } }>;
+}
+
+interface IdentityWithDelegation extends Identity {
+  getDelegation(): DelegationChain;
+}
+
+function hasDelegation(id: Identity): id is IdentityWithDelegation {
+  return typeof (id as IdentityWithDelegation).getDelegation === "function";
+}
+
 /** Check if a DelegationIdentity's chain is still valid (not expired). */
 function isDelegationFresh(identity: Identity): boolean {
+  if (!hasDelegation(identity)) return true;
   try {
-    // DelegationIdentity has getDelegation() but the type isn't exported in all versions
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const di = identity as any;
-    if (typeof di.getDelegation !== "function") return true;
-    const chain = di.getDelegation();
+    const chain = identity.getDelegation();
     const nowNs = BigInt(Date.now()) * BigInt(1_000_000);
     for (const { delegation } of chain.delegations) {
       if (delegation.expiration < nowNs) return false;
     }
     return true;
   } catch {
-    return true; // Can't check — assume valid
+    return true;
   }
 }
 
@@ -56,13 +65,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Test-only mock: allows E2E tests to simulate auth without real II.
   // Dead-code eliminated in production builds via NODE_ENV check.
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = typeof window !== "undefined" ? (window as any) : undefined;
-    if (process.env.NODE_ENV !== "production" && w && w.__AEGIS_MOCK_AUTH !== undefined) {
+    if (typeof window === "undefined") return;
+    const w = window as Window & { __AEGIS_MOCK_AUTH?: boolean; __AEGIS_MOCK_PRINCIPAL?: string };
+    if (process.env.NODE_ENV !== "production" && w.__AEGIS_MOCK_AUTH !== undefined) {
       const isAuth = !!w.__AEGIS_MOCK_AUTH;
       setIsAuthenticated(isAuth);
       if (isAuth) {
-        const mockPrincipalText = (w.__AEGIS_MOCK_PRINCIPAL as string) || "2vxsx-fae";
+        const mockPrincipalText = w.__AEGIS_MOCK_PRINCIPAL || "2vxsx-fae";
         setPrincipal(Principal.fromText(mockPrincipalText));
       }
       setIsLoading(false);

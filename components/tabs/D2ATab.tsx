@@ -8,9 +8,11 @@ import { formatICP } from "@/lib/ic/icpLedger";
 import { handleICSessionError } from "@/lib/utils/errors";
 import { errMsg } from "@/lib/utils/errors";
 import { Principal } from "@dfinity/principal";
+import { npubEncode } from "nostr-tools/nip19";
+import { maskNpub } from "@/lib/nostr/linkAccount";
 import { colors, space, fonts, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
-import type { AgentState } from "@/lib/agent/types";
+import type { AgentState, ActivityLogEntry } from "@/lib/agent/types";
 import type { D2AMatchRecord } from "@/lib/ic/declarations";
 import type { Identity } from "@dfinity/agent";
 
@@ -46,12 +48,33 @@ function truncPrincipal(p: Principal): string {
   return t.length > 16 ? t.slice(0, 8) + "..." + t.slice(-5) : t;
 }
 
+function relativeTime(ts: number): string {
+  const diff = Math.max(0, Date.now() - ts);
+  if (diff < 60_000) return "just now";
+  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}h ago`;
+  return `${Math.floor(diff / 86400_000)}d ago`;
+}
+
+const LOG_ICONS: Record<string, { icon: string; color: string }> = {
+  presence: { icon: "\uD83D\uDCE1", color: colors.text.muted },
+  discovery: { icon: "\uD83D\uDD0D", color: colors.sky[400] },
+  offer_sent: { icon: "\uD83E\uDD1D", color: colors.purple[400] },
+  offer_received: { icon: "\uD83E\uDD1D", color: colors.purple[400] },
+  accept: { icon: "\u2713", color: colors.green[400] },
+  deliver: { icon: "\u2713", color: colors.green[400] },
+  received: { icon: "\u2713", color: colors.green[400] },
+  reject: { icon: "\u2717", color: colors.amber[400] },
+  error: { icon: "\u26A0", color: colors.red[400] },
+};
+
 export const D2ATab: React.FC<D2ATabProps> = ({
   content, agentState, mobile, identity, principalText,
   onValidate, onFlag, onTabChange,
 }) => {
   const [subTab, setSubTab] = useState<SubTab>("exchanges");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showAllLogs, setShowAllLogs] = useState(false);
 
   // Match records from IC canister
   const [matches, setMatches] = useState<D2AMatchRecord[]>([]);
@@ -131,6 +154,100 @@ export const D2ATab: React.FC<D2ATabProps> = ({
         </p>
       </div>
 
+      {/* Agent Card */}
+      {agentState?.isActive && agentState.myPubkey && (
+        <div style={{
+          ...surfaceCard(mobile),
+          marginBottom: space[4],
+          display: "flex",
+          alignItems: "center",
+          gap: space[3],
+          flexWrap: "wrap",
+        }}>
+          <div style={{
+            width: 10, height: 10, borderRadius: "50%",
+            background: colors.green[400],
+            boxShadow: `0 0 6px ${colors.green[400]}`,
+            flexShrink: 0,
+          }} />
+          <div style={{ flex: 1, minWidth: 120 }}>
+            <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginBottom: 2 }}>Agent Identity</div>
+            <code style={{
+              fontFamily: fonts.mono, fontSize: t.bodySm.size,
+              color: colors.purple[400], letterSpacing: "0.02em",
+            }}>
+              {(() => { try { return maskNpub(npubEncode(agentState.myPubkey!)); } catch { return agentState.myPubkey?.slice(0, 12) + "\u2026"; } })()}
+            </code>
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 8px",
+              borderRadius: radii.pill, textTransform: "uppercase",
+              background: "rgba(52,211,153,0.12)", color: colors.green[400],
+            }}>
+              Active
+            </span>
+            <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: 2 }}>
+              {agentState.peers.length} peers {"\u00B7"} {agentState.sentItems}{"\u2191"} {agentState.receivedItems}{"\u2193"}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activity Log */}
+      {agentState?.isActive && agentState.activityLog.length > 0 && (
+        <div style={{
+          ...surfaceCard(mobile),
+          marginBottom: space[4],
+          padding: mobile ? space[3] : space[4],
+        }}>
+          <div style={{
+            fontSize: t.caption.size, fontWeight: 600, color: colors.text.muted,
+            textTransform: "uppercase", letterSpacing: "0.05em",
+            marginBottom: space[2],
+          }}>
+            Activity Log
+          </div>
+          {(showAllLogs ? agentState.activityLog.slice(0, 20) : agentState.activityLog.slice(0, 5)).map((entry: ActivityLogEntry) => {
+            const meta = LOG_ICONS[entry.type] || { icon: "\u2022", color: colors.text.muted };
+            return (
+              <div key={entry.id} style={{
+                display: "flex", alignItems: "center", gap: space[2],
+                padding: `${space[1]}px 0`,
+                fontSize: t.caption.size,
+                borderBottom: `1px solid ${colors.border.default}`,
+              }}>
+                <span style={{ color: meta.color, flexShrink: 0, width: 18, textAlign: "center" }}>{meta.icon}</span>
+                <span style={{ color: colors.text.secondary, flex: 1 }}>
+                  {entry.message}
+                  {entry.peerId && (
+                    <span style={{ color: colors.text.disabled, fontFamily: fonts.mono, marginLeft: space[1] }}>
+                      {entry.peerId.slice(0, 8)}...
+                    </span>
+                  )}
+                </span>
+                <span style={{ color: colors.text.disabled, flexShrink: 0, fontSize: 10 }}>
+                  {relativeTime(entry.timestamp)}
+                </span>
+              </div>
+            );
+          })}
+          {agentState.activityLog.length > 5 && (
+            <button
+              onClick={() => setShowAllLogs(!showAllLogs)}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: colors.purple[400], fontSize: t.caption.size,
+                fontWeight: 600, fontFamily: "inherit",
+                marginTop: space[2], padding: 0,
+              }}
+            >
+              {showAllLogs ? "Show less" : `Show more (${agentState.activityLog.length})`}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Sub-tab selector */}
       <div style={{
         display: "flex", gap: space[1], marginBottom: space[4],
@@ -183,15 +300,25 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                 />
               </div>
             ))
+          ) : agentState?.isActive ? (
+            <EmptyState
+              emoji={"\u21C4"}
+              title="Waiting for exchanges"
+              subtitle="Your agent is actively searching for compatible peers."
+              checklist={[
+                { done: true, text: "Agent identity established" },
+                { done: true, text: "Broadcasting presence to relays" },
+                { done: (agentState.peers.length ?? 0) > 0, text: `Discovering compatible peers (${agentState.peers.length} found)` },
+                { done: agentState.activeHandshakes.length > 0 || agentState.sentItems > 0, text: "Negotiating content exchange" },
+              ]}
+            />
           ) : (
             <EmptyState
               emoji={"\u21C4"}
-              title="No D2A exchanges yet"
-              subtitle={agentState?.isActive
-                ? "Your agent is discovering peers. Content exchanges will appear here."
-                : "Enable D2A Agent in Settings to start exchanging content with peers."}
-              action={!agentState?.isActive && onTabChange ? () => onTabChange("settings") : undefined}
-              actionLabel="Go to Settings"
+              title="Start exchanging content"
+              subtitle="D2A lets your agent autonomously discover peers with shared interests and exchange quality content."
+              action={onTabChange ? () => onTabChange("settings") : undefined}
+              actionLabel="Enable in Settings"
             />
           )}
         </div>
@@ -200,6 +327,9 @@ export const D2ATab: React.FC<D2ATabProps> = ({
       {/* Published section */}
       {subTab === "published" && (
         <div>
+          <p style={{ fontSize: t.bodySm.size, color: colors.text.muted, marginTop: 0, marginBottom: space[4] }}>
+            Content you{"'"}ve validated as quality. These signals demonstrate your curation taste and are shared with D2A peers during exchanges.
+          </p>
           {published.length > 0 ? (
             published.map((item, i) => (
               <div key={item.id} style={{ animation: `slideUp .3s ease ${i * 0.06}s both` }}>
@@ -244,7 +374,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
             <EmptyState
               emoji={"\u2713"}
               title="No published signals yet"
-              subtitle="Validate quality content in the Burn tab to build your signal history."
+              subtitle="Validated content becomes your signal history \u2014 quality items you've verified are shared with D2A peers as proof of your curation taste."
               action={onTabChange ? () => onTabChange("incinerator") : undefined}
               actionLabel="Start Evaluating"
             />
@@ -340,7 +470,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
             <EmptyState
               emoji={"\u26A1"}
               title="No match records yet"
-              subtitle="Fee-paid matches from D2A content exchanges will appear here."
+              subtitle="Fee-paid matches are recorded on the Internet Computer when exchanging with untrusted peers. Trusted peers (via WoT) exchange freely."
             />
           ) : null}
         </div>
@@ -350,9 +480,10 @@ export const D2ATab: React.FC<D2ATabProps> = ({
 };
 
 // Shared empty state component
-function EmptyState({ emoji, title, subtitle, action, actionLabel }: {
+function EmptyState({ emoji, title, subtitle, action, actionLabel, checklist }: {
   emoji: string; title: string; subtitle: string;
   action?: () => void; actionLabel?: string;
+  checklist?: Array<{ done: boolean; text: string }>;
 }) {
   return (
     <div style={{
@@ -363,6 +494,20 @@ function EmptyState({ emoji, title, subtitle, action, actionLabel }: {
       <div style={{ fontSize: 32, marginBottom: space[3] }}>{emoji}</div>
       <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>{title}</div>
       <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>{subtitle}</div>
+      {checklist && (
+        <div style={{ textAlign: "left", display: "inline-block", marginTop: space[3] }}>
+          {checklist.map((item, i) => (
+            <div key={i} style={{
+              display: "flex", gap: space[2], alignItems: "center",
+              fontSize: t.bodySm.size, padding: `${space[1]}px 0`,
+              color: item.done ? colors.green[400] : colors.text.disabled,
+            }}>
+              <span style={{ flexShrink: 0 }}>{item.done ? "\u2713" : "\u25CC"}</span>
+              <span>{item.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {action && actionLabel && (
         <div style={{ marginTop: space[4] }}>
           <button onClick={action} style={{

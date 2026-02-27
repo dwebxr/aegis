@@ -35,6 +35,7 @@ const defaultState: AgentState = {
   sentItems: 0,
   d2aMatchCount: 0,
   consecutiveErrors: 0,
+  activityLog: [],
 };
 
 const AgentContext = createContext<AgentContextValue>({
