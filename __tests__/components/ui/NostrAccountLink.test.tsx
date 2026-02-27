@@ -228,4 +228,60 @@ describe("NostrAccountLink", () => {
     expect(html).toContain("FromStorage");
     expect(html).toContain("99 follows");
   });
+
+  it("external account prop overrides localStorage state", () => {
+    // localStorage has followCount 0 (stale IC restore)
+    saveLinkedAccount({
+      npub: FAKE_NPUB,
+      pubkeyHex: FAKE_HEX,
+      displayName: "Stale",
+      linkedAt: Date.now(),
+      followCount: 0,
+    });
+    // Parent passes hydrated account with real follow count
+    const hydrated: LinkedNostrAccount = {
+      npub: FAKE_NPUB,
+      pubkeyHex: FAKE_HEX,
+      displayName: "Hydrated",
+      linkedAt: Date.now(),
+      followCount: 110,
+    };
+    const html = renderToStaticMarkup(
+      <NostrAccountLink account={hydrated} onLinkChange={noop} />
+    );
+    expect(html).toContain("Hydrated");
+    expect(html).toContain("110 follows");
+    expect(html).not.toContain("Stale");
+  });
+
+  it("external account=null shows Not linked even if localStorage has account", () => {
+    saveLinkedAccount({
+      npub: FAKE_NPUB,
+      pubkeyHex: FAKE_HEX,
+      displayName: "InStorage",
+      linkedAt: Date.now(),
+      followCount: 50,
+    });
+    const html = renderToStaticMarkup(
+      <NostrAccountLink account={null} onLinkChange={noop} />
+    );
+    expect(html).toContain("Not linked");
+    expect(html).not.toContain("InStorage");
+  });
+
+  it("falls back to localStorage when account prop is undefined", () => {
+    saveLinkedAccount({
+      npub: FAKE_NPUB,
+      pubkeyHex: FAKE_HEX,
+      displayName: "FallbackTest",
+      linkedAt: Date.now(),
+      followCount: 77,
+    });
+    // No account prop passed — should use localStorage
+    const html = renderToStaticMarkup(
+      <NostrAccountLink onLinkChange={noop} />
+    );
+    expect(html).toContain("FallbackTest");
+    expect(html).toContain("77 follows");
+  });
 });

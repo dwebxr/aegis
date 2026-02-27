@@ -266,15 +266,20 @@ function AegisAppInner() {
             // IC has linked account that localStorage doesn't — restore
             saveLinkedAccount(icAccount);
             setLinkedAccount(icAccount);
-            // Hydrate displayName + followCount from relays in background
-            void fetchNostrProfile(icAccount.pubkeyHex).then(profile => {
+          } else if (localAccount && !icAccount) {
+            void syncLinkedAccountToIC(identity, localAccount, icD2A).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
+          }
+
+          // Hydrate displayName + followCount from relays if the stored count is 0
+          // (covers: first IC restore, and retries after interrupted hydration)
+          const accountToHydrate = localAccount || icAccount;
+          if (accountToHydrate && accountToHydrate.followCount === 0) {
+            void fetchNostrProfile(accountToHydrate.pubkeyHex).then(profile => {
               if (cancelled) return;
-              const hydrated: LinkedNostrAccount = { ...icAccount, displayName: profile.displayName, followCount: profile.followCount };
+              const hydrated: LinkedNostrAccount = { ...accountToHydrate, displayName: profile.displayName ?? accountToHydrate.displayName, followCount: profile.followCount };
               saveLinkedAccount(hydrated);
               setLinkedAccount(hydrated);
             }).catch(err => console.warn("[nostr] Profile hydration failed:", errMsg(err)));
-          } else if (localAccount && !icAccount) {
-            void syncLinkedAccountToIC(identity, localAccount, icD2A).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
           }
         }
       } catch (err) {
