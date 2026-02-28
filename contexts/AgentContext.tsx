@@ -14,6 +14,8 @@ import { getCanisterId } from "@/lib/ic/agent";
 import { Principal } from "@dfinity/principal";
 import type { AgentState } from "@/lib/agent/types";
 import type { WoTGraph } from "@/lib/wot/types";
+import type { NostrProfileMetadata } from "@/lib/nostr/profile";
+import { getCachedAgentProfile, setCachedAgentProfile, fetchAgentProfile } from "@/lib/nostr/profile";
 import { errMsg } from "@/lib/utils/errors";
 import { syncLinkedAccountToIC, getLinkedAccount } from "@/lib/nostr/linkAccount";
 
@@ -24,6 +26,10 @@ interface AgentContextValue {
   setD2AEnabled: (enabled: boolean) => void;
   setWoTGraph: (graph: WoTGraph | null) => void;
   wotGraph: WoTGraph | null;
+  agentProfile: NostrProfileMetadata | null;
+  agentProfileLoading: boolean;
+  refreshAgentProfile: () => Promise<void>;
+  nostrKeys: { sk: Uint8Array; pk: string } | null;
 }
 
 const defaultState: AgentState = {
@@ -45,6 +51,10 @@ const AgentContext = createContext<AgentContextValue>({
   setD2AEnabled: () => {},
   setWoTGraph: () => {},
   wotGraph: null,
+  agentProfile: null,
+  agentProfileLoading: false,
+  refreshAgentProfile: async () => {},
+  nostrKeys: null,
 });
 
 export function AgentProvider({ children }: { children: React.ReactNode }) {
@@ -55,11 +65,53 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const [agentState, setAgentState] = useState<AgentState>(defaultState);
   const [isEnabled, setIsEnabled] = useState(false);
   const [wotGraph, setWotGraphState] = useState<WoTGraph | null>(null);
+  const [agentProfile, setAgentProfile] = useState<NostrProfileMetadata | null>(null);
+  const [agentProfileLoading, setAgentProfileLoading] = useState(false);
   const managerRef = useRef<AgentManager | null>(null);
+  const profileFetchId = useRef(0);
   const profileRef = useRef(profile);
   profileRef.current = profile;
   const contentRef = useRef(content);
   contentRef.current = content;
+
+  const nostrKeys = useMemo(() => {
+    if (!principalText) return null;
+    return deriveNostrKeypairFromText(principalText);
+  }, [principalText]);
+
+  const refreshAgentProfile = useCallback(async () => {
+    if (!nostrKeys || !principalText) return;
+    const fetchId = ++profileFetchId.current;
+    setAgentProfileLoading(true);
+    try {
+      const cached = getCachedAgentProfile(principalText);
+      if (cached) setAgentProfile(cached);
+
+      const fresh = await fetchAgentProfile(nostrKeys.pk);
+      if (fetchId !== profileFetchId.current) return; // stale request
+      if (fresh) {
+        setAgentProfile(fresh);
+        setCachedAgentProfile(principalText, fresh);
+      }
+    } catch (err) {
+      if (fetchId !== profileFetchId.current) return;
+      console.warn("[agent-profile] Fetch failed:", errMsg(err));
+    } finally {
+      if (fetchId === profileFetchId.current) {
+        setAgentProfileLoading(false);
+      }
+    }
+  }, [nostrKeys, principalText]);
+
+  useEffect(() => {
+    if (isAuthenticated && principalText && nostrKeys) {
+      refreshAgentProfile();
+    } else {
+      profileFetchId.current++; // cancel any in-flight fetch
+      setAgentProfile(null);
+      setAgentProfileLoading(false);
+    }
+  }, [isAuthenticated, principalText, nostrKeys, refreshAgentProfile]);
 
   const toggleAgent = useCallback(() => {
     setIsEnabled(prev => {
@@ -83,7 +135,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || !principalText || !identity || !isEnabled) {
+    if (!isAuthenticated || !principalText || !identity || !isEnabled || !nostrKeys) {
       if (managerRef.current) {
         managerRef.current.stop();
         managerRef.current = null;
@@ -93,7 +145,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     }
 
     let cancelled = false;
-    const keys = deriveNostrKeypairFromText(principalText);
+    const keys = nostrKeys;
     const capturedIdentity = identity;
 
     const startAgent = async () => {
@@ -155,12 +207,13 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         principalText,
       );
 
+      managerRef.current = manager;
       if (cancelled) {
         manager.stop();
+        managerRef.current = null;
         return;
       }
 
-      managerRef.current = manager;
       manager.start();
     };
 
@@ -175,7 +228,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         managerRef.current = null;
       }
     };
-  }, [isAuthenticated, principalText, identity, isEnabled, addContent, addNotification]);
+  }, [isAuthenticated, principalText, identity, isEnabled, nostrKeys, addContent, addNotification]);
 
   // D2A event notifications — fires toasts for significant agent state transitions
   const prevStateRef = useRef<AgentState>(defaultState);
@@ -211,7 +264,9 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(() => ({
     agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph,
-  }), [agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph]);
+    agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys,
+  }), [agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph,
+    agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys]);
 
   return (
     <AgentContext.Provider value={value}>

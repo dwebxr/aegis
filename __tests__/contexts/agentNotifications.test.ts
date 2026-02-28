@@ -1,9 +1,6 @@
 import type { AgentState } from "@/lib/agent/types";
 
-/**
- * Pure function that mirrors the notification detection logic in AgentContext.
- * Extracted to enable unit testing without React rendering.
- */
+// Mirrors AgentContext notification logic — data-layer only, no React state
 function detectAgentEvents(prev: AgentState, curr: AgentState): string[] {
   const events: string[] = [];
 

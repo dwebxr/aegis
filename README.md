@@ -397,7 +397,7 @@ Fee collection only occurs when both peers include their IC principal in their p
 
 D2A enables Aegis agents to discover each other and exchange quality content directly — no central server, no platform algorithm, no data harvesting. All communication happens over Nostr relays using ephemeral encrypted events.
 
-### Identity
+### Identity & Profile
 
 Each agent's identity derives deterministically from their Internet Computer principal:
 
@@ -407,6 +407,8 @@ pk = secp256k1_pubkey(sk)
 ```
 
 No additional key management. The Nostr keypair is always reproducible from the IC login.
+
+Agents have a full **Nostr Kind 0 profile** (display name, avatar, bio, website, banner) editable from the D2A Activity tab. Profile changes are signed and published to relays, making the agent visible to any Nostr client. The profile uses merge-on-write: existing fields set by other clients are preserved unless explicitly overwritten or cleared.
 
 ### Phase 1: Presence Broadcast
 
@@ -656,7 +658,9 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - After 3+ feedback events, AI scoring becomes personalized
 
 ### D2A Activity Tab
-- **Agent Business Card** — displays IC-derived Nostr npub (masked), status badge, peer count, and sent/received stats
+- **Agent Profile Card** — avatar (44px, green border when active), display name, masked npub with Copy button, peer count, sent/received stats, and optional bio/website display
+- **Edit Profile modal** — edit display name, avatar (upload via nostr.build with NIP-98 auth), bio, website, and banner URL; publishes Kind 0 to Nostr relays with merge-on-write (preserves fields set by other clients, empty string clears a field)
+- **Profile caching** — localStorage cache for instant display on load, background relay fetch for freshest data, stale-request cancellation on principal change
 - **Real-time Activity Log** — presence broadcasts, peer discovery, offer/accept/reject/deliver events with type-specific icons and relative timestamps (collapsible, 5 default / 20 expanded, capped at 50 entries)
 - **Rich Empty States** with dynamic progress checklist (identity → broadcasting → discovering peers → negotiating) and actionable guidance
 - Published tab description clarifies that validated quality items serve as D2A curation signals
@@ -675,6 +679,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 
 ### Signal Publishing
 - Deterministic Nostr keypair derived from IC Principal (no extra key management)
+- Agent Kind 0 profile (name, avatar, bio, website) published to relays and visible to any Nostr client
 - Self-evaluated posts published as Kind 1 events with `aegis-score` tags
 - Image attachment via nostr.build (NIP-92 imeta tag, JPEG/PNG/GIF/WebP, max 5MB)
 - Client-side signing — private key never leaves the browser
@@ -795,7 +800,7 @@ aegis/
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
 │   ├── tabs/                            # Dashboard (Top3, Spotlight, Discoveries, YouTube embed), Briefing, Incinerator, Sources, Analytics, D2A Activity
-│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner, CommandPalette, ShareBriefingModal, D2ABadge, D2ANetworkMini, AgentStatusBadge, StatCard, ScoreRing, MiniChart, BarChart, BriefingClassificationBadge, IncineratorViz, NotificationToggle, DemoBanner
+│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner, CommandPalette, ShareBriefingModal, AgentProfileEditModal, D2ABadge, D2ANetworkMini, AgentStatusBadge, StatCard, ScoreRing, MiniChart, BarChart, BriefingClassificationBadge, IncineratorViz, NotificationToggle, DemoBanner
 │   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
 │   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
 │   ├── onboarding/                      # OnboardingFlow (guided setup wizard)
@@ -808,7 +813,7 @@ aegis/
 │   ├── ContentContext.tsx               # Content CRUD + IC sync + error notifications
 │   ├── PreferenceContext.tsx            # Preference learning lifecycle
 │   ├── SourceContext.tsx                # RSS/Nostr source management + IC sync
-│   ├── AgentContext.tsx                 # D2A agent lifecycle + activity log + error notifications
+│   ├── AgentContext.tsx                 # D2A agent lifecycle + agent profile state + activity log + error notifications
 │   ├── FilterModeContext.tsx            # Lite/Pro filter mode (persisted to localStorage)
 │   └── DemoContext.tsx                  # Demo mode for unauthenticated users
 ├── lib/
@@ -848,6 +853,7 @@ aegis/
 │   │   └── sourceState.ts              # Source runtime state (backoff, health, adaptive timing)
 │   ├── nostr/
 │   │   ├── identity.ts                  # IC Principal -> Nostr keypair (SHA-256 derivation)
+│   │   ├── profile.ts                   # Kind 0 agent profile (cache, fetch, merge-on-write publish)
 │   │   ├── linkAccount.ts              # npub import, localStorage CRUD, relay profile fetch
 │   │   ├── publish.ts                   # Event signing + relay publish + publishAndPartition
 │   │   ├── encrypt.ts                   # NIP-44 encrypt/decrypt (XChaCha20-Poly1305)

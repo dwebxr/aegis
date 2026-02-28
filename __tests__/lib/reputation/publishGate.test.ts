@@ -16,10 +16,6 @@ import {
 
 beforeEach(() => localStorage.clear());
 
-// ---------------------------------------------------------------------------
-// Persistence
-// ---------------------------------------------------------------------------
-
 describe("loadPublishReputations / savePublishReputations", () => {
   it("returns empty map when nothing stored", () => {
     expect(loadPublishReputations().size).toBe(0);
@@ -52,9 +48,7 @@ describe("loadPublishReputations / savePublishReputations", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // checkPublishGate
-// ---------------------------------------------------------------------------
 
 describe("checkPublishGate", () => {
   it("new user (no reputation) can publish freely", () => {
@@ -104,9 +98,7 @@ describe("checkPublishGate", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // recordPublishValidation / recordPublishFlag
-// ---------------------------------------------------------------------------
 
 describe("recordPublishValidation", () => {
   it("creates new reputation with score +1", () => {
@@ -151,9 +143,7 @@ describe("recordPublishFlag", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // applyReputationRecovery
-// ---------------------------------------------------------------------------
 
 describe("applyReputationRecovery", () => {
   const WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -196,10 +186,6 @@ describe("applyReputationRecovery", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// D2A independence
-// ---------------------------------------------------------------------------
-
 describe("D2A independence", () => {
   it("publish reputation does not affect D2A reputation storage", () => {
     recordPublishFlag("pk1");
@@ -208,10 +194,6 @@ describe("D2A independence", () => {
     expect(d2aRaw).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function makeRep(pubkey: string, overrides: Partial<PublishReputation> = {}): PublishReputation {
   return {

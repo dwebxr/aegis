@@ -2,6 +2,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { ContentCard } from "@/components/ui/ContentCard";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { AgentProfileEditModal } from "@/components/ui/AgentProfileEditModal";
+import { PencilIcon } from "@/components/icons";
 import { isD2AContent } from "@/lib/d2a/activity";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { formatICP } from "@/lib/ic/icpLedger";
@@ -10,6 +12,7 @@ import { errMsg } from "@/lib/utils/errors";
 import { Principal } from "@dfinity/principal";
 import { npubEncode } from "nostr-tools/nip19";
 import { maskNpub } from "@/lib/nostr/linkAccount";
+import { useAgent } from "@/contexts/AgentContext";
 import { colors, space, fonts, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import type { AgentState, ActivityLogEntry } from "@/lib/agent/types";
@@ -72,20 +75,26 @@ export const D2ATab: React.FC<D2ATabProps> = ({
   content, agentState, mobile, identity, principalText,
   onValidate, onFlag, onTabChange,
 }) => {
+  const { agentProfile, agentProfileLoading, nostrKeys, refreshAgentProfile } = useAgent();
   const [subTab, setSubTab] = useState<SubTab>("exchanges");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showAllLogs, setShowAllLogs] = useState(false);
-  const [npubCopied, setNpubCopied] = useState(false);
+  const [npubCopyState, setNpubCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [showProfileInfo, setShowProfileInfo] = useState(true);
+  const [avatarError, setAvatarError] = useState(false);
 
-  // Match records from IC canister
+  const currentPicture = agentProfile?.picture;
+  useEffect(() => { setAvatarError(false); }, [currentPicture]);
+
   const [matches, setMatches] = useState<D2AMatchRecord[]>([]);
   const [matchLoading, setMatchLoading] = useState(false);
   const [matchLoaded, setMatchLoaded] = useState(false);
   const [matchHasMore, setMatchHasMore] = useState(true);
   const [matchOffset, setMatchOffset] = useState(0);
+  const [matchError, setMatchError] = useState<string | null>(null);
   const PAGE_SIZE = 10;
 
-  // Derived content lists
   const d2aReceived = useMemo(
     () => content.filter(isD2AContent).sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)),
     [content],
@@ -95,10 +104,10 @@ export const D2ATab: React.FC<D2ATabProps> = ({
     [content],
   );
 
-  // Load matches from IC
   const loadMatches = useCallback(async (offset: number) => {
     if (!identity || !principalText) return;
     setMatchLoading(true);
+    setMatchError(null);
     try {
       const backend = await createBackendActorAsync(identity);
       const principal = Principal.fromText(principalText);
@@ -108,6 +117,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
       setMatchOffset(offset + page.length);
     } catch (err) {
       if (handleICSessionError(err)) return;
+      setMatchError(errMsg(err));
       console.warn("[d2a-tab] Failed to load matches:", errMsg(err));
     } finally {
       setMatchLoading(false);
@@ -115,7 +125,6 @@ export const D2ATab: React.FC<D2ATabProps> = ({
     }
   }, [identity, principalText]);
 
-  // Trigger match load when switching to matches tab
   useEffect(() => {
     if (subTab === "matches" && !matchLoaded && identity && principalText) {
       loadMatches(0);
@@ -156,79 +165,229 @@ export const D2ATab: React.FC<D2ATabProps> = ({
       </div>
 
       {/* Agent Card */}
-      {agentState?.isActive && agentState.myPubkey && (
-        <div style={{
-          ...surfaceCard(mobile),
-          marginBottom: space[4],
-          display: "flex",
-          alignItems: "center",
-          gap: space[3],
-          flexWrap: "wrap",
-        }}>
-          <div style={{
-            width: 10, height: 10, borderRadius: "50%",
-            background: colors.green[400],
-            boxShadow: `0 0 6px ${colors.green[400]}`,
-            flexShrink: 0,
-          }} />
-          <div style={{ flex: 1, minWidth: 120 }}>
-            <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginBottom: 2 }}>Agent Identity</div>
-            <div style={{ display: "flex", alignItems: "center", gap: space[2], position: "relative" }}>
-              <code style={{
-                fontFamily: fonts.mono, fontSize: t.bodySm.size,
-                color: colors.purple[400], letterSpacing: "0.02em",
+      {agentState?.isActive && agentState.myPubkey && (() => {
+        const avatarSize = mobile ? 36 : 44;
+        const profilePicture = agentProfile?.picture;
+        const profileName = agentProfile?.display_name || agentProfile?.name || (principalText ? `Aegis Agent for ${principalText.slice(0, 5)}...${principalText.slice(-3)}` : "Aegis Agent");
+        return (
+          <>
+            <div style={{
+              ...surfaceCard(mobile),
+              marginBottom: space[4],
+              display: "flex",
+              gap: space[3],
+              flexWrap: "wrap",
+              alignItems: "flex-start",
+            }}>
+              {/* Avatar */}
+              <div style={{
+                width: avatarSize, height: avatarSize,
+                borderRadius: "50%",
+                border: `2px solid ${colors.green[400]}`,
+                overflow: "hidden",
+                flexShrink: 0,
+                background: colors.bg.surface,
+                display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                {(() => { try { return maskNpub(npubEncode(agentState.myPubkey!)); } catch { return agentState.myPubkey?.slice(0, 12) + "\u2026"; } })()}
-              </code>
+                {profilePicture && !avatarError ? (
+                  <img
+                    src={profilePicture}
+                    alt="Agent"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    onError={() => setAvatarError(true)}
+                  />
+                ) : (
+                  <span style={{ fontSize: avatarSize * 0.5, opacity: 0.4 }}>{"\uD83E\uDD16"}</span>
+                )}
+              </div>
+
+              {/* Center: name + npub + about + website */}
+              <div style={{ flex: 1, minWidth: 120 }}>
+                {/* Name row */}
+                <div style={{
+                  fontSize: mobile ? t.h3.mobileSz : t.h3.size,
+                  fontWeight: 700,
+                  color: colors.text.primary,
+                  marginBottom: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: space[2],
+                }}>
+                  {profileName}
+                  {agentProfileLoading && (
+                    <span style={{ fontSize: t.caption.size, color: colors.text.disabled, fontWeight: 400 }}>...</span>
+                  )}
+                </div>
+
+                {/* npub + copy */}
+                <div style={{ display: "flex", alignItems: "center", gap: space[2], position: "relative", marginBottom: space[1] }}>
+                  <code style={{
+                    fontFamily: fonts.mono, fontSize: t.caption.size,
+                    color: colors.purple[400], letterSpacing: "0.02em",
+                  }}>
+                    {(() => { try { return maskNpub(npubEncode(agentState.myPubkey!)); } catch { return agentState.myPubkey?.slice(0, 12) + "\u2026"; } })()}
+                  </code>
+                  <button
+                    onClick={() => {
+                      try {
+                        const fullNpub = npubEncode(agentState.myPubkey!);
+                        navigator.clipboard.writeText(fullNpub).then(() => {
+                          setNpubCopyState("copied");
+                          setTimeout(() => setNpubCopyState("idle"), 2000);
+                        }).catch(() => {
+                          setNpubCopyState("failed");
+                          setTimeout(() => setNpubCopyState("idle"), 2000);
+                        });
+                      } catch {
+                        setNpubCopyState("failed");
+                        setTimeout(() => setNpubCopyState("idle"), 2000);
+                      }
+                    }}
+                    style={{
+                      background: "none", border: `1px solid ${colors.border.default}`,
+                      borderRadius: radii.sm, padding: "1px 6px",
+                      fontSize: 10, color: npubCopyState === "copied" ? colors.green[400] : npubCopyState === "failed" ? colors.red[400] : colors.text.muted,
+                      cursor: "pointer", transition: transitions.fast,
+                      fontFamily: fonts.sans, lineHeight: 1.4,
+                    }}
+                  >
+                    {npubCopyState === "copied" ? "Copied!" : npubCopyState === "failed" ? "Failed" : "Copy npub"}
+                  </button>
+                  {npubCopyState === "copied" && (
+                    <div style={{
+                      position: "absolute", top: "100%", left: 0, marginTop: 4,
+                      background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
+                      borderRadius: radii.sm, padding: "4px 8px",
+                      fontFamily: fonts.mono, fontSize: 10, color: colors.purple[400],
+                      whiteSpace: "nowrap", zIndex: 10,
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                    }}>
+                      {(() => { try { return npubEncode(agentState.myPubkey!); } catch { return ""; } })()}
+                    </div>
+                  )}
+                </div>
+
+                {/* About (optional) */}
+                {agentProfile?.about && (
+                  <p style={{
+                    fontSize: t.bodySm.size, color: colors.text.tertiary,
+                    lineHeight: 1.5, margin: 0, marginBottom: space[1],
+                    overflow: "hidden", textOverflow: "ellipsis",
+                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                  }}>
+                    {agentProfile.about}
+                  </p>
+                )}
+
+                {/* Website (optional) */}
+                {agentProfile?.website && (
+                  <a
+                    href={agentProfile.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: t.caption.size, color: colors.cyan[400],
+                      textDecoration: "none", display: "inline-flex",
+                      alignItems: "center", gap: 4,
+                    }}
+                  >
+                    {"\uD83D\uDD17"} {agentProfile.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                  </a>
+                )}
+              </div>
+
+              {/* Right: status + edit */}
+              <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", gap: space[2], alignItems: "flex-end" }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: "2px 8px",
+                  borderRadius: radii.pill, textTransform: "uppercase",
+                  background: "rgba(52,211,153,0.12)", color: colors.green[400],
+                }}>
+                  Active
+                </span>
+                <div style={{ fontSize: t.caption.size, color: colors.text.muted }}>
+                  {agentState.peers.length} peers {"\u00B7"} {agentState.sentItems}{"\u2191"} {agentState.receivedItems}{"\u2193"}
+                </div>
+                {nostrKeys && principalText && (
+                  <button
+                    onClick={() => setShowProfileEdit(true)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      background: "none", border: `1px solid ${colors.border.default}`,
+                      borderRadius: radii.sm, padding: "2px 8px",
+                      fontSize: t.caption.size, color: colors.text.muted,
+                      cursor: "pointer", transition: transitions.fast,
+                      fontFamily: fonts.sans,
+                    }}
+                  >
+                    <PencilIcon s={10} /> Edit Profile
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Explanatory text block */}
+            {showProfileInfo && (
+              <div style={{
+                ...surfaceCard(mobile),
+                marginBottom: space[4],
+                borderLeft: `3px solid ${colors.purple[400]}`,
+                padding: mobile ? space[3] : space[4],
+              }}>
+                <div style={{ fontSize: t.bodySm.size, color: colors.text.muted, lineHeight: 1.7 }}>
+                  <p style={{ margin: 0, marginBottom: space[2] }}>
+                    This account was auto-generated from your Internet Identity as your Aegis agent{"'"}s Nostr account.
+                  </p>
+                  <p style={{ margin: 0, marginBottom: space[2] }}>
+                    Your linked main Nostr account (npub) is used only for the follow graph (WoT). All posts come from this agent account.
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    The icon, name, and about set here are published as a Nostr Kind 0 profile, visible from other Nostr clients.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowProfileInfo(false)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: colors.purple[400], fontSize: t.caption.size,
+                    fontWeight: 600, fontFamily: "inherit",
+                    marginTop: space[2], padding: 0,
+                  }}
+                >
+                  Hide
+                </button>
+              </div>
+            )}
+            {!showProfileInfo && (
               <button
-                onClick={() => {
-                  try {
-                    const fullNpub = npubEncode(agentState.myPubkey!);
-                    navigator.clipboard.writeText(fullNpub).then(() => {
-                      setNpubCopied(true);
-                      setTimeout(() => setNpubCopied(false), 2000);
-                    });
-                  } catch {
-                    // npubEncode failed — nothing to copy
-                  }
-                }}
+                onClick={() => setShowProfileInfo(true)}
                 style={{
-                  background: "none", border: `1px solid ${colors.border.default}`,
-                  borderRadius: radii.sm, padding: "1px 6px",
-                  fontSize: 10, color: npubCopied ? colors.green[400] : colors.text.muted,
-                  cursor: "pointer", transition: transitions.fast,
-                  fontFamily: fonts.sans, lineHeight: 1.4,
+                  background: "none", border: "none", cursor: "pointer",
+                  color: colors.text.disabled, fontSize: t.caption.size,
+                  fontFamily: "inherit", marginBottom: space[4], padding: 0,
                 }}
               >
-                {npubCopied ? "Copied!" : "Copy npub"}
+                Learn more about this agent account
               </button>
-              {npubCopied && (
-                <div style={{
-                  position: "absolute", top: "100%", left: 0, marginTop: 4,
-                  background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-                  borderRadius: radii.sm, padding: "4px 8px",
-                  fontFamily: fonts.mono, fontSize: 10, color: colors.purple[400],
-                  whiteSpace: "nowrap", zIndex: 10,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-                }}>
-                  {(() => { try { return npubEncode(agentState.myPubkey!); } catch { return ""; } })()}
-                </div>
-              )}
-            </div>
-          </div>
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <span style={{
-              fontSize: 10, fontWeight: 700, padding: "2px 8px",
-              borderRadius: radii.pill, textTransform: "uppercase",
-              background: "rgba(52,211,153,0.12)", color: colors.green[400],
-            }}>
-              Active
-            </span>
-            <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: 2 }}>
-              {agentState.peers.length} peers {"\u00B7"} {agentState.sentItems}{"\u2191"} {agentState.receivedItems}{"\u2193"}
-            </div>
-          </div>
-        </div>
+            )}
+
+          </>
+        );
+      })()}
+
+      {/* Profile edit modal — outside agent-active guard so it survives deactivation */}
+      {showProfileEdit && nostrKeys && principalText && (
+        <AgentProfileEditModal
+          currentProfile={agentProfile}
+          nostrKeys={nostrKeys}
+          principalText={principalText}
+          onClose={() => setShowProfileEdit(false)}
+          onSaved={() => {
+            setShowProfileEdit(false);
+            refreshAgentProfile();
+          }}
+          mobile={mobile}
+        />
       )}
 
       {/* Activity Log */}
@@ -428,6 +587,14 @@ export const D2ATab: React.FC<D2ATabProps> = ({
               title="Login required"
               subtitle="Sign in with Internet Identity to view your D2A match records."
             />
+          ) : matchError && matches.length === 0 ? (
+            <EmptyState
+              emoji={"\u26A0"}
+              title="Failed to load matches"
+              subtitle={matchError}
+              action={() => { setMatchError(null); setMatchLoaded(false); }}
+              actionLabel="Retry"
+            />
           ) : matchLoading && matches.length === 0 ? (
             <div style={{ ...surfaceCard(mobile), textAlign: "center", padding: space[10] }}>
               <div style={{ fontSize: 32, marginBottom: space[3], animation: "pulse 2s infinite" }}>{"\u26A1"}</div>
@@ -516,7 +683,6 @@ export const D2ATab: React.FC<D2ATabProps> = ({
   );
 };
 
-// Shared empty state component
 function EmptyState({ emoji, title, subtitle, action, actionLabel, checklist }: {
   emoji: string; title: string; subtitle: string;
   action?: () => void; actionLabel?: string;
