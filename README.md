@@ -82,6 +82,7 @@ Non-BYOK users: Ollama\* → WebLLM\* → IC LLM → Server Claude → Heuristic
 | Local LLM (Ollama) | localStorage only | No (browser-specific) |
 | Browser AI (WebLLM) | localStorage only | No (browser-specific) |
 | Interests & Preferences | IC canister + localStorage cache | Yes |
+| Agent Profile (Kind 0) | Nostr relays + localStorage cache | Yes (via relays) |
 
 ## Architecture
 
