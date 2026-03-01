@@ -103,20 +103,21 @@ function AegisAppInner() {
     error?: string;
   } | null>(null);
 
-  // Deep Link: ?tab=sources&url=https://example.com/article
+  // Deep Link: ?tab=sources  or  ?tab=sources&url=https://example.com/article
+  const deepLinkTab = useMemo(() => searchParams.get("tab"), [searchParams]);
   const deepLinkUrl = useMemo(() => {
-    if (searchParams.get("tab") !== "sources") return null;
+    if (deepLinkTab !== "sources") return null;
     return extractUrl(searchParams.get("url"));
-  }, [searchParams]);
+  }, [deepLinkTab, searchParams]);
   const deepLinkConsumedRef = useRef(false);
 
   useEffect(() => {
-    if (!deepLinkUrl || deepLinkConsumedRef.current) return;
+    if (deepLinkTab !== "sources" || deepLinkConsumedRef.current) return;
     if (!isAuthenticated) return;
     deepLinkConsumedRef.current = true;
     setTab("sources");
     window.history.replaceState({}, "", "/");
-  }, [deepLinkUrl, isAuthenticated]);
+  }, [deepLinkTab, isAuthenticated]);
 
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
