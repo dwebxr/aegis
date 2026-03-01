@@ -1,8 +1,9 @@
 "use client";
-import React from "react";
+import React, { useRef } from "react";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { ShieldIcon, SearchIcon, FireIcon, RSSIcon, D2AIcon } from "@/components/icons";
 import { colors, fonts, space } from "@/styles/theme";
 import type { NavItem } from "./Sidebar";
@@ -27,6 +28,7 @@ function buildNavItems(size: number): NavItem[] {
 
 export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, children }) => {
   const { mobile, tablet } = useWindowSize();
+  const mainRef = useRef<HTMLElement>(null);
 
   return (
     <div style={{
@@ -39,13 +41,16 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
         <Sidebar navItems={buildNavItems(20)} activeTab={activeTab} onTabChange={onTabChange} collapsed={tablet} />
       )}
 
-      <main data-testid="aegis-main-content" style={{
+      <main ref={mainRef} data-testid="aegis-main-content" style={{
         flex: 1, overflow: "auto",
+        overscrollBehaviorY: "contain" as const, // prevent native pull-to-refresh
         padding: mobile ? `${space[4]}px ${space[4]}px 100px` : tablet ? `${space[6]}px ${space[6]}px` : `${space[10]}px ${space[12]}px`,
       }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          {children}
-        </div>
+        <PullToRefresh scrollRef={mainRef} enabled={mobile}>
+          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+            {children}
+          </div>
+        </PullToRefresh>
       </main>
 
       {mobile && (
