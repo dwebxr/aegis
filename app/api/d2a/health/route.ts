@@ -26,8 +26,9 @@ export async function GET(request: NextRequest) {
       signal: AbortSignal.timeout(5000),
     });
     checks.icCanister = icRes.status === 400 || icRes.ok ? "reachable" : `error (${icRes.status})`;
-  } catch {
+  } catch (err) {
     checks.icCanister = "unreachable";
+    console.warn("[d2a/health] IC canister check failed:", err instanceof Error ? err.message : String(err));
   }
 
   const allOk = checks.icCanister === "reachable" && checks.x402Receiver !== "not configured";

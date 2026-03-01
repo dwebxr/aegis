@@ -120,4 +120,25 @@ describe("handleICSessionError", () => {
   it("does not dispatch for case-sensitive mismatch", () => {
     expect(handleICSessionError(new Error("invalid signature"))).toBe(false);
   });
+
+  // @dfinity/agent actual error strings (verified against node_modules source)
+  it("returns true for CertificateVerificationError 'Signature verification failed'", () => {
+    expect(handleICSessionError(new Error("Signature verification failed"))).toBe(true);
+    expect(dispatchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns true for 'Invalid delegations.' from delegation.js", () => {
+    expect(handleICSessionError(new Error("Invalid delegations."))).toBe(true);
+    expect(dispatchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns true for expired certificate timestamp", () => {
+    expect(handleICSessionError(new Error("Certificate is signed more than 5 minutes in the past. Certificate time: 2026-01-01"))).toBe(true);
+    expect(dispatchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns true for replica signed query signature error", () => {
+    expect(handleICSessionError(new Error("Invalid signature from replica signed query: no matching node key found."))).toBe(true);
+    expect(dispatchSpy).toHaveBeenCalledTimes(1);
+  });
 });

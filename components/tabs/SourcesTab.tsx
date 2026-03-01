@@ -13,10 +13,7 @@ import { parseGitHubRepo, parseBlueskyHandle, parseRedditSubreddit, parseMastodo
 import { loadSourceStates, resetSourceErrors, type SourceRuntimeState, getSourceHealth, getSourceKey } from "@/lib/ingestion/sourceState";
 import { relativeTime } from "@/lib/utils/scores";
 import { getSuggestions, dismissSuggestion, discoverFeed as discoverFeedForDomain, type DomainValidation } from "@/lib/sources/discovery";
-
-function isTimeout(err: unknown): boolean {
-  return err instanceof DOMException && err.name === "TimeoutError";
-}
+import { isTimeout } from "@/lib/utils/errors";
 
 interface SourcesTabProps {
   onAnalyze: (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;

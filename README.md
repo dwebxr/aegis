@@ -716,6 +716,8 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Scoring cache uses `Map` (O(1) lookup) instead of `Record` with FIFO pruning via insertion order
 - Image backfill delay reduced from 800ms to 300ms per item (24s → 9s for 30 items)
 - Timestamp refresh interval increased from 30s to 60s (50% fewer re-renders)
+- HTTP cache headers map capped at 200 entries (defense-in-depth against memory growth)
+- Client-side fetch timeouts set 5s below server maxDuration (avoids client-side timeout masking server errors)
 
 ### Runtime Safety
 - Preference storage validates nested structures (topic affinities, author trust, calibration) before loading
@@ -723,6 +725,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - useEffect async operations use cancellation flags to prevent stale state updates after unmount
 - Notification dedup logic and D2A checklist logic extracted as pure testable functions (no re-implementation in tests)
 - ReadableStream readers wrapped in try-finally for guaranteed cleanup on error (ogimage)
+- IC delegation/signature expiry detection fires `aegis:session-expired` event (covers 5 @dfinity/agent error patterns)
 - All localStorage catch blocks log diagnostically (no silent swallowing)
 
 ### API Hardening
@@ -767,7 +770,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (3561 tests, 208 suites) |
+| Test | Jest + ts-jest (3836 tests, 217 suites) |
 
 ## Project Structure
 
@@ -895,9 +898,9 @@ aegis/
 │   ├── types/                           # ContentItem, API response types, source types
 │   ├── utils/
 │       ├── scores.ts                    # Score computation + relativeTime
-│       ├── errors.ts                    # errMsg() shared error formatter
+│       ├── errors.ts                    # errMsg(), errMsgShort(), isTimeout(), handleICSessionError()
 │       ├── hashing.ts                   # SHA-256 content fingerprinting (dedup + manifest)
-│       ├── url.ts                       # SSRF protection (blockPrivateUrl/blockPrivateRelay)
+│       ├── url.ts                       # extractUrl(), SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       ├── csv.ts                       # CSV export (RFC-compliant escaping)
 │       ├── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
 │       ├── math.ts                      # Shared clamp() utility
@@ -917,7 +920,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 3561 tests across 208 suites
+├── __tests__/                           # 3836 tests across 217 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)

@@ -185,6 +185,7 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
                 justifyContent: "center",
               }}>
                 {picture && !imgError ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={picture}
                     alt="Agent avatar"

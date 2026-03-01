@@ -44,6 +44,7 @@ import { getCanisterId } from "@/lib/ic/agent";
 import type { UserReputation } from "@/lib/ic/declarations";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
+import { extractUrl } from "@/lib/utils/url";
 import { checkPublishGate, type PublishGateDecision } from "@/lib/reputation/publishGate";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -51,17 +52,6 @@ const PUSH_THROTTLE: Record<string, number> = {
   "1x_day": 24 * MS_PER_HOUR,
   "3x_day": 8 * MS_PER_HOUR,
 };
-
-function extractUrl(text: string | null): string | null {
-  if (!text) return null;
-  const trimmed = text.trim();
-  try {
-    const u = new URL(trimmed);
-    if (u.protocol === "http:" || u.protocol === "https:") return trimmed;
-  } catch { /* not a bare URL */ }
-  const match = trimmed.match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/i);
-  return match ? match[0] : null;
-}
 
 function AegisAppInner() {
   const { mobile } = useWindowSize();

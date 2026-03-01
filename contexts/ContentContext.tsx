@@ -40,7 +40,7 @@ async function fetchAnalyze(
       method: "POST",
       headers,
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(25_000),
     });
     const data = await res.json();
     if (!res.ok) {

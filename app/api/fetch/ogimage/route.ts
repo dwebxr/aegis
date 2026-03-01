@@ -3,7 +3,7 @@ import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { blockPrivateUrl } from "@/lib/utils/url";
 import { errMsg } from "@/lib/utils/errors";
 
-export const maxDuration = 10;
+export const maxDuration = 15;
 
 export async function POST(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);

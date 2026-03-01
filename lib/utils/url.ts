@@ -1,7 +1,18 @@
 /**
- * SSRF protection utilities.
- * Checks hostnames and URLs against private/internal network ranges.
+ * URL utilities — extraction, validation, and SSRF protection.
  */
+
+/** Extract first HTTP/HTTPS URL from text. Returns null if none found. */
+export function extractUrl(text: string | null): string | null {
+  if (!text) return null;
+  const trimmed = text.trim();
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol === "http:" || u.protocol === "https:") return trimmed;
+  } catch { /* not a bare URL */ }
+  const match = trimmed.match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/i);
+  return match ? match[0] : null;
+}
 
 export function blockPrivateHostname(hostname: string): string | null {
   const h = hostname.toLowerCase();

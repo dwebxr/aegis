@@ -190,6 +190,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 {profilePicture && !avatarError ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={profilePicture}
                     alt="Agent"

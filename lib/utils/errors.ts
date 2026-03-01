@@ -8,10 +8,21 @@ export function errMsgShort(err: unknown): string {
   return msg.length > 120 ? msg.slice(0, 117) + "..." : msg;
 }
 
+/** Check if an error is a DOMException TimeoutError (from AbortSignal.timeout). */
+export function isTimeout(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "TimeoutError";
+}
+
 /** Detect IC delegation/signature expiry errors and fire session-expired event. Returns true if handled. */
 export function handleICSessionError(err: unknown): boolean {
   const msg = errMsg(err);
-  if (msg.includes("Invalid signature") || msg.includes("Invalid basic signature")) {
+  if (
+    msg.includes("Invalid signature") ||
+    msg.includes("Invalid basic signature") ||
+    msg.includes("Signature verification failed") ||
+    msg.includes("Invalid delegations") ||
+    msg.includes("Certificate is signed more than")
+  ) {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("aegis:session-expired"));
     }

@@ -202,11 +202,12 @@ export class IngestionScheduler {
       const now = Date.now();
       const cycleItems: ContentItem[] = [];
 
-      // Purge httpCacheHeaders for sources no longer in the active list
+      // Purge httpCacheHeaders for sources no longer in the active list or if over cap
       const activeKeys = new Set(sources.map(s => getSourceKey(s.type, s.config)));
       this.httpCacheHeaders.forEach((_, key) => {
         if (!activeKeys.has(key)) this.httpCacheHeaders.delete(key);
       });
+      if (this.httpCacheHeaders.size > 200) this.httpCacheHeaders.clear();
 
       for (const source of sources) {
         if (!source.enabled) continue;
