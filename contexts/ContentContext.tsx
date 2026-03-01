@@ -198,10 +198,10 @@ function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal").Prin
       c.scoringEngine ? encodeEngineInReason(c.scoringEngine, c.reason) : c.reason,
       c.topics,
     ),
-    createdAt: BigInt(c.createdAt * 1_000_000),
+    createdAt: BigInt(c.createdAt) * BigInt(1_000_000),
     validated: c.validated,
     flagged: c.flagged,
-    validatedAt: c.validatedAt ? [BigInt(c.validatedAt * 1_000_000)] as [bigint] : [] as [],
+    validatedAt: c.validatedAt ? [BigInt(c.validatedAt) * BigInt(1_000_000)] as [bigint] : [] as [],
   };
 }
 

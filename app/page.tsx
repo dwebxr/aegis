@@ -509,7 +509,7 @@ function AegisAppInner() {
             },
             verdict: scores.verdict === "quality" ? { quality: null } : { slop: null },
             topics: scores.topics || [],
-            createdAt: BigInt(Date.now() * 1_000_000),
+            createdAt: BigInt(Date.now()) * BigInt(1_000_000),
           }, stakeAmount);
 
           if ("ok" in stakeResult) {
@@ -631,7 +631,7 @@ function AegisAppInner() {
           shareState={shareState}
         />
       )}
-      {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} initialUrl={deepLinkConsumedRef.current ? deepLinkUrl ?? undefined : undefined} />}
+      {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} initialUrl={deepLinkUrl ?? undefined} />}
       {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} pipelineStats={pipelineResult?.stats ?? null} />}
       {tab === "d2a" && <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={setTab} />}
       {tab === "settings" && <SettingsTab mobile={mobile} linkedAccount={linkedAccount} onLinkChange={handleLinkAccount} />}
