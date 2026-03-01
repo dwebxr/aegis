@@ -350,7 +350,7 @@ function savedToIC(s: SavedSource, owner: import("@dfinity/principal").Principal
     sourceType: s.type,
     configJson: JSON.stringify({ label: s.label, ...config }),
     enabled: s.enabled,
-    createdAt: BigInt(s.createdAt) * BigInt(1_000_000),
+    createdAt: BigInt(Math.round(s.createdAt)) * BigInt(1_000_000),
   };
 }
 

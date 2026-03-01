@@ -83,7 +83,7 @@ export async function syncPreferencesToIC(
     const backend = await createBackendActorAsync(identity);
     return await backend.saveUserPreferences(
       JSON.stringify(profile),
-      BigInt(profile.lastUpdated),
+      BigInt(Math.round(profile.lastUpdated)),
     );
   } catch (err) {
     console.warn("[prefs] IC sync failed:", errMsg(err));
