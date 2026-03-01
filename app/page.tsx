@@ -88,32 +88,30 @@ function AegisAppInner() {
     try { return sessionStorage.getItem("aegis-wot-prompt-dismissed") === "true"; } catch { return false; }
   });
 
-  // Web Share Target
+  // Web Share Target + Deep Link → Sources tab with auto-Extract
+  // Both paths capture the URL in state before replaceState clears searchParams,
+  // then pass it to SourcesTab as initialUrl for auto-fill + Extract.
   const searchParams = useSearchParams();
-  const sharedUrl = useMemo(() => {
-    return extractUrl(searchParams.get("share_url"))
-        || extractUrl(searchParams.get("share_text"))
-        || extractUrl(searchParams.get("share_title"))
-        || null;
-  }, [searchParams]);
   const shareConsumedRef = useRef(false);
-  const [shareState, setShareState] = useState<{
-    url: string;
-    status: "fetching" | "analyzing" | "done" | "error";
-    error?: string;
-  } | null>(null);
-
-  // Deep Link: ?tab=sources  or  ?tab=sources&url=https://example.com/article
-  // URL is captured in state so it survives replaceState clearing searchParams.
-  const deepLinkConsumedRef = useRef(false);
   const [capturedDeepLinkUrl, setCapturedDeepLinkUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (deepLinkConsumedRef.current) return;
-    if (searchParams.get("tab") !== "sources") return;
+    if (shareConsumedRef.current) return;
     if (!isAuthenticated) return;
-    deepLinkConsumedRef.current = true;
-    const url = extractUrl(searchParams.get("url"));
+
+    // Web Share Target: ?share_url=xxx or ?share_text=xxx
+    const sharedUrl = extractUrl(searchParams.get("share_url"))
+      || extractUrl(searchParams.get("share_text"))
+      || extractUrl(searchParams.get("share_title"));
+
+    // Deep Link: ?tab=sources&url=xxx  or  ?tab=sources
+    const isDeepLink = searchParams.get("tab") === "sources";
+    const deepLinkUrl = isDeepLink ? extractUrl(searchParams.get("url")) : null;
+
+    const url = sharedUrl || deepLinkUrl;
+    if (!sharedUrl && !isDeepLink) return;
+
+    shareConsumedRef.current = true;
     if (url) setCapturedDeepLinkUrl(url);
     setTab("sources");
     window.history.replaceState({}, "", "/");
@@ -408,44 +406,6 @@ function AegisAppInner() {
       throw err;
     }
   };
-  const handleAnalyzeRef = useRef(handleAnalyze);
-  handleAnalyzeRef.current = handleAnalyze;
-
-  // Web Share Target: auto-process shared URL
-  useEffect(() => {
-    if (!sharedUrl || shareConsumedRef.current) return;
-    shareConsumedRef.current = true;
-    if (isDemoMode && !bannerDismissed) dismissBanner();
-    setTab("incinerator");
-    window.history.replaceState({}, "", "/");
-    setShareState({ url: sharedUrl, status: "fetching" });
-    (async () => {
-      try {
-        const res = await fetch("/api/fetch/url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: sharedUrl }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setShareState(s => s ? { ...s, status: "error", error: data.error } : null);
-          addNotification("Share: " + (data.error || "Could not fetch URL"), "error");
-          return;
-        }
-        setShareState(s => s ? { ...s, status: "analyzing" } : null);
-        await handleAnalyzeRef.current(data.content || data.description || "", {
-          sourceUrl: sharedUrl,
-          imageUrl: data.imageUrl,
-        });
-        setShareState(s => s ? { ...s, status: "done" } : null);
-      } catch (err) {
-        console.warn("[share] Auto-process failed:", errMsg(err));
-        setShareState(s => s ? { ...s, status: "error", error: "Analysis failed" } : null);
-        addNotification("Shared URL analysis failed", "error");
-      }
-    })();
-  }, [sharedUrl, isDemoMode, bannerDismissed, dismissBanner, addNotification]);
-
   const handlePublishSignal = useCallback(async (
     text: string,
     scores: AnalyzeResponse,
@@ -629,7 +589,6 @@ function AegisAppInner() {
           stakingEnabled={isAuthenticated && (publishGate?.requiresDeposit ?? false)}
           publishGate={publishGate}
           mobile={mobile}
-          shareState={shareState}
         />
       )}
       {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} initialUrl={capturedDeepLinkUrl ?? undefined} />}

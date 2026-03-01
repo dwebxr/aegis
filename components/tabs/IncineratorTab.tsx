@@ -7,12 +7,6 @@ import { colors, space, type as t, radii, kpiLabelStyle } from "@/styles/theme";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { PublishGateDecision } from "@/lib/reputation/publishGate";
 
-interface ShareState {
-  url: string;
-  status: "fetching" | "analyzing" | "done" | "error";
-  error?: string;
-}
-
 interface IncineratorTabProps {
   isAnalyzing: boolean;
   onAnalyze: (text: string) => Promise<AnalyzeResponse>;
@@ -23,7 +17,6 @@ interface IncineratorTabProps {
   stakingEnabled?: boolean;
   publishGate?: PublishGateDecision | null;
   mobile?: boolean;
-  shareState?: ShareState | null;
 }
 
 const STAGES = [
@@ -33,40 +26,9 @@ const STAGES = [
   { id: "S4", name: "Cross-Valid", activatable: false, color: colors.text.tertiary },
 ] as const;
 
-export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, onUploadImage, nostrPubkey, icpBalance, stakingEnabled, publishGate, mobile, shareState }) => {
+export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, onUploadImage, nostrPubkey, icpBalance, stakingEnabled, publishGate, mobile }) => {
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
-      {/* Web Share Target status banner */}
-      {shareState && shareState.status !== "done" && (
-        <div style={{
-          background: shareState.status === "error" ? "rgba(248,113,113,0.08)" : "rgba(56,189,248,0.08)",
-          border: `1px solid ${shareState.status === "error" ? "rgba(248,113,113,0.2)" : "rgba(56,189,248,0.2)"}`,
-          borderRadius: radii.lg,
-          padding: `${space[3]}px ${space[5]}px`,
-          marginBottom: space[4],
-          display: "flex",
-          alignItems: "center",
-          gap: space[3],
-        }}>
-          {shareState.status !== "error" && (
-            <span style={{ display: "inline-block", animation: "spin 1s linear infinite", fontSize: 18 }}>&#x27F3;</span>
-          )}
-          <div>
-            <div style={{
-              fontSize: t.bodySm.size, fontWeight: 600,
-              color: shareState.status === "error" ? colors.red[400] : colors.sky[400],
-            }}>
-              {shareState.status === "fetching" && "Fetching shared URL..."}
-              {shareState.status === "analyzing" && "Analyzing content..."}
-              {shareState.status === "error" && "Share failed"}
-            </div>
-            <div style={{ fontSize: t.tiny.size, color: colors.text.muted, marginTop: 2, wordBreak: "break-all" }}>
-              {shareState.status === "error" ? (shareState.error || shareState.url) : shareState.url}
-            </div>
-          </div>
-        </div>
-      )}
-
       <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
         <h1 data-testid="aegis-incinerator-heading" style={{
           fontSize: mobile ? t.display.mobileSz : t.display.size,
