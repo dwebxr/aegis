@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { fonts, colors, space, type as t, radii, transitions, kpiLabelStyle } from "@/styles/theme";
 import { RSSIcon, GlobeIcon, LinkIcon, GitHubIcon, CheckIcon } from "@/components/icons";
 import { POPULAR_SOURCES, CATALOG_CATEGORIES, type CatalogCategory } from "@/lib/sources/catalog";
@@ -22,6 +22,8 @@ interface SourcesTabProps {
   onAnalyze: (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
   isAnalyzing: boolean;
   mobile?: boolean;
+  /** Deep link: pre-fill URL input and auto-trigger extraction */
+  initialUrl?: string;
 }
 
 type QuickAddId = "youtube" | "topic" | "github" | "bluesky" | "reddit" | "mastodon" | "farcaster";
@@ -53,7 +55,7 @@ function formatRetryCountdown(until: number): string {
   return `${Math.ceil(diffSec / 60)} min`;
 }
 
-export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, mobile }) => {
+export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, mobile, initialUrl }) => {
   const { sources, syncStatus, syncError, addSource, removeSource, toggleSource, updateSource } = useSources();
   const { isAuthenticated } = useAuth();
   const { isDemoMode } = useDemo();
@@ -107,6 +109,17 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     return () => clearInterval(id);
   }, []);
 
+  // Deep link: auto-fill URL and trigger extraction
+  const initialUrlConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!initialUrl || initialUrlConsumedRef.current) return;
+    initialUrlConsumedRef.current = true;
+    setActiveSource("url");
+    setUrlInput(initialUrl);
+    void fetchUrl(initialUrl);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialUrl]);
+
   // Source auto-suggestions from validated domains
   const [feedSuggestions, setFeedSuggestions] = useState<Array<DomainValidation & { discoveredFeedUrl?: string | null }>>([]);
   useEffect(() => {
@@ -159,11 +172,12 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     }
   }, []);
 
-  const fetchUrl = async () => {
-    if (!urlInput.trim()) return;
+  const fetchUrl = async (overrideUrl?: string) => {
+    const target = overrideUrl ?? urlInput;
+    if (!target.trim()) return;
     setUrlLoading(true); setUrlError(""); setUrlResult(null);
     try {
-      const res = await fetch("/api/fetch/url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: urlInput }), signal: AbortSignal.timeout(20_000) });
+      const res = await fetch("/api/fetch/url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: target }), signal: AbortSignal.timeout(20_000) });
       const data = await res.json();
       if (!res.ok) { setUrlError(data.error || "Failed to extract"); return; }
       setUrlResult(data);
@@ -499,7 +513,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             <label style={labelStyle}>Article URL</label>
             <div style={{ display: "flex", gap: space[2] }}>
               <input value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="https://example.com/article" style={{ ...inputStyle, flex: 1 }} />
-              <button onClick={fetchUrl} disabled={urlLoading || !urlInput.trim()} style={btnStyle(!urlInput.trim(), urlLoading)}>
+              <button onClick={() => fetchUrl()} disabled={urlLoading || !urlInput.trim()} style={btnStyle(!urlInput.trim(), urlLoading)}>
                 {urlLoading ? "Extracting..." : "Extract"}
               </button>
             </div>

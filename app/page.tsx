@@ -103,6 +103,21 @@ function AegisAppInner() {
     error?: string;
   } | null>(null);
 
+  // Deep Link: ?tab=sources&url=https://example.com/article
+  const deepLinkUrl = useMemo(() => {
+    if (searchParams.get("tab") !== "sources") return null;
+    return extractUrl(searchParams.get("url"));
+  }, [searchParams]);
+  const deepLinkConsumedRef = useRef(false);
+
+  useEffect(() => {
+    if (!deepLinkUrl || deepLinkConsumedRef.current) return;
+    if (!isAuthenticated) return;
+    deepLinkConsumedRef.current = true;
+    setTab("sources");
+    window.history.replaceState({}, "", "/");
+  }, [deepLinkUrl, isAuthenticated]);
+
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
   userContextRef.current = userContext;
@@ -616,7 +631,7 @@ function AegisAppInner() {
           shareState={shareState}
         />
       )}
-      {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />}
+      {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} initialUrl={deepLinkConsumedRef.current ? deepLinkUrl ?? undefined : undefined} />}
       {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} pipelineStats={pipelineResult?.stats ?? null} />}
       {tab === "d2a" && <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={setTab} />}
       {tab === "settings" && <SettingsTab mobile={mobile} linkedAccount={linkedAccount} onLinkChange={handleLinkAccount} />}
