@@ -78,12 +78,7 @@ export function buildAegisTags(
   return tags;
 }
 
-interface BriefingPublishResult {
-  naddr: string;
-  eventId: string;
-  relaysPublished: string[];
-  relaysFailed: string[];
-}
+type BriefingPublishResult = PublishResult & { naddr: string };
 
 /** Publish a serialized briefing as a NIP-23 long-form article (Kind 30023). */
 export async function publishBriefingToNostr(

@@ -43,7 +43,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
 
       <main ref={mainRef} data-testid="aegis-main-content" style={{
         flex: 1, overflow: "auto",
-        overscrollBehaviorY: "contain" as const, // prevent native pull-to-refresh
+        overscrollBehaviorY: "contain", // prevent native pull-to-refresh
         padding: mobile ? `${space[4]}px ${space[4]}px 100px` : tablet ? `${space[6]}px ${space[6]}px` : `${space[10]}px ${space[12]}px`,
       }}>
         <PullToRefresh scrollRef={mainRef} enabled={mobile}>

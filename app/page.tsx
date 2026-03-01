@@ -105,24 +105,19 @@ function AegisAppInner() {
 
   // Deep Link: ?tab=sources  or  ?tab=sources&url=https://example.com/article
   // URL is captured in state so it survives replaceState clearing searchParams.
-  const deepLinkTab = useMemo(() => searchParams.get("tab"), [searchParams]);
-  const deepLinkUrl = useMemo(() => {
-    if (deepLinkTab !== "sources") return null;
-    return extractUrl(searchParams.get("url"));
-  }, [deepLinkTab, searchParams]);
   const deepLinkConsumedRef = useRef(false);
   const [capturedDeepLinkUrl, setCapturedDeepLinkUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (deepLinkTab !== "sources" || deepLinkConsumedRef.current) return;
+    if (deepLinkConsumedRef.current) return;
+    if (searchParams.get("tab") !== "sources") return;
     if (!isAuthenticated) return;
     deepLinkConsumedRef.current = true;
-    // Capture URL in state before replaceState clears searchParams.
-    // Both setState calls are batched — SourcesTab receives both tab + URL in one render.
-    if (deepLinkUrl) setCapturedDeepLinkUrl(deepLinkUrl);
+    const url = extractUrl(searchParams.get("url"));
+    if (url) setCapturedDeepLinkUrl(url);
     setTab("sources");
     window.history.replaceState({}, "", "/");
-  }, [deepLinkTab, deepLinkUrl, isAuthenticated]);
+  }, [searchParams, isAuthenticated]);
 
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
