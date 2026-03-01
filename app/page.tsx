@@ -104,20 +104,25 @@ function AegisAppInner() {
   } | null>(null);
 
   // Deep Link: ?tab=sources  or  ?tab=sources&url=https://example.com/article
+  // URL is captured in state so it survives replaceState clearing searchParams.
   const deepLinkTab = useMemo(() => searchParams.get("tab"), [searchParams]);
   const deepLinkUrl = useMemo(() => {
     if (deepLinkTab !== "sources") return null;
     return extractUrl(searchParams.get("url"));
   }, [deepLinkTab, searchParams]);
   const deepLinkConsumedRef = useRef(false);
+  const [capturedDeepLinkUrl, setCapturedDeepLinkUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (deepLinkTab !== "sources" || deepLinkConsumedRef.current) return;
     if (!isAuthenticated) return;
     deepLinkConsumedRef.current = true;
+    // Capture URL in state before replaceState clears searchParams.
+    // Both setState calls are batched — SourcesTab receives both tab + URL in one render.
+    if (deepLinkUrl) setCapturedDeepLinkUrl(deepLinkUrl);
     setTab("sources");
     window.history.replaceState({}, "", "/");
-  }, [deepLinkTab, isAuthenticated]);
+  }, [deepLinkTab, deepLinkUrl, isAuthenticated]);
 
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
@@ -632,7 +637,7 @@ function AegisAppInner() {
           shareState={shareState}
         />
       )}
-      {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} initialUrl={deepLinkUrl ?? undefined} />}
+      {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} initialUrl={capturedDeepLinkUrl ?? undefined} />}
       {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} pipelineStats={pipelineResult?.stats ?? null} />}
       {tab === "d2a" && <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={setTab} />}
       {tab === "settings" && <SettingsTab mobile={mobile} linkedAccount={linkedAccount} onLinkChange={handleLinkAccount} />}
