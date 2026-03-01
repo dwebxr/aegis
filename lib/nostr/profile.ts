@@ -1,6 +1,6 @@
 import { finalizeEvent } from "nostr-tools/pure";
 import { SimplePool } from "nostr-tools/pool";
-import { KIND_PROFILE, DEFAULT_RELAYS } from "./types";
+import { KIND_PROFILE, KIND_RELAY_LIST, DEFAULT_RELAYS } from "./types";
 import { publishAndPartition, type PublishResult } from "./publish";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
@@ -124,6 +124,35 @@ export async function publishAgentProfile(
   );
 
   const { published, failed } = await publishAndPartition(signed, urls);
+
+  if (published.length > 0) {
+    // Publish Kind 10002 (NIP-65 Relay List Metadata) so other clients
+    // know where to find this pubkey's events
+    try {
+      const relayListEvent = finalizeEvent(
+        {
+          kind: KIND_RELAY_LIST,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: urls.map((u) => ["r", u]),
+          content: "",
+        },
+        sk,
+      );
+      await publishAndPartition(relayListEvent, urls);
+    } catch (err) {
+      console.warn("[agent-profile] Kind 10002 relay list publish failed:", errMsg(err));
+    }
+
+    // Verify the profile was stored by fetching it back
+    try {
+      const verified = await fetchAgentProfile(pubkeyHex, published.slice(0, 1));
+      if (!verified) {
+        console.warn("[agent-profile] Post-publish verification: relay returned no Kind 0");
+      }
+    } catch (err) {
+      console.warn("[agent-profile] Post-publish verification failed:", errMsg(err));
+    }
+  }
 
   return {
     eventId: signed.id,

@@ -16,13 +16,25 @@ export async function publishAndPartition(
   urls: string[],
 ): Promise<{ published: string[]; failed: string[] }> {
   const pool = new SimplePool();
-  const results = await Promise.allSettled(pool.publish(urls, signed));
-  pool.destroy();
+  try {
+    const results = await Promise.allSettled(pool.publish(urls, signed));
 
-  const published: string[] = [];
-  const failed: string[] = [];
-  results.forEach((r, i) => (r.status === "fulfilled" ? published : failed).push(urls[i]));
-  return { published, failed };
+    const published: string[] = [];
+    const failed: string[] = [];
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") {
+        published.push(urls[i]);
+      } else {
+        console.warn(`[nostr-publish] Relay ${urls[i]} rejected:`, r.reason);
+        failed.push(urls[i]);
+      }
+    });
+    return { published, failed };
+  } finally {
+    // Allow relay connections to flush before teardown
+    await new Promise((r) => setTimeout(r, 1500));
+    pool.destroy();
+  }
 }
 
 /** Client-side only — private key never leaves the browser. */

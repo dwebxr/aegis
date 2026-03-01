@@ -31,12 +31,17 @@ const fakeSk = new Uint8Array(32).fill(1);
 
 describe("publishSignalToNostr", () => {
   beforeEach(() => {
+    jest.useFakeTimers({ advanceTimers: true });
     jest.clearAllMocks();
     // Default: single relay succeeds
     (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
       publish: jest.fn().mockReturnValue([Promise.resolve()]),
       destroy: jest.fn(),
     }) as unknown as SimplePool);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("returns eventId from finalized event", async () => {
@@ -140,12 +145,17 @@ describe("publishBriefingToNostr", () => {
   };
 
   beforeEach(() => {
+    jest.useFakeTimers({ advanceTimers: true });
     jest.clearAllMocks();
     (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
       publish: jest.fn().mockReturnValue([Promise.resolve()]),
       destroy: jest.fn(),
     }) as unknown as SimplePool);
     mockNaddrEncode.mockReturnValue("naddr1mock");
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("returns naddr, eventId, and relay lists", async () => {

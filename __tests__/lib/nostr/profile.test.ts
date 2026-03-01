@@ -370,11 +370,16 @@ describe("publishAgentProfile", () => {
   const fakeSk = new Uint8Array(32).fill(1);
 
   beforeEach(() => {
+    jest.useFakeTimers({ advanceTimers: true });
     (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
       querySync: jest.fn().mockResolvedValue([]),
       publish: jest.fn().mockReturnValue([Promise.resolve()]),
       destroy: jest.fn(),
     }) as unknown as SimplePool);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("publishes new profile when no existing profile", async () => {
@@ -389,18 +394,15 @@ describe("publishAgentProfile", () => {
   it("merges with existing profile (preserve existing fields)", async () => {
     const existing = { name: "OldName", lud16: "old@pay.me", nip05: "old@nostr.com" };
 
-    let callCount = 0; // 1st pool = fetch, 2nd = publish
+    let callCount = 0; // 1st pool = fetch, rest = publish/verify
     (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => {
       callCount++;
-      if (callCount === 1) {
-        return {
-          querySync: jest.fn().mockResolvedValue([
-            { kind: 0, created_at: 1700000000, content: JSON.stringify(existing), tags: [] },
-          ]),
-          destroy: jest.fn(),
-        } as unknown as SimplePool;
-      }
       return {
+        querySync: callCount === 1
+          ? jest.fn().mockResolvedValue([
+              { kind: 0, created_at: 1700000000, content: JSON.stringify(existing), tags: [] },
+            ])
+          : jest.fn().mockResolvedValue([]),
         publish: jest.fn().mockReturnValue(DEFAULT_RELAYS.map(() => Promise.resolve())),
         destroy: jest.fn(),
       } as unknown as SimplePool;
@@ -420,15 +422,12 @@ describe("publishAgentProfile", () => {
     let callCount = 0;
     (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => {
       callCount++;
-      if (callCount === 1) {
-        return {
-          querySync: jest.fn().mockResolvedValue([
-            { kind: 0, created_at: 1700000000, content: JSON.stringify(existing), tags: [] },
-          ]),
-          destroy: jest.fn(),
-        } as unknown as SimplePool;
-      }
       return {
+        querySync: callCount === 1
+          ? jest.fn().mockResolvedValue([
+              { kind: 0, created_at: 1700000000, content: JSON.stringify(existing), tags: [] },
+            ])
+          : jest.fn().mockResolvedValue([]),
         publish: jest.fn().mockReturnValue([Promise.resolve()]),
         destroy: jest.fn(),
       } as unknown as SimplePool;
@@ -444,15 +443,12 @@ describe("publishAgentProfile", () => {
     let callCount = 0;
     (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => {
       callCount++;
-      if (callCount === 1) {
-        return {
-          querySync: jest.fn().mockResolvedValue([
-            { kind: 0, created_at: 1700000000, content: JSON.stringify(existing), tags: [] },
-          ]),
-          destroy: jest.fn(),
-        } as unknown as SimplePool;
-      }
       return {
+        querySync: callCount === 1
+          ? jest.fn().mockResolvedValue([
+              { kind: 0, created_at: 1700000000, content: JSON.stringify(existing), tags: [] },
+            ])
+          : jest.fn().mockResolvedValue([]),
         publish: jest.fn().mockReturnValue([Promise.resolve()]),
         destroy: jest.fn(),
       } as unknown as SimplePool;
@@ -467,13 +463,10 @@ describe("publishAgentProfile", () => {
     let callCount = 0;
     (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => {
       callCount++;
-      if (callCount === 1) {
-        return {
-          querySync: jest.fn().mockRejectedValue(new Error("relay offline")),
-          destroy: jest.fn(),
-        } as unknown as SimplePool;
-      }
       return {
+        querySync: callCount === 1
+          ? jest.fn().mockRejectedValue(new Error("relay offline"))
+          : jest.fn().mockResolvedValue([]),
         publish: jest.fn().mockReturnValue([Promise.resolve()]),
         destroy: jest.fn(),
       } as unknown as SimplePool;
@@ -509,17 +502,14 @@ describe("publishAgentProfile", () => {
     let callCount = 0;
     (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => {
       callCount++;
-      if (callCount === 1) {
-        return {
-          querySync: jest.fn().mockResolvedValue([]),
-          destroy: jest.fn(),
-        } as unknown as SimplePool;
-      }
       return {
-        publish: jest.fn().mockReturnValue([
-          Promise.resolve(),
-          Promise.reject(new Error("timeout")),
-        ]),
+        querySync: jest.fn().mockResolvedValue([]),
+        publish: callCount === 2
+          ? jest.fn().mockReturnValue([
+              Promise.resolve(),
+              Promise.reject(new Error("timeout")),
+            ])
+          : jest.fn().mockReturnValue([Promise.resolve()]),
         destroy: jest.fn(),
       } as unknown as SimplePool;
     });
@@ -537,20 +527,11 @@ describe("publishAgentProfile", () => {
     const mockQuerySync = jest.fn().mockResolvedValue([]);
     const mockPublish = jest.fn().mockReturnValue([Promise.resolve()]);
 
-    let callCount = 0;
-    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        return {
-          querySync: mockQuerySync,
-          destroy: jest.fn(),
-        } as unknown as SimplePool;
-      }
-      return {
-        publish: mockPublish,
-        destroy: jest.fn(),
-      } as unknown as SimplePool;
-    });
+    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
+      querySync: mockQuerySync,
+      publish: mockPublish,
+      destroy: jest.fn(),
+    } as unknown as SimplePool));
 
     await publishAgentProfile({ name: "Agent" }, fakeSk, FAKE_HEX, customRelays);
     expect(mockQuerySync).toHaveBeenCalledWith(customRelays, expect.anything());
@@ -570,20 +551,11 @@ describe("publishAgentProfile", () => {
 
   it("returns all published relays when all succeed", async () => {
     const relays = ["wss://r1.com", "wss://r2.com", "wss://r3.com"];
-    let callCount = 0;
-    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        return {
-          querySync: jest.fn().mockResolvedValue([]),
-          destroy: jest.fn(),
-        } as unknown as SimplePool;
-      }
-      return {
-        publish: jest.fn().mockReturnValue(relays.map(() => Promise.resolve())),
-        destroy: jest.fn(),
-      } as unknown as SimplePool;
-    });
+    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
+      querySync: jest.fn().mockResolvedValue([]),
+      publish: jest.fn().mockReturnValue(relays.map(() => Promise.resolve())),
+      destroy: jest.fn(),
+    } as unknown as SimplePool));
 
     const result = await publishAgentProfile({ name: "Agent" }, fakeSk, FAKE_HEX, relays);
     expect(result.relaysPublished).toEqual(relays);
@@ -592,20 +564,11 @@ describe("publishAgentProfile", () => {
 
   it("returns all failed relays when all fail", async () => {
     const relays = ["wss://r1.com", "wss://r2.com"];
-    let callCount = 0;
-    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        return {
-          querySync: jest.fn().mockResolvedValue([]),
-          destroy: jest.fn(),
-        } as unknown as SimplePool;
-      }
-      return {
-        publish: jest.fn().mockReturnValue(relays.map(() => Promise.reject(new Error("fail")))),
-        destroy: jest.fn(),
-      } as unknown as SimplePool;
-    });
+    (SimplePool as jest.MockedClass<typeof SimplePool>).mockImplementation(() => ({
+      querySync: jest.fn().mockResolvedValue([]),
+      publish: jest.fn().mockImplementation(() => relays.map(() => Promise.reject(new Error("fail")))),
+      destroy: jest.fn(),
+    } as unknown as SimplePool));
 
     const result = await publishAgentProfile({ name: "Agent" }, fakeSk, FAKE_HEX, relays);
     expect(result.relaysPublished).toEqual([]);

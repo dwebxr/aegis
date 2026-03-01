@@ -77,7 +77,12 @@ describe("publishAndPartition — relay distribution", () => {
   const keys = deriveNostrKeypairFromText("test-publish-partition");
 
   beforeEach(() => {
+    jest.useFakeTimers({ advanceTimers: true });
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("returns published and failed lists", async () => {
@@ -148,7 +153,12 @@ describe("publishSignalToNostr — relay fallback", () => {
   const keys = deriveNostrKeypairFromText("test-signal-relay");
 
   beforeEach(() => {
+    jest.useFakeTimers({ advanceTimers: true });
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("uses DEFAULT_RELAYS when relayUrls is empty array", async () => {
