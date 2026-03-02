@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
-import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
+import { safeFetch } from "@/lib/utils/url";
 import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 15;

@@ -60,7 +60,7 @@ function AegisAppInner() {
   const { addNotification } = useNotify();
   const { content, isAnalyzing, syncStatus, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, pendingCount, clearDemoContent } = useContent();
   const { isAuthenticated, identity, principalText, login } = useAuth();
-  const { userContext, profile, bookmarkItem, unbookmarkItem } = usePreferences();
+  const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
   const { agentState, isEnabled: agentIsEnabled, setD2AEnabled, setWoTGraph: pushWoTGraph } = useAgent();
   const { isDemoMode, bannerDismissed, dismissBanner } = useDemo();
