@@ -86,4 +86,62 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
   );
 });
 
+// Background Sync: replay offline action queue when connectivity resumes
+interface SyncEvent extends ExtendableEvent {
+  tag: string;
+}
+
+self.addEventListener("sync", ((event: SyncEvent) => {
+  if (event.tag === "aegis-offline-queue") {
+    event.waitUntil(drainOfflineQueueFromSW());
+  }
+}) as EventListener);
+
+async function drainOfflineQueueFromSW(): Promise<void> {
+  const DB_NAME = "aegis-offline-queue";
+  const STORE_NAME = "pending-actions";
+
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const d = req.result;
+      if (!d.objectStoreNames.contains(STORE_NAME)) {
+        d.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+
+  const actions = await new Promise<Array<{ id: number; type: string; payload: unknown }>>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.getAll();
+    tx.oncomplete = () => resolve(req.result);
+    tx.onerror = () => reject(tx.error);
+  });
+
+  for (const action of actions) {
+    try {
+      const res = await fetch("/api/offline-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: action.type, payload: action.payload }),
+      });
+      if (res.ok) {
+        await new Promise<void>((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, "readwrite");
+          tx.objectStore(STORE_NAME).delete(action.id);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      }
+    } catch {
+      // Will retry on next sync event
+    }
+  }
+
+  db.close();
+}
+
 serwist.addEventListeners();

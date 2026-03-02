@@ -43,6 +43,14 @@ export interface UserPreferenceProfile {
   lastUpdated: number;
   customFilterRules?: CustomFilterRule[];
   activityHistogram?: ActivityHistogram;
+  bookmarkedIds?: string[];
+  notificationPrefs?: NotificationPrefs;
+}
+
+export interface NotificationPrefs {
+  topicAlerts?: string[];
+  minScoreAlert?: number;
+  d2aAlerts?: boolean;
 }
 
 export interface UserContext {

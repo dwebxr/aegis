@@ -58,7 +58,7 @@ function AegisAppInner() {
   const { addNotification } = useNotify();
   const { content, isAnalyzing, syncStatus, analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent } = useContent();
   const { isAuthenticated, identity, principalText, login } = useAuth();
-  const { userContext, profile } = usePreferences();
+  const { userContext, profile, bookmarkItem, unbookmarkItem } = usePreferences();
   const { getSchedulerSources } = useSources();
   const { agentState, isEnabled: agentIsEnabled, setD2AEnabled, setWoTGraph: pushWoTGraph } = useAgent();
   const { isDemoMode, bannerDismissed, dismissBanner } = useDemo();
@@ -111,6 +111,8 @@ function AegisAppInner() {
   const userContextRef = useRef(userContext);
   userContextRef.current = userContext;
   const ledgerRef = useRef<ICPLedgerActor | null>(null);
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
   const agentEnabledRef = useRef(agentIsEnabled);
   agentEnabledRef.current = agentIsEnabled;
 
@@ -342,11 +344,29 @@ function AegisAppInner() {
           }
         } catch { return; /* Safari private mode — skip push */ }
         const quality = items.filter(i => i.verdict === "quality");
-        const preview = (quality.length > 0 ? quality : items)
+        // Apply notification rules if set
+        const notifPrefs = profileRef.current.notificationPrefs;
+        let filteredItems = quality.length > 0 ? quality : items;
+        if (notifPrefs) {
+          filteredItems = filteredItems.filter(item => {
+            // D2A content always passes if d2aAlerts enabled
+            if (notifPrefs.d2aAlerts && (item.source as string) === "d2a") return true;
+            // Check min score
+            if (notifPrefs.minScoreAlert && item.scores.composite < notifPrefs.minScoreAlert) return false;
+            // Check topic alerts (if specified, at least one must match)
+            if (notifPrefs.topicAlerts && notifPrefs.topicAlerts.length > 0) {
+              const itemTopics = (item.topics ?? []).map(t => t.toLowerCase());
+              if (!notifPrefs.topicAlerts.some(alertTopic => itemTopics.includes(alertTopic.toLowerCase()))) return false;
+            }
+            return true;
+          });
+          if (filteredItems.length === 0) return;
+        }
+        const preview = filteredItems
           .slice(0, 3)
           .map(i => `${i.verdict === "quality" ? "\u2713" : "\u2717"} ${i.text.slice(0, 60).replace(/\n/g, " ")}`)
           .join("\n");
-        const summary = `${count} item${count > 1 ? "s" : ""} scored`;
+        const summary = `${filteredItems.length} item${filteredItems.length !== 1 ? "s" : ""} matched`;
         try { localStorage.setItem("aegis-push-last", String(Date.now())); } catch { /* ignore */ }
         void fetch("/api/push/send", {
           method: "POST",
@@ -381,6 +401,15 @@ function AegisAppInner() {
     flagItem(id);
     addNotification("Flagged", "error");
   };
+
+  const handleBookmark = useCallback((id: string) => {
+    const isCurrentlyBookmarked = (profile.bookmarkedIds ?? []).includes(id);
+    if (isCurrentlyBookmarked) {
+      unbookmarkItem(id);
+    } else {
+      bookmarkItem(id);
+    }
+  }, [profile.bookmarkedIds, bookmarkItem, unbookmarkItem]);
 
   const handleAnalyze = async (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => {
     try {

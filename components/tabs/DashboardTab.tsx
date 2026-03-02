@@ -21,6 +21,7 @@ import {
   computeDashboardValidated,
   computeUnreviewedQueue,
   computeTopicDistribution,
+  computeTopicTrends,
   clusterByStory,
 } from "@/lib/dashboard/utils";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
@@ -194,7 +195,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const { sources } = useSources();
   const { isDemoMode } = useDemo();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop" | "validated">("quality");
+  const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop" | "validated" | "bookmarked">("quality");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [showAllContent, setShowAllContent] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
@@ -214,7 +215,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     try { return localStorage.getItem("aegis-home-mode") === "dashboard" ? "dashboard" : "feed"; }
     catch { return "feed"; }
   });
-  const { profile, setTopicAffinity, removeTopicAffinity, setQualityThreshold, addFilterRule, removeFilterRule } = usePreferences();
+  const { profile, setTopicAffinity, removeTopicAffinity, setQualityThreshold, addFilterRule, removeFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activityRange, setActivityRange] = useState<"today" | "7d" | "30d">("today");
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -257,10 +258,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     setExpandedClusters(new Set());
   }, [verdictFilter, sourceFilter]);
 
-  const filteredContent = useMemo(
-    () => applyDashboardFilters(content, verdictFilter, sourceFilter),
-    [content, verdictFilter, sourceFilter],
-  );
+  const filteredContent = useMemo(() => {
+    if (verdictFilter === "bookmarked") {
+      const bookmarkSet = new Set(profile.bookmarkedIds ?? []);
+      return content.filter(c => bookmarkSet.has(c.id)).sort((a, b) => b.createdAt - a.createdAt);
+    }
+    return applyDashboardFilters(content, verdictFilter, sourceFilter);
+  }, [content, verdictFilter, sourceFilter, profile.bookmarkedIds]);
 
   const clusteredContent = useMemo(
     () => clusterByStory(filteredContent),
@@ -322,6 +326,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return computeTopicDistribution(content);
   }, [content, homeMode]);
 
+  const topicTrends = useMemo(() => computeTopicTrends(content), [content]);
+
   const dashboardActivity = useMemo(() => {
     if (homeMode !== "dashboard") return null;
     return computeDashboardActivity(content, activityRange);
@@ -367,6 +373,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       if (parts.length > 0) showFeedback(parts.join("  \u00B7  "));
     }
   }, [content, onFlag, showFeedback]);
+
+  const handleBookmark = useCallback((id: string) => {
+    const isCurrentlyBookmarked = (profile.bookmarkedIds ?? []).includes(id);
+    if (isCurrentlyBookmarked) {
+      unbookmarkItem(id);
+    } else {
+      bookmarkItem(id);
+    }
+  }, [profile.bookmarkedIds, bookmarkItem, unbookmarkItem]);
 
   useEffect(() => {
     return () => { clearTimeout(feedbackTimerRef.current); };
@@ -549,7 +564,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               Filtered Signal {hasActiveFilter && <span style={{ fontSize: t.bodySm.size, color: colors.text.disabled }}>({filteredContent.length})</span>}
             </div>
             <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
-              {(["quality", "all", "slop", "validated"] as const).map(v => (
+              {([
+                { id: "quality" as const, label: "quality" },
+                { id: "all" as const, label: "all" },
+                { id: "slop" as const, label: "slop" },
+                { id: "validated" as const, label: "\u2713 validated" },
+                { id: "bookmarked" as const, label: "\uD83D\uDD16 Saved" },
+              ]).map(({ id: v, label }) => (
                 <button
                   key={v}
                   data-testid={`aegis-filter-${v}`}
@@ -557,24 +578,24 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   style={{
                     padding: `${space[1]}px ${space[3]}px`,
                     background: verdictFilter === v
-                      ? (v === "quality" ? colors.green.bg : v === "slop" ? colors.red.bg : v === "validated" ? "rgba(167,139,250,0.06)" : colors.bg.raised)
+                      ? (v === "quality" ? colors.green.bg : v === "slop" ? colors.red.bg : v === "validated" ? "rgba(167,139,250,0.06)" : v === "bookmarked" ? `${colors.cyan[500]}08` : colors.bg.raised)
                       : "transparent",
                     border: `1px solid ${verdictFilter === v
-                      ? (v === "quality" ? colors.green.border : v === "slop" ? colors.red.border : v === "validated" ? "rgba(167,139,250,0.15)" : colors.border.emphasis)
+                      ? (v === "quality" ? colors.green.border : v === "slop" ? colors.red.border : v === "validated" ? "rgba(167,139,250,0.15)" : v === "bookmarked" ? `${colors.cyan[500]}25` : colors.border.emphasis)
                       : colors.border.default}`,
                     borderRadius: radii.pill,
                     color: verdictFilter === v
-                      ? (v === "quality" ? colors.green[400] : v === "slop" ? colors.red[400] : v === "validated" ? colors.purple[400] : colors.text.secondary)
+                      ? (v === "quality" ? colors.green[400] : v === "slop" ? colors.red[400] : v === "validated" ? colors.purple[400] : v === "bookmarked" ? colors.cyan[400] : colors.text.secondary)
                       : colors.text.disabled,
                     fontSize: t.caption.size,
                     fontWeight: 600,
                     cursor: "pointer",
                     fontFamily: "inherit",
                     transition: transitions.fast,
-                    textTransform: "capitalize",
+                    textTransform: v === "bookmarked" ? "none" : "capitalize",
                   }}
                 >
-                  {v === "validated" ? `\u2713 ${v}` : v}
+                  {label}
                 </button>
               ))}
               {availableSources.length > 1 && (
@@ -675,6 +696,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                       onToggle={() => setExpanded(expanded === rep.id ? null : rep.id)}
                       onValidate={handleValidateWithFeedback}
                       onFlag={handleFlagWithFeedback}
+                      onBookmark={handleBookmark}
+                      isBookmarked={(profile.bookmarkedIds ?? []).includes(rep.id)}
+                      onAddFilterRule={addFilterRule}
                       mobile={mobile}
                       focused={focusedId === rep.id}
                       clusterCount={hasCluster ? cluster.members.length - 1 : undefined}
@@ -709,6 +733,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           onToggle={() => setExpanded(expanded === m.id ? null : m.id)}
                           onValidate={handleValidateWithFeedback}
                           onFlag={handleFlagWithFeedback}
+                          onBookmark={handleBookmark}
+                          isBookmarked={(profile.bookmarkedIds ?? []).includes(m.id)}
+                          onAddFilterRule={addFilterRule}
                           mobile={mobile}
                           focused={focusedId === m.id}
                         />
@@ -1362,6 +1389,31 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                       }}>
                         {entry.count}
                       </span>
+                      {(() => {
+                        const trend = topicTrends.find(tr => tr.topic === entry.topic);
+                        if (!trend) return null;
+                        const arrow = trend.direction === "up" ? "\u2191" : trend.direction === "down" ? "\u2193" : "\u2192";
+                        const arrowColor = trend.direction === "up" ? colors.green[400] : trend.direction === "down" ? colors.red[400] : colors.text.disabled;
+                        return (
+                          <>
+                            <span style={{ width: 50, fontSize: 10, color: arrowColor, fontWeight: 600, textAlign: "right", flexShrink: 0 }}>
+                              {arrow} {Math.abs(trend.changePercent)}%
+                            </span>
+                            <div style={{ display: "flex", alignItems: "flex-end", gap: 1, height: 14, width: 20, flexShrink: 0 }}>
+                              {trend.weeklyHistory.map((count, i) => {
+                                const max = Math.max(...trend.weeklyHistory, 1);
+                                return (
+                                  <div key={i} style={{
+                                    width: 3, borderRadius: 1,
+                                    height: Math.max((count / max) * 14, 2),
+                                    background: i === trend.weeklyHistory.length - 1 ? barColor : `${colors.text.disabled}40`,
+                                  }} />
+                                );
+                              })}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   );
                 })}

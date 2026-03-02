@@ -61,6 +61,28 @@ export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile
     if (typeof ah.lastActivityAt !== "number" || typeof ah.totalEvents !== "number") return false;
   }
 
+  // Optional: bookmarkedIds
+  if (p.bookmarkedIds !== undefined) {
+    if (!Array.isArray(p.bookmarkedIds)) return false;
+    for (const id of p.bookmarkedIds as unknown[]) {
+      if (typeof id !== "string") return false;
+    }
+  }
+
+  // Optional: notificationPrefs
+  if (p.notificationPrefs !== undefined) {
+    const np = p.notificationPrefs as Record<string, unknown>;
+    if (typeof np !== "object" || np === null || Array.isArray(np)) return false;
+    if (np.topicAlerts !== undefined) {
+      if (!Array.isArray(np.topicAlerts)) return false;
+      for (const t of np.topicAlerts as unknown[]) {
+        if (typeof t !== "string") return false;
+      }
+    }
+    if (np.minScoreAlert !== undefined && typeof np.minScoreAlert !== "number") return false;
+    if (np.d2aAlerts !== undefined && typeof np.d2aAlerts !== "boolean") return false;
+  }
+
   return true;
 }
 

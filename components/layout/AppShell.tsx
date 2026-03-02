@@ -1,11 +1,13 @@
 "use client";
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
+import { SyncStatusBanner } from "@/components/ui/SyncStatusBanner";
+import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { ShieldIcon, SearchIcon, FireIcon, RSSIcon, D2AIcon } from "@/components/icons";
-import { colors, fonts, space } from "@/styles/theme";
+import { colors, fonts, space, type as t, radii, transitions } from "@/styles/theme";
 import type { NavItem } from "./Sidebar";
 
 interface AppShellProps {
@@ -29,6 +31,9 @@ function buildNavItems(size: number): NavItem[] {
 export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, children }) => {
   const { mobile, tablet } = useWindowSize();
   const mainRef = useRef<HTMLElement>(null);
+  const { canInstall, installed, promptInstall } = useInstallPrompt();
+  const [installDismissed, setInstallDismissed] = useState(false);
+  const showInstallBanner = canInstall && !installed && !installDismissed;
 
   return (
     <div style={{
@@ -48,6 +53,56 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
       }}>
         <PullToRefresh scrollRef={mainRef} enabled={mobile}>
           <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+            {showInstallBanner && (
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: `${space[2]}px ${space[4]}px`,
+                background: `${colors.cyan[500]}10`,
+                border: `1px solid ${colors.cyan[500]}25`,
+                borderRadius: radii.md,
+                marginBottom: space[3],
+              }}>
+                <span style={{ fontSize: t.caption.size, color: colors.text.secondary, fontWeight: 600 }}>
+                  Install Aegis for faster access
+                </span>
+                <div style={{ display: "flex", gap: space[2], flexShrink: 0 }}>
+                  <button
+                    onClick={() => void promptInstall()}
+                    style={{
+                      padding: `${space[1]}px ${space[3]}px`,
+                      background: `${colors.cyan[500]}18`,
+                      border: `1px solid ${colors.cyan[500]}33`,
+                      borderRadius: radii.sm,
+                      color: colors.cyan[400],
+                      fontSize: t.caption.size,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      transition: transitions.fast,
+                    }}
+                  >
+                    Install
+                  </button>
+                  <button
+                    onClick={() => setInstallDismissed(true)}
+                    aria-label="Dismiss install banner"
+                    style={{
+                      padding: `${space[1]}px ${space[2]}px`,
+                      background: "transparent",
+                      border: "none",
+                      color: colors.text.disabled,
+                      fontSize: t.body.size,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      lineHeight: 1,
+                    }}
+                  >
+                    &times;
+                  </button>
+                </div>
+              </div>
+            )}
+            <SyncStatusBanner />
             {children}
           </div>
         </PullToRefresh>

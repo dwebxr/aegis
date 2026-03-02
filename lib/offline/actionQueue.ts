@@ -42,10 +42,19 @@ function withDB<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBR
   }));
 }
 
-export function enqueueAction(type: QueuedActionType, payload: unknown): Promise<void> {
-  return withDB("readwrite", store => {
+export async function enqueueAction(type: QueuedActionType, payload: unknown): Promise<void> {
+  await withDB("readwrite", store => {
     store.add({ type, payload, createdAt: Date.now(), retries: 0 } satisfies Omit<QueuedAction, "id">);
   });
+  // Register Background Sync if available
+  if (typeof navigator !== "undefined" && "serviceWorker" in navigator && "SyncManager" in window) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await (reg as ServiceWorkerRegistration & { sync: { register(tag: string): Promise<void> } }).sync.register("aegis-offline-queue");
+    } catch {
+      // SyncManager not supported or permission denied — falls back to onReconnect
+    }
+  }
 }
 
 export function dequeueAll(): Promise<QueuedAction[]> {

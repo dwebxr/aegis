@@ -23,6 +23,8 @@ interface ContentCardProps {
   onValidate: (id: string) => void;
   onFlag: (id: string) => void;
   onAddFilterRule?: (rule: Omit<CustomFilterRule, "id" | "createdAt">) => void;
+  onBookmark?: (id: string) => void;
+  isBookmarked?: boolean;
   mobile?: boolean;
   variant?: CardVariant;
   rank?: number;
@@ -126,7 +128,7 @@ function ScoreTags({ item }: { item: ContentItem }) {
   );
 }
 
-export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, mobile, variant = "default", rank, focused, clusterCount }) => {
+export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, isBookmarked, mobile, variant = "default", rank, focused, clusterCount }) => {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const isSlop = item.verdict === "slop";
@@ -342,6 +344,25 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
               >
                 Read more &rarr;
               </a>
+            )}
+            {onBookmark && (
+              <button
+                aria-label={isBookmarked ? "Remove bookmark" : "Bookmark for later"}
+                onClick={e => { e.stopPropagation(); onBookmark(item.id); }}
+                style={{
+                  padding: `${space[2]}px ${space[3]}px`,
+                  background: isBookmarked ? `${colors.amber[400]}18` : "transparent",
+                  border: `1px solid ${isBookmarked ? `${colors.amber[400]}30` : colors.border.default}`,
+                  borderRadius: radii.md,
+                  color: isBookmarked ? colors.amber[400] : colors.text.muted,
+                  fontSize: t.bodySm.size, fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  transition: transitions.fast, fontFamily: "inherit",
+                }}
+              >
+                {isBookmarked ? "\uD83D\uDD16 Saved" : "\uD83D\uDD16 Save"}
+              </button>
             )}
             {isSlop && !isLarge ? (
               <button disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{

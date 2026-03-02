@@ -209,6 +209,61 @@ export function computeTopicDistribution(
     .slice(0, 8);
 }
 
+// ── Topic Trends ────────────────────────────────────────────
+
+export interface TopicTrend {
+  topic: string;
+  currentCount: number;
+  previousCount: number;
+  changePercent: number;
+  direction: "up" | "down" | "stable";
+  weeklyHistory: number[];
+}
+
+export function computeTopicTrends(content: ContentItem[], weeks = 4): TopicTrend[] {
+  const now = Date.now();
+  const weekMs = 7 * 86400000;
+
+  // Build per-week topic counts. weekBuckets[0] = most recent week
+  const weekBuckets: Map<string, number>[] = [];
+  for (let w = 0; w < weeks; w++) {
+    const weekStart = now - (w + 1) * weekMs;
+    const weekEnd = now - w * weekMs;
+    const topicCounts = new Map<string, number>();
+    for (const item of content) {
+      if (item.createdAt < weekStart || item.createdAt >= weekEnd) continue;
+      if (!item.topics) continue;
+      for (const topic of item.topics) {
+        const t = topic.toLowerCase();
+        topicCounts.set(t, (topicCounts.get(t) ?? 0) + 1);
+      }
+    }
+    weekBuckets.push(topicCounts);
+  }
+
+  // Collect all topics from most recent 2 weeks
+  const allTopics = new Set<string>();
+  for (const bucket of weekBuckets.slice(0, 2)) {
+    for (const topic of bucket.keys()) allTopics.add(topic);
+  }
+
+  const trends: TopicTrend[] = [];
+  for (const topic of allTopics) {
+    const current = weekBuckets[0]?.get(topic) ?? 0;
+    const previous = weekBuckets[1]?.get(topic) ?? 0;
+    const changePercent = previous === 0
+      ? (current > 0 ? 100 : 0)
+      : Math.round(((current - previous) / previous) * 100);
+    const direction: TopicTrend["direction"] =
+      changePercent > 10 ? "up" : changePercent < -10 ? "down" : "stable";
+    const weeklyHistory = weekBuckets.map(b => b.get(topic) ?? 0).reverse();
+
+    trends.push({ topic, currentCount: current, previousCount: previous, changePercent, direction, weeklyHistory });
+  }
+
+  return trends.sort((a, b) => b.currentCount - a.currentCount).slice(0, 8);
+}
+
 // ── Story Clustering ────────────────────────────────────────
 
 export interface StoryCluster {

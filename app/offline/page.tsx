@@ -1,6 +1,17 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { queueSize } from "@/lib/offline/actionQueue";
+
 export default function OfflinePage() {
+  const [pending, setPending] = useState(0);
+
+  useEffect(() => {
+    queueSize()
+      .then(setPending)
+      .catch(() => { /* IndexedDB unavailable */ });
+  }, []);
+
   return (
     <div
       style={{
@@ -26,6 +37,21 @@ export default function OfflinePage() {
       <p style={{ color: "#64748b", fontSize: "0.875rem", maxWidth: "24rem", marginBottom: "1.5rem" }}>
         Your cached evaluations are still available offline.
       </p>
+      {pending > 0 && (
+        <div style={{
+          padding: "0.625rem 1.5rem",
+          borderRadius: "0.5rem",
+          border: "1px solid #f59e0b33",
+          backgroundColor: "#f59e0b15",
+          color: "#fbbf24",
+          fontSize: "0.875rem",
+          fontWeight: 600,
+          marginBottom: "1rem",
+          maxWidth: "24rem",
+        }}>
+          {pending} action{pending !== 1 ? "s" : ""} pending sync — will sync when online
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <button
           onClick={() => { window.location.href = "/"; }}

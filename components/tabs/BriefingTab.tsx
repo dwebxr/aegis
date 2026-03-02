@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { ContentCard } from "@/components/ui/ContentCard";
 import { ShareBriefingModal } from "@/components/ui/ShareBriefingModal";
 import { ShareIcon } from "@/components/icons";
@@ -12,6 +12,7 @@ import { colors, space, fonts, type as t, radii, transitions } from "@/styles/th
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
+import { errMsg } from "@/lib/utils/errors";
 
 interface BriefingTabProps {
   content: ContentItem[];
@@ -29,6 +30,9 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showFiltered, setShowFiltered] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [digest, setDigest] = useState<string | null>(null);
+  const [digestLoading, setDigestLoading] = useState(false);
+  const [digestError, setDigestError] = useState<string | null>(null);
   const { syncBriefing } = useContent();
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
@@ -52,6 +56,42 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
       syncBriefing(briefingRef.current, nostrKeys?.pk ?? null);
     }
   }, [briefingSyncKey, syncBriefing, nostrKeys?.pk]);
+
+  useEffect(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const cached = localStorage.getItem(`aegis-digest-${today}`);
+      if (cached) setDigest(cached);
+    } catch { /* SSR / private mode */ }
+  }, []);
+
+  const generateDigest = useCallback(async () => {
+    if (briefing.priority.length === 0) return;
+    setDigestLoading(true);
+    setDigestError(null);
+    try {
+      const articles = briefing.priority.map(b => ({
+        title: b.item.text.split("\n")[0].slice(0, 80),
+        text: b.item.text.slice(0, 200),
+        score: b.item.scores.composite,
+        topics: b.item.topics ?? [],
+      }));
+      const res = await fetch("/api/briefing/digest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articles }),
+      });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      const data = await res.json();
+      setDigest(data.digest);
+      const today = new Date().toISOString().slice(0, 10);
+      try { localStorage.setItem(`aegis-digest-${today}`, data.digest); } catch { /* ignore */ }
+    } catch (err) {
+      setDigestError(errMsg(err));
+    } finally {
+      setDigestLoading(false);
+    }
+  }, [briefing.priority]);
 
   const insightCount = briefing.priority.length + (briefing.serendipity ? 1 : 0) + dedupedDiscoveries.length;
   const canShare = nostrKeys && briefing.priority.length > 0;
@@ -165,6 +205,47 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 Start Evaluating &rarr;
               </button>
             </div>
+          )}
+        </div>
+      )}
+
+      {briefing.priority.length > 0 && (
+        <div style={{
+          marginTop: space[4], marginBottom: space[4],
+          padding: `${space[4]}px ${space[5]}px`,
+          background: colors.bg.surface,
+          border: `1px solid ${colors.border.default}`,
+          borderRadius: radii.lg,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3] }}>
+            <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
+              Today&apos;s Digest
+            </span>
+            {!digest && (
+              <button onClick={generateDigest} disabled={digestLoading} style={{
+                padding: `${space[1]}px ${space[3]}px`,
+                background: digestLoading ? colors.bg.overlay : `${colors.cyan[500]}18`,
+                border: `1px solid ${digestLoading ? colors.border.subtle : `${colors.cyan[500]}33`}`,
+                borderRadius: radii.md,
+                color: digestLoading ? colors.text.disabled : colors.cyan[400],
+                fontSize: t.caption.size, fontWeight: 600,
+                cursor: digestLoading ? "not-allowed" : "pointer",
+                fontFamily: "inherit", transition: transitions.fast,
+              }}>
+                {digestLoading ? "Generating..." : "Generate Digest"}
+              </button>
+            )}
+          </div>
+          {digest ? (
+            <p style={{ fontSize: t.body.size, color: colors.text.secondary, lineHeight: 1.6, margin: 0 }}>
+              {digest}
+            </p>
+          ) : digestError ? (
+            <p style={{ fontSize: t.caption.size, color: colors.red[400], margin: 0 }}>{digestError}</p>
+          ) : (
+            <p style={{ fontSize: t.caption.size, color: colors.text.disabled, margin: 0 }}>
+              AI-generated summary of your top priority articles.
+            </p>
           )}
         </div>
       )}

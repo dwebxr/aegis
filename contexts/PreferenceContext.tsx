@@ -1,7 +1,7 @@
 "use client";
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "./AuthContext";
-import type { UserPreferenceProfile, UserContext, CustomFilterRule } from "@/lib/preferences/types";
+import type { UserPreferenceProfile, UserContext, CustomFilterRule, NotificationPrefs } from "@/lib/preferences/types";
 import { createEmptyProfile, TOPIC_AFFINITY_CAP, TOPIC_AFFINITY_FLOOR } from "@/lib/preferences/types";
 import { learn, getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { loadProfile, saveProfile, syncPreferencesToIC, loadPreferencesFromIC, mergeProfiles } from "@/lib/preferences/storage";
@@ -20,6 +20,9 @@ interface PreferenceState {
   setQualityThreshold: (value: number) => void;
   addFilterRule: (rule: Omit<CustomFilterRule, "id" | "createdAt">) => void;
   removeFilterRule: (ruleId: string) => void;
+  bookmarkItem: (id: string) => void;
+  unbookmarkItem: (id: string) => void;
+  setNotificationPrefs: (prefs: NotificationPrefs) => void;
 }
 
 const emptyProfile = createEmptyProfile("");
@@ -35,6 +38,9 @@ const PreferenceContext = createContext<PreferenceState>({
   setQualityThreshold: () => {},
   addFilterRule: () => {},
   removeFilterRule: () => {},
+  bookmarkItem: () => {},
+  unbookmarkItem: () => {},
+  setNotificationPrefs: () => {},
 });
 
 export function PreferenceProvider({ children }: { children: React.ReactNode }) {
@@ -209,6 +215,36 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     debouncedICSync(next);
   }, [debouncedSave, debouncedICSync]);
 
+  const bookmarkItem = useCallback((id: string) => {
+    const next = structuredClone(profileRef.current);
+    const existing = next.bookmarkedIds ?? [];
+    if (!existing.includes(id)) {
+      next.bookmarkedIds = [...existing, id];
+      next.lastUpdated = Date.now();
+      setProfile(next);
+      debouncedSave(next);
+      debouncedICSync(next);
+    }
+  }, [debouncedSave, debouncedICSync]);
+
+  const unbookmarkItem = useCallback((id: string) => {
+    const next = structuredClone(profileRef.current);
+    next.bookmarkedIds = (next.bookmarkedIds ?? []).filter(bid => bid !== id);
+    next.lastUpdated = Date.now();
+    setProfile(next);
+    debouncedSave(next);
+    debouncedICSync(next);
+  }, [debouncedSave, debouncedICSync]);
+
+  const setNotificationPrefs = useCallback((prefs: NotificationPrefs) => {
+    const next = structuredClone(profileRef.current);
+    next.notificationPrefs = prefs;
+    next.lastUpdated = Date.now();
+    setProfile(next);
+    debouncedSave(next);
+    debouncedICSync(next);
+  }, [debouncedSave, debouncedICSync]);
+
   const isPersonalized = useMemo(() => hasEnoughData(profile), [profile]);
   const userContext = useMemo(() => isPersonalized ? getContext(profile) : null, [profile, isPersonalized]);
 
@@ -216,7 +252,8 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     profile, userContext, isPersonalized, onValidate, onFlag,
     setTopicAffinity, removeTopicAffinity, setQualityThreshold,
     addFilterRule, removeFilterRule,
-  }), [profile, userContext, isPersonalized, onValidate, onFlag, setTopicAffinity, removeTopicAffinity, setQualityThreshold, addFilterRule, removeFilterRule]);
+    bookmarkItem, unbookmarkItem, setNotificationPrefs,
+  }), [profile, userContext, isPersonalized, onValidate, onFlag, setTopicAffinity, removeTopicAffinity, setQualityThreshold, addFilterRule, removeFilterRule, bookmarkItem, unbookmarkItem, setNotificationPrefs]);
 
   return (
     <PreferenceContext.Provider value={value}>

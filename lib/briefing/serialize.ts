@@ -60,6 +60,7 @@ function renderItemBody(it: ContentItem, lines: string[]): void {
 
 export function serializeBriefing(
   briefing: BriefingState,
+  digest?: string,
 ): SerializedBriefing {
   const identifier = `briefing-${briefing.generatedAt}`;
   const dateStr = formatDate(briefing.generatedAt);
@@ -79,6 +80,11 @@ export function serializeBriefing(
   lines.push("");
   lines.push("---");
   lines.push("");
+
+  if (digest) {
+    lines.push(`> **Digest:** ${digest}`);
+    lines.push("");
+  }
 
   if (briefing.priority.length > 0) {
     lines.push("## Priority Briefing");
