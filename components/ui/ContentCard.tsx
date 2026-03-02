@@ -128,7 +128,7 @@ function ScoreTags({ item }: { item: ContentItem }) {
   );
 }
 
-export const ContentCard: React.FC<ContentCardProps> = React.memo(({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, isBookmarked, mobile, variant = "default", rank, focused, clusterCount }) => {
+const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, isBookmarked, mobile, variant = "default", rank, focused, clusterCount }) => {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const isSlop = item.verdict === "slop";
@@ -436,4 +436,6 @@ export const ContentCard: React.FC<ContentCardProps> = React.memo(({ item, expan
       )}
     </div>
   );
-});
+};
+
+export const ContentCard = React.memo(ContentCardInner);
