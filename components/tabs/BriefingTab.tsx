@@ -216,7 +216,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         </div>
       )}
 
-      {briefing.priority.length > 0 && (
+      {briefing.priority.length > 0 && getUserApiKey() && (
         <div style={{
           marginTop: space[4], marginBottom: space[4],
           padding: `${space[4]}px ${space[5]}px`,
