@@ -22,7 +22,7 @@ Aegis is **free to use** for content filtering. No wallet, no deposit, no setup 
 2. **Browse** the Dashboard — 3 preset RSS feeds (Hacker News, CoinDesk, The Verge) are auto-fetched and scored
 3. **Login** with Internet Identity — unlocks custom sources, Pro mode, and publishing
 4. **Add Sources** in the Sources tab — use Quick Add presets (YouTube, Topic, GitHub, Bluesky, Reddit, Mastodon, Farcaster) or paste any RSS/Atom feed URL
-5. **(Optional)** Link your Nostr npub in Settings — enables WoT trust graph and free D2A with trusted peers
+5. **(Optional)** Link your Nostr npub in Settings > Account — enables WoT trust graph and free D2A with trusted peers
 
 ### Three Modes: Demo → Lite → Pro
 
@@ -35,18 +35,18 @@ Aegis has two independent axes: **authentication state** (Demo vs Logged-in) and
 | **Pro** | Logged in + AI setup | Custom (add/edit/remove) | AI pipeline + heuristic fallback | Yes | Free during alpha |
 
 - **Demo**: Open the app without logging in. You get 3 preset RSS feeds scored with heuristic filters. Source management is disabled. Great for trying Aegis without commitment. Pro mode selector is locked.
-- **Lite**: Login and select "Lite" in Settings > Filter Mode. Full source management with heuristic-only scoring. No API calls, $0 cost. WoT and serendipity disabled.
-- **Pro**: Login and select "Pro" in Settings > Filter Mode. **Requires at least one AI scoring engine** (Ollama, Browser AI, or BYOK API key) to be configured in Settings. Full AI scoring pipeline (Ollama → WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
+- **Lite**: Login and select "Lite" in Settings > Feeds. Full source management with heuristic-only scoring. No API calls, $0 cost. WoT and serendipity disabled.
+- **Pro**: Login and select "Pro" in Settings > Feeds. **Requires at least one AI scoring engine** (Ollama, Browser AI, or BYOK API key) to be configured in Settings > Feeds. Full AI scoring pipeline (Ollama → WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
 
-Users switch between Lite and Pro in Settings > Filter Mode, which also shows the status of each AI engine (Ollama, WebLLM, BYOK). The Dashboard displays the current mode as a read-only badge — clicking it navigates to Settings. Pro is gated behind AI scoring availability — if no AI engine is configured, the Pro button shows "AI setup required" and auto-falls back to Lite. Demo mode is automatic when not logged in — logging in clears demo content and enables full source management.
+Users switch between Lite and Pro in Settings > Feeds (with AI engine status indicators). The Dashboard displays the current mode as a read-only badge — clicking it navigates to Settings. Pro is gated behind AI scoring availability — if no AI engine is configured, the Pro button shows "AI setup required" and auto-falls back to Lite. Demo mode is automatic when not logged in — logging in clears demo content and enables full source management.
 
 ### AI Scoring Engines
 
 | Engine | Tier | Where | Cost | When used |
 |--------|------|-------|------|-----------|
-| Ollama / OpenAI-compatible | 0th\* | Local server (user-hosted) | Free | **Opt-in** — enable in Settings; tried first when active |
-| WebLLM (Llama 3.1 8B q4f16) | 1st\* | Browser-local (WebGPU) | Free | **Opt-in** — enable in Settings; tried when Ollama inactive/fails |
-| Anthropic Claude (BYOK) | 2nd | Off-chain (Vercel) | User's API key | When user sets own API key in Settings |
+| Ollama / OpenAI-compatible | 0th\* | Local server (user-hosted) | Free | **Opt-in** — enable in Settings > Feeds; tried first when active |
+| WebLLM (Llama 3.1 8B q4f16) | 1st\* | Browser-local (WebGPU) | Free | **Opt-in** — enable in Settings > Feeds; tried when Ollama inactive/fails |
+| Anthropic Claude (BYOK) | 2nd | Off-chain (Vercel) | User's API key | When user sets own API key in Settings > Feeds |
 | IC LLM (Llama 3.1 8B) | 3rd | On-chain (IC canister) | Free | Default for authenticated users |
 | Anthropic Claude (server key) | 3.5th | Off-chain (Vercel) | Free during alpha | Non-BYOK users when IC LLM fails (future Pro subscription) |
 | Heuristic filter | 4th | Client-side | Free | Fallback when all LLM tiers fail |
@@ -61,13 +61,13 @@ Non-BYOK users: Ollama\* → WebLLM\* → IC LLM → Server Claude → Heuristic
 | What you want to do | Cost | Prerequisites |
 |---------------------|------|---------------|
 | Publish quality signals to Nostr | Free while in good standing | Login (Internet Identity) |
-| D2A exchange (trusted peers) | Free | Link Nostr npub in Settings |
+| D2A exchange (trusted peers) | Free | Link Nostr npub in Settings > Account |
 | D2A exchange (known peers) | 0.001 ICP / item | ICRC-2 pre-approval (0.1 ICP) |
 | D2A exchange (unknown peers) | 0.002 ICP / item | ICRC-2 pre-approval (0.1 ICP) |
 
 \*Deposit required only if your published signals are repeatedly flagged as low-quality (anti-spam measure). New users and users in good standing publish for free.
 
-**Trusted peers** are users in the follow graph of the Nostr account you link in Settings. D2A exchanges between trusted peers are free — no ICP needed. The agent starts in **trusted-only mode** when the wallet has insufficient funds.
+**Trusted peers** are users in the follow graph of the Nostr account you link in Settings > Account. D2A exchanges between trusted peers are free — no ICP needed. The agent starts in **trusted-only mode** when the wallet has insufficient funds.
 
 **How does Publish Signal reputation work?** Every publisher starts with a neutral reputation. Signals validated by the community improve your standing; signals flagged as slop degrade it. If your reputation drops below the threshold, an ICP deposit (0.001–1.0 ICP) is required as a quality assurance bond. Reputation naturally recovers over time (+1 per week of inactivity).
 
@@ -142,7 +142,7 @@ Aegis uses a multi-tier scoring pipeline with automatic fallback. The system tri
 
 ### Tier 0: Ollama / OpenAI-Compatible Local LLM (Free, Zero-Latency)
 
-When enabled in Settings, **Ollama** (or any OpenAI-compatible local LLM server) is tried **first** — before any other tier. It calls `POST /v1/chat/completions` on your local server (default `http://localhost:11434`). Zero cost, zero latency, fully private — no data leaves your machine. Configure the endpoint and model in Settings > Local LLM (Ollama).
+When enabled in Settings > Feeds, **Ollama** (or any OpenAI-compatible local LLM server) is tried **first** — before any other tier. It calls `POST /v1/chat/completions` on your local server (default `http://localhost:11434`). Zero cost, zero latency, fully private — no data leaves your machine. Configure the endpoint and model in Settings > Feeds.
 
 **Setup**: Install [Ollama](https://ollama.ai), pull a model (`ollama pull llama3.2`), and start the server. Set `OLLAMA_ORIGINS=*` (or `OLLAMA_ORIGINS=https://aegis.dwebxr.xyz`) to allow cross-origin requests from the browser. Any OpenAI-compatible server (LM Studio, llama.cpp server, vLLM, etc.) works — just set the endpoint in Settings.
 
@@ -150,13 +150,13 @@ If Ollama is not enabled or fails, the system falls through to Tier 1.
 
 ### Tier 1: WebLLM Browser-Local Scoring (Free, Privacy-First)
 
-When enabled in Settings, **WebLLM** (Llama 3.1 8B q4f16 via WebGPU) is tried next. It runs entirely in the browser: no API calls, no data leaves the device. The model downloads once on first use (~4 GB) and scores locally thereafter. Requires a WebGPU-capable browser.
+When enabled in Settings > Feeds, **WebLLM** (Llama 3.1 8B q4f16 via WebGPU) is tried next. It runs entirely in the browser: no API calls, no data leaves the device. The model downloads once on first use (~4 GB) and scores locally thereafter. Requires a WebGPU-capable browser.
 
 If WebLLM is not enabled or fails, the system falls through to Tier 2.
 
 ### Tier 2: Claude API BYOK (User's Own Key)
 
-When the user has set their own Anthropic API key in Settings, Aegis calls the Claude API with the full V/C/L framework and the user's preference context. This provides the highest quality analysis. The key is sent via `X-User-API-Key` header to the `/api/analyze` endpoint.
+When the user has set their own Anthropic API key in Settings > Feeds, Aegis calls the Claude API with the full V/C/L framework and the user's preference context. This provides the highest quality analysis. The key is sent via `X-User-API-Key` header to the `/api/analyze` endpoint.
 
 If the BYOK call fails or no user key is set, the system falls through to Tier 3.
 
@@ -247,17 +247,17 @@ Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social g
 
 - **Demo**: Unauthenticated state. 3 preset RSS feeds, heuristic scoring, Pro selector locked. Source management disabled.
 - **Lite**: Authenticated, heuristic-only scoring. Full source management but no API calls, no WoT, no serendipity. $0 cost.
-- **Pro**: Authenticated + at least one AI engine configured (Ollama, WebLLM, or BYOK key). Full AI scoring pipeline + WoT social graph filtering + serendipity discovery (up to 5 per cycle). Free during alpha; alternatively bring your own Claude API key in Settings.
+- **Pro**: Authenticated + at least one AI engine configured (Ollama, WebLLM, or BYOK key). Full AI scoring pipeline + WoT social graph filtering + serendipity discovery (up to 5 per cycle). Free during alpha; alternatively bring your own Claude API key in Settings > Feeds.
 
-Users switch between Lite and Pro in Settings > Filter Mode (with AI engine status indicators). The Dashboard shows the current mode as a read-only badge. Pro is locked with "AI setup required" until an AI engine is configured. Demo mode is automatic when not logged in.
+Users switch between Lite and Pro in Settings > Feeds (with AI engine status indicators). The Dashboard shows the current mode as a read-only badge. Pro is locked with "AI setup required" until an AI engine is configured. Demo mode is automatic when not logged in.
 
 ### Nostr Account Linking
 
 By default, Aegis derives a Nostr keypair from the user's Internet Computer principal. Since this derived key has zero followers on the Nostr network, the WoT graph starts empty.
 
-Users can link an existing Nostr account (npub) in Settings to use its follow graph as the WoT root:
+Users can link an existing Nostr account (npub) in Settings > Account to use its follow graph as the WoT root:
 
-1. Enter an npub (bech32) or 64-char hex pubkey in **Settings > Nostr Account**
+1. Enter an npub (bech32) or 64-char hex pubkey in **Settings > Account > Nostr Account**
 2. Aegis fetches the account's profile (Kind 0) and follow list (Kind 3) from relays
 3. The linked pubkey replaces the IC-derived key as the WoT graph root
 4. All WoT scores, D2A trust tiers, and content filtering automatically reflect the linked account's social graph
@@ -701,7 +701,10 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Sidebar navigation descriptions updated for clarity; active state with stronger visual indicator
 - Mobile touch targets meet 48px accessibility minimum
 - Settings gear icon visible in collapsed sidebar mode
-- Inline agent settings on Dashboard — add/remove topic interests, adjust quality threshold slider
+- Settings organized into sub-tabs: General, Agent, Feeds, Data, Account — with deep-link support from Dashboard
+- Agent summary card on Dashboard with quick "Edit in Settings" link to Settings > Agent
+- Export CSV/JSON with period and content type scope selectors in Settings > Data
+- Account danger zone for local data deletion in Settings > Account
 - Offline page shows cached evaluation availability with "View Cached Dashboard" button
 - Heuristic fallback notification — users are informed when AI is unavailable and scoring falls back to heuristics
 - Error notifications persist 5 seconds (info/success remain 2.5s); all notifications have a dismiss button
@@ -803,7 +806,14 @@ aegis/
 │           └── discover-feed/route.ts   # RSS feed auto-discovery from any URL
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
-│   ├── tabs/                            # Dashboard (Top3, Spotlight, Discoveries, YouTube embed), Briefing, Incinerator, Sources, Analytics, D2A Activity
+│   ├── tabs/                            # Dashboard (Top3, Spotlight, Discoveries, YouTube embed), Briefing, Incinerator, Sources, Analytics, D2A Activity, Settings (sub-tab orchestrator)
+│   ├── settings/                        # Settings sub-tab sections
+│   │   ├── GeneralSection.tsx           # Theme toggle + push notification preferences
+│   │   ├── AgentSection.tsx             # Interests, blocked authors, burn patterns, quality threshold, D2A params
+│   │   ├── FeedSection.tsx              # Filter mode (Lite/Pro), AI scoring (BYOK), Ollama, WebLLM
+│   │   ├── DataSection.tsx              # Export CSV/JSON (scoped), clear cache, reset preferences
+│   │   ├── AccountSection.tsx           # IC principal, Nostr account, about, danger zone (delete local data)
+│   │   └── styles.ts                    # Shared card/button/pill styles for settings sections
 │   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner, CommandPalette, ShareBriefingModal, AgentProfileEditModal, D2ABadge, D2ANetworkMini, AgentStatusBadge, StatCard, ScoreRing, MiniChart, BarChart, BriefingClassificationBadge, IncineratorViz, NotificationToggle, DemoBanner
 │   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
 │   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
@@ -892,6 +902,7 @@ aegis/
 │   │   └── types.ts                     # WebLLMStatus type
 │   ├── reputation/
 │   │   └── publishGate.ts               # Publish Signal reputation gating (localStorage)
+│   ├── config.ts                          # APP_URL constant (NEXT_PUBLIC_APP_URL env var with fallback)
 │   ├── glossary.ts                        # Domain term definitions (V-Signal, WoT, D2A, etc.)
 │   ├── apiKey/
 │   │   └── storage.ts                   # BYOK API key storage (localStorage, never sent to server)
@@ -902,6 +913,7 @@ aegis/
 │       ├── hashing.ts                   # SHA-256 content fingerprinting (dedup + manifest)
 │       ├── url.ts                       # extractUrl(), SSRF protection (blockPrivateUrl/blockPrivateRelay)
 │       ├── csv.ts                       # CSV export (RFC-compliant escaping)
+│       ├── export.ts                    # Content export (CSV/JSON with period + type scope filtering)
 │       ├── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
 │       ├── math.ts                      # Shared clamp() utility
 │       ├── youtube.ts                   # YouTube video ID extraction + embed URL builder
@@ -920,7 +932,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 4269 tests across 250 suites
+├── __tests__/                           # 4427 tests across 259 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -981,7 +993,10 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=...      # VAPID public key
 VAPID_PRIVATE_KEY=...                 # VAPID private key
 VAPID_SUBJECT=mailto:admin@example.com
 
-# D2A CORS (optional — defaults to ICP canister + aegis.dwebxr.xyz)
+# Canonical app URL (optional — defaults to https://aegis.dwebxr.xyz)
+NEXT_PUBLIC_APP_URL=https://aegis.dwebxr.xyz
+
+# D2A CORS (optional — defaults to ICP canister + app URL)
 D2A_CORS_ORIGINS=https://example.com,https://other.com
 
 # x402 D2A Payment Gateway (optional)
@@ -1101,7 +1116,7 @@ Aegis follows a staged decentralization roadmap to balance security with trustle
 
 **Lite mode costs nothing** — it runs entirely client-side with heuristic scoring (no API calls).
 
-Pro mode uses the multi-tier AI scoring pipeline. Ollama (Tier 0, when enabled), WebLLM (Tier 1, when enabled), and IC LLM (Tier 3) are all free. BYOK users (Tier 2) pay their own Claude API costs (~$0.01/day, ~50 articles/day). The server-side Claude key (Tier 3.5) is free during alpha; after alpha, it will move to a Pro subscription plan. You can also bring your own API key (Settings > AI Scoring) — roughly $2/month for typical usage.
+Pro mode uses the multi-tier AI scoring pipeline. Ollama (Tier 0, when enabled), WebLLM (Tier 1, when enabled), and IC LLM (Tier 3) are all free. BYOK users (Tier 2) pay their own Claude API costs (~$0.01/day, ~50 articles/day). The server-side Claude key (Tier 3.5) is free during alpha; after alpha, it will move to a Pro subscription plan. You can also bring your own API key (Settings > Feeds) — roughly $2/month for typical usage.
 
 ### Why not just use a P2P small-world network?
 

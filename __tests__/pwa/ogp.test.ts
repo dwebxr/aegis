@@ -22,9 +22,9 @@ describe("OGP / Meta tags (structural)", () => {
   });
 
   describe("metadata in layout.tsx", () => {
-    it("has metadataBase set", () => {
+    it("has metadataBase set via APP_URL", () => {
       expect(layoutContent).toContain("metadataBase");
-      expect(layoutContent).toContain("https://aegis.dwebxr.xyz");
+      expect(layoutContent).toContain("APP_URL");
     });
 
     it("has openGraph config", () => {

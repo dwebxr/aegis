@@ -114,12 +114,12 @@ describe("DashboardTab — with content", () => {
     expect(html).toContain("3");
   });
 
-  it("shows export buttons when content exists", () => {
+  it("does not show inline export buttons (moved to Settings > Data)", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("Export CSV");
-    expect(html).toContain("Export JSON");
+    expect(html).not.toContain("Export CSV");
+    expect(html).not.toContain("Export JSON");
   });
 
   it("shows filter buttons (quality, all, slop)", () => {

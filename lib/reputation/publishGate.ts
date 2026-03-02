@@ -99,8 +99,6 @@ export function checkPublishGate(pubkey: string): PublishGateDecision {
   return { canPublish: false, requiresDeposit: false, reason: "Publishing suspended due to repeated low-quality signals." };
 }
 
-// Reputation updates
-
 function getOrCreate(pubkey: string): { map: Map<string, PublishReputation>; rep: PublishReputation } {
   const map = loadPublishReputations();
   const existing = map.get(pubkey);

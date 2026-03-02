@@ -1014,8 +1014,8 @@ function EmptyState({ emoji, title, subtitle, action, actionLabel, checklist }: 
       <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>{subtitle}</div>
       {checklist && (
         <div style={{ textAlign: "left", display: "inline-block", marginTop: space[3] }}>
-          {checklist.map((item, i) => (
-            <div key={i} style={{
+          {checklist.map((item) => (
+            <div key={item.text} style={{
               display: "flex", gap: space[2], alignItems: "center",
               fontSize: t.bodySm.size, padding: `${space[1]}px 0`,
               color: item.done ? colors.green[400] : colors.text.disabled,

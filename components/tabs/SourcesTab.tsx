@@ -532,6 +532,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     <img
                       src={urlResult.imageUrl}
                       alt=""
+                      loading="lazy"
                       style={{ width: 100, height: 100, objectFit: "cover", borderRadius: radii.sm, border: `1px solid ${colors.border.default}`, flexShrink: 0 }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
@@ -588,9 +589,9 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                 </button>
                 {discoveredFeeds.length > 0 && (
                   <div style={{ marginTop: space[2], display: "flex", gap: space[2], flexWrap: "wrap" }}>
-                    {discoveredFeeds.map((f, i) => (
+                    {discoveredFeeds.map((f) => (
                       <button
-                        key={i}
+                        key={f.url}
                         onClick={() => { setRssInput(f.url); setDiscoveredFeeds([]); setResolvedPlatform(null); }}
                         style={{
                           padding: `${space[1]}px ${space[3]}px`,
@@ -678,12 +679,13 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   )}
                 </div>
                 {rssResult.items.map((item, i) => (
-                  <div key={i} style={{ background: colors.bg.raised, borderRadius: radii.md, padding: space[3], marginBottom: space[1], display: "flex", alignItems: "center", gap: space[3] }}>
+                  <div key={item.link ? `${item.link}-${i}` : `${item.title}-${i}`} style={{ background: colors.bg.raised, borderRadius: radii.md, padding: space[3], marginBottom: space[1], display: "flex", alignItems: "center", gap: space[3] }}>
                     {item.imageUrl && (
                       /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
                       <img
                         src={item.imageUrl}
                         alt=""
+                        loading="lazy"
                         style={{ width: 48, height: 48, objectFit: "cover", borderRadius: radii.sm, border: `1px solid ${colors.border.default}`, flexShrink: 0 }}
                         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                       />

@@ -67,6 +67,17 @@ function AegisAppInner() {
   const { filterMode } = useFilterMode();
 
   const [tab, setTab] = useState("dashboard");
+  const [settingsSubTab, setSettingsSubTab] = useState<string | undefined>();
+
+  const handleTabChange = useCallback((t: string) => {
+    if (t.startsWith("settings:")) {
+      setTab("settings");
+      setSettingsSubTab(t.split(":")[1]);
+    } else {
+      setTab(t);
+      if (t !== "settings") setSettingsSubTab(undefined);
+    }
+  }, []);
   const [icpBalance, setIcpBalance] = useState<bigint | null>(null);
   const [reputation, setReputation] = useState<UserReputation | null>(null);
   const [engagementIndex, setEngagementIndex] = useState<number | null>(null);
@@ -579,22 +590,22 @@ function AegisAppInner() {
 
   if (showLanding) {
     return (
-      <AppShell activeTab={tab} onTabChange={setTab}>
+      <AppShell activeTab={tab} onTabChange={handleTabChange}>
         <LandingHero onTryDemo={dismissBanner} onLogin={login} mobile={mobile} />
       </AppShell>
     );
   }
 
   return (
-    <AppShell activeTab={tab} onTabChange={setTab}>
+    <AppShell activeTab={tab} onTabChange={handleTabChange}>
       <DemoBanner mobile={mobile} />
       {isAuthenticated && !linkedAccount && !wotPromptDismissed && (
-        <WoTPromptBanner onGoToSettings={() => setTab("settings")} onDismiss={dismissWotPrompt} />
+        <WoTPromptBanner onGoToSettings={() => handleTabChange("settings")} onDismiss={dismissWotPrompt} />
       )}
       {tab === "dashboard" && (
-        <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={setTab} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} />
+        <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} />
       )}
-      {tab === "briefing" && <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} onTabChange={setTab} />}
+      {tab === "briefing" && <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} onTabChange={handleTabChange} />}
       {tab === "incinerator" && (
         <IncineratorTab
           isAnalyzing={isAnalyzing}
@@ -610,8 +621,8 @@ function AegisAppInner() {
       )}
       {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} initialUrl={capturedDeepLinkUrl ?? undefined} />}
       {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} pipelineStats={pipelineResult?.stats ?? null} />}
-      {tab === "d2a" && <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={setTab} />}
-      {tab === "settings" && <SettingsTab mobile={mobile} linkedAccount={linkedAccount} onLinkChange={handleLinkAccount} />}
+      {tab === "d2a" && <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={handleTabChange} />}
+      {tab === "settings" && <SettingsTab mobile={mobile} linkedAccount={linkedAccount} onLinkChange={handleLinkAccount} initialSubTab={settingsSubTab} content={content} />}
     </AppShell>
   );
 }

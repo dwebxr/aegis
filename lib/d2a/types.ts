@@ -22,7 +22,7 @@ export interface D2ABriefingResponse {
   version: "1.0";
   generatedAt: string;
   source: "aegis";
-  sourceUrl: "https://aegis.dwebxr.xyz";
+  sourceUrl: string;
   summary: {
     totalEvaluated: number;
     totalBurned: number;

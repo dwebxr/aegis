@@ -49,7 +49,6 @@ function briefingScore(item: ContentItem, prefs: UserPreferenceProfile, now?: nu
 
   const authorBoost = prefs.authorTrust[item.author]?.trust || 0;
 
-  // recentTopics bonus: boost items whose topics match recently-seen topics
   const recentBonus = item.topics?.reduce((sum, t) => {
     const isRecent = prefs.recentTopics.some(rt =>
       rt.topic === t && currentTime - rt.timestamp < RECENT_TOPIC_WINDOW_MS,

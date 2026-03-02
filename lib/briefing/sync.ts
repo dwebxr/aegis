@@ -2,6 +2,7 @@ import type { _SERVICE } from "@/lib/ic/declarations/aegis_backend.did";
 import type { BriefingState } from "./types";
 import type { D2ABriefingResponse, D2ABriefingItem } from "@/lib/d2a/types";
 import { errMsg } from "@/lib/utils/errors";
+import { APP_URL } from "@/lib/config";
 
 function toBriefingItem(bi: BriefingState["priority"][0]): D2ABriefingItem {
   const { item } = bi;
@@ -38,7 +39,7 @@ export function briefingToD2AResponse(
     version: "1.0",
     generatedAt: new Date(state.generatedAt).toISOString(),
     source: "aegis",
-    sourceUrl: "https://aegis.dwebxr.xyz",
+    sourceUrl: APP_URL,
     summary: {
       totalEvaluated: state.totalItems,
       totalBurned,

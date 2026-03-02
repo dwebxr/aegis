@@ -328,7 +328,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 }}>
                   {d.item.avatar && d.item.avatar.startsWith("http") ? (
                     /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
-                    <img src={d.item.avatar} alt="" style={{
+                    <img src={d.item.avatar} alt="" loading="lazy" style={{
                       width: 20, height: 20, borderRadius: "50%", objectFit: "cover",
                       border: `1px solid ${colors.border.default}`,
                     }} />

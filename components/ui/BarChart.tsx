@@ -15,7 +15,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, labels, color, height 
   return (
     <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height }}>
       {data.map((v, i) => (
-        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+        <div key={labels[i]} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
           <div style={{
             width: "100%", height: `${(v / mx) * 52}px`,
             background: color, borderRadius: "3px 3px 0 0",

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
 import { X402_NETWORK, X402_PRICE, X402_RECEIVER } from "@/lib/d2a/x402Server";
+import { APP_URL } from "@/lib/config";
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
     name: "Aegis",
     description: "D2A Social Agent Platform — AI-curated content briefings with V/C/L scoring",
     version: "1.0",
-    sourceUrl: "https://aegis.dwebxr.xyz",
+    sourceUrl: APP_URL,
     endpoints: {
       briefing: {
         url: "/api/d2a/briefing",

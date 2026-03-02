@@ -282,7 +282,7 @@ export const SharedBriefingView: React.FC<SharedBriefingViewProps> = ({ briefing
               Priority Briefing
             </h2>
             {priorityItems.map((item, i) => (
-              <ItemCard key={i} item={item} />
+              <ItemCard key={`p${item.rank ?? i}-${item.title}`} item={item} />
             ))}
           </section>
         )}
@@ -307,7 +307,7 @@ export const SharedBriefingView: React.FC<SharedBriefingViewProps> = ({ briefing
               Selected outside usual topics to prevent filter bubbles.
             </p>
             {serendipityItems.map((item, i) => (
-              <ItemCard key={i} item={item} />
+              <ItemCard key={`s${i}-${item.title}`} item={item} />
             ))}
           </section>
         )}

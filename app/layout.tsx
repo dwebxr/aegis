@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Providers } from "@/components/Providers";
+import { APP_URL } from "@/lib/config";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -11,7 +12,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://aegis.dwebxr.xyz"),
+  metadataBase: new URL(APP_URL),
 
   title: {
     default: "Aegis — AI Content Quality Filter",
@@ -45,7 +46,7 @@ export const metadata: Metadata = {
     title: "Aegis — AI Content Quality Filter",
     description:
       "Your personal AI that burns the slop and delivers only what matters. Powered by on-chain AI scoring, Nostr signal publishing, and device-to-agent content exchange.",
-    url: "https://aegis.dwebxr.xyz",
+    url: APP_URL,
     images: [
       {
         url: "/og-image.png",
@@ -93,7 +94,7 @@ const jsonLd = {
   name: "Aegis",
   description:
     "AI Content Quality Filter — Zero-noise briefing powered by AI + Nostr + Internet Computer",
-  url: "https://aegis.dwebxr.xyz",
+  url: APP_URL,
   applicationCategory: "UtilitiesApplication",
   operatingSystem: "Web",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },

@@ -1,5 +1,6 @@
 import type { BriefingState } from "./types";
 import type { ContentItem } from "@/lib/types/content";
+import { APP_URL } from "@/lib/config";
 
 export interface SerializedBriefing {
   content: string;
@@ -108,7 +109,7 @@ export function serializeBriefing(
 
   lines.push("---");
   lines.push("");
-  lines.push("*Curated by [Aegis](https://aegis.dwebxr.xyz) — AI Content Quality Filter*");
+  lines.push(`*Curated by [Aegis](${APP_URL}) — AI Content Quality Filter*`);
 
   const allItems = [...briefing.priority.map(b => b.item), ...(briefing.serendipity ? [briefing.serendipity.item] : [])];
   const allTopics = new Set(allItems.flatMap(i => i.topics || []));
@@ -122,7 +123,7 @@ export function serializeBriefing(
     ["t", "aegis"],
     ["t", "briefing"],
     ["t", "ai-curation"],
-    ["client", "aegis", "https://aegis.dwebxr.xyz"],
+    ["client", "aegis", APP_URL],
     ...Array.from(allTopics).slice(0, 10).map(t => ["t", t]),
   ];
 

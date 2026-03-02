@@ -2,10 +2,10 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard, deriveScoreTags } from "@/components/ui/ContentCard";
-import { ChevronDownIcon, GearIcon } from "@/components/icons";
+import { GearIcon } from "@/components/icons";
 import { fonts, colors, space, type as t, radii, transitions, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
-import { contentToCSV } from "@/lib/utils/csv";
+import { exportContentCSV, exportContentJSON } from "@/lib/utils/export";
 import { extractYouTubeVideoId, youTubeEmbedUrl } from "@/lib/utils/youtube";
 import { useFilterMode } from "@/contexts/FilterModeContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
@@ -33,16 +33,6 @@ import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 import { NewItemsBar } from "@/components/ui/NewItemsBar";
 import { useSources } from "@/contexts/SourceContext";
 import { useDemo } from "@/contexts/DemoContext";
-
-function downloadFile(data: string, filename: string, mime: string) {
-  const blob = new Blob([data], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 function ScorePill({ gr, tag }: { gr: ReturnType<typeof scoreGrade>; tag: { label: string; color: string } | null }) {
   return (
@@ -95,7 +85,7 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
         />
       ) : showImg ? (
         /* eslint-disable-next-line @next/next/no-img-element -- dashboard card OG thumbnail */
-        <img src={item.imageUrl!} alt=""
+        <img src={item.imageUrl!} alt="" loading="lazy"
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
           onError={onImgError} />
       ) : (
@@ -229,13 +219,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     try { return localStorage.getItem("aegis-home-mode") === "dashboard" ? "dashboard" : "feed"; }
     catch { return "feed"; }
   });
-  const { profile, setTopicAffinity, removeTopicAffinity, setQualityThreshold, addFilterRule, removeFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { profile, setTopicAffinity, addFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
   const [activityRange, setActivityRange] = useState<"today" | "7d" | "30d">("today");
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [newTopic, setNewTopic] = useState("");
-  const [newBlockedAuthor, setNewBlockedAuthor] = useState("");
-  const [newBurnPattern, setNewBurnPattern] = useState("");
 
   useEffect(() => {
     try { localStorage.setItem("aegis-home-mode", homeMode); } catch { console.debug("[dashboard] localStorage unavailable"); }
@@ -419,22 +405,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     enabled: !mobile && homeMode === "feed",
   });
 
-  const exportCSV = useCallback(() => {
-    downloadFile(contentToCSV(content), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv");
-  }, [content]);
-
-  const exportJSON = useCallback(() => {
-    const data = content.map(c => ({
-      id: c.id, author: c.author, source: c.source, verdict: c.verdict,
-      scores: c.scores, vSignal: c.vSignal, cContext: c.cContext, lSlop: c.lSlop,
-      topics: c.topics, text: c.text, reason: c.reason,
-      createdAt: new Date(c.createdAt).toISOString(),
-      validatedAt: c.validatedAt ? new Date(c.validatedAt).toISOString() : null,
-      sourceUrl: c.sourceUrl,
-    }));
-    downloadFile(JSON.stringify(data, null, 2), `aegis-evaluations-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
-  }, [content]);
-
   const paletteCommands: PaletteCommand[] = useMemo(() => [
     { label: "Go to Feed", action: () => setHomeMode("feed") },
     { label: "Go to Dashboard", action: () => setHomeMode("dashboard") },
@@ -445,9 +415,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     { label: "Filter: Slop", action: () => setVerdictFilter("slop") },
     { label: "Filter: All", action: () => setVerdictFilter("all") },
     { label: "Filter: Validated", action: () => setVerdictFilter("validated") },
-    { label: "Export CSV", action: exportCSV },
-    { label: "Export JSON", action: exportJSON },
-  ], [onTabChange, exportCSV, exportJSON]);
+    { label: "Export CSV", action: () => exportContentCSV(content) },
+    { label: "Export JSON", action: () => exportContentJSON(content) },
+  ], [onTabChange, content]);
 
   return (
     <div data-testid="aegis-dashboard" style={{ animation: "fadeIn .4s ease" }}>
@@ -1015,7 +985,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             }}>
                               {showThumb ? (
                                 /* eslint-disable-next-line @next/next/no-img-element -- spotlight compact thumbnail */
-                                <img src={ruItem.imageUrl!} alt=""
+                                <img src={ruItem.imageUrl!} alt="" loading="lazy"
                                   style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                                   onError={() => markImgFailed(ruItem.id)} />
                               ) : (
@@ -1124,7 +1094,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     }}>
                       {showThumb ? (
                         /* eslint-disable-next-line @next/next/no-img-element -- discovery card thumbnail */
-                        <img src={item.imageUrl!} alt=""
+                        <img src={item.imageUrl!} alt="" loading="lazy"
                           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                           onError={() => markImgFailed(item.id)} />
                       ) : (
@@ -1225,7 +1195,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     }}>
                       {showThumb ? (
                         /* eslint-disable-next-line @next/next/no-img-element -- unreviewed card thumbnail */
-                        <img src={item.imageUrl!} alt=""
+                        <img src={item.imageUrl!} alt="" loading="lazy"
                           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                           onError={() => markImgFailed(item.id)} />
                       ) : (
@@ -1320,7 +1290,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     }}>
                       {showThumb ? (
                         /* eslint-disable-next-line @next/next/no-img-element -- validated card thumbnail */
-                        <img src={item.imageUrl!} alt=""
+                        <img src={item.imageUrl!} alt="" loading="lazy"
                           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                           onError={() => markImgFailed(item.id)} />
                       ) : (
@@ -1435,7 +1405,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                               {trend.weeklyHistory.map((count, i) => {
                                 const max = Math.max(...trend.weeklyHistory, 1);
                                 return (
-                                  <div key={i} style={{
+                                  <div key={`w${i}`} style={{
                                     width: 3, borderRadius: 1,
                                     height: Math.max((count / max) * 14, 2),
                                     background: i === trend.weeklyHistory.length - 1 ? barColor : `${colors.text.disabled}40`,
@@ -1481,7 +1451,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </div>
           )}
 
-          {/* === Inline Agent Settings === */}
+          {/* Agent Settings — summary card with link to Settings > Agent */}
           <div style={{
             background: colors.bg.surface,
             border: `1px solid ${colors.border.default}`,
@@ -1489,236 +1459,34 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             padding: `${space[3]}px ${space[4]}px`,
             marginBottom: space[4],
           }}>
-            <button
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              style={{
-                display: "flex", alignItems: "center", gap: space[2], width: "100%",
-                background: "transparent", border: "none", cursor: "pointer",
-                color: colors.text.tertiary, fontSize: t.bodySm.size, fontWeight: 600,
-                fontFamily: "inherit", padding: 0,
-              }}
-            >
+            <div style={{
+              display: "flex", alignItems: "center", gap: space[2], width: "100%",
+            }}>
               <GearIcon s={16} />
-              <span>Agent Settings</span>
-              {!settingsOpen && (
-                <span style={{ color: colors.text.disabled, fontWeight: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
-                  : {Object.entries(profile.topicAffinities).filter(([, v]) => v >= 0.2).length} interests
-                  &middot; threshold {profile.calibration.qualityThreshold.toFixed(1)}
-                  &middot; {profile.totalValidated + profile.totalFlagged} reviews
-                </span>
-              )}
-              <div style={{ flex: 1 }} />
-              <span style={{
-                display: "inline-flex",
-                transform: settingsOpen ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.2s ease",
-              }}>
-                <ChevronDownIcon s={14} />
+              <span style={{ color: colors.text.tertiary, fontSize: t.bodySm.size, fontWeight: 600 }}>Agent Settings</span>
+              <span style={{ color: colors.text.disabled, fontWeight: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, fontSize: t.bodySm.size }}>
+                : {Object.entries(profile.topicAffinities).filter(([, v]) => v >= 0.2).length} interests
+                &middot; threshold {profile.calibration.qualityThreshold.toFixed(1)}
+                &middot; {profile.totalValidated + profile.totalFlagged} reviews
               </span>
-            </button>
-
-            {settingsOpen && (
-              <div style={{ marginTop: space[3], paddingTop: space[3], borderTop: `1px solid ${colors.border.default}` }}>
-                {/* Interest tag chips */}
-                <div style={{ marginBottom: space[4] }}>
-                  <div style={{ fontSize: t.caption.size, color: colors.text.disabled, marginBottom: space[2], fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    Interests
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: space[2], alignItems: "center" }}>
-                    {Object.entries(profile.topicAffinities)
-                      .filter(([, v]) => v >= 0.2)
-                      .sort(([, a], [, b]) => b - a)
-                      .map(([topic]) => (
-                        <span key={topic} style={{
-                          display: "inline-flex", alignItems: "center", gap: 4,
-                          fontSize: t.caption.size, padding: `2px ${space[2]}px`,
-                          background: `${colors.cyan[400]}10`, border: `1px solid ${colors.cyan[400]}20`,
-                          borderRadius: radii.pill, color: colors.cyan[400],
-                        }}>
-                          {topic}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); removeTopicAffinity(topic); }}
-                            style={{
-                              background: "transparent", border: "none", cursor: "pointer",
-                              color: colors.cyan[400], padding: 0, fontSize: 14, lineHeight: 1,
-                              display: "inline-flex", alignItems: "center",
-                            }}
-                          >&times;</button>
-                        </span>
-                      ))}
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      <input
-                        value={newTopic}
-                        onChange={(e) => setNewTopic(e.target.value.slice(0, 30))}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && newTopic.trim()) {
-                            const t = newTopic.trim().toLowerCase();
-                            if ((profile.topicAffinities[t] ?? 0) < 0.2) {
-                              setTopicAffinity(t, 0.3);
-                            }
-                            setNewTopic("");
-                          }
-                        }}
-                        placeholder="+ Add topic"
-                        style={{
-                          width: 100, padding: `2px ${space[2]}px`,
-                          background: "transparent",
-                          border: `1px solid ${colors.border.default}`,
-                          borderRadius: radii.pill,
-                          color: colors.text.secondary,
-                          fontSize: t.caption.size,
-                          fontFamily: "inherit",
-                          outline: "none",
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Blocked Authors */}
-                {(() => {
-                  const authorRules = (profile.customFilterRules ?? []).filter(r => r.field === "author");
-                  return authorRules.length > 0 || settingsOpen ? (
-                    <div style={{ marginBottom: space[4] }}>
-                      <div style={{ fontSize: t.caption.size, color: colors.text.disabled, marginBottom: space[2], fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                        Blocked Authors
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: space[2], alignItems: "center" }}>
-                        {authorRules.map(rule => (
-                          <span key={rule.id} style={{
-                            display: "inline-flex", alignItems: "center", gap: 4,
-                            fontSize: t.caption.size, padding: `2px ${space[2]}px`,
-                            background: `${colors.red[400]}10`, border: `1px solid ${colors.red[400]}20`,
-                            borderRadius: radii.pill, color: colors.red[400],
-                          }}>
-                            {rule.pattern}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); removeFilterRule(rule.id); }}
-                              style={{
-                                background: "transparent", border: "none", cursor: "pointer",
-                                color: colors.red[400], padding: 0, fontSize: 14, lineHeight: 1,
-                                display: "inline-flex", alignItems: "center",
-                              }}
-                            >&times;</button>
-                          </span>
-                        ))}
-                        <input
-                          value={newBlockedAuthor}
-                          onChange={(e) => setNewBlockedAuthor(e.target.value.slice(0, 60))}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && newBlockedAuthor.trim()) {
-                              addFilterRule({ field: "author", pattern: newBlockedAuthor.trim() });
-                              setNewBlockedAuthor("");
-                            }
-                          }}
-                          placeholder="+ Block author"
-                          style={{
-                            width: 120, padding: `2px ${space[2]}px`,
-                            background: "transparent",
-                            border: `1px solid ${colors.border.default}`,
-                            borderRadius: radii.pill,
-                            color: colors.text.secondary,
-                            fontSize: t.caption.size,
-                            fontFamily: "inherit",
-                            outline: "none",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ) : null;
-                })()}
-
-                {/* Burn Patterns */}
-                <div style={{ marginBottom: space[4] }}>
-                  <div style={{ fontSize: t.caption.size, color: colors.text.disabled, marginBottom: space[2], fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    Burn Patterns
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: space[2], alignItems: "center" }}>
-                    {(profile.customFilterRules ?? []).filter(r => r.field === "title").map(rule => (
-                      <span key={rule.id} style={{
-                        display: "inline-flex", alignItems: "center", gap: 4,
-                        fontSize: t.caption.size, padding: `2px ${space[2]}px`,
-                        background: `${colors.orange[400]}10`, border: `1px solid ${colors.orange[400]}20`,
-                        borderRadius: radii.pill, color: colors.orange[400],
-                      }}>
-                        &ldquo;{rule.pattern}&rdquo;
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeFilterRule(rule.id); }}
-                          style={{
-                            background: "transparent", border: "none", cursor: "pointer",
-                            color: colors.orange[400], padding: 0, fontSize: 14, lineHeight: 1,
-                            display: "inline-flex", alignItems: "center",
-                          }}
-                        >&times;</button>
-                      </span>
-                    ))}
-                    <input
-                      value={newBurnPattern}
-                      onChange={(e) => setNewBurnPattern(e.target.value.slice(0, 60))}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newBurnPattern.trim()) {
-                          addFilterRule({ field: "title", pattern: newBurnPattern.trim() });
-                          setNewBurnPattern("");
-                        }
-                      }}
-                      placeholder="+ Add keyword"
-                      style={{
-                        width: 120, padding: `2px ${space[2]}px`,
-                        background: "transparent",
-                        border: `1px solid ${colors.border.default}`,
-                        borderRadius: radii.pill,
-                        color: colors.text.secondary,
-                        fontSize: t.caption.size,
-                        fontFamily: "inherit",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Threshold slider */}
-                <div style={{ marginBottom: space[3] }}>
-                  <div style={{ fontSize: t.caption.size, color: colors.text.disabled, marginBottom: space[2], fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    Quality Threshold: <span style={{ color: colors.cyan[400], fontFamily: fonts.mono }}>{profile.calibration.qualityThreshold.toFixed(1)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1} max={9} step={0.5}
-                    value={profile.calibration.qualityThreshold}
-                    onChange={(e) => { const v = parseFloat(e.target.value); if (!Number.isNaN(v)) setQualityThreshold(v); }}
-                    style={{
-                      width: "100%", accentColor: colors.cyan[400],
-                      cursor: "pointer",
-                    }}
-                  />
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[1] }}>
-                    <span>More content</span>
-                    <span>Stricter filtering</span>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
-                  <button
-                    onClick={() => { showFeedback("Settings saved"); setSettingsOpen(false); }}
-                    style={{
-                      padding: `${space[2]}px ${space[4]}px`,
-                      background: `${colors.cyan[400]}10`,
-                      border: `1px solid ${colors.cyan[400]}25`,
-                      borderRadius: radii.md,
-                      color: colors.cyan[400],
-                      fontSize: t.bodySm.size, fontWeight: 600,
-                      cursor: "pointer", fontFamily: "inherit",
-                      transition: transitions.fast,
-                    }}
-                  >
-                    Done
-                  </button>
-                  <span style={{ fontSize: t.tiny.size, color: colors.text.disabled }}>
-                    Changes apply in real time
-                  </span>
-                </div>
-              </div>
-            )}
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => onTabChange?.("settings:agent")}
+                style={{
+                  padding: `${space[1]}px ${space[3]}px`,
+                  background: `${colors.cyan[400]}10`,
+                  border: `1px solid ${colors.cyan[400]}25`,
+                  borderRadius: radii.md,
+                  color: colors.cyan[400],
+                  fontSize: t.caption.size, fontWeight: 600,
+                  cursor: "pointer", fontFamily: "inherit",
+                  transition: transitions.fast,
+                  whiteSpace: "nowrap", flexShrink: 0,
+                }}
+              >
+                Edit
+              </button>
+            </div>
           </div>
 
           {/* === Recent Activity with time-range tabs === */}
@@ -1860,19 +1628,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         </div>
       )}
 
-      {content.length > 0 && (
-        <div style={{ display: "flex", gap: space[2], marginTop: space[4] }}>
-          {([
-            { label: "Export CSV", onClick: exportCSV },
-            { label: "Export JSON", onClick: exportJSON },
-          ] as const).map(btn => (
-            <button key={btn.label} onClick={btn.onClick} style={exportBtnStyle}>
-              &#x1F4E5; {btn.label}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Keyboard shortcut hint — only in feed mode where keyboard nav is active */}
       {!mobile && homeMode === "feed" && (
         <div style={{
@@ -1888,15 +1643,3 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   );
 };
 
-const exportBtnStyle: React.CSSProperties = {
-  padding: `${space[2]}px ${space[4]}px`,
-  background: colors.bg.surface,
-  border: `1px solid ${colors.border.default}`,
-  borderRadius: radii.md,
-  color: colors.text.muted,
-  fontSize: t.bodySm.size,
-  fontWeight: 600,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  transition: transitions.fast,
-};
