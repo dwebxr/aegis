@@ -121,7 +121,7 @@ describe("Filter Pipeline → Serendipity → Cost Tracking integration", () => 
     const monthly = getMonthlyCost(month);
     expect(monthly.totalEvaluated).toBe(5);
     expect(monthly.totalDays).toBe(1);
-    expect(monthly.timeSavedMinutes).toBeGreaterThanOrEqual(0);
+    expect(monthly.timeSavedMinutes).toBe(0);
   });
 
   it("serendipity classification integrates with pipeline WoT scoring", () => {

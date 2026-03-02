@@ -71,7 +71,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const { profile } = usePreferences();
   const { content, addContent } = useContent();
   const [agentState, setAgentState] = useState<AgentState>(defaultState);
-  const [isEnabled, setIsEnabled] = useState(false);
+  const [isEnabled, setD2AEnabled] = useState(false);
   const [d2aComments, setD2aComments] = useState<StoredComment[]>(() => loadComments());
   const [wotGraph, setWotGraphState] = useState<WoTGraph | null>(null);
   const [agentProfile, setAgentProfile] = useState<NostrProfileMetadata | null>(null);
@@ -114,7 +114,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isAuthenticated && principalText && nostrKeys) {
-      refreshAgentProfile();
+      void refreshAgentProfile();
     } else {
       profileFetchId.current++; // cancel any in-flight fetch
       setAgentProfile(null);
@@ -123,7 +123,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, principalText, nostrKeys, refreshAgentProfile]);
 
   const toggleAgent = useCallback(() => {
-    setIsEnabled(prev => {
+    setD2AEnabled(prev => {
       const next = !prev;
       if (identity) {
         void syncLinkedAccountToIC(identity, getLinkedAccount(), next).catch(e => console.warn("[agent] IC sync failed:", errMsg(e)));
@@ -131,10 +131,6 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, [identity]);
-
-  const setD2AEnabled = useCallback((enabled: boolean) => {
-    setIsEnabled(enabled);
-  }, []);
 
   const setWoTGraph = useCallback((graph: WoTGraph | null) => {
     setWotGraphState(graph);
@@ -303,7 +299,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph,
     agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys,
     sendComment: handleSendComment, d2aComments,
-  }), [agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph,
+  }), [agentState, isEnabled, toggleAgent, setWoTGraph, wotGraph,
     agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys,
     handleSendComment, d2aComments]);
 

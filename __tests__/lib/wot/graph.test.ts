@@ -138,7 +138,9 @@ describe("calculateMutualFollows", () => {
 
   it("handles empty graph", () => {
     const nodes = new Map<string, WoTNode>();
-    // Should not throw
+    // Should not throw on empty input
     calculateMutualFollows(nodes, "user");
+    // Map remains empty after processing
+    expect(nodes.size).toBe(0);
   });
 });

@@ -94,7 +94,7 @@ describe("AgentManager — activity log", () => {
 
     const state = mgr.getState();
     const presenceLogs = state.activityLog.filter(e => e.type === "presence");
-    expect(presenceLogs.length).toBeGreaterThanOrEqual(1);
+    expect(presenceLogs.length).toBe(1);
     expect(presenceLogs[0].message).toContain("Broadcast presence");
 
     mgr.stop();
@@ -113,7 +113,7 @@ describe("AgentManager — activity log", () => {
 
     const state = mgr.getState();
     const discoveryLogs = state.activityLog.filter(e => e.type === "discovery");
-    expect(discoveryLogs.length).toBeGreaterThanOrEqual(1);
+    expect(discoveryLogs.length).toBe(1);
     expect(discoveryLogs[0].message).toMatch(/Discovered \d+ peer/);
 
     mgr.stop();
@@ -129,7 +129,7 @@ describe("AgentManager — activity log", () => {
 
     const state = mgr.getState();
     const errorLogs = state.activityLog.filter(e => e.type === "error");
-    expect(errorLogs.length).toBeGreaterThanOrEqual(1);
+    expect(errorLogs.length).toBe(1);
     expect(errorLogs[0].message).toContain("Relay offline");
 
     mgr.stop();
@@ -363,7 +363,7 @@ describe("AgentManager — log entries for reject flow", () => {
 
     const state = mgr.getState();
     const rejectLogs = state.activityLog.filter(e => e.type === "reject");
-    expect(rejectLogs.length).toBeGreaterThanOrEqual(1);
+    expect(rejectLogs.length).toBe(1);
     expect(rejectLogs[0].message).toContain("Peer rejected");
 
     mgr.stop();

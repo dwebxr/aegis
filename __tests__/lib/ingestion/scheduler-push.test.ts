@@ -96,14 +96,17 @@ describe("IngestionScheduler onCycleComplete", () => {
   });
 
   it("does not crash when onCycleComplete is not provided", () => {
+    const spy = jest.spyOn(global, "setTimeout");
+    const before = spy.mock.calls.length;
     const scheduler = new IngestionScheduler({
       onNewContent: mockOnNewContent,
       getSources: () => [],
       getUserContext: () => null,
     });
 
-    // Should not throw
     scheduler.start();
+    expect(spy.mock.calls.length).toBeGreaterThan(before);
     scheduler.stop();
+    spy.mockRestore();
   });
 });

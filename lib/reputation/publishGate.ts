@@ -30,8 +30,6 @@ interface SerializedStore {
   entries: Array<[string, PublishReputation]>;
 }
 
-// Persistence — mirrors lib/d2a/reputation.ts pattern
-
 export function loadPublishReputations(): Map<string, PublishReputation> {
   if (typeof globalThis.localStorage === "undefined") return new Map();
   let raw: string | null;

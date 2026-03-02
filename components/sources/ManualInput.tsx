@@ -19,8 +19,12 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
   const handleGo = async () => {
     if (!text.trim()) return;
     setResult(null);
-    const r = await onAnalyze(text);
-    setResult(r);
+    try {
+      const r = await onAnalyze(text);
+      setResult(r);
+    } catch (err) {
+      console.error("[ManualInput] Analysis failed:", err instanceof Error ? err.message : String(err));
+    }
   };
 
   return (

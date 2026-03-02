@@ -88,7 +88,6 @@ function validateContentItems(parsed: unknown): ContentItem[] {
 }
 
 async function loadCachedContentAsync(): Promise<ContentItem[]> {
-  // Try IDB first
   if (isIDBAvailable()) {
     try {
       const data = await idbGet<unknown>(STORE_CONTENT_CACHE, IDB_CONTENT_KEY);
@@ -97,7 +96,6 @@ async function loadCachedContentAsync(): Promise<ContentItem[]> {
       console.warn("[content] IDB load failed, trying localStorage:", errMsg(err));
     }
   }
-  // Fallback: localStorage
   if (typeof globalThis.localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem(CONTENT_CACHE_KEY);

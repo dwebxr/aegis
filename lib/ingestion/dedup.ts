@@ -49,7 +49,6 @@ export class ArticleDeduplicator {
       }
     }
 
-    // Fallback: localStorage
     this.loadFromLocalStorage();
     this.initialized = true;
   }

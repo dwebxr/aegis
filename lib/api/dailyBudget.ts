@@ -47,7 +47,6 @@ export async function withinDailyBudget(): Promise<boolean> {
     const count = (await store.get<number>(dailyKey())) ?? 0;
     return count < DAILY_BUDGET;
   }
-  // Fallback: in-memory
   const now = Date.now();
   if (now >= memResetAt) {
     memCalls = 0;
@@ -68,7 +67,6 @@ export async function recordApiCall(): Promise<void> {
     }
     return;
   }
-  // Fallback: in-memory
   memCalls++;
   const threshold = Math.floor(DAILY_BUDGET * 0.1);
   if (threshold > 0 && memCalls === DAILY_BUDGET - threshold) {

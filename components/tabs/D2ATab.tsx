@@ -563,7 +563,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                           contentTitle={item.text.slice(0, 80)}
                           peerPubkey={peerPk}
                           onSend={(payload: D2ACommentPayload) => {
-                            void sendComment(peerPk, payload);
+                            void sendComment(peerPk, payload).catch(err => console.warn("[d2a] sendComment failed:", err));
                             setCommentOpen(null);
                           }}
                         />
@@ -956,7 +956,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                           topics: group.topics,
                           ownerPk: group.ownerPk,
                           createdAt: group.createdAt,
-                        });
+                        }).catch(err => console.warn("[d2a] publishCurationList failed:", err));
                       } : undefined}
                       mobile={mobile}
                     />
@@ -988,7 +988,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                   topics: group.topics,
                   ownerPk: group.ownerPk,
                   createdAt: group.createdAt,
-                });
+                }).catch(err => console.warn("[d2a] publishCurationList failed:", err));
               }}
               mobile={mobile}
             />

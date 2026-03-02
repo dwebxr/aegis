@@ -187,7 +187,7 @@ function AegisAppInner() {
   const handleLinkAccount = useCallback((account: LinkedNostrAccount | null) => {
     setLinkedAccount(account);
     if (!account) {
-      void clearWoTCache();
+      void clearWoTCache().catch(err => console.warn("[page] clearWoTCache failed:", err));
       setWotPromptDismissed(false);
       try { sessionStorage.removeItem("aegis-wot-prompt-dismissed"); } catch { console.debug("[page] sessionStorage unavailable"); }
     }

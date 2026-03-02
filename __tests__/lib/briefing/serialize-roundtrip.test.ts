@@ -111,9 +111,12 @@ describe("serializeBriefing — edge cases", () => {
     const state = makeBriefingState({ priority: [], serendipity: null });
     const result = serializeBriefing(state);
     expect(result.content).toContain("# Aegis Briefing");
-    // Summary should use fallback format
+    // Summary should use fallback format with actual content
     const summaryTag = result.tags.find(t => t[0] === "summary");
     expect(summaryTag).toBeDefined();
+    expect(summaryTag![1]).toBeTruthy();
+    expect(typeof summaryTag![1]).toBe("string");
+    expect(summaryTag![1].length).toBeGreaterThan(0);
   });
 
   it("item with no reason omits blockquote for that item", () => {

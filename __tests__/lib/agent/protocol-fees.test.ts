@@ -92,8 +92,7 @@ describe("timing constants consistency", () => {
     expect(RESONANCE_THRESHOLD).toBeLessThan(1);
   });
 
-  it("MIN_OFFER_SCORE is in [0, 10]", () => {
-    expect(MIN_OFFER_SCORE).toBeGreaterThanOrEqual(1);
-    expect(MIN_OFFER_SCORE).toBeLessThanOrEqual(10);
+  it("MIN_OFFER_SCORE is 7.0", () => {
+    expect(MIN_OFFER_SCORE).toBe(7.0);
   });
 });

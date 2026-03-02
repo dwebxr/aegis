@@ -136,8 +136,11 @@ describe("IngestionScheduler — enrichment flow", () => {
     const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
     await runCycle();
 
-    // Should not crash — enrichment failure is handled gracefully
-    // Content may or may not be produced depending on quickFilter
+    // Both mocks consumed: RSS feed fetch + rejected enrichment fetch
+    const fetchCalls = (global.fetch as jest.Mock).mock.calls;
+    expect(fetchCalls.length).toBe(2);
+    // Scheduler survived the rejected enrichment without crashing
+    // onNewContent may or may not fire depending on quickFilter for short text
   });
 
   it("does not enrich non-RSS sources", async () => {

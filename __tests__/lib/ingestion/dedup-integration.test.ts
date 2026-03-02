@@ -94,20 +94,26 @@ describe("ArticleDeduplicator — FIFO pruning", () => {
 });
 
 describe("ArticleDeduplicator — flush/dirty tracking", () => {
-  it("flush() persists dirty state", () => {
+  it("flush() completes without error and data remains accessible", async () => {
     const dedup = new ArticleDeduplicator();
-    dedup.reset();
+    await dedup.reset();
 
-    dedup.markSeen("https://a.com", "test");
-    // Should not throw
-    dedup.flush();
+    dedup.markSeen("https://a.com", "test content for flush");
+    await dedup.flush();
+
+    // Verify the data survives by checking isDuplicate still works
+    expect(dedup.isDuplicate("https://a.com", "anything")).toBe(true);
+    expect(dedup.size).toBe(2);
   });
 
-  it("flush() is no-op when not dirty", () => {
+  it("flush() is no-op when not dirty", async () => {
     const dedup = new ArticleDeduplicator();
-    dedup.reset();
+    await dedup.reset();
+    const sizeBefore = dedup.size;
 
     // No markSeen → not dirty → flush should be quick no-op
-    dedup.flush();
+    await dedup.flush();
+    // Size should remain the same (0) after a no-op flush
+    expect(dedup.size).toBe(sizeBefore);
   });
 });

@@ -4,16 +4,15 @@ describe("heuristicScores — edge cases", () => {
   describe("boundary conditions", () => {
     it("handles empty string", () => {
       const scores = heuristicScores("");
-      expect(scores.originality).toBeGreaterThanOrEqual(1);
-      expect(scores.insight).toBeGreaterThanOrEqual(1);
-      expect(scores.credibility).toBeGreaterThanOrEqual(1);
-      expect(scores.composite).toBeGreaterThanOrEqual(1);
+      expect(scores.originality).toBe(4);
+      expect(scores.insight).toBe(4);
+      expect(scores.credibility).toBe(5);
+      expect(scores.composite).toBe(4.3);
     });
 
     it("handles single word", () => {
       const scores = heuristicScores("hello");
-      expect(scores.composite).toBeGreaterThanOrEqual(1);
-      expect(scores.composite).toBeLessThanOrEqual(10);
+      expect(scores.composite).toBe(4.3);
     });
 
     it("handles exactly 8 words (boundary for 'very short' penalty)", () => {
@@ -53,9 +52,10 @@ describe("heuristicScores — edge cases", () => {
         Array(20).fill("🔥🚀💰").join(" ") +
         "!!!".repeat(50);
       const scores = heuristicScores(spamText);
-      expect(scores.originality).toBeGreaterThanOrEqual(0);
-      expect(scores.insight).toBeGreaterThanOrEqual(0);
-      expect(scores.credibility).toBeGreaterThanOrEqual(0);
+      expect(scores.originality).toBe(0);
+      expect(scores.insight).toBe(5);
+      expect(scores.credibility).toBe(2);
+      expect(scores.composite).toBe(2.3);
     });
 
     it("never returns scores above 10", () => {

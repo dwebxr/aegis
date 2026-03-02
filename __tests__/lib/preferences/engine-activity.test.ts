@@ -16,9 +16,11 @@ describe("learn() — activity histogram", () => {
   it("initialises histogram on first event", () => {
     const profile = createEmptyProfile("user1");
     const result = learn(profile, makeEvent());
-    expect(result.activityHistogram).toBeDefined();
+    expect(result.activityHistogram).toEqual(expect.objectContaining({
+      hourCounts: expect.any(Array),
+      totalEvents: 1,
+    }));
     expect(result.activityHistogram!.hourCounts).toHaveLength(24);
-    expect(result.activityHistogram!.totalEvents).toBe(1);
   });
 
   it("increments the correct hour bucket", () => {

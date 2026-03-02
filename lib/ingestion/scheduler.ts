@@ -77,12 +77,15 @@ export class IngestionScheduler {
       console.error("[scheduler] Unhandled cycle error:", errMsg(err));
       this.running = false;
     });
-    // Initialize dedup from IDB before first cycle
     const initAndStart = async () => {
-      await this.dedup.init();
+      try {
+        await this.dedup.init();
+      } catch (err) {
+        console.error("[scheduler] Dedup init failed:", errMsg(err));
+      }
       safeCycle();
     };
-    this.initialTimeoutId = setTimeout(() => { initAndStart(); }, 5000);
+    this.initialTimeoutId = setTimeout(() => { void initAndStart(); }, 5000);
     this.intervalId = setInterval(safeCycle, BASE_CYCLE_MS);
   }
 
@@ -207,7 +210,6 @@ export class IngestionScheduler {
       const now = Date.now();
       const cycleItems: ContentItem[] = [];
 
-      // Purge httpCacheHeaders for sources no longer in the active list or if over cap
       const activeKeys = new Set(sources.map(s => getSourceKey(s.type, s.config)));
       this.httpCacheHeaders.forEach((_, key) => {
         if (!activeKeys.has(key)) this.httpCacheHeaders.delete(key);
@@ -228,14 +230,10 @@ export class IngestionScheduler {
         }
 
         if (state.errorCount >= MAX_CONSECUTIVE_FAILURES) continue;
-
-        // Skip if not yet due (adaptive/backoff timing)
         if (state.nextFetchAt > now) continue;
 
         const errorsBefore = state.errorCount;
         const items = await this.fetchSource(source, key);
-
-        // If fetch recorded an error, skip scoring and success tracking
         if (state.errorCount > errorsBefore) continue;
 
         const passed = items.filter(raw => quickSlopFilter(raw.text));

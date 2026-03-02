@@ -220,6 +220,11 @@ describe("AgentManager — handleOffer error handling", () => {
     onEventHandler({ pubkey: "peer-xyz", content: "encrypted-offer" });
     await new Promise(r => setTimeout(r, 50));
 
+    // sendReject was attempted despite the relay error
+    expect(mockSendReject).toHaveBeenCalled();
+    // Agent must remain active despite rejection failure
+    expect(mgr.getState().isActive).toBe(true);
+
     mgr.stop();
   });
 });

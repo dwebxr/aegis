@@ -378,7 +378,7 @@ describe("SourcesTab — Quick Add: addSource payload construction", () => {
 
   it("Reddit: produces correct addSource payload", () => {
     const sub = parseRedditSubreddit("r/programming");
-    expect(sub).toBeTruthy(); // not empty = valid
+    expect(sub).toBe("programming");
     const feedUrl = `https://www.reddit.com/r/${sub}/.rss`;
     const label = `r/${sub}`;
     const payload = { type: "rss" as const, feedUrl, label, enabled: true };
@@ -451,24 +451,3 @@ describe("SourcesTab — Quick Add error validation", () => {
   });
 });
 
-// ─── Quick Add: empty/whitespace input is trimmed and blocked ───
-
-describe("SourcesTab — Quick Add: empty input guard", () => {
-  // handleQuickAdd has: const input = quickAddInput.trim(); if (!input) return;
-  // This tests that behavior — empty and whitespace inputs produce falsy values
-
-  it("empty string trims to empty (early return)", () => {
-    expect("".trim()).toBe("");
-    expect(!"".trim()).toBe(true);
-  });
-
-  it("whitespace-only trims to empty (early return)", () => {
-    expect("   ".trim()).toBe("");
-    expect(!"   ".trim()).toBe(true);
-  });
-
-  it("valid input is not blocked after trim", () => {
-    expect("r/programming".trim()).toBe("r/programming");
-    expect(!"r/programming".trim()).toBe(false);
-  });
-});

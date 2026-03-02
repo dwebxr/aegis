@@ -93,14 +93,14 @@ describe("heuristicScores", () => {
       // Lots of exclamations + caps → severe penalties
       const text = "WOW! AMAZING! INCREDIBLE! UNBELIEVABLE! SHOCKING!";
       const result = heuristicScores(text);
-      expect(result.originality).toBeGreaterThanOrEqual(0);
-      expect(result.credibility).toBeGreaterThanOrEqual(0);
+      expect(result.originality).toBe(0);
+      expect(result.credibility).toBe(0);
+      expect(result.composite).toBe(1.4);
     });
 
     it("composite is always 0-10", () => {
       const result = heuristicScores("");
-      expect(result.composite).toBeGreaterThanOrEqual(1);
-      expect(result.composite).toBeLessThanOrEqual(10);
+      expect(result.composite).toBe(4.3);
     });
   });
 

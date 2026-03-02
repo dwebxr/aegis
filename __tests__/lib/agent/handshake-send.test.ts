@@ -47,7 +47,7 @@ describe("sendOffer", () => {
     expect(() => JSON.parse(signedEvent.content)).toThrow();
     // Tags should include "p" and "d2a"
     expect(signedEvent.tags).toContainEqual(["p", bob.pk]);
-    expect(signedEvent.tags.find((t: string[]) => t[0] === "d2a")).toBeTruthy();
+    expect(signedEvent.tags).toContainEqual(expect.arrayContaining(["d2a"]));
   });
 
   it("throws when all relays fail", async () => {
@@ -77,9 +77,7 @@ describe("sendAccept", () => {
     await sendAccept(bob.sk, bob.pk, alice.pk, relays);
 
     const [signedEvent] = mockPublishAndPartition.mock.calls[0];
-    const d2aTag = signedEvent.tags.find((t: string[]) => t[0] === "d2a");
-    expect(d2aTag).toBeTruthy();
-    expect(d2aTag[1]).toBe("aegis-d2a-accept");
+    expect(signedEvent.tags).toContainEqual(["d2a", "aegis-d2a-accept"]);
   });
 
   it("throws when all relays fail", async () => {

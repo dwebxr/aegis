@@ -38,8 +38,12 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
 
   const handleSelfEvaluate = async () => {
     if (!text.trim()) return;
-    const result = await onAnalyze(text);
-    setSelfScore(result);
+    try {
+      const result = await onAnalyze(text);
+      setSelfScore(result);
+    } catch (err) {
+      console.error("[SignalComposer] Self-evaluate failed:", err instanceof Error ? err.message : String(err));
+    }
   };
 
   const effectiveStake = stakingEnabled ? BigInt(stakeE8s) : undefined;

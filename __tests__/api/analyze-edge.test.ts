@@ -63,9 +63,8 @@ describe("POST /api/analyze — edge cases", () => {
         expect(res.status).toBe(200);
         const data = await res.json();
         expect(data.tier).toBe("heuristic");
-        expect(data.composite).toBeGreaterThanOrEqual(1);
-        expect(data.composite).toBeLessThanOrEqual(10);
-        expect(["quality", "slop"]).toContain(data.verdict);
+        expect(data.composite).toBe(6.5);
+        expect(data.verdict).toBe("quality");
       } finally {
         if (originalKey) process.env.ANTHROPIC_API_KEY = originalKey;
       }
@@ -80,12 +79,10 @@ describe("POST /api/analyze — edge cases", () => {
           text: "BUY NOW!!! AMAZING!!! WOW!!! INCREDIBLE!!! MUST SEE!!!"
         }));
         const data = await res.json();
-        expect(data.originality).toBeGreaterThanOrEqual(0);
-        expect(data.insight).toBeGreaterThanOrEqual(0);
-        expect(data.credibility).toBeGreaterThanOrEqual(0);
-        expect(data.originality).toBeLessThanOrEqual(10);
-        expect(data.insight).toBeLessThanOrEqual(10);
-        expect(data.credibility).toBeLessThanOrEqual(10);
+        expect(data.originality).toBe(0);
+        expect(data.insight).toBe(4);
+        expect(data.credibility).toBe(0);
+        expect(data.composite).toBe(1.4);
       } finally {
         if (originalKey) process.env.ANTHROPIC_API_KEY = originalKey;
       }

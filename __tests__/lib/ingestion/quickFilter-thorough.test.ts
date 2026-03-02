@@ -88,12 +88,13 @@ describe("heuristicScores — composite formula", () => {
   });
 
   it("all scores are clamped to [0, 10]", () => {
-    // Even with maximum penalties, values should be >= 0
-    const terrible = "WOW!!! 🎉🔥💯🚀🎊 YES!!!"; // high exclamation + emoji + short
+    // Maximum penalties: exclamation + emoji + short
+    const terrible = "WOW!!! 🎉🔥💯🚀🎊 YES!!!";
     const scores = heuristicScores(terrible);
-    expect(scores.originality).toBeGreaterThanOrEqual(0);
-    expect(scores.insight).toBeGreaterThanOrEqual(0);
-    expect(scores.credibility).toBeGreaterThanOrEqual(0);
+    expect(scores.originality).toBe(0);
+    expect(scores.insight).toBe(4);
+    expect(scores.credibility).toBe(2);
+    expect(scores.composite).toBe(1.9);
   });
 
   it("all scores capped at 10 even with many bonuses", () => {
@@ -169,9 +170,8 @@ describe("quickSlopFilter", () => {
 describe("heuristicScores — edge cases", () => {
   it("empty string doesn't crash", () => {
     const scores = heuristicScores("");
-    expect(scores.composite).toBeGreaterThanOrEqual(1);
-    expect(scores.composite).toBeLessThanOrEqual(10);
-    expect(scores.verdict).toMatch(/quality|slop/);
+    expect(scores.composite).toBe(4.3);
+    expect(scores.verdict).toBe("quality");
   });
 
   it("single character", () => {
@@ -181,8 +181,7 @@ describe("heuristicScores — edge cases", () => {
 
   it("only whitespace", () => {
     const scores = heuristicScores("   \n\t  ");
-    expect(scores.composite).toBeGreaterThanOrEqual(1);
-    expect(scores.composite).toBeLessThanOrEqual(10);
+    expect(scores.composite).toBe(4.3);
   });
 
   it("very long text (10K words)", () => {

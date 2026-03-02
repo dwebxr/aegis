@@ -127,7 +127,7 @@ describe("ShareBriefingModal — interaction", () => {
 
     const cancelBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent === "Cancel");
-    expect(cancelBtn).toBeTruthy();
+    expect(cancelBtn).not.toBeNull();
     act(() => { cancelBtn!.click(); });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -156,7 +156,7 @@ describe("ShareBriefingModal — interaction", () => {
 
     const shareBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent === "Share Briefing");
-    expect(shareBtn).toBeTruthy();
+    expect(shareBtn).not.toBeNull();
 
     await act(async () => { shareBtn!.click(); });
 
@@ -263,7 +263,7 @@ describe("ShareBriefingModal — error handling", () => {
 
     const retryBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent === "Try Again");
-    expect(retryBtn).toBeTruthy();
+    expect(retryBtn).not.toBeNull();
     act(() => { retryBtn!.click(); });
 
     expect(container.textContent).toContain("Share Briefing");

@@ -49,19 +49,26 @@ describe("IngestionScheduler — lifecycle", () => {
   }
 
   it("start() is idempotent — second call is a no-op", () => {
+    const spy = jest.spyOn(global, "setTimeout");
     const scheduler = makeScheduler();
     scheduler.start();
+    const countAfterFirst = spy.mock.calls.length;
     scheduler.start(); // Should not throw or create duplicate timers
+    expect(spy.mock.calls.length).toBe(countAfterFirst);
     scheduler.stop();
+    spy.mockRestore();
   });
 
   it("stop() clears both initial timeout and interval", () => {
+    const clearSpy = jest.spyOn(global, "clearInterval");
     const scheduler = makeScheduler();
     scheduler.start();
     scheduler.stop();
+    expect(clearSpy).toHaveBeenCalled();
     // After stop, start should work again (timers were cleared)
     scheduler.start();
     scheduler.stop();
+    clearSpy.mockRestore();
   });
 
   it("double-stop does not throw", () => {

@@ -166,7 +166,7 @@ describe("AgentProfileEditModal — interaction", () => {
 
     const cancelBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent === "Cancel");
-    expect(cancelBtn).toBeTruthy();
+    expect(cancelBtn).not.toBeNull();
     act(() => { cancelBtn!.click(); });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -203,7 +203,7 @@ describe("AgentProfileEditModal — interaction", () => {
 
     const saveBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent?.includes("Save"));
-    expect(saveBtn).toBeTruthy();
+    expect(saveBtn).not.toBeNull();
 
     await act(async () => { saveBtn!.click(); });
 
@@ -278,7 +278,7 @@ describe("AgentProfileEditModal — interaction", () => {
 
     const retryBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent === "Try Again");
-    expect(retryBtn).toBeTruthy();
+    expect(retryBtn).not.toBeNull();
     act(() => { retryBtn!.click(); });
 
     expect(container.textContent).toContain("Edit Agent Profile");
@@ -295,7 +295,7 @@ describe("AgentProfileEditModal — interaction", () => {
 
     const doneBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent === "Done");
-    expect(doneBtn).toBeTruthy();
+    expect(doneBtn).not.toBeNull();
     act(() => { doneBtn!.click(); });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -359,7 +359,7 @@ describe("AgentProfileEditModal — image upload", () => {
     });
 
     const fileInput = container.querySelector("input[type='file']") as HTMLInputElement;
-    expect(fileInput).toBeTruthy();
+    expect(fileInput).not.toBeNull();
 
     const largeFile = new File([new ArrayBuffer(6 * 1024 * 1024)], "big.jpg", { type: "image/jpeg" });
     Object.defineProperty(fileInput, "files", { value: [largeFile], configurable: true });
@@ -473,7 +473,7 @@ describe("AgentProfileEditModal — image upload", () => {
     expect(container.textContent).toContain("Edit Agent Profile");
     expect(container.textContent).toContain(uploadedUrl);
     const img = container.querySelector("img[alt='Agent avatar']") as HTMLImageElement;
-    expect(img).toBeTruthy();
+    expect(img).not.toBeNull();
     expect(img.src).toBe(uploadedUrl);
   });
 
@@ -499,7 +499,7 @@ describe("AgentProfileEditModal — image upload", () => {
 
     const tryAgainBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent?.includes("Try Again"));
-    expect(tryAgainBtn).toBeTruthy();
+    expect(tryAgainBtn).not.toBeNull();
 
     await act(async () => { tryAgainBtn!.click(); });
 
@@ -509,7 +509,7 @@ describe("AgentProfileEditModal — image upload", () => {
     // Upload button should be available again
     const uploadBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent?.includes("Upload"));
-    expect(uploadBtn).toBeTruthy();
+    expect(uploadBtn).not.toBeNull();
   });
 
   it("prevents upload during non-edit phase", async () => {

@@ -142,14 +142,21 @@ describe("contentToCSV", () => {
   it("handles empty topics array", () => {
     const item = makeItem({ topics: [] });
     const csv = contentToCSV([item]);
-    // Empty topics should be empty field
-    expect(csv.split("\n")[1]).toBeDefined();
+    const row = csv.split("\n")[1];
+    // Empty topics → empty field (no semicolons), row still valid CSV
+    expect(row).toBeDefined();
+    expect(row.split(",").length).toBeGreaterThanOrEqual(5);
+    // Should not contain any topic content
+    expect(row).not.toContain("tech;");
   });
 
   it("handles undefined topics", () => {
     const item = makeItem({ topics: undefined });
     const csv = contentToCSV([item]);
-    expect(csv.split("\n")[1]).toBeDefined();
+    const row = csv.split("\n")[1];
+    // Undefined topics → empty field, row still valid CSV
+    expect(row).toBeDefined();
+    expect(row.split(",").length).toBeGreaterThanOrEqual(5);
   });
 
   it("escapes text with commas", () => {

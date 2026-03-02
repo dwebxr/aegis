@@ -193,7 +193,7 @@ describe("CommandPalette — interactive behavior", () => {
     ]});
 
     const button = getCommandButtons().find(b => b.textContent === "Click Me");
-    expect(button).toBeTruthy();
+    expect(button).not.toBeNull();
     act(() => { button!.click(); });
     expect(action).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);

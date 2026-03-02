@@ -35,7 +35,7 @@ describe("createBackendActorAsync", () => {
     const [passedFactory, actorOpts] = mockActorCreateActor.mock.calls[0];
     expect(passedFactory).toBe(idlFactory);
     expect(actorOpts.canisterId).toBe("rluf3-eiaaa-aaaam-qgjuq-cai");
-    expect(actor).toBeDefined();
+    expect(actor).toHaveProperty("getUserEvaluations");
   });
 
   it("still creates actor when syncTime fails (clock drift tolerance)", async () => {
@@ -47,7 +47,7 @@ describe("createBackendActorAsync", () => {
     // syncTime failed but actor was still created
     expect(mockSyncTime).toHaveBeenCalledTimes(1);
     expect(mockActorCreateActor).toHaveBeenCalledTimes(1);
-    expect(actor).toBeDefined();
+    expect(actor).toHaveProperty("getUserEvaluations");
 
     // Error was logged with the real errMsg() utility
     expect(errorSpy).toHaveBeenCalledWith("[ic] syncTime failed:", "Network unreachable");

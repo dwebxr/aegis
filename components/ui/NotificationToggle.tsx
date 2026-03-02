@@ -24,10 +24,14 @@ export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact 
   const denied = permission === "denied";
 
   const handleToggle = async () => {
-    if (isSubscribed) {
-      await unsubscribe();
-    } else {
-      await subscribe();
+    try {
+      if (isSubscribed) {
+        await unsubscribe();
+      } else {
+        await subscribe();
+      }
+    } catch (err) {
+      console.error("[NotificationToggle] Toggle failed:", err instanceof Error ? err.message : String(err));
     }
   };
 

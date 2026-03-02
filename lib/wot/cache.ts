@@ -6,7 +6,6 @@ const WOT_CACHE_KEY = "aegis-wot-graph";
 const IDB_KEY = "graph";
 
 export async function loadWoTCache(): Promise<WoTGraph | null> {
-  // Try IDB first
   if (isIDBAvailable()) {
     try {
       const entry = await idbGet<WoTCacheEntry>(STORE_WOT_CACHE, IDB_KEY);
@@ -23,7 +22,6 @@ export async function loadWoTCache(): Promise<WoTGraph | null> {
     }
   }
 
-  // Fallback: localStorage
   if (typeof globalThis.localStorage === "undefined") return null;
   try {
     const raw = localStorage.getItem(WOT_CACHE_KEY);

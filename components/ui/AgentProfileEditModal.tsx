@@ -222,7 +222,7 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
                   style={{ display: "none" }}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handleImageUpload(file);
+                    if (file) void handleImageUpload(file);
                     e.target.value = "";
                   }}
                 />

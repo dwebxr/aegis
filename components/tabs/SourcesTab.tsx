@@ -128,7 +128,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
       Promise.all(suggestions.map(async s => ({
         ...s,
         discoveredFeedUrl: s.feedUrl || await discoverFeedForDomain(s.domain),
-      }))).then(setFeedSuggestions);
+      }))).then(setFeedSuggestions).catch(err => console.warn("[sources] Feed discovery failed:", err));
     } else {
       setFeedSuggestions([]);
     }

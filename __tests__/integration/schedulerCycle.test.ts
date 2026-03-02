@@ -219,25 +219,34 @@ describe("IngestionScheduler — cycle integration", () => {
 
 describe("IngestionScheduler — start/stop lifecycle", () => {
   it("start() initializes timers", () => {
+    const setTimeoutSpy = jest.spyOn(global, "setTimeout");
     const { scheduler } = makeScheduler();
+    const before = setTimeoutSpy.mock.calls.length;
     scheduler.start();
-    // Verify scheduler is started by checking it can be stopped without error
+    expect(setTimeoutSpy.mock.calls.length).toBeGreaterThan(before);
     scheduler.stop();
+    setTimeoutSpy.mockRestore();
   });
 
-  it("stop() clears all timers", () => {
+  it("stop() clears all timers (double stop does not throw)", () => {
+    const clearIntervalSpy = jest.spyOn(global, "clearInterval");
     const { scheduler } = makeScheduler();
     scheduler.start();
     scheduler.stop();
-    // Double stop should not throw
     scheduler.stop();
+    expect(clearIntervalSpy).toHaveBeenCalled();
+    clearIntervalSpy.mockRestore();
   });
 
   it("start() is idempotent (calling twice doesn't create duplicate timers)", () => {
+    const setTimeoutSpy = jest.spyOn(global, "setTimeout");
     const { scheduler } = makeScheduler();
     scheduler.start();
+    const countAfterFirst = setTimeoutSpy.mock.calls.length;
     scheduler.start(); // Second call should be no-op
+    expect(setTimeoutSpy.mock.calls.length).toBe(countAfterFirst);
     scheduler.stop();
+    setTimeoutSpy.mockRestore();
   });
 
   it("resetDedup() clears the deduplication cache", () => {

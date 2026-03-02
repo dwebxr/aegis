@@ -89,9 +89,10 @@ describe("IngestionScheduler — Nostr source", () => {
     await runCycle();
 
     const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
-    // Empty string split → [""] → not useful, but config.relays?.split(",") should
-    // handle this; the default relay is used only when relays is undefined/null
+    // Empty string split → [""] — verify relays is an array with actual values
     expect(body.relays).toBeDefined();
+    expect(Array.isArray(body.relays)).toBe(true);
+    expect(body.relays.length).toBeGreaterThanOrEqual(1);
   });
 
   it("processes Nostr events into content items with nostr: source URL", async () => {

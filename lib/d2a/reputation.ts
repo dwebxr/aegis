@@ -121,7 +121,6 @@ export function getTrustTier(effectiveTrust: number): TrustTier {
   if (effectiveTrust >= 0.8) return "trusted";
   if (effectiveTrust >= 0.4) return "known";
   if (effectiveTrust >= 0) return "unknown";
-  // effectiveTrust < 0: not expected from calculateEffectiveTrust but handled defensively
   return "restricted";
 }
 

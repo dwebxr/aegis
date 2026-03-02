@@ -29,8 +29,9 @@ function isDelegationFresh(identity: Identity): boolean {
       if (delegation.expiration < nowNs) return false;
     }
     return true;
-  } catch {
-    return true;
+  } catch (err) {
+    console.warn("[auth] Failed to check delegation freshness, treating as expired:", err);
+    return false;
   }
 }
 

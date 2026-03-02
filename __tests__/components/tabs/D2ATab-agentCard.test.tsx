@@ -284,7 +284,7 @@ describe("D2ATab Agent Card — interaction", () => {
 
     const editBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent?.includes("Edit Profile"));
-    expect(editBtn).toBeTruthy();
+    expect(editBtn).not.toBeNull();
 
     act(() => { editBtn!.click(); });
 
@@ -296,7 +296,7 @@ describe("D2ATab Agent Card — interaction", () => {
 
     const hideBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent === "Hide");
-    expect(hideBtn).toBeTruthy();
+    expect(hideBtn).not.toBeNull();
 
     act(() => { hideBtn!.click(); });
 
@@ -315,7 +315,7 @@ describe("D2ATab Agent Card — interaction", () => {
     // Then show
     const learnBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent?.includes("Learn more"));
-    expect(learnBtn).toBeTruthy();
+    expect(learnBtn).not.toBeNull();
     act(() => { learnBtn!.click(); });
 
     expect(container.textContent).toContain("auto-generated from your Internet Identity");
@@ -333,7 +333,7 @@ describe("D2ATab Agent Card — interaction", () => {
 
     const copyBtn = Array.from(container.querySelectorAll("button"))
       .find(b => b.textContent === "Copy npub");
-    expect(copyBtn).toBeTruthy();
+    expect(copyBtn).not.toBeNull();
 
     await act(async () => { copyBtn!.click(); });
 
@@ -350,7 +350,7 @@ describe("D2ATab Agent Card — interaction", () => {
     render();
 
     const img = container.querySelector("img[alt='Agent']") as HTMLImageElement;
-    expect(img).toBeTruthy();
+    expect(img).not.toBeNull();
 
     act(() => { img.dispatchEvent(new Event("error")); });
 

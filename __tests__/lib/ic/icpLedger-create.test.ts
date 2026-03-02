@@ -37,7 +37,7 @@ describe("createICPLedgerActorAsync", () => {
     const [idlFactory, options] = mockActorCreateActor.mock.calls[0];
     expect(typeof idlFactory).toBe("function");
     expect(options.canisterId).toBe("ryjl3-tyaaa-aaaaa-aaaba-cai");
-    expect(actor).toBeDefined();
+    expect(actor).toHaveProperty("icrc1_balance_of");
   });
 
   it("syncs time before creating actor", async () => {
@@ -59,7 +59,7 @@ describe("createICPLedgerActorAsync", () => {
     // syncTime failed but actor was still created
     expect(mockSyncTime).toHaveBeenCalledTimes(1);
     expect(mockActorCreateActor).toHaveBeenCalledTimes(1);
-    expect(actor).toBeDefined();
+    expect(actor).toHaveProperty("icrc1_balance_of");
 
     // Error was logged with the real errMsg() utility
     expect(errorSpy).toHaveBeenCalledWith("[ic] ledger syncTime failed:", "Time sync failed");

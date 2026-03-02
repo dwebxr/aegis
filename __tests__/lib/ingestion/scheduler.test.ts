@@ -47,9 +47,13 @@ describe("IngestionScheduler", () => {
 
   describe("start/stop lifecycle", () => {
     it("starts and stops without error", () => {
+      const spy = jest.spyOn(global, "setTimeout");
+      const before = spy.mock.calls.length;
       const scheduler = new IngestionScheduler(makeCallbacks());
       scheduler.start();
+      expect(spy.mock.calls.length).toBeGreaterThan(before);
       scheduler.stop();
+      spy.mockRestore();
     });
 
     it("does not start multiple intervals on repeated start() calls", async () => {

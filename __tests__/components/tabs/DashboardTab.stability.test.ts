@@ -198,7 +198,7 @@ describe("Tab switch stability — display:none preserves state", () => {
     });
 
     const dashDiv = container.querySelector("[data-top3-ids]")!;
-    expect(dashDiv).toBeTruthy();
+    expect(dashDiv).not.toBeNull();
     const idsBefore = dashDiv.getAttribute("data-top3-ids");
 
     // Switch to Feed tab
@@ -208,7 +208,7 @@ describe("Tab switch stability — display:none preserves state", () => {
 
     // Component is still in DOM (display:none), not unmounted
     const dashDivAfter = container.querySelector("[data-top3-ids]");
-    expect(dashDivAfter).toBeTruthy();
+    expect(dashDivAfter).not.toBeNull();
     expect(dashDivAfter!.getAttribute("data-top3-ids")).toBe(idsBefore);
   });
 

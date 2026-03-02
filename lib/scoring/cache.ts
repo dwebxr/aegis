@@ -92,7 +92,6 @@ export async function initScoringCache(): Promise<void> {
     }
   }
 
-  // Fallback: load from localStorage
   _useIDB = false;
   if (typeof globalThis.localStorage !== "undefined") {
     try {
@@ -192,7 +191,7 @@ export function clearScoringCache(): void {
   _memCache = new Map();
   if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
   if (_useIDB) {
-    idbPut(STORE_SCORE_CACHE, IDB_KEY, {}).catch(() => {});
+    idbPut(STORE_SCORE_CACHE, IDB_KEY, {}).catch(err => console.warn("[scoring-cache] IDB clear failed:", err));
   }
   if (typeof globalThis.localStorage !== "undefined") {
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
