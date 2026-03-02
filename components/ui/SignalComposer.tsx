@@ -36,13 +36,16 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
   const [imageError, setImageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [evalError, setEvalError] = useState<string | null>(null);
+
   const handleSelfEvaluate = async () => {
     if (!text.trim()) return;
+    setEvalError(null);
     try {
       const result = await onAnalyze(text);
       setSelfScore(result);
     } catch (err) {
-      console.error("[SignalComposer] Self-evaluate failed:", err instanceof Error ? err.message : String(err));
+      setEvalError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -176,7 +179,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
 
       <textarea
         value={text}
-        onChange={e => { setText(e.target.value); setSelfScore(null); }}
+        onChange={e => { setText(e.target.value); setSelfScore(null); setEvalError(null); }}
         placeholder="Share your signal — analysis, findings, insights..."
         style={{
           width: "100%",
@@ -258,24 +261,31 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
         </div>
 
         {!selfScore ? (
-          <button
-            onClick={handleSelfEvaluate}
-            disabled={!text.trim() || isAnalyzing || isUploading}
-            style={{
-              padding: mobile ? "10px 20px" : "10px 28px",
-              background: text.trim() && !isAnalyzing && !isUploading
-                ? "linear-gradient(135deg, #7c3aed, #2563eb)"
-                : "rgba(255,255,255,0.05)",
-              border: "none",
-              borderRadius: 10,
-              color: text.trim() && !isAnalyzing && !isUploading ? "#fff" : colors.text.muted,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: text.trim() && !isAnalyzing && !isUploading ? "pointer" : "not-allowed",
-            }}
-          >
-            {isAnalyzing ? "Evaluating..." : "Self-Evaluate"}
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <button
+              onClick={handleSelfEvaluate}
+              disabled={!text.trim() || isAnalyzing || isUploading}
+              style={{
+                padding: mobile ? "10px 20px" : "10px 28px",
+                background: text.trim() && !isAnalyzing && !isUploading
+                  ? "linear-gradient(135deg, #7c3aed, #2563eb)"
+                  : "rgba(255,255,255,0.05)",
+                border: "none",
+                borderRadius: 10,
+                color: text.trim() && !isAnalyzing && !isUploading ? "#fff" : colors.text.muted,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: text.trim() && !isAnalyzing && !isUploading ? "pointer" : "not-allowed",
+              }}
+            >
+              {isAnalyzing ? "Evaluating..." : "Self-Evaluate"}
+            </button>
+            {evalError && (
+              <div style={{ fontSize: 10, color: colors.red[400], fontWeight: 600 }}>
+                {evalError}
+              </div>
+            )}
+          </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

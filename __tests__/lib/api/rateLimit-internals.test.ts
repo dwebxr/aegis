@@ -63,33 +63,35 @@ describe("rateLimit — MAX_WINDOW_ENTRIES eviction", () => {
     let rl: (req: NextRequest, limit?: number, windowMs?: number) => ReturnType<typeof import("@/lib/api/rateLimit").rateLimit>;
     let reset: () => void;
 
-    // Fresh module to start with empty map
     jest.isolateModules(() => {
       const mod = require("@/lib/api/rateLimit");
       rl = mod.rateLimit;
       reset = mod._resetRateLimits;
     });
 
-    // Fill the map with 10,000 unique IPs
+    // Use limit=1 so the first request exhausts the quota.
+    // If not evicted, next request from same IP returns 429.
+    // If evicted, IP gets a fresh window and returns null.
+
+    // Fill map with 10,000 unique IPs (each at count=1, limit=1 → exhausted)
     for (let i = 0; i < 10_000; i++) {
-      // IP format: a.b.c.d where we encode i into 4 octets
       const a = (i >> 16) & 255;
       const b = (i >> 8) & 255;
       const c = i & 255;
-      rl!(makeRequest(`${a}.${b}.${c}.1`), 100, 300_000);
+      rl!(makeRequest(`${a}.${b}.${c}.1`), 1, 300_000);
     }
 
-    // The first IP (0.0.0.1) should currently be rate-tracked
-    // Now add one more entry to trigger eviction
-    rl!(makeRequest("evict-trigger"), 100, 300_000);
+    // Sanity: 0.0.0.1 is rate-limited (count=1 >= limit=1)
+    const beforeEviction = rl!(makeRequest("0.0.0.1"), 1, 300_000);
+    expect(beforeEviction).not.toBeNull();
+    expect(beforeEviction!.status).toBe(429);
 
-    // The oldest entry (0.0.0.1) should have been evicted
-    // So a new request from that IP should get a fresh window (count starts at 1)
-    // If it hadn't been evicted, the count would be 2
-    // We can verify by exhausting the limit: if evicted, we need 100 more requests
-    // Simpler: just verify the request succeeds (it would either way)
-    const result = rl!(makeRequest("0.0.0.1"), 100, 300_000);
-    expect(result).toBeNull(); // Allowed regardless, but confirms the path executed
+    // Add one more to trigger eviction of oldest (0.0.0.1)
+    rl!(makeRequest("evict-trigger"), 1, 300_000);
+
+    // 0.0.0.1 was evicted → gets fresh window → allowed
+    const afterEviction = rl!(makeRequest("0.0.0.1"), 1, 300_000);
+    expect(afterEviction).toBeNull();
 
     reset!();
   }, 30_000);

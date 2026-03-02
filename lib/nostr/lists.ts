@@ -1,5 +1,4 @@
 import { finalizeEvent } from "nostr-tools/pure";
-import { SimplePool } from "nostr-tools/pool";
 import { KIND_CATEGORIZED_LIST, DEFAULT_RELAYS } from "./types";
 import { publishAndPartition } from "./publish";
 
@@ -74,33 +73,3 @@ export function parseCurationListEvent(event: {
   };
 }
 
-export async function fetchCurationLists(
-  pool: SimplePool,
-  pubkeys: string[],
-  relayUrls?: string[],
-): Promise<CurationListEvent[]> {
-  const urls = relayUrls?.length ? relayUrls : DEFAULT_RELAYS;
-  const events = await pool.querySync(urls, {
-    kinds: [KIND_CATEGORIZED_LIST],
-    authors: pubkeys,
-  });
-
-  const lists: CurationListEvent[] = [];
-  // Use latest event per dTag (replaceable parameterized event)
-  const latestByDTag = new Map<string, typeof events[0]>();
-  for (const ev of events) {
-    const dTag = ev.tags.find(t => t[0] === "d")?.[1];
-    if (!dTag || !dTag.startsWith(AEGIS_GROUP_PREFIX)) continue;
-    const existing = latestByDTag.get(dTag);
-    if (!existing || ev.created_at > existing.created_at) {
-      latestByDTag.set(dTag, ev);
-    }
-  }
-
-  for (const ev of latestByDTag.values()) {
-    const parsed = parseCurationListEvent(ev);
-    if (parsed) lists.push(parsed);
-  }
-
-  return lists;
-}

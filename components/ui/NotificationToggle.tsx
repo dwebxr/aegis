@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { colors, space, type as t, radii, transitions } from "@/styles/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePushNotification } from "@/hooks/usePushNotification";
@@ -19,11 +19,14 @@ export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact 
     isLoading,
   } = usePushNotification();
 
+  const [error, setError] = useState<string | null>(null);
+
   if (!isAuthenticated || !isSupported) return null;
 
   const denied = permission === "denied";
 
   const handleToggle = async () => {
+    setError(null);
     try {
       if (isSubscribed) {
         await unsubscribe();
@@ -31,17 +34,17 @@ export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact 
         await subscribe();
       }
     } catch (err) {
-      console.error("[NotificationToggle] Toggle failed:", err instanceof Error ? err.message : String(err));
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
   if (compact) {
-    const bellColor = isSubscribed ? colors.cyan[400] : denied ? colors.red[400] : colors.text.disabled;
+    const bellColor = error ? colors.red[400] : isSubscribed ? colors.cyan[400] : denied ? colors.red[400] : colors.text.disabled;
     return (
       <button
         onClick={handleToggle}
         disabled={denied || isLoading}
-        title={isSubscribed ? "Push notifications on" : denied ? "Notifications blocked" : "Enable push notifications"}
+        title={error ? `Error: ${error}` : isSubscribed ? "Push notifications on" : denied ? "Notifications blocked" : "Enable push notifications"}
         style={{
           display: "flex", alignItems: "center", justifyContent: "center",
           width: 28, height: 28,
@@ -85,15 +88,17 @@ export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact 
         </div>
         <div style={{
           fontSize: t.tiny.size,
-          color: colors.text.disabled,
+          color: error ? colors.red[400] : colors.text.disabled,
           marginTop: 1,
           lineHeight: t.tiny.lineHeight,
         }}>
-          {isSubscribed
-            ? "Briefing alerts active"
-            : denied
-              ? "Blocked in browser"
-              : "Get briefing alerts"}
+          {error
+            ? error
+            : isSubscribed
+              ? "Briefing alerts active"
+              : denied
+                ? "Blocked in browser"
+                : "Get briefing alerts"}
         </div>
       </div>
       <button

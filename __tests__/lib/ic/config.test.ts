@@ -84,10 +84,9 @@ describe("IC config utilities", () => {
   });
 
   describe("isLocal detection", () => {
-    it("is false in test environment (no window)", async () => {
+    it("is false in test environment (jsdom is not localhost)", async () => {
       const { isLocal } = await import("@/lib/ic/config");
-      // In Jest, typeof window may be undefined or not localhost
-      expect(typeof isLocal).toBe("boolean");
+      expect(isLocal).toBe(false);
     });
   });
 });

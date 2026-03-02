@@ -1,4 +1,4 @@
-import { isD2AContent, extractD2ASenderPk } from "@/lib/d2a/activity";
+import { isD2AContent } from "@/lib/d2a/activity";
 import type { ContentItem } from "@/lib/types/content";
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
@@ -59,41 +59,3 @@ describe("isD2AContent", () => {
   });
 });
 
-describe("extractD2ASenderPk", () => {
-  it("extracts pubkey from valid D2A reason", () => {
-    expect(extractD2ASenderPk(makeItem({ reason: "Received via D2A from abc12345..." }))).toBe("abc12345");
-  });
-
-  it("returns null for empty reason", () => {
-    expect(extractD2ASenderPk(makeItem({ reason: "" }))).toBeNull();
-  });
-
-  it("returns null for undefined reason", () => {
-    expect(extractD2ASenderPk(makeItem({ reason: undefined }))).toBeNull();
-  });
-
-  it("returns null for non-D2A reason", () => {
-    expect(extractD2ASenderPk(makeItem({ reason: "AI analysis complete" }))).toBeNull();
-  });
-
-  it("extracts full 64-char pubkey", () => {
-    const pk = "abcdef0123456789".repeat(4); // 64 chars
-    expect(extractD2ASenderPk(makeItem({ reason: `Received via D2A from ${pk}` }))).toBe(pk);
-  });
-
-  it("stops at non-word character boundary", () => {
-    expect(extractD2ASenderPk(makeItem({ reason: "Received via D2A from abc123..." }))).toBe("abc123");
-  });
-
-  it("returns null for reason with prefix only (no pubkey)", () => {
-    expect(extractD2ASenderPk(makeItem({ reason: "Received via D2A from " }))).toBeNull();
-  });
-
-  it("extracts pubkey with underscores", () => {
-    expect(extractD2ASenderPk(makeItem({ reason: "Received via D2A from abc_123" }))).toBe("abc_123");
-  });
-
-  it("extracts only first word-character sequence after prefix", () => {
-    expect(extractD2ASenderPk(makeItem({ reason: "Received via D2A from pk1 extra text" }))).toBe("pk1");
-  });
-});

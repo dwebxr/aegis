@@ -15,15 +15,18 @@ interface ManualInputProps {
 export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing, mobile }) => {
   const [text, setText] = useState("");
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGo = async () => {
     if (!text.trim()) return;
     setResult(null);
+    setError(null);
     try {
       const r = await onAnalyze(text);
       setResult(r);
     } catch (err) {
-      console.error("[ManualInput] Analysis failed:", err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
     }
   };
 
@@ -66,6 +69,12 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
           )}
         </button>
       </div>
+
+      {error && (
+        <div data-testid="aegis-manual-error" style={{ fontSize: 12, color: colors.red[400], marginBottom: 12, fontWeight: 600 }}>
+          Analysis failed: {error}
+        </div>
+      )}
 
       {result && (
         <div data-testid="aegis-manual-result" style={{

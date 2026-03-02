@@ -16,7 +16,7 @@ import type { AgentState, D2ACommentPayload } from "@/lib/agent/types";
 import type { WoTGraph } from "@/lib/wot/types";
 import type { NostrProfileMetadata } from "@/lib/nostr/profile";
 import { sendComment as sendCommentMsg } from "@/lib/agent/handshake";
-import { saveComment, loadComments } from "@/lib/d2a/comments";
+import { saveComment, loadComments, clearOldComments } from "@/lib/d2a/comments";
 import type { StoredComment } from "@/lib/d2a/comments";
 import { getCachedAgentProfile, setCachedAgentProfile, fetchAgentProfile } from "@/lib/nostr/profile";
 import { errMsg } from "@/lib/utils/errors";
@@ -72,7 +72,10 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const { content, addContent } = useContent();
   const [agentState, setAgentState] = useState<AgentState>(defaultState);
   const [isEnabled, setD2AEnabled] = useState(false);
-  const [d2aComments, setD2aComments] = useState<StoredComment[]>(() => loadComments());
+  const [d2aComments, setD2aComments] = useState<StoredComment[]>(() => {
+    clearOldComments();
+    return loadComments();
+  });
   const [wotGraph, setWotGraphState] = useState<WoTGraph | null>(null);
   const [agentProfile, setAgentProfile] = useState<NostrProfileMetadata | null>(null);
   const [agentProfileLoading, setAgentProfileLoading] = useState(false);

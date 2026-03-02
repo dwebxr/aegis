@@ -125,10 +125,16 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     const suggestions = getSuggestions(existingUrls);
     if (suggestions.length > 0) {
       // Attempt feed discovery for each suggestion
-      Promise.all(suggestions.map(async s => ({
+      Promise.allSettled(suggestions.map(async s => ({
         ...s,
         discoveredFeedUrl: s.feedUrl || await discoverFeedForDomain(s.domain),
-      }))).then(setFeedSuggestions).catch(err => console.warn("[sources] Feed discovery failed:", err));
+      }))).then(results => {
+        setFeedSuggestions(
+          results
+            .filter((r): r is PromiseFulfilledResult<typeof suggestions[0] & { discoveredFeedUrl: string | null }> => r.status === "fulfilled")
+            .map(r => r.value),
+        );
+      });
     } else {
       setFeedSuggestions([]);
     }
