@@ -110,14 +110,17 @@ export class ArticleDeduplicator {
   }
 
   private prune(): void {
-    while (this.insertionOrder.length > MAX_ENTRIES) {
-      const oldest = this.insertionOrder.shift()!;
+    if (this.insertionOrder.length <= MAX_ENTRIES) return;
+    const excess = this.insertionOrder.length - MAX_ENTRIES;
+    for (let i = 0; i < excess; i++) {
+      const oldest = this.insertionOrder[i];
       if (oldest.startsWith("u:")) {
         this.urls.delete(oldest.slice(2));
       } else if (oldest.startsWith("f:")) {
         this.fingerprints.delete(oldest.slice(2));
       }
     }
+    this.insertionOrder = this.insertionOrder.slice(excess);
   }
 
   private loadFromData(data: DedupData): void {

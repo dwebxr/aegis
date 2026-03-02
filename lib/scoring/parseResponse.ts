@@ -1,13 +1,13 @@
 import type { ScoreParseResult } from "./types";
 import { clamp } from "@/lib/utils/math";
 
-function num(v: unknown, fallback: number): number {
-  const n = Number(v);
+function toNum(value: unknown, fallback: number): number {
+  const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
 
 function scoreField(parsed: Record<string, unknown>, key: string): number {
-  return clamp(num(parsed[key], 5), 0, 10);
+  return clamp(toNum(parsed[key], 5), 0, 10);
 }
 
 /**
@@ -24,9 +24,9 @@ export function parseScoreResponse(raw: string): ScoreParseResult | null {
     if (jsonStart === -1 || jsonEnd === -1) return null;
 
     const jsonStr = cleaned.slice(jsonStart, jsonEnd + 1);
-    const raw_parsed: unknown = JSON.parse(jsonStr);
-    if (typeof raw_parsed !== "object" || raw_parsed === null) return null;
-    const parsed = raw_parsed as Record<string, unknown>;
+    const rawParsed: unknown = JSON.parse(jsonStr);
+    if (typeof rawParsed !== "object" || rawParsed === null) return null;
+    const parsed = rawParsed as Record<string, unknown>;
 
     const vSignal = scoreField(parsed, "vSignal");
     const cContext = scoreField(parsed, "cContext");
@@ -35,7 +35,7 @@ export function parseScoreResponse(raw: string): ScoreParseResult | null {
     const insight = scoreField(parsed, "insight");
     const credibility = scoreField(parsed, "credibility");
 
-    const rawComposite = num(parsed.composite, (vSignal * cContext) / (lSlop + 0.5));
+    const rawComposite = toNum(parsed.composite, (vSignal * cContext) / (lSlop + 0.5));
     const composite = clamp(rawComposite, 0, 10);
 
     const verdict: "quality" | "slop" = parsed.verdict === "quality" ? "quality" : "slop";

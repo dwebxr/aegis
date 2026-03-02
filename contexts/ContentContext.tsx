@@ -107,15 +107,15 @@ async function loadCachedContentAsync(): Promise<ContentItem[]> {
   }
 }
 
-let _contentSaveTimer: ReturnType<typeof setTimeout> | null = null;
-let _contentUseIDB = false;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let useIDB = false;
 
 function saveCachedContent(items: ContentItem[]): void {
-  if (_contentSaveTimer) clearTimeout(_contentSaveTimer);
-  _contentSaveTimer = setTimeout(() => {
-    _contentSaveTimer = null;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
     const truncated = truncatePreservingActioned(items);
-    if (_contentUseIDB) {
+    if (useIDB) {
       idbPut(STORE_CONTENT_CACHE, IDB_CONTENT_KEY, truncated).catch(err => {
         console.warn("[content] IDB save failed:", errMsg(err));
       });
@@ -261,7 +261,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   // Load cached content from IDB on mount
   useEffect(() => {
     let cancelled = false;
-    _contentUseIDB = isIDBAvailable();
+    useIDB = isIDBAvailable();
     loadCachedContentAsync().then(items => {
       if (!cancelled && items.length > 0) {
         setContent(items);

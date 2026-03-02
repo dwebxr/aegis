@@ -33,15 +33,6 @@ function truncate(s: string, max: number): string {
   return s.slice(0, max - 3) + "...";
 }
 
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
 function itemTitle(item: ContentItem): string {
   const raw = item.text || "Untitled";
   const firstLine = raw.split("\n")[0];
@@ -63,7 +54,9 @@ export function serializeBriefing(
   digest?: string,
 ): SerializedBriefing {
   const identifier = `briefing-${briefing.generatedAt}`;
-  const dateStr = formatDate(briefing.generatedAt);
+  const dateStr = new Date(briefing.generatedAt).toLocaleDateString("en-US", {
+    year: "numeric", month: "short", day: "numeric", timeZone: "UTC",
+  });
   const insightCount = briefing.priority.length + (briefing.serendipity ? 1 : 0);
   const burned = briefing.totalItems - insightCount;
 

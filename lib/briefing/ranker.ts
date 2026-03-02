@@ -135,10 +135,9 @@ export function generateBriefing(
     };
   }
 
-  const selectedIds = new Set(priorityIds);
-  if (serendipity) selectedIds.add(serendipity.item.id);
+  if (serendipity) priorityIds.add(serendipity.item.id);
 
-  const filteredOut = content.filter(c => !selectedIds.has(c.id));
+  const filteredOut = content.filter(c => !priorityIds.has(c.id));
 
   return {
     priority: priorityItems.map(s => ({

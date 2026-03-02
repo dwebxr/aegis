@@ -208,7 +208,7 @@ export class AgentManager {
 
   private async broadcastMyPresence(): Promise<void> {
     const prefs = this.callbacks.getPrefs();
-    const interests = Object.entries(prefs.topicAffinities || {})
+    const interests = Object.entries(prefs.topicAffinities ?? {})
       .filter(([, v]) => v >= 0.2)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 20)

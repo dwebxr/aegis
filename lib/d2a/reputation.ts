@@ -95,9 +95,7 @@ export function recordSlop(pubkey: string): PeerReputation {
 }
 
 export function isBlocked(pubkey: string): boolean {
-  const map = loadReputations();
-  const rep = map.get(pubkey);
-  return rep?.blocked ?? false;
+  return loadReputations().get(pubkey)?.blocked ?? false;
 }
 
 export function getReputation(pubkey: string): PeerReputation | undefined {

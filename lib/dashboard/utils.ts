@@ -125,10 +125,10 @@ export function computeDashboardActivity(
   activityRange: "today" | "7d" | "30d",
   now?: number,
 ): DashboardActivityStats {
-  const _now = now ?? Date.now();
+  const currentTime = now ?? Date.now();
   const dayMs = 86400000;
   const rangeDays = activityRange === "30d" ? 30 : activityRange === "7d" ? 7 : 1;
-  const rangeStart = _now - rangeDays * dayMs;
+  const rangeStart = currentTime - rangeDays * dayMs;
   const rangeItems = content.filter(c => c.createdAt >= rangeStart);
   const actionLimit = activityRange === "today" ? 3 : 5;
   const recentActions = content
@@ -139,8 +139,8 @@ export function computeDashboardActivity(
   const chartQuality: number[] = [];
   const chartSlop: number[] = [];
   for (let i = chartDays - 1; i >= 0; i--) {
-    const dayStart = _now - (i + 1) * dayMs;
-    const dayEnd = _now - i * dayMs;
+    const dayStart = currentTime - (i + 1) * dayMs;
+    const dayEnd = currentTime - i * dayMs;
     const dayItems = content.filter(c => c.createdAt >= dayStart && c.createdAt < dayEnd);
     const dayQual = dayItems.filter(c => c.verdict === "quality").length;
     const dayTotal = dayItems.length;
