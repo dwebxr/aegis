@@ -82,6 +82,18 @@ function serendipityScore(item: ContentItem, prefs: UserPreferenceProfile): numb
   return vSignal * 0.5 + noveltyBonus * 0.3 + topicNovelty * 0.2;
 }
 
+function deduplicateBySource(items: ContentItem[]): ContentItem[] {
+  const seen = new Map<string, ContentItem>();
+  for (const item of items) {
+    const key = item.sourceUrl || item.id;
+    const existing = seen.get(key);
+    if (!existing || item.scores.composite > existing.scores.composite) {
+      seen.set(key, item);
+    }
+  }
+  return Array.from(seen.values());
+}
+
 export function generateBriefing(
   content: ContentItem[],
   prefs: UserPreferenceProfile,
@@ -92,7 +104,10 @@ export function generateBriefing(
     c.verdict === "quality" && !c.flagged && c.scores.composite >= threshold,
   );
 
-  const scored: Array<{ item: ContentItem; score: number }> = qualityItems.map(item => ({
+  // Deduplicate by sourceUrl — keep the highest-composite item per URL
+  const dedupedItems = deduplicateBySource(qualityItems);
+
+  const scored: Array<{ item: ContentItem; score: number }> = dedupedItems.map(item => ({
     item,
     score: briefingScore(item, prefs, now),
   }));

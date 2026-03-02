@@ -282,8 +282,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, [content, verdictFilter, sourceFilter, profile.bookmarkedIds]);
 
   const clusteredContent = useMemo(
-    () => clusterByStory(filteredContent),
-    [filteredContent],
+    () => homeMode === "feed" ? clusterByStory(filteredContent) : [],
+    [filteredContent, homeMode],
   );
 
   const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set());
@@ -341,7 +341,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return computeTopicDistribution(content);
   }, [content, homeMode]);
 
-  const topicTrends = useMemo(() => computeTopicTrends(content), [content]);
+  const topicTrends = useMemo(() => {
+    if (homeMode !== "dashboard") return null;
+    return computeTopicTrends(content);
+  }, [content, homeMode]);
 
   const dashboardActivity = useMemo(() => {
     if (homeMode !== "dashboard") return null;
@@ -1418,7 +1421,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         {entry.count}
                       </span>
                       {(() => {
-                        const trend = topicTrends.find(tr => tr.topic === entry.topic);
+                        const trend = topicTrends?.find(tr => tr.topic === entry.topic);
                         if (!trend) return null;
                         const arrow = trend.direction === "up" ? "\u2191" : trend.direction === "down" ? "\u2193" : "\u2192";
                         const arrowColor = trend.direction === "up" ? colors.green[400] : trend.direction === "down" ? colors.red[400] : colors.text.disabled;
