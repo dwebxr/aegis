@@ -18,7 +18,6 @@ import { loadGroups, saveGroup, removeGroup, addMember, removeMember } from "@/l
 import type { CurationGroup } from "@/lib/d2a/curationGroup";
 import { buildGroupFeed } from "@/lib/d2a/curationFeed";
 import { publishCurationList } from "@/lib/nostr/lists";
-import { getCommentsForContent } from "@/lib/d2a/comments";
 import { hashContent } from "@/lib/utils/hashing";
 import type { D2ACommentPayload } from "@/lib/agent/types";
 import { createBackendActorAsync } from "@/lib/ic/actor";

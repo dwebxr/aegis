@@ -121,14 +121,15 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const [feedSuggestions, setFeedSuggestions] = useState<Array<DomainValidation & { discoveredFeedUrl?: string | null }>>([]);
   useEffect(() => {
     if (isDemoMode) return;
+    let cancelled = false;
     const existingUrls = sources.filter(s => s.type === "rss" && s.feedUrl).map(s => s.feedUrl!);
     const suggestions = getSuggestions(existingUrls);
     if (suggestions.length > 0) {
-      // Attempt feed discovery for each suggestion
       Promise.allSettled(suggestions.map(async s => ({
         ...s,
         discoveredFeedUrl: s.feedUrl || await discoverFeedForDomain(s.domain),
       }))).then(results => {
+        if (cancelled) return;
         setFeedSuggestions(
           results
             .filter((r): r is PromiseFulfilledResult<typeof suggestions[0] & { discoveredFeedUrl: string | null }> => r.status === "fulfilled")
@@ -138,6 +139,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     } else {
       setFeedSuggestions([]);
     }
+    return () => { cancelled = true; };
   }, [sources, isDemoMode]);
 
   // Feed auto-discovery
@@ -181,8 +183,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     setUrlLoading(true); setUrlError(""); setUrlResult(null);
     try {
       const res = await fetch("/api/fetch/url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: target }), signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) { const e = await res.json().catch(() => null); setUrlError(e?.error || "Failed to extract"); return; }
       const data = await res.json();
-      if (!res.ok) { setUrlError(data.error || "Failed to extract"); return; }
       setUrlResult(data);
     } catch (err) { setUrlError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setUrlLoading(false); }
   };
@@ -192,8 +194,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     setRssLoading(true); setRssError(""); setRssResult(null);
     try {
       const res = await fetch("/api/fetch/rss", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ feedUrl: rssInput, limit: 10 }), signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) { const e = await res.json().catch(() => null); setRssError(e?.error || "Failed to parse feed"); return; }
       const data = await res.json();
-      if (!res.ok) { setRssError(data.error || "Failed to parse feed"); return; }
       setRssResult(data);
     } catch (err) { setRssError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setRssLoading(false); }
   };
@@ -203,8 +205,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     setTwitterLoading(true); setTwitterError(""); setTwitterResult(null);
     try {
       const res = await fetch("/api/fetch/twitter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bearerToken: twitterToken, query: twitterQuery, maxResults: 10 }), signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) { const e = await res.json().catch(() => null); setTwitterError(e?.error || "Failed to fetch tweets"); return; }
       const data = await res.json();
-      if (!res.ok) { setTwitterError(data.error || "Failed to fetch tweets"); return; }
       setTwitterResult(data);
     } catch (err) { setTwitterError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setTwitterLoading(false); }
   };
@@ -215,8 +217,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
       const relays = nostrRelays.split("\n").map(r => r.trim()).filter(Boolean);
       const pubkeys = nostrPubkeys.split("\n").map(p => p.trim()).filter(Boolean);
       const res = await fetch("/api/fetch/nostr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ relays, pubkeys: pubkeys.length > 0 ? pubkeys : undefined, limit: 20 }), signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) { const e = await res.json().catch(() => null); setNostrError(e?.error || "Failed to fetch events"); return; }
       const data = await res.json();
-      if (!res.ok) { setNostrError(data.error || "Failed to fetch events"); return; }
       setNostrResult(data);
     } catch (err) { setNostrError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setNostrLoading(false); }
   };
@@ -350,16 +352,17 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
           body: JSON.stringify({ feedUrl, limit: 10 }),
           signal: AbortSignal.timeout(15_000),
         });
-        const data = await res.json();
         if (!res.ok) {
+          const e = await res.json().catch(() => null);
           setRssInput("");
           if (quickAddMode === "topic") {
             setRssError("Feed fetch failed — try different keywords or paste a direct RSS URL");
           } else {
-            setRssError(data.error || "Failed to parse feed");
+            setRssError(e?.error || "Failed to parse feed");
           }
           return;
         }
+        const data = await res.json();
         setRssResult({ ...data, feedTitle: data.feedTitle || label });
         setResolvedPlatform(quickAddMode as QuickAddId);
         // Only clear quick add form after successful validation

@@ -147,7 +147,7 @@ describe("migrateToIDB — partial migration", () => {
 
 describe("migrateToIDB — logging", () => {
   it("logs migration count when items are migrated", async () => {
-    const spy = jest.spyOn(console, "log").mockImplementation();
+    const spy = jest.spyOn(console, "info").mockImplementation();
     localStorage.setItem("aegis-score-cache", JSON.stringify({ k: 1 }));
     localStorage.setItem("aegis_article_dedup", JSON.stringify({ urls: [] }));
 
@@ -158,7 +158,7 @@ describe("migrateToIDB — logging", () => {
   });
 
   it("does not log when no items to migrate", async () => {
-    const spy = jest.spyOn(console, "log").mockImplementation();
+    const spy = jest.spyOn(console, "info").mockImplementation();
     await migrateToIDB();
     expect(spy).not.toHaveBeenCalledWith(expect.stringContaining("Migrated"));
     spy.mockRestore();

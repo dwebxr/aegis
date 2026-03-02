@@ -1,6 +1,6 @@
 import React from "react";
 import type { StoredComment } from "@/lib/d2a/comments";
-import { colors, space, radii, type as t, fonts } from "@/styles/theme";
+import { colors, space, radii, type as t } from "@/styles/theme";
 
 interface CommentThreadProps {
   comments: StoredComment[];

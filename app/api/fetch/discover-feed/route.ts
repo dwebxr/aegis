@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
-import { blockPrivateUrl } from "@/lib/utils/url";
+import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
 import { detectPlatformFeed, extractYouTubeChannelId } from "@/lib/sources/platformFeed";
 
 export const maxDuration = 30;
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
   // Step 1: Fetch HTML and look for <link rel="alternate"> tags
   try {
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       headers: {
         "User-Agent": "Aegis/2.0 Feed Discovery",
         Accept: "text/html",
@@ -109,14 +109,12 @@ export async function POST(request: NextRequest) {
     const probed = await Promise.all(
       COMMON_PATHS.map(async (path) => {
         const probeUrl = `${origin}${path}`;
-        if (blockPrivateUrl(probeUrl)) return null;
 
         try {
-          const res = await fetch(probeUrl, {
+          const res = await safeFetch(probeUrl, {
             method: "HEAD",
             headers: { "User-Agent": "Aegis/2.0 Feed Discovery" },
             signal: AbortSignal.timeout(5_000),
-            redirect: "follow",
           });
           const ct = res.headers.get("content-type") ?? "";
           if (res.ok && (ct.includes("xml") || ct.includes("rss") || ct.includes("atom"))) {

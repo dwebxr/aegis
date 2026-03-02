@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Parser from "rss-parser";
 import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
-import { blockPrivateUrl } from "@/lib/utils/url";
+import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
 
 export const maxDuration = 30;
 
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     if (etag) headers["If-None-Match"] = etag;
     if (lastModified) headers["If-Modified-Since"] = lastModified;
 
-    const res = await fetch(feedUrl, { headers, signal: AbortSignal.timeout(10_000) });
+    const res = await safeFetch(feedUrl, { headers, signal: AbortSignal.timeout(10_000) });
 
     if (res.status === 304) {
       return NextResponse.json({

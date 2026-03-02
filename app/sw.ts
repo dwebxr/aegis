@@ -127,6 +127,7 @@ async function drainOfflineQueueFromSW(): Promise<void> {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: action.type, payload: action.payload }),
+        signal: AbortSignal.timeout(10_000),
       });
       if (res.ok) {
         await new Promise<void>((resolve, reject) => {

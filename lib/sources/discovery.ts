@@ -94,6 +94,7 @@ export async function discoverFeed(domain: string): Promise<string | null> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: `https://${domain}` }),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!resp.ok) return null;
     const data = await resp.json();

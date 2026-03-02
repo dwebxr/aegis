@@ -57,6 +57,31 @@ export function blockPrivateUrl(urlString: string): string | null {
   return blockPrivateHostname(parsed.hostname);
 }
 
+/**
+ * Fetch with SSRF-safe redirect handling.
+ * Each redirect target is validated against blockPrivateUrl before following.
+ */
+export async function safeFetch(
+  url: string,
+  init?: RequestInit,
+  maxRedirects = 5,
+): Promise<Response> {
+  let current = url;
+  for (let i = 0; i <= maxRedirects; i++) {
+    const blocked = blockPrivateUrl(current);
+    if (blocked) throw new Error(blocked);
+    const res = await fetch(current, { ...init, redirect: "manual" });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) return res;
+      current = new URL(location, current).href;
+      continue;
+    }
+    return res;
+  }
+  throw new Error("Too many redirects");
+}
+
 export function blockPrivateRelay(relayUrl: string): string | null {
   let parsed: URL;
   try {

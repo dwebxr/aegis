@@ -264,11 +264,11 @@ describe("discoverFeed", () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       "/api/fetch/discover-feed",
-      {
+      expect.objectContaining({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: "https://blog.example.com" }),
-      },
+      }),
     );
   });
 });

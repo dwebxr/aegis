@@ -1,7 +1,7 @@
 import type { ContentItem } from "@/lib/types/content";
 import type { WoTGraph } from "@/lib/wot/types";
 import type { PeerReputation, TrustTier } from "./reputation";
-import { loadReputations, calculateEffectiveTrust, getTrustTier } from "./reputation";
+import { calculateEffectiveTrust, getTrustTier } from "./reputation";
 import { isD2AContent } from "./activity";
 import { calculateWoTScore } from "@/lib/wot/scorer";
 import { npubEncode } from "nostr-tools/nip19";

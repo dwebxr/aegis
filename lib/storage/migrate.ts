@@ -60,6 +60,6 @@ export async function migrateToIDB(): Promise<void> {
   }
 
   if (migrated > 0) {
-    console.log(`[migrate] Migrated ${migrated} cache(s) from localStorage to IndexedDB`);
+    console.info(`[migrate] Migrated ${migrated} cache(s) from localStorage to IndexedDB`);
   }
 }

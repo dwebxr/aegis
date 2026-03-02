@@ -412,15 +412,6 @@ function AegisAppInner() {
     addNotification("Flagged", "error");
   };
 
-  const handleBookmark = useCallback((id: string) => {
-    const isCurrentlyBookmarked = (profile.bookmarkedIds ?? []).includes(id);
-    if (isCurrentlyBookmarked) {
-      unbookmarkItem(id);
-    } else {
-      bookmarkItem(id);
-    }
-  }, [profile.bookmarkedIds, bookmarkItem, unbookmarkItem]);
-
   const handleAnalyze = async (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => {
     try {
       const result = await analyze(text, userContext, meta);

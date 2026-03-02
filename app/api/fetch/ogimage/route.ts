@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
-import { blockPrivateUrl } from "@/lib/utils/url";
+import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
 import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 15;
@@ -23,16 +23,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "URL is required" }, { status: 400 });
   }
 
-  const blocked = blockPrivateUrl(url);
-  if (blocked) {
-    return NextResponse.json({ imageUrl: null });
-  }
-
   try {
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       signal: AbortSignal.timeout(8_000),
       headers: { "User-Agent": "Aegis/1.0 (OG Image Fetcher)" },
-      redirect: "follow",
     });
 
     if (!res.ok) {
