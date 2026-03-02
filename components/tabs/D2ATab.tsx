@@ -5,6 +5,22 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { AgentProfileEditModal } from "@/components/ui/AgentProfileEditModal";
 import { PencilIcon } from "@/components/icons";
 import { isD2AContent } from "@/lib/d2a/activity";
+import { computePeerStats, sortPeerStats } from "@/lib/d2a/peerStats";
+import type { PeerSortKey } from "@/lib/d2a/peerStats";
+import { loadReputations } from "@/lib/d2a/reputation";
+import { TrustTierBadge } from "@/components/ui/TrustTierBadge";
+import { CommentInput } from "@/components/ui/CommentInput";
+import { CommentThread } from "@/components/ui/CommentThread";
+import { CreateGroupModal } from "@/components/ui/CreateGroupModal";
+import { GroupCard } from "@/components/ui/GroupCard";
+import { GroupFeedView } from "@/components/ui/GroupFeedView";
+import { loadGroups, saveGroup, removeGroup, addMember, removeMember } from "@/lib/d2a/curationGroup";
+import type { CurationGroup } from "@/lib/d2a/curationGroup";
+import { buildGroupFeed } from "@/lib/d2a/curationFeed";
+import { publishCurationList } from "@/lib/nostr/lists";
+import { getCommentsForContent } from "@/lib/d2a/comments";
+import { hashContent } from "@/lib/utils/hashing";
+import type { D2ACommentPayload } from "@/lib/agent/types";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { formatICP } from "@/lib/ic/icpLedger";
 import { handleICSessionError } from "@/lib/utils/errors";
@@ -19,7 +35,7 @@ import type { AgentState, ActivityLogEntry } from "@/lib/agent/types";
 import type { D2AMatchRecord } from "@/lib/ic/declarations";
 import type { Identity } from "@dfinity/agent";
 
-type SubTab = "exchanges" | "published" | "matches";
+type SubTab = "exchanges" | "published" | "matches" | "peers" | "groups";
 
 interface D2ATabProps {
   content: ContentItem[];
@@ -69,19 +85,26 @@ const LOG_ICONS: Record<string, { icon: string; color: string }> = {
   received: { icon: "\u2713", color: colors.green[400] },
   reject: { icon: "\u2717", color: colors.amber[400] },
   error: { icon: "\u26A0", color: colors.red[400] },
+  comment_sent: { icon: "\uD83D\uDCAC", color: colors.amber[400] },
+  comment_received: { icon: "\uD83D\uDCAC", color: colors.amber[400] },
 };
 
 export const D2ATab: React.FC<D2ATabProps> = ({
   content, agentState, mobile, identity, principalText,
   onValidate, onFlag, onTabChange,
 }) => {
-  const { agentProfile, agentProfileLoading, nostrKeys, refreshAgentProfile } = useAgent();
+  const { agentProfile, agentProfileLoading, nostrKeys, refreshAgentProfile, wotGraph, sendComment, d2aComments } = useAgent();
   const [subTab, setSubTab] = useState<SubTab>("exchanges");
+  const [peerSortKey, setPeerSortKey] = useState<PeerSortKey>("effectiveTrust");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [commentOpen, setCommentOpen] = useState<string | null>(null);
   const [showAllLogs, setShowAllLogs] = useState(false);
   const [npubCopyState, setNpubCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileInfo, setShowProfileInfo] = useState(true);
+  const [groups, setGroups] = useState<CurationGroup[]>(() => loadGroups());
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState(false);
 
   const currentPicture = agentProfile?.picture;
@@ -103,6 +126,12 @@ export const D2ATab: React.FC<D2ATabProps> = ({
     () => content.filter(c => c.validated && c.verdict === "quality").sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)),
     [content],
   );
+
+  const peerStats = useMemo(() => {
+    const reputations = loadReputations();
+    const stats = computePeerStats(content, reputations, wotGraph ?? null);
+    return sortPeerStats(stats, peerSortKey);
+  }, [content, wotGraph, peerSortKey]);
 
   const loadMatches = useCallback(async (offset: number) => {
     if (!identity || !principalText) return;
@@ -131,16 +160,20 @@ export const D2ATab: React.FC<D2ATabProps> = ({
     }
   }, [subTab, matchLoaded, identity, principalText, loadMatches]);
 
-  const counts = {
+  const counts: Record<SubTab, number> = {
     exchanges: d2aReceived.length,
     published: published.length,
     matches: matches.length,
+    peers: peerStats.length,
+    groups: groups.length,
   };
 
   const subTabs: { id: SubTab; label: string; emoji: string }[] = [
     { id: "exchanges", label: "Exchanges", emoji: "\u21C4" },
     { id: "published", label: "Published", emoji: "\u2713" },
     { id: "matches", label: "Matches", emoji: "\u26A1" },
+    { id: "peers", label: "Peers", emoji: "\uD83D\uDC65" },
+    { id: "groups", label: "Groups", emoji: "\uD83D\uDCCB" },
   ];
 
   return (
@@ -485,18 +518,60 @@ export const D2ATab: React.FC<D2ATabProps> = ({
       {subTab === "exchanges" && (
         <div>
           {d2aReceived.length > 0 ? (
-            d2aReceived.map((item, i) => (
-              <div key={item.id} style={{ animation: `slideUp .3s ease ${i * 0.06}s both` }}>
-                <ContentCard
-                  item={item}
-                  expanded={expanded === item.id}
-                  onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
-                  onValidate={onValidate}
-                  onFlag={onFlag}
-                  mobile={mobile}
-                />
-              </div>
-            ))
+            d2aReceived.map((item, i) => {
+              const contentHash = hashContent(item.text);
+              const itemComments = d2aComments.filter(c => c.contentHash === contentHash);
+              const peerPk = item.nostrPubkey;
+              return (
+                <div key={item.id} style={{ animation: `slideUp .3s ease ${i * 0.06}s both` }}>
+                  <ContentCard
+                    item={item}
+                    expanded={expanded === item.id}
+                    onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
+                    onValidate={onValidate}
+                    onFlag={onFlag}
+                    mobile={mobile}
+                  />
+                  {expanded === item.id && peerPk && (
+                    <div style={{
+                      padding: `0 ${mobile ? space[4] : space[5]}px ${space[3]}px`,
+                      marginTop: -space[2],
+                      marginBottom: space[2],
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[1] }}>
+                        <button
+                          onClick={() => setCommentOpen(commentOpen === item.id ? null : item.id)}
+                          style={{
+                            background: "none", border: `1px solid ${colors.border.default}`,
+                            borderRadius: radii.sm, padding: `1px ${space[2]}px`,
+                            fontSize: t.caption.size, fontWeight: 600,
+                            color: commentOpen === item.id ? colors.amber[400] : colors.text.muted,
+                            cursor: "pointer", fontFamily: "inherit",
+                            transition: transitions.fast,
+                          }}
+                        >
+                          Comment{itemComments.length > 0 ? ` (${itemComments.length})` : ""}
+                        </button>
+                      </div>
+                      {itemComments.length > 0 && (
+                        <CommentThread comments={itemComments} currentUserPk={nostrKeys?.pk} />
+                      )}
+                      {commentOpen === item.id && (
+                        <CommentInput
+                          contentHash={contentHash}
+                          contentTitle={item.text.slice(0, 80)}
+                          peerPubkey={peerPk}
+                          onSend={(payload: D2ACommentPayload) => {
+                            void sendComment(peerPk, payload);
+                            setCommentOpen(null);
+                          }}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : agentState?.isActive ? (
             <EmptyState
               emoji={"\u21C4"}
@@ -678,6 +753,245 @@ export const D2ATab: React.FC<D2ATabProps> = ({
               subtitle="Fee-paid matches are recorded on the Internet Computer when exchanging with untrusted peers. Trusted peers (via WoT) exchange freely."
             />
           ) : null}
+        </div>
+      )}
+
+      {/* Peers section */}
+      {subTab === "peers" && (
+        <div>
+          {peerStats.length > 0 ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3] }}>
+                <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.secondary }}>
+                  D2A Peers ({peerStats.length})
+                </span>
+                <select
+                  value={peerSortKey}
+                  onChange={e => setPeerSortKey(e.target.value as PeerSortKey)}
+                  style={{
+                    background: colors.bg.surface, border: `1px solid ${colors.border.default}`,
+                    borderRadius: radii.sm, padding: `${space[1]}px ${space[2]}px`,
+                    color: colors.text.secondary, fontSize: t.caption.size,
+                    fontFamily: "inherit", cursor: "pointer",
+                  }}
+                >
+                  <option value="effectiveTrust">Trust</option>
+                  <option value="itemsReceived">Items</option>
+                  <option value="qualityRate">Quality</option>
+                  <option value="reputation">Rep Score</option>
+                </select>
+              </div>
+              {peerStats.map((peer, i) => (
+                <div key={peer.pubkey} style={{
+                  ...surfaceCard(mobile),
+                  marginBottom: space[2],
+                  animation: `slideUp .3s ease ${i * 0.04}s both`,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
+                    {/* Avatar placeholder */}
+                    <div style={{
+                      width: 36, height: 36, borderRadius: "50%",
+                      background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0, fontSize: 16,
+                    }}>
+                      {"\uD83D\uDC64"}
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: space[2], flexWrap: "wrap" }}>
+                        <span style={{
+                          fontFamily: fonts.mono, fontSize: t.bodySm.size,
+                          fontWeight: 600, color: colors.text.secondary,
+                        }}>
+                          {peer.displayName}
+                        </span>
+                        <TrustTierBadge tier={peer.trustTier} />
+                      </div>
+                      <div style={{ display: "flex", gap: space[3], marginTop: space[1], flexWrap: "wrap" }}>
+                        <span style={{ fontSize: t.caption.size, color: colors.text.muted }}>
+                          {peer.itemsReceived} received
+                        </span>
+                        <span style={{ fontSize: t.caption.size, color: colors.green[400] }}>
+                          {peer.validated} validated
+                        </span>
+                        <span style={{ fontSize: t.caption.size, color: colors.red[400] }}>
+                          {peer.flagged} flagged
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quality bar + score */}
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{
+                        fontSize: t.h3.size, fontWeight: 700, fontFamily: fonts.mono,
+                        color: peer.qualityRate >= 0.7 ? colors.green[400] : peer.qualityRate >= 0.4 ? colors.amber[400] : colors.red[400],
+                      }}>
+                        {(peer.qualityRate * 100).toFixed(0)}%
+                      </div>
+                      <div style={{ fontSize: 9, color: colors.text.muted, textTransform: "uppercase" }}>Quality</div>
+                      {/* Mini quality bar */}
+                      <div style={{
+                        width: 48, height: 3, background: colors.bg.raised,
+                        borderRadius: 2, marginTop: 2, overflow: "hidden",
+                      }}>
+                        <div style={{
+                          width: `${peer.qualityRate * 100}%`, height: "100%",
+                          background: peer.qualityRate >= 0.7 ? colors.green[400] : peer.qualityRate >= 0.4 ? colors.amber[400] : colors.red[400],
+                          borderRadius: 2,
+                        }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom row: trust details */}
+                  <div style={{
+                    display: "flex", gap: space[4], marginTop: space[2],
+                    paddingTop: space[2], borderTop: `1px solid ${colors.border.default}`,
+                    flexWrap: "wrap",
+                  }}>
+                    <div>
+                      <span style={{ fontSize: 10, color: colors.text.muted, textTransform: "uppercase" }}>WoT </span>
+                      <span style={{ fontFamily: fonts.mono, fontWeight: 600, fontSize: t.bodySm.size, color: colors.purple[400] }}>
+                        {(peer.wotScore * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 10, color: colors.text.muted, textTransform: "uppercase" }}>Rep </span>
+                      <span style={{ fontFamily: fonts.mono, fontWeight: 600, fontSize: t.bodySm.size, color: peer.reputation.score >= 0 ? colors.green[400] : colors.red[400] }}>
+                        {peer.reputation.score > 0 ? "+" : ""}{peer.reputation.score}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 10, color: colors.text.muted, textTransform: "uppercase" }}>Trust </span>
+                      <span style={{ fontFamily: fonts.mono, fontWeight: 600, fontSize: t.bodySm.size, color: colors.cyan[400] }}>
+                        {(peer.effectiveTrust * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <EmptyState
+              emoji={"\uD83D\uDC65"}
+              title="No peers yet"
+              subtitle="Peers appear here after your D2A agent exchanges content. Enable the agent in Settings to get started."
+              action={onTabChange ? () => onTabChange("settings") : undefined}
+              actionLabel="Enable in Settings"
+            />
+          )}
+        </div>
+      )}
+
+      {/* Groups section */}
+      {subTab === "groups" && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3] }}>
+            <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.secondary }}>
+              Curation Groups
+            </span>
+            {nostrKeys && (
+              <button
+                onClick={() => setShowCreateGroup(true)}
+                style={{
+                  padding: `${space[1]}px ${space[3]}px`,
+                  background: `${colors.purple[400]}12`,
+                  border: `1px solid ${colors.purple[400]}33`,
+                  borderRadius: radii.sm, color: colors.purple[400],
+                  fontSize: t.bodySm.size, fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit",
+                  transition: transitions.fast,
+                }}
+              >
+                + Create Group
+              </button>
+            )}
+          </div>
+
+          {groups.length > 0 ? (
+            groups.map(group => {
+              const feed = buildGroupFeed(group, content);
+              const isOwner = group.ownerPk === nostrKeys?.pk;
+              const isExpanded = expandedGroup === group.id;
+              return (
+                <div key={group.id}>
+                  <GroupCard
+                    group={group}
+                    feedCount={feed.length}
+                    isOwner={isOwner}
+                    expanded={isExpanded}
+                    onToggle={() => setExpandedGroup(isExpanded ? null : group.id)}
+                    onDelete={isOwner ? () => {
+                      removeGroup(group.id);
+                      setGroups(loadGroups());
+                      if (expandedGroup === group.id) setExpandedGroup(null);
+                    } : undefined}
+                    mobile={mobile}
+                  />
+                  {isExpanded && (
+                    <GroupFeedView
+                      group={group}
+                      feed={feed}
+                      isOwner={isOwner}
+                      currentUserPk={nostrKeys?.pk}
+                      onValidate={onValidate}
+                      onFlag={onFlag}
+                      onAddMember={isOwner ? (pk: string) => {
+                        addMember(group.id, pk);
+                        setGroups(loadGroups());
+                      } : undefined}
+                      onRemoveMember={isOwner ? (pk: string) => {
+                        removeMember(group.id, pk);
+                        setGroups(loadGroups());
+                      } : undefined}
+                      onSync={nostrKeys ? () => {
+                        void publishCurationList(nostrKeys.sk, {
+                          dTag: group.dTag,
+                          name: group.name,
+                          description: group.description,
+                          members: group.members,
+                          topics: group.topics,
+                          ownerPk: group.ownerPk,
+                          createdAt: group.createdAt,
+                        });
+                      } : undefined}
+                      mobile={mobile}
+                    />
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <EmptyState
+              emoji={"\uD83D\uDCCB"}
+              title="No curation groups yet"
+              subtitle="Create a group to collaboratively curate content with trusted peers. Groups use Nostr lists for decentralized membership."
+            />
+          )}
+
+          {showCreateGroup && nostrKeys && (
+            <CreateGroupModal
+              ownerPk={nostrKeys.pk}
+              onClose={() => setShowCreateGroup(false)}
+              onCreate={(group) => {
+                saveGroup(group);
+                setGroups(loadGroups());
+                setShowCreateGroup(false);
+                void publishCurationList(nostrKeys.sk, {
+                  dTag: group.dTag,
+                  name: group.name,
+                  description: group.description,
+                  members: group.members,
+                  topics: group.topics,
+                  ownerPk: group.ownerPk,
+                  createdAt: group.createdAt,
+                });
+              }}
+              mobile={mobile}
+            />
+          )}
         </div>
       )}
     </div>

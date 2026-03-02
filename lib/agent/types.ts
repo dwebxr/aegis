@@ -47,7 +47,19 @@ export interface D2ADeliverMessage extends D2AMessageBase {
   payload: D2ADeliverPayload;
 }
 
-export type D2AMessage = D2AOfferMessage | D2AAcceptMessage | D2ARejectMessage | D2ADeliverMessage;
+export interface D2ACommentPayload {
+  contentHash: string;
+  contentTitle: string;
+  comment: string;
+  timestamp: number;
+}
+
+export interface D2ACommentMessage extends D2AMessageBase {
+  type: "comment";
+  payload: D2ACommentPayload;
+}
+
+export type D2AMessage = D2AOfferMessage | D2AAcceptMessage | D2ARejectMessage | D2ADeliverMessage | D2ACommentMessage;
 
 export interface D2AOfferPayload {
   topic: string;
@@ -68,7 +80,8 @@ export interface D2ADeliverPayload {
 
 export type ActivityLogType =
   | "presence" | "discovery" | "offer_sent" | "offer_received"
-  | "accept" | "reject" | "deliver" | "received" | "error";
+  | "accept" | "reject" | "deliver" | "received" | "error"
+  | "comment_sent" | "comment_received";
 
 export interface ActivityLogEntry {
   id: string;

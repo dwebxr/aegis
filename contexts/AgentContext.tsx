@@ -12,12 +12,16 @@ import { createBackendActorAsync } from "@/lib/ic/actor";
 import { createICPLedgerActorAsync, ICP_FEE } from "@/lib/ic/icpLedger";
 import { getCanisterId } from "@/lib/ic/agent";
 import { Principal } from "@dfinity/principal";
-import type { AgentState } from "@/lib/agent/types";
+import type { AgentState, D2ACommentPayload } from "@/lib/agent/types";
 import type { WoTGraph } from "@/lib/wot/types";
 import type { NostrProfileMetadata } from "@/lib/nostr/profile";
+import { sendComment as sendCommentMsg } from "@/lib/agent/handshake";
+import { saveComment, loadComments } from "@/lib/d2a/comments";
+import type { StoredComment } from "@/lib/d2a/comments";
 import { getCachedAgentProfile, setCachedAgentProfile, fetchAgentProfile } from "@/lib/nostr/profile";
 import { errMsg } from "@/lib/utils/errors";
 import { syncLinkedAccountToIC, getLinkedAccount } from "@/lib/nostr/linkAccount";
+import { DEFAULT_RELAYS } from "@/lib/nostr/types";
 
 interface AgentContextValue {
   agentState: AgentState;
@@ -30,6 +34,8 @@ interface AgentContextValue {
   agentProfileLoading: boolean;
   refreshAgentProfile: () => Promise<void>;
   nostrKeys: { sk: Uint8Array; pk: string } | null;
+  sendComment: (peerPubkey: string, payload: D2ACommentPayload) => Promise<void>;
+  d2aComments: StoredComment[];
 }
 
 const defaultState: AgentState = {
@@ -55,6 +61,8 @@ const AgentContext = createContext<AgentContextValue>({
   agentProfileLoading: false,
   refreshAgentProfile: async () => {},
   nostrKeys: null,
+  sendComment: async () => {},
+  d2aComments: [],
 });
 
 export function AgentProvider({ children }: { children: React.ReactNode }) {
@@ -64,6 +72,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const { content, addContent } = useContent();
   const [agentState, setAgentState] = useState<AgentState>(defaultState);
   const [isEnabled, setIsEnabled] = useState(false);
+  const [d2aComments, setD2aComments] = useState<StoredComment[]>(() => loadComments());
   const [wotGraph, setWotGraphState] = useState<WoTGraph | null>(null);
   const [agentProfile, setAgentProfile] = useState<NostrProfileMetadata | null>(null);
   const [agentProfileLoading, setAgentProfileLoading] = useState(false);
@@ -134,6 +143,21 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const handleSendComment = useCallback(async (peerPubkey: string, payload: D2ACommentPayload) => {
+    if (!nostrKeys) throw new Error("No Nostr keys available");
+    await sendCommentMsg(nostrKeys.sk, nostrKeys.pk, peerPubkey, payload, DEFAULT_RELAYS);
+    const stored: StoredComment = {
+      id: `${payload.contentHash}-${nostrKeys.pk}-${payload.timestamp}`,
+      contentHash: payload.contentHash,
+      senderPk: nostrKeys.pk,
+      comment: payload.comment,
+      timestamp: payload.timestamp,
+      direction: "sent",
+    };
+    saveComment(stored);
+    setD2aComments(loadComments());
+  }, [nostrKeys]);
+
   useEffect(() => {
     if (!isAuthenticated || !principalText || !identity || !isEnabled || !nostrKeys) {
       if (managerRef.current) {
@@ -178,6 +202,19 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
           getContent: () => contentRef.current,
           getPrefs: () => profileRef.current,
           onStateChange: (state) => setAgentState(state),
+          onComment: (msg, senderPk) => {
+            const stored: StoredComment = {
+              id: `${msg.payload.contentHash}-${senderPk}-${msg.payload.timestamp}`,
+              contentHash: msg.payload.contentHash,
+              senderPk,
+              comment: msg.payload.comment,
+              timestamp: msg.payload.timestamp,
+              direction: "received",
+            };
+            saveComment(stored);
+            setD2aComments(loadComments());
+            addNotification(`Comment from ${senderPk.slice(0, 8)}... on "${msg.payload.contentTitle.slice(0, 30)}"`, "info");
+          },
           onD2AMatchComplete: async (_senderPk, senderPrincipalId, contentHash, fee) => {
             if (!senderPrincipalId) {
               console.warn("[agent] D2A match: sender has no IC principal, skipping fee");
@@ -265,8 +302,10 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(() => ({
     agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph,
     agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys,
+    sendComment: handleSendComment, d2aComments,
   }), [agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph,
-    agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys]);
+    agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys,
+    handleSendComment, d2aComments]);
 
   return (
     <AgentContext.Provider value={value}>

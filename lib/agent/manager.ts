@@ -6,7 +6,7 @@ import type { Filter } from "nostr-tools/filter";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { ContentItem } from "@/lib/types/content";
 import type { WoTGraph } from "@/lib/wot/types";
-import type { AgentProfile, AgentState, HandshakeState, D2AOfferPayload, D2ADeliverPayload, ActivityLogEntry, ActivityLogType } from "./types";
+import type { AgentProfile, AgentState, HandshakeState, D2AOfferPayload, D2ADeliverPayload, D2ACommentMessage, ActivityLogEntry, ActivityLogType } from "./types";
 import { broadcastPresence, discoverPeers, calculateResonance } from "./discovery";
 import { sendOffer, sendAccept, sendReject, deliverContent, parseD2AMessage, isHandshakeExpired } from "./handshake";
 import {
@@ -36,6 +36,7 @@ interface AgentManagerCallbacks {
   getPrefs: () => UserPreferenceProfile;
   onStateChange: (state: AgentState) => void;
   onD2AMatchComplete?: (senderPk: string, senderPrincipalId: string | undefined, contentHash: string, fee: number) => void | Promise<void>;
+  onComment?: (msg: D2ACommentMessage, senderPk: string) => void;
 }
 
 export class AgentManager {
@@ -336,6 +337,10 @@ export class AgentManager {
         break;
       case "deliver":
         await this.handleDelivery(senderPk, message.payload);
+        break;
+      case "comment":
+        this.addLog("comment_received", `Comment from peer on "${message.payload.contentTitle.slice(0, 40)}"`, senderPk);
+        this.callbacks.onComment?.(message, senderPk);
         break;
     }
   }

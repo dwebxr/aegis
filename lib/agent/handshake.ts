@@ -1,13 +1,15 @@
 import { finalizeEvent } from "nostr-tools/pure";
 import { encryptMessage, decryptMessage } from "@/lib/nostr/encrypt";
 import { publishAndPartition } from "@/lib/nostr/publish";
-import type { HandshakeState, D2AOfferPayload, D2ADeliverPayload, D2AMessage } from "./types";
+import type { HandshakeState, D2AOfferPayload, D2ADeliverPayload, D2ACommentPayload, D2AMessage } from "./types";
 import {
   KIND_EPHEMERAL,
   TAG_D2A_OFFER,
   TAG_D2A_ACCEPT,
   TAG_D2A_REJECT,
   TAG_D2A_DELIVER,
+  TAG_D2A_COMMENT,
+  MAX_COMMENT_LENGTH,
   HANDSHAKE_TIMEOUT_MS,
 } from "./protocol";
 
@@ -16,6 +18,7 @@ const D2A_TAG_MAP: Record<D2AMessage["type"], string> = {
   accept: TAG_D2A_ACCEPT,
   reject: TAG_D2A_REJECT,
   deliver: TAG_D2A_DELIVER,
+  comment: TAG_D2A_COMMENT,
 };
 
 async function sendD2AMessage(
@@ -78,7 +81,13 @@ export async function deliverContent(
   return sendD2AMessage(sk, peerPubkey, { type: "deliver", fromPubkey: myPubkey, toPubkey: peerPubkey, payload: content }, relayUrls);
 }
 
-const VALID_D2A_TYPES = new Set<D2AMessage["type"]>(["offer", "accept", "reject", "deliver"]);
+export async function sendComment(
+  sk: Uint8Array, myPubkey: string, peerPubkey: string, payload: D2ACommentPayload, relayUrls: string[],
+): Promise<{ published: string[]; failed: string[] }> {
+  return sendD2AMessage(sk, peerPubkey, { type: "comment", fromPubkey: myPubkey, toPubkey: peerPubkey, payload }, relayUrls);
+}
+
+const VALID_D2A_TYPES = new Set<D2AMessage["type"]>(["offer", "accept", "reject", "deliver", "comment"]);
 
 function isValidOfferPayload(p: unknown): p is D2AOfferPayload {
   return !!p && typeof p === "object" &&
@@ -93,6 +102,16 @@ function isValidDeliverPayload(p: unknown): p is D2ADeliverPayload {
     typeof (p as D2ADeliverPayload).author === "string" &&
     typeof (p as D2ADeliverPayload).verdict === "string" &&
     Array.isArray((p as D2ADeliverPayload).topics);
+}
+
+function isValidCommentPayload(p: unknown): p is D2ACommentPayload {
+  if (!p || typeof p !== "object") return false;
+  const c = p as D2ACommentPayload;
+  return typeof c.contentHash === "string" &&
+    typeof c.contentTitle === "string" &&
+    typeof c.comment === "string" &&
+    c.comment.length <= MAX_COMMENT_LENGTH &&
+    typeof c.timestamp === "number";
 }
 
 export function parseD2AMessage(
@@ -128,6 +147,12 @@ export function parseD2AMessage(
       case "deliver":
         if (!isValidDeliverPayload(payload)) {
           console.warn("[handshake] Invalid deliver payload from", senderPk.slice(0, 8) + "...");
+          return null;
+        }
+        return { type, fromPubkey, toPubkey, payload };
+      case "comment":
+        if (!isValidCommentPayload(payload)) {
+          console.warn("[handshake] Invalid comment payload from", senderPk.slice(0, 8) + "...");
           return null;
         }
         return { type, fromPubkey, toPubkey, payload };

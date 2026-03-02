@@ -8,6 +8,8 @@ export const TAG_D2A_OFFER = "aegis-d2a-offer";
 export const TAG_D2A_ACCEPT = "aegis-d2a-accept";
 export const TAG_D2A_REJECT = "aegis-d2a-reject";
 export const TAG_D2A_DELIVER = "aegis-d2a-deliver";
+export const TAG_D2A_COMMENT = "aegis-d2a-comment";
+export const MAX_COMMENT_LENGTH = 280;
 
 export const PRESENCE_BROADCAST_INTERVAL_MS = 5 * 60 * 1000;
 export const PEER_EXPIRY_MS = 15 * 60 * 1000;
