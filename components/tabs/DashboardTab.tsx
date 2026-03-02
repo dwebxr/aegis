@@ -300,7 +300,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const contentRef = useRef(content);
   contentRef.current = content;
   const briefingNowRef = useRef(Date.now());
-  useEffect(() => { briefingNowRef.current = Date.now(); }, [profile]);
 
   const dashboardTop3 = useMemo(() => {
     return computeDashboardTop3(contentRef.current, profile, briefingNowRef.current);
@@ -367,7 +366,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, []);
 
   const handleValidateWithFeedback = useCallback((id: string) => {
-    const item = content.find(c => c.id === id);
+    const item = contentRef.current.find(c => c.id === id);
     onValidate(id);
     if (item) {
       const parts: string[] = [];
@@ -377,10 +376,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       if (item.scores.composite >= 3.5 && item.scores.composite <= 4.5) parts.push("Threshold relaxed");
       if (parts.length > 0) showFeedback(parts.join("  \u00B7  "));
     }
-  }, [content, onValidate, showFeedback]);
+  }, [onValidate, showFeedback]);
 
   const handleFlagWithFeedback = useCallback((id: string) => {
-    const item = content.find(c => c.id === id);
+    const item = contentRef.current.find(c => c.id === id);
     onFlag(id);
     if (item) {
       const parts: string[] = [];
@@ -390,17 +389,20 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       if (item.verdict === "quality") parts.push("Threshold tightened");
       if (parts.length > 0) showFeedback(parts.join("  \u00B7  "));
     }
-  }, [content, onFlag, showFeedback]);
+  }, [onFlag, showFeedback]);
 
   const bookmarkSet = useMemo(() => new Set(profile.bookmarkedIds ?? []), [profile.bookmarkedIds]);
 
+  const bookmarkSetRef = useRef(bookmarkSet);
+  bookmarkSetRef.current = bookmarkSet;
+
   const handleBookmark = useCallback((id: string) => {
-    if (bookmarkSet.has(id)) {
+    if (bookmarkSetRef.current.has(id)) {
       unbookmarkItem(id);
     } else {
       bookmarkItem(id);
     }
-  }, [bookmarkSet, bookmarkItem, unbookmarkItem]);
+  }, [bookmarkItem, unbookmarkItem]);
 
   useEffect(() => {
     return () => { clearTimeout(feedbackTimerRef.current); };
