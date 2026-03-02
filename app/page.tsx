@@ -46,6 +46,8 @@ import type { AnalyzeResponse } from "@/lib/types/api";
 import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
 import { extractUrl } from "@/lib/utils/url";
 import { checkPublishGate, type PublishGateDecision } from "@/lib/reputation/publishGate";
+import { migrateToIDB } from "@/lib/storage/migrate";
+import { initScoringCache } from "@/lib/scoring/cache";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 const PUSH_THROTTLE: Record<string, number> = {
@@ -56,7 +58,7 @@ const PUSH_THROTTLE: Record<string, number> = {
 function AegisAppInner() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
-  const { content, isAnalyzing, syncStatus, analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent } = useContent();
+  const { content, isAnalyzing, syncStatus, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, pendingCount, clearDemoContent } = useContent();
   const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile, bookmarkItem, unbookmarkItem } = usePreferences();
   const { getSchedulerSources } = useSources();
@@ -77,6 +79,12 @@ function AegisAppInner() {
     // sessionStorage may throw in SSR or restrictive privacy modes; default to not-dismissed
     try { return sessionStorage.getItem("aegis-wot-prompt-dismissed") === "true"; } catch { return false; }
   });
+
+  // One-time migration from localStorage to IndexedDB + scoring cache init
+  useEffect(() => {
+    migrateToIDB().catch(err => console.warn("[page] IDB migration failed:", err));
+    initScoringCache().catch(err => console.warn("[page] Scoring cache init failed:", err));
+  }, []);
 
   // Web Share Target + Deep Link → Sources tab with auto-Extract
   // Both paths capture the URL in state before replaceState clears searchParams,
@@ -139,33 +147,35 @@ function AegisAppInner() {
       return;
     }
 
-    const cached = loadWoTCache();
-    if (cached && cached.userPubkey === wotRootPubkey) {
-      setWotGraph(cached);
-      return;
-    }
-
     let cancelled = false;
-    setWotLoading(true);
 
-    // Cap at 1 hop for large follow lists (>500) to keep graph manageable
-    const la = linkedAccountRef.current;
-    const config = la && la.followCount > 500
-      ? { ...DEFAULT_WOT_CONFIG, maxHops: 1 }
-      : DEFAULT_WOT_CONFIG;
+    (async () => {
+      const cached = await loadWoTCache();
+      if (cancelled) return;
+      if (cached && cached.userPubkey === wotRootPubkey) {
+        setWotGraph(cached);
+        return;
+      }
 
-    buildFollowGraph(wotRootPubkey, config)
-      .then(graph => {
+      setWotLoading(true);
+
+      // Cap at 1 hop for large follow lists (>500) to keep graph manageable
+      const la = linkedAccountRef.current;
+      const config = la && la.followCount > 500
+        ? { ...DEFAULT_WOT_CONFIG, maxHops: 1 }
+        : DEFAULT_WOT_CONFIG;
+
+      try {
+        const graph = await buildFollowGraph(wotRootPubkey, config);
         if (cancelled) return;
         setWotGraph(graph);
-        saveWoTCache(graph, config.cacheTTLMs);
-      })
-      .catch(err => {
+        await saveWoTCache(graph, config.cacheTTLMs);
+      } catch (err) {
         console.warn("[wot] Failed to build follow graph:", errMsg(err));
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setWotLoading(false);
-      });
+      }
+    })();
 
     return () => { cancelled = true; };
   }, [wotRootPubkey]);
@@ -177,7 +187,7 @@ function AegisAppInner() {
   const handleLinkAccount = useCallback((account: LinkedNostrAccount | null) => {
     setLinkedAccount(account);
     if (!account) {
-      clearWoTCache();
+      void clearWoTCache();
       setWotPromptDismissed(false);
       try { sessionStorage.removeItem("aegis-wot-prompt-dismissed"); } catch { console.debug("[page] sessionStorage unavailable"); }
     }
@@ -317,7 +327,7 @@ function AegisAppInner() {
 
   useEffect(() => {
     const scheduler = new IngestionScheduler({
-      onNewContent: addContent,
+      onNewContent: addContentBuffered,
       getSources: () => {
         const userSources = getSchedulerSourcesRef.current();
         if (userSources.length > 0) return userSources;
@@ -386,7 +396,7 @@ function AegisAppInner() {
     schedulerRef.current = scheduler;
     scheduler.start();
     return () => scheduler.stop();
-  }, [addContent, demoSchedulerSources, addNotification]);
+  }, [addContentBuffered, demoSchedulerSources, addNotification]);
 
   useEffect(() => {
     if (isAuthenticated) clearDemoContent();
@@ -594,7 +604,7 @@ function AegisAppInner() {
         <WoTPromptBanner onGoToSettings={() => setTab("settings")} onDismiss={dismissWotPrompt} />
       )}
       {tab === "dashboard" && (
-        <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={setTab} discoveries={discoveries} />
+        <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={setTab} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} />
       )}
       {tab === "briefing" && <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} onTabChange={setTab} />}
       {tab === "incinerator" && (

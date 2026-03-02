@@ -214,13 +214,13 @@ describe("computeUnreviewedQueue", () => {
   });
 });
 
-// ─── All-validated edge cases ───
+// ─── Validated items inclusion (no longer excluded from Top3/Spotlight) ───
 
-describe("computeDashboardTop3 — validated exclusion", () => {
+describe("computeDashboardTop3 — includes validated items", () => {
   const now = Date.now();
   const profile = makeProfile({ ai: 0.8 });
 
-  it("returns empty when all items are validated", () => {
+  it("includes validated items in top3", () => {
     const items = Array.from({ length: 5 }, (_, i) =>
       makeItem({
         id: `val-${i}`,
@@ -231,50 +231,46 @@ describe("computeDashboardTop3 — validated exclusion", () => {
       }),
     );
     const top3 = computeDashboardTop3(items, profile, now);
-    expect(top3).toEqual([]);
+    expect(top3.length).toBe(3);
   });
 
-  it("only includes unvalidated items in top3", () => {
+  it("ranks validated and unvalidated items together by score", () => {
     const items = [
       makeItem({ id: "val-high", text: "Validated high score AI", validated: true, scores: { originality: 10, insight: 10, credibility: 10, composite: 10 } }),
       makeItem({ id: "unval-low", text: "Unvalidated lower score article", validated: false, scores: { originality: 5, insight: 5, credibility: 5, composite: 5 } }),
     ];
     const top3 = computeDashboardTop3(items, profile, now);
     const ids = top3.map(bi => bi.item.id);
+    expect(ids).toContain("val-high");
     expect(ids).toContain("unval-low");
-    expect(ids).not.toContain("val-high");
   });
 });
 
-describe("computeTopicSpotlight — validated exclusion", () => {
+describe("computeTopicSpotlight — includes validated items", () => {
   const now = Date.now();
 
-  it("returns empty when all quality items are validated", () => {
+  it("includes validated quality items in spotlight", () => {
     const profile = makeProfile({ ai: 0.8 });
-    const items = Array.from({ length: 5 }, (_, i) =>
+    // Need enough items so some go to spotlight (not all absorbed by top3)
+    const items = Array.from({ length: 8 }, (_, i) =>
       makeItem({
         id: `val-spot-${i}`,
-        text: `Validated AI content ${i}`,
+        text: `Validated AI content ${i} unique text here`,
         topics: ["ai"],
         validated: true,
-        scores: { originality: 8, insight: 8, credibility: 8, composite: 8 },
+        scores: { originality: 8 - i * 0.5, insight: 8, credibility: 8, composite: 8 - i * 0.5 },
       }),
     );
     const top3 = computeDashboardTop3(items, profile, now);
     const spotlight = computeTopicSpotlight(items, profile, top3);
-    expect(spotlight).toEqual([]);
-  });
-
-  it("skips validated items but includes unvalidated ones", () => {
-    const profile = makeProfile({ ai: 0.8 });
-    const items = [
-      makeItem({ id: "val", text: "Validated AI article", topics: ["ai"], validated: true, scores: { originality: 10, insight: 10, credibility: 10, composite: 10 } }),
-      makeItem({ id: "unval", text: "Unvalidated AI article fresh content", topics: ["ai"], validated: false, scores: { originality: 6, insight: 6, credibility: 6, composite: 6 } }),
-    ];
-    const top3 = computeDashboardTop3(items, profile, now);
-    const spotlight = computeTopicSpotlight(items, profile, top3);
-    const allSpotlightIds = spotlight.flatMap(g => g.items.map(it => it.id));
-    expect(allSpotlightIds).not.toContain("val");
+    // Validated items not in top3 should appear in spotlight
+    const top3Ids = new Set(top3.map(bi => bi.item.id));
+    const spotlightIds = spotlight.flatMap(g => g.items.map(it => it.id));
+    const nonTop3Validated = items.filter(it => !top3Ids.has(it.id));
+    // At least some non-top3 validated items should be in spotlight
+    if (nonTop3Validated.length > 0) {
+      expect(spotlightIds.length).toBeGreaterThan(0);
+    }
   });
 });
 

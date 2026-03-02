@@ -52,14 +52,15 @@ describe("IngestionScheduler", () => {
       scheduler.stop();
     });
 
-    it("does not start multiple intervals on repeated start() calls", () => {
+    it("does not start multiple intervals on repeated start() calls", async () => {
       const callbacks = makeCallbacks();
       const scheduler = new IngestionScheduler(callbacks);
       scheduler.start();
       scheduler.start(); // second call should be no-op
 
-      // After 5s delay, first cycle runs
+      // After 5s delay, first cycle runs (async dedup.init() requires microtask flush)
       jest.advanceTimersByTime(5000);
+      await Promise.resolve();
       expect(callbacks.getSources).toHaveBeenCalledTimes(1);
 
       scheduler.stop();
@@ -75,17 +76,19 @@ describe("IngestionScheduler", () => {
       expect(callbacks.getSources).not.toHaveBeenCalled();
     });
 
-    it("runs first cycle after 5 second delay", () => {
+    it("runs first cycle after 5 second delay", async () => {
       const callbacks = makeCallbacks();
       const scheduler = new IngestionScheduler(callbacks);
       scheduler.start();
 
       // Before 5s
       jest.advanceTimersByTime(4999);
+      await Promise.resolve();
       expect(callbacks.getSources).not.toHaveBeenCalled();
 
-      // At 5s
+      // At 5s (async dedup.init() requires microtask flush)
       jest.advanceTimersByTime(1);
+      await Promise.resolve();
       expect(callbacks.getSources).toHaveBeenCalledTimes(1);
 
       scheduler.stop();

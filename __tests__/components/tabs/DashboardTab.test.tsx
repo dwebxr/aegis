@@ -341,18 +341,18 @@ describe("DashboardTab — dashboard mode rendering", () => {
     expect(html).toContain("Topic Spotlight");
   });
 
-  it("renders Validated section", () => {
+  it("renders Saved section", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("Validated");
-    expect(html).toContain("No validated items yet");
+    expect(html).toContain("Saved");
+    expect(html).toContain("No saved items yet");
   });
 
-  it("renders Validated items when present", () => {
+  it("renders Saved items when bookmarked", () => {
     const items = [
-      makeItem({ id: "val-1", validated: true, validatedAt: now - 1000 }),
-      makeItem({ id: "val-2", validated: true, validatedAt: now - 2000 }),
+      makeItem({ id: "saved-1" }),
+      makeItem({ id: "saved-2" }),
     ];
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />

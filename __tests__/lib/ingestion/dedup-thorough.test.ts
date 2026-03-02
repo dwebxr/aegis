@@ -110,44 +110,47 @@ describe("ArticleDeduplicator — FIFO pruning", () => {
 });
 
 describe("ArticleDeduplicator — persistence", () => {
-  it("round-trips data through localStorage", () => {
+  it("round-trips data through localStorage", async () => {
     const d1 = new ArticleDeduplicator();
     d1.markSeen("https://example.com/persist", "Persistence test");
-    d1.flush();
+    await d1.flush();
 
     const d2 = new ArticleDeduplicator();
+    await d2.init();
     expect(d2.isDuplicate("https://example.com/persist", "Persistence test")).toBe(true);
   });
 
-  it("flush is no-op when nothing changed", () => {
+  it("flush is no-op when nothing changed", async () => {
     const d = new ArticleDeduplicator();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const setSpy = jest.spyOn(globalThis.localStorage as any, "setItem");
-    d.flush();
+    await d.flush();
     // Should not call setItem because dirty flag is false
     expect(setSpy).not.toHaveBeenCalled();
     setSpy.mockRestore();
   });
 
-  it("handles corrupted localStorage gracefully", () => {
+  it("handles corrupted localStorage gracefully", async () => {
     store["aegis_article_dedup"] = "not valid json {{{";
     const d = new ArticleDeduplicator();
+    await d.init();
     // Should not throw, should start fresh
     expect(d.size).toBe(0);
     expect(d.isDuplicate(undefined, "any text")).toBe(false);
   });
 
-  it("reset clears all data and persists", () => {
+  it("reset clears all data and persists", async () => {
     const d = new ArticleDeduplicator();
     d.markSeen("https://example.com/1", "test1");
     d.markSeen("https://example.com/2", "test2");
-    d.flush();
+    await d.flush();
     expect(d.size).toBeGreaterThan(0);
 
     d.reset();
     expect(d.size).toBe(0);
 
     const d2 = new ArticleDeduplicator();
+    await d2.init();
     expect(d2.isDuplicate("https://example.com/1", "test1")).toBe(false);
   });
 });

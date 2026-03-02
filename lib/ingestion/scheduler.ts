@@ -77,7 +77,12 @@ export class IngestionScheduler {
       console.error("[scheduler] Unhandled cycle error:", errMsg(err));
       this.running = false;
     });
-    this.initialTimeoutId = setTimeout(safeCycle, 5000);
+    // Initialize dedup from IDB before first cycle
+    const initAndStart = async () => {
+      await this.dedup.init();
+      safeCycle();
+    };
+    this.initialTimeoutId = setTimeout(() => { initAndStart(); }, 5000);
     this.intervalId = setInterval(safeCycle, BASE_CYCLE_MS);
   }
 
@@ -267,7 +272,7 @@ export class IngestionScheduler {
     } catch (err) {
       console.error("[scheduler] Ingestion cycle failed:", errMsg(err));
     } finally {
-      this.dedup.flush();
+      await this.dedup.flush();
       this.running = false;
     }
   }

@@ -480,7 +480,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
 
       {/* Sub-tab selector */}
       <div style={{
-        display: "flex", gap: space[1], marginBottom: space[4],
+        display: "flex", gap: mobile ? 2 : space[1], marginBottom: space[4],
         background: colors.bg.surface, borderRadius: radii.md,
         border: `1px solid ${colors.border.default}`, padding: space[1],
       }}>
@@ -488,9 +488,10 @@ export const D2ATab: React.FC<D2ATabProps> = ({
           <button
             key={st.id}
             onClick={() => setSubTab(st.id)}
+            title={mobile ? st.label : undefined}
             style={{
-              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: space[1],
-              padding: `${space[2]}px ${space[3]}px`,
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: mobile ? 2 : space[1],
+              padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
               borderRadius: radii.sm, border: "none", cursor: "pointer",
               fontFamily: "inherit", fontSize: t.bodySm.size, fontWeight: 600,
               background: subTab === st.id ? colors.bg.raised : "transparent",
@@ -499,7 +500,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
             }}
           >
             <span>{st.emoji}</span>
-            {st.label}
+            {!mobile && st.label}
             {counts[st.id] > 0 && (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: "1px 6px",

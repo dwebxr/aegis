@@ -22,9 +22,14 @@ import { syncBriefingToCanister } from "@/lib/briefing/sync";
 import type { BriefingState } from "@/lib/briefing/types";
 import { enqueueAction, dequeueAll, removeAction, incrementRetries } from "@/lib/offline/actionQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { isIDBAvailable, idbGet, idbPut } from "@/lib/storage/idb";
+import { STORE_CONTENT_CACHE } from "@/lib/storage/idb";
 
 const CONTENT_CACHE_KEY = "aegis-content-cache";
+const IDB_CONTENT_KEY = "items";
 const MAX_CACHED_ITEMS = 200;
+const MAX_PENDING_BUFFER = 100;
+const SAVE_DEBOUNCE_MS = 1000;
 
 async function fetchAnalyze(
   text: string,
@@ -73,32 +78,58 @@ async function tryBYOK(text: string, uc: UserContext | null | undefined, key: st
   return { ...data, scoringEngine: "claude-byok" as const };
 }
 
-function loadCachedContent(): ContentItem[] {
+function validateContentItems(parsed: unknown): ContentItem[] {
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter(
+    (c: unknown): c is ContentItem =>
+      !!c && typeof c === "object" &&
+      typeof (c as ContentItem).id === "string" &&
+      typeof (c as ContentItem).createdAt === "number",
+  );
+}
+
+async function loadCachedContentAsync(): Promise<ContentItem[]> {
+  // Try IDB first
+  if (isIDBAvailable()) {
+    try {
+      const data = await idbGet<unknown>(STORE_CONTENT_CACHE, IDB_CONTENT_KEY);
+      if (data) return validateContentItems(data);
+    } catch (err) {
+      console.warn("[content] IDB load failed, trying localStorage:", errMsg(err));
+    }
+  }
+  // Fallback: localStorage
   if (typeof globalThis.localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem(CONTENT_CACHE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (c: unknown): c is ContentItem =>
-        !!c && typeof c === "object" &&
-        typeof (c as ContentItem).id === "string" &&
-        typeof (c as ContentItem).createdAt === "number",
-    );
+    return validateContentItems(JSON.parse(raw));
   } catch (err) {
     console.warn("[content] Failed to parse cached content:", errMsg(err));
     return [];
   }
 }
 
+let _contentSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let _contentUseIDB = false;
+
 function saveCachedContent(items: ContentItem[]): void {
-  if (typeof globalThis.localStorage === "undefined") return;
-  try {
-    localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncatePreservingActioned(items)));
-  } catch (err) {
-    console.warn("[content] localStorage save failed (quota?):", errMsg(err));
-  }
+  if (_contentSaveTimer) clearTimeout(_contentSaveTimer);
+  _contentSaveTimer = setTimeout(() => {
+    _contentSaveTimer = null;
+    const truncated = truncatePreservingActioned(items);
+    if (_contentUseIDB) {
+      idbPut(STORE_CONTENT_CACHE, IDB_CONTENT_KEY, truncated).catch(err => {
+        console.warn("[content] IDB save failed:", errMsg(err));
+      });
+    } else if (typeof globalThis.localStorage !== "undefined") {
+      try {
+        localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncated));
+      } catch (err) {
+        console.warn("[content] localStorage save failed (quota?):", errMsg(err));
+      }
+    }
+  }, SAVE_DEBOUNCE_MS);
 }
 
 /** Truncate to MAX_CACHED_ITEMS but never drop validated or flagged items. */
@@ -136,6 +167,11 @@ interface ContentState {
   validateItem: (id: string) => void;
   flagItem: (id: string) => void;
   addContent: (item: ContentItem) => void;
+  /** Buffer a new item for later display (used by scheduler). */
+  addContentBuffered: (item: ContentItem) => void;
+  /** Move all buffered items into visible content. */
+  flushPendingItems: () => void;
+  pendingCount: number;
   clearDemoContent: () => void;
   loadFromIC: () => Promise<void>;
   syncBriefing: (state: BriefingState, nostrPubkey?: string | null) => void;
@@ -159,6 +195,9 @@ const ContentContext = createContext<ContentState>({
   validateItem: () => {},
   flagItem: () => {},
   addContent: () => {},
+  addContentBuffered: () => {},
+  flushPendingItems: () => {},
+  pendingCount: 0,
   clearDemoContent: () => {},
   loadFromIC: async () => {},
   syncBriefing: () => {},
@@ -208,10 +247,12 @@ function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal").Prin
 export function ContentProvider({ children, preferenceCallbacks }: { children: React.ReactNode; preferenceCallbacks?: PreferenceCallbacks }) {
   const { addNotification } = useNotify();
   const { isAuthenticated, identity, principal } = useAuth();
-  const [content, setContent] = useState<ContentItem[]>(() => loadCachedContent());
+  const [content, setContent] = useState<ContentItem[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "offline">("idle");
   const [pendingActions, setPendingActions] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const pendingItemsRef = useRef<ContentItem[]>([]);
   const actorRef = useRef<_SERVICE | null>(null);
   const contentRef = useRef(content);
   contentRef.current = content;
@@ -219,6 +260,20 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const drainQueueRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const backfillCleanupRef = useRef<(() => void) | null>(null);
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
+
+  // Load cached content from IDB on mount
+  useEffect(() => {
+    let cancelled = false;
+    loadCachedContentAsync().then(items => {
+      if (!cancelled && items.length > 0) {
+        _contentUseIDB = isIDBAvailable();
+        setContent(items);
+      }
+    }).catch(err => {
+      console.warn("[content] Failed to load cached content:", errMsg(err));
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   /** Fire-and-forget IC call with offline queue fallback. */
   function syncToIC(promise: Promise<unknown>, actionType: "saveEvaluation" | "updateEvaluation", payload: unknown) {
@@ -530,6 +585,46 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     });
   }, [isAuthenticated, principal, addNotification]);
 
+  const addContentBuffered = useCallback((item: ContentItem) => {
+    const owned = (!item.owner && isAuthenticated && principal)
+      ? { ...item, owner: principal.toText() }
+      : item;
+
+    // IC save immediately (don't wait for flush)
+    if (actorRef.current && isAuthenticated && principal) {
+      syncToIC(actorRef.current.saveEvaluation(toICEvaluation(owned, principal)), "saveEvaluation", { itemId: owned.id });
+    }
+
+    // Dedup against visible content + pending buffer
+    const isDup = contentRef.current.some(c =>
+      (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
+      (!item.sourceUrl && c.text === item.text),
+    ) || pendingItemsRef.current.some(c =>
+      (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
+      (!item.sourceUrl && c.text === item.text),
+    );
+    if (isDup) return;
+
+    pendingItemsRef.current.push(owned);
+    setPendingCount(pendingItemsRef.current.length);
+
+    // Auto-flush at MAX_PENDING_BUFFER
+    if (pendingItemsRef.current.length >= MAX_PENDING_BUFFER) {
+      const items = pendingItemsRef.current;
+      pendingItemsRef.current = [];
+      setPendingCount(0);
+      setContent(prev => truncatePreservingActioned([...items, ...prev]));
+    }
+  }, [isAuthenticated, principal, addNotification]);
+
+  const flushPendingItems = useCallback(() => {
+    if (pendingItemsRef.current.length === 0) return;
+    const items = pendingItemsRef.current;
+    pendingItemsRef.current = [];
+    setPendingCount(0);
+    setContent(prev => truncatePreservingActioned([...items, ...prev]));
+  }, []);
+
   const clearDemoContent = useCallback(() => {
     setContent(prev => prev.filter(c => c.owner !== ""));
   }, []);
@@ -670,9 +765,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated]);
 
   const value = useMemo(() => ({
-    content, isAnalyzing, syncStatus, pendingActions, isOnline,
-    analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent, loadFromIC, syncBriefing,
-  }), [content, isAnalyzing, syncStatus, pendingActions, isOnline, analyze, scoreText, validateItem, flagItem, addContent, clearDemoContent, loadFromIC, syncBriefing]);
+    content, isAnalyzing, syncStatus, pendingActions, isOnline, pendingCount,
+    analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, clearDemoContent, loadFromIC, syncBriefing,
+  }), [content, isAnalyzing, syncStatus, pendingActions, isOnline, pendingCount, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, clearDemoContent, loadFromIC, syncBriefing]);
 
   return (
     <ContentContext.Provider value={value}>

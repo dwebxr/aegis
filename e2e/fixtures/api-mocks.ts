@@ -69,6 +69,29 @@ export async function setupApiMocks(page: Page) {
     });
   });
 
+  // /api/fetch/nostr — return empty events
+  await page.route("**/api/fetch/nostr**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ events: [] }),
+    });
+  });
+
+  // /api/fetch/farcaster — return empty items
+  await page.route("**/api/fetch/farcaster**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: [] }),
+    });
+  });
+
+  // /api/push/register — accept push subscriptions
+  await page.route("**/api/push/register**", async (route) => {
+    await route.fulfill({ status: 204 });
+  });
+
   // Block IC canister calls
   await page.route("**/api/v2/canister/**", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/cbor", body: Buffer.from([]) });

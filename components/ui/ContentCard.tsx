@@ -324,7 +324,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
               {item.reason}
             </div>
           )}
-          <div style={{ display: "flex", gap: space[2] }}>
+          <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
             {item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) && (
               <a
                 href={item.sourceUrl}
@@ -333,16 +333,16 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
                 onClick={(e) => e.stopPropagation()}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  padding: `${space[2]}px ${space[3]}px`,
+                  padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
                   background: `${colors.blue[400]}10`,
                   border: `1px solid ${colors.blue[400]}30`,
                   borderRadius: radii.md,
                   color: colors.blue[400], fontSize: t.bodySm.size, fontWeight: 600,
                   textDecoration: "none", whiteSpace: "nowrap",
-                  transition: transitions.fast, fontFamily: "inherit",
+                  transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
                 }}
               >
-                Read more &rarr;
+                {mobile ? "\u2197" : <>Read more &rarr;</>}
               </a>
             )}
             {onBookmark && (
@@ -350,7 +350,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
                 aria-label={isBookmarked ? "Remove bookmark" : "Bookmark for later"}
                 onClick={e => { e.stopPropagation(); onBookmark(item.id); }}
                 style={{
-                  padding: `${space[2]}px ${space[3]}px`,
+                  padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
                   background: isBookmarked ? `${colors.amber[400]}18` : "transparent",
                   border: `1px solid ${isBookmarked ? `${colors.amber[400]}30` : colors.border.default}`,
                   borderRadius: radii.md,
@@ -358,47 +358,47 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
                   fontSize: t.bodySm.size, fontWeight: 600,
                   cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  transition: transitions.fast, fontFamily: "inherit",
+                  transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
                 }}
               >
-                {isBookmarked ? "\uD83D\uDD16 Saved" : "\uD83D\uDD16 Save"}
+                {mobile ? "\uD83D\uDD16" : (isBookmarked ? "\uD83D\uDD16 Saved" : "\uD83D\uDD16 Save")}
               </button>
             )}
             {isSlop && !isLarge ? (
               <button disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
-                flex: 1, padding: `${space[2]}px ${space[3]}px`,
+                flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
                 background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
                 border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
                 color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600,
                 cursor: item.validated ? "default" : "pointer", opacity: item.validated ? 0.6 : 1,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                transition: transitions.fast, fontFamily: "inherit",
+                transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
               }}>
-                <CheckIcon /> {item.validated ? "Validated" : "Not Slop"}
+                <CheckIcon />{!mobile && (item.validated ? " Validated" : " Not Slop")}
               </button>
             ) : (
               <>
                 <button disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
-                  flex: 1, padding: `${space[2]}px ${space[3]}px`,
+                  flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
                   background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
                   border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
                   color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600,
                   cursor: item.validated ? "default" : "pointer", opacity: item.validated ? 0.6 : 1,
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  transition: transitions.fast, fontFamily: "inherit",
+                  transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
                 }}>
-                  <CheckIcon /> {item.validated ? "Validated" : "Validate"}
+                  <CheckIcon />{!mobile && (item.validated ? " Validated" : " Validate")}
                 </button>
                 <button disabled={item.flagged} aria-label="Flag as slop" onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
-                  flex: 1, padding: `${space[2]}px ${space[3]}px`,
+                  flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
                   background: item.flagged ? `${colors.red[400]}18` : colors.red.bg,
                   border: `1px solid ${colors.red.border}`, borderRadius: radii.md,
                   color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600,
                   cursor: item.flagged ? "default" : "pointer", opacity: item.flagged ? 0.6 : 1,
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  transition: transitions.fast, fontFamily: "inherit",
+                  transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
                 }}>
-                  <XCloseIcon /> {item.flagged ? "Flagged" : "Flag Slop"}
+                  <XCloseIcon />{!mobile && (item.flagged ? " Flagged" : " Flag Slop")}
                 </button>
               </>
             )}

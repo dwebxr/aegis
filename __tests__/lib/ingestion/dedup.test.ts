@@ -84,13 +84,15 @@ describe("ArticleDeduplicator", () => {
   });
 
   describe("localStorage persistence", () => {
-    it("persists across instances", () => {
+    it("persists across instances", async () => {
       const dedup1 = new ArticleDeduplicator();
+      await dedup1.init();
       dedup1.markSeen("https://example.com/1", "unique content here");
-      dedup1.flush();
+      await dedup1.flush();
 
       // New instance should load from localStorage
       const dedup2 = new ArticleDeduplicator();
+      await dedup2.init();
       expect(dedup2.isDuplicate("https://example.com/1", "other text")).toBe(true);
     });
   });

@@ -124,20 +124,23 @@ describe("ArticleDeduplicator — edge cases", () => {
   });
 
   describe("localStorage persistence", () => {
-    it("survives reconstruction from localStorage", () => {
+    it("survives reconstruction from localStorage", async () => {
       const dedup1 = new ArticleDeduplicator();
+      await dedup1.init();
       dedup1.markSeen("https://example.com/persisted", "Persisted content");
-      dedup1.flush();
+      await dedup1.flush();
 
       // Create new instance — should load from localStorage
       const dedup2 = new ArticleDeduplicator();
+      await dedup2.init();
       expect(dedup2.isDuplicate("https://example.com/persisted", "Other")).toBe(true);
       expect(dedup2.isDuplicate(undefined, "Persisted content")).toBe(true);
     });
 
-    it("handles corrupted localStorage gracefully", () => {
+    it("handles corrupted localStorage gracefully", async () => {
       store["aegis_article_dedup"] = "not valid json {{{";
       const dedup = new ArticleDeduplicator();
+      await dedup.init();
       // Should start fresh without crashing
       expect(dedup.size).toBe(0);
       expect(dedup.isDuplicate("https://example.com/x", "test")).toBe(false);
@@ -145,10 +148,11 @@ describe("ArticleDeduplicator — edge cases", () => {
   });
 
   describe("reset", () => {
-    it("clears all state and localStorage", () => {
+    it("clears all state and localStorage", async () => {
       const dedup = new ArticleDeduplicator();
+      await dedup.init();
       dedup.markSeen("https://example.com/x", "Content");
-      dedup.flush();
+      await dedup.flush();
       expect(dedup.size).toBeGreaterThan(0);
 
       dedup.reset();
@@ -157,6 +161,7 @@ describe("ArticleDeduplicator — edge cases", () => {
 
       // New instance should also be empty (localStorage cleared)
       const dedup2 = new ArticleDeduplicator();
+      await dedup2.init();
       expect(dedup2.size).toBe(0);
     });
   });

@@ -1,4 +1,4 @@
-import { contentDedup, computeDashboardTop3, computeTopicSpotlight, computeDashboardValidated } from "@/lib/dashboard/utils";
+import { contentDedup, computeDashboardTop3, computeTopicSpotlight } from "@/lib/dashboard/utils";
 import { createEmptyProfile } from "@/lib/preferences/types";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { ContentItem } from "@/lib/types/content";
@@ -357,38 +357,20 @@ describe("Ranking stability — pinned time reference", () => {
 // ─── Validated section dedup ───
 
 describe("Validated section — excluded from Top3/Spotlight", () => {
-  it("validated items never appear in Top3 or Spotlight, only in Validated section", () => {
+  it("validated items appear in Top3 and Spotlight alongside unvalidated items", () => {
     const now = Date.now();
     const profile = makeProfile({ ai: 0.8 });
-    const fillers = Array.from({ length: 6 }, (_, i) =>
-      makeItem({ id: `fill-${i}`, topics: ["other"], text: `Filler ${i} unique`, scores: { originality: 20, insight: 20, credibility: 20, composite: 20 } }),
-    );
     const items = [
-      ...fillers,
-      // High-scoring validated item → excluded from Top3/Spotlight, only in Validated
-      makeItem({ id: "top-validated", topics: ["ai"], text: "Top validated AI article content", scores: { originality: 10, insight: 10, credibility: 10, composite: 10 }, validated: true, validatedAt: now }),
-      // Low-scoring validated item → also only in Validated section
-      makeItem({ id: "only-validated", topics: ["cooking"], text: "A validated cooking article", scores: { originality: 5, insight: 5, credibility: 5, composite: 5 }, validated: true, validatedAt: now - 1000 }),
+      makeItem({ id: "val-1", topics: ["ai"], text: "Validated AI article content", scores: { originality: 10, insight: 10, credibility: 10, composite: 10 }, validated: true, validatedAt: now }),
+      makeItem({ id: "unval-1", topics: ["ai"], text: "Unvalidated AI article content", scores: { originality: 9, insight: 9, credibility: 9, composite: 9 }, validated: false }),
+      makeItem({ id: "unval-2", topics: ["ai"], text: "Another unvalidated article", scores: { originality: 8, insight: 8, credibility: 8, composite: 8 }, validated: false }),
     ];
 
     const top3 = computeDashboardTop3(items, profile, now);
-    const spotlight = computeTopicSpotlight(items, profile, top3);
+    const top3Ids = top3.map(bi => bi.item.id);
 
-    // Build allShownIds
-    const shownIds = new Set(top3.map(bi => bi.item.id));
-    for (const g of spotlight) {
-      for (const item of g.items) shownIds.add(item.id);
-    }
-
-    // Validated items must NOT appear in Top3 or Spotlight
-    expect(shownIds.has("top-validated")).toBe(false);
-    expect(shownIds.has("only-validated")).toBe(false);
-
-    const validated = computeDashboardValidated(items, shownIds);
-    const valIds = validated.map((v: ContentItem) => v.id);
-    // Both validated items should appear in the Validated section
-    expect(valIds).toContain("top-validated");
-    expect(valIds).toContain("only-validated");
+    // Validated items are included in Top3 (no longer excluded)
+    expect(top3Ids).toContain("val-1");
   });
 });
 

@@ -18,7 +18,7 @@ import {
   computeDashboardTop3,
   computeTopicSpotlight,
   computeDashboardActivity,
-  computeDashboardValidated,
+  computeDashboardSaved,
   computeUnreviewedQueue,
   computeTopicDistribution,
   computeTopicTrends,
@@ -30,6 +30,7 @@ import { useKeyboardNav } from "@/hooks/useKeyboardNav";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import type { PaletteCommand } from "@/components/ui/CommandPalette";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
+import { NewItemsBar } from "@/components/ui/NewItemsBar";
 import { useSources } from "@/contexts/SourceContext";
 import { useDemo } from "@/contexts/DemoContext";
 
@@ -134,6 +135,18 @@ const inlineFBtnStyle: React.CSSProperties = {
   color: colors.red[400], fontSize: t.caption.size, fontWeight: 600,
   cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
 };
+const inlineBBtnStyle: React.CSSProperties = {
+  padding: `2px ${space[2]}px`, borderRadius: radii.sm,
+  background: "transparent", border: `1px solid ${colors.border.default}`,
+  color: colors.text.muted, fontSize: t.caption.size, fontWeight: 600,
+  cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
+};
+const inlineBBtnActiveStyle: React.CSSProperties = {
+  ...inlineBBtnStyle,
+  background: `${colors.amber[400]}18`,
+  border: `1px solid ${colors.amber[400]}30`,
+  color: colors.amber[400],
+};
 
 function AgentKnowledgePills({ agentContext, profile }: {
   agentContext: { highAffinityTopics: string[]; trustedAuthors: string[] };
@@ -188,9 +201,11 @@ interface DashboardTabProps {
   wotLoading?: boolean;
   onTabChange?: (tab: string) => void;
   discoveries?: SerendipityItem[];
+  pendingCount?: number;
+  onFlushPending?: () => void;
 }
 
-export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [] }) => {
+export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [], pendingCount = 0, onFlushPending }) => {
   const { filterMode } = useFilterMode();
   const { sources } = useSources();
   const { isDemoMode } = useDemo();
@@ -297,9 +312,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, dashboardTop3]);
 
-  // Cascading cross-section deduplication: Top3 → Spotlight → Discoveries → Unreviewed → Validated
-  // Consolidated into a single memo to avoid 6-step intermediate Set allocations.
-  const { filteredDiscoveries, unreviewedQueue, dashboardValidated } = useMemo(() => {
+  // Cascading cross-section deduplication: Top3 → Spotlight → Discoveries → Unreviewed → Saved
+  // Consolidated into a single memo to avoid intermediate Set allocations.
+  const { filteredDiscoveries, unreviewedQueue, dashboardSaved } = useMemo(() => {
     // 1. Top sections: Top3 + Spotlight
     const topIds = new Set(dashboardTop3.map(c => c.item.id));
     for (const group of dashboardTopicSpotlight) {
@@ -314,12 +329,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     const queue = computeUnreviewedQueue(contentRef.current, topIds);
     for (const item of queue) topIds.add(item.id);
 
-    // 4. Validated (exclude everything above)
-    const validated = computeDashboardValidated(contentRef.current, topIds);
+    // 4. Saved/Bookmarked (exclude everything above)
+    const saved = computeDashboardSaved(contentRef.current, profile.bookmarkedIds ?? [], topIds);
 
-    return { filteredDiscoveries: filtDisc, unreviewedQueue: queue, dashboardValidated: validated };
+    return { filteredDiscoveries: filtDisc, unreviewedQueue: queue, dashboardSaved: saved };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboardTop3, dashboardTopicSpotlight, discoveries]);
+  }, [dashboardTop3, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds]);
 
   const topicDistribution = useMemo(() => {
     if (homeMode !== "dashboard") return null;
@@ -673,6 +688,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </>
           ) : (
             <>
+              {pendingCount > 0 && onFlushPending && (
+                <NewItemsBar count={pendingCount} onFlush={onFlushPending} />
+              )}
               {clusteredContent.slice(0, showAllContent ? 50 : 5).map((cluster, i) => {
                 const rep = cluster.representative;
                 const hasCluster = cluster.members.length > 1;
@@ -883,6 +901,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                           <ScorePill gr={gr} tag={tag} />
                           <div style={{ flex: 1 }} />
+                          <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
+                            style={(profile.bookmarkedIds ?? []).includes(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                           <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
                             disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
                           <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
@@ -964,6 +984,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                               <ScorePill gr={heroGr} tag={heroTag} />
                               <div style={{ flex: 1 }} />
+                              <button onClick={(e) => { e.stopPropagation(); handleBookmark(heroItem.id); }}
+                                style={(profile.bookmarkedIds ?? []).includes(heroItem.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                               <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(heroItem.id); }}
                                 disabled={heroItem.validated} style={{ ...inlineVBtnStyle, opacity: heroItem.validated ? 0.5 : 1, cursor: heroItem.validated ? "default" : "pointer" }}>&#x2713;</button>
                               <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(heroItem.id); }}
@@ -1034,6 +1056,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                                   <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                                     <ScorePill gr={ruGr} tag={ruTag} />
                                     <div style={{ flex: 1 }} />
+                                    <button onClick={(e) => { e.stopPropagation(); handleBookmark(ruItem.id); }}
+                                      style={(profile.bookmarkedIds ?? []).includes(ruItem.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                                     <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(ruItem.id); }}
                                       disabled={ruItem.validated} style={{ ...inlineVBtnStyle, opacity: ruItem.validated ? 0.5 : 1, cursor: ruItem.validated ? "default" : "pointer" }}>&#x2713;</button>
                                     <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(ruItem.id); }}
@@ -1138,6 +1162,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                             <ScorePill gr={gr} tag={tag} />
                             <div style={{ flex: 1 }} />
+                            <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
+                              style={(profile.bookmarkedIds ?? []).includes(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
                               disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
@@ -1234,6 +1260,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                             <ScorePill gr={gr} tag={tag} />
                             <div style={{ flex: 1 }} />
+                            <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
+                              style={(profile.bookmarkedIds ?? []).includes(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
                               disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
@@ -1251,7 +1279,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             )}
           </div>
 
-          {/* Validated */}
+          {/* Saved */}
           <div style={{
             background: "transparent",
             border: `1px solid ${colors.border.subtle}`,
@@ -1263,15 +1291,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               color: colors.text.tertiary, marginBottom: space[3],
               display: "flex", alignItems: "center", gap: space[2],
             }}>
-              <span>&#x2713;</span> Validated
+              <span>&#x1F516;</span> Saved
             </div>
-            {dashboardValidated.length === 0 ? (
+            {dashboardSaved.length === 0 ? (
               <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
-                No validated items yet. Validate quality content to save it here.
+                No saved items yet. Bookmark content to save it here.
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
-                {dashboardValidated.map(item => {
+                {dashboardSaved.map(item => {
                   const gr = scoreGrade(item.scores.composite);
                   const tag = deriveScoreTags(item)[0] ?? null;
                   const showThumb = item.imageUrl && !failedImages.has(item.id);
@@ -1323,13 +1351,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             marginBottom: space[2],
                           }}>
                             {item.author} &middot; {item.platform || item.source}
-                            {item.validatedAt && (
-                              <> &middot; {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</>
-                            )}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
                             <ScorePill gr={gr} tag={tag} />
                             <div style={{ flex: 1 }} />
+                            <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
+                              style={(profile.bookmarkedIds ?? []).includes(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
                               disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}

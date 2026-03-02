@@ -286,13 +286,16 @@ describe("clearScoringCache", () => {
 
 describe("localStorage integration", () => {
   it("persists cache to localStorage via flushCache", () => {
+    jest.useFakeTimers();
     storeScoringCache("persist:h", "h", makeResult());
+    jest.advanceTimersByTime(600); // debounce is 500ms
 
     const raw = store[STORAGE_KEY];
     expect(raw).toBeDefined();
     const parsed = JSON.parse(raw);
     expect(parsed["persist:h"]).toBeDefined();
     expect(parsed["persist:h"].profileHash).toBe("h");
+    jest.useRealTimers();
   });
 
   it("handles corrupted localStorage gracefully (returns empty cache)", () => {
@@ -304,6 +307,7 @@ describe("localStorage integration", () => {
   });
 
   it("handles QuotaExceededError during save — logs warning, does not throw", () => {
+    jest.useFakeTimers();
     const originalSetItem = globalThis.localStorage.setItem;
     globalThis.localStorage.setItem = () => {
       throw new DOMException("QuotaExceededError");
@@ -311,13 +315,15 @@ describe("localStorage integration", () => {
     const warnSpy = jest.spyOn(console, "warn").mockImplementation();
 
     expect(() => storeScoringCache("quota:h", "h", makeResult())).not.toThrow();
+    jest.advanceTimersByTime(600); // trigger debounced flush
     expect(warnSpy).toHaveBeenCalledWith(
-      "[scoring-cache] flushCache failed (quota?):",
+      "[scoring-cache] localStorage flush failed (quota?):",
       expect.any(DOMException),
     );
 
     warnSpy.mockRestore();
     globalThis.localStorage.setItem = originalSetItem;
+    jest.useRealTimers();
   });
 
   it("in-memory cache avoids repeated JSON.parse (second call uses _memCache)", () => {

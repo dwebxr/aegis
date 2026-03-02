@@ -149,7 +149,7 @@ export async function linkNostrAccount(
   if (!saved) {
     throw new Error("Failed to save linked account");
   }
-  clearWoTCache();
+  await clearWoTCache();
 
   return account;
 }
