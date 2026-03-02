@@ -241,7 +241,6 @@ export function computeTopicTrends(content: ContentItem[], weeks = 4): TopicTren
     weekBuckets.push(topicCounts);
   }
 
-  // Collect all topics from most recent 2 weeks
   const allTopics = new Set<string>();
   for (const bucket of weekBuckets.slice(0, 2)) {
     for (const topic of bucket.keys()) allTopics.add(topic);

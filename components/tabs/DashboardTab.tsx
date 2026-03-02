@@ -214,9 +214,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [showAllContent, setShowAllContent] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-  const markImgFailed = useCallback((id: string) => {
+  const markImgFailed = (id: string) =>
     setFailedImages(prev => { const next = new Set(prev); next.add(id); return next; });
-  }, []);
   // Clear stale failedImages when content items are added/removed (e.g., after backfill)
   const prevContentLenRef = useRef(content.length);
   useEffect(() => {

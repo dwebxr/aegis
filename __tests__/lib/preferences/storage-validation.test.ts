@@ -75,7 +75,7 @@ describe("isValidProfile — boundary and edge cases", () => {
 
   it("accepts empty topicAffinities", () => {
     const data = validProfileData();
-    data.topicAffinities = {};
+    (data as Record<string, unknown>).topicAffinities = {};
     expect(isValidProfile(data)).toBe(true);
   });
 

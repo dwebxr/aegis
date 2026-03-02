@@ -191,7 +191,6 @@ function AegisAppInner() {
       setWotPromptDismissed(false);
       try { sessionStorage.removeItem("aegis-wot-prompt-dismissed"); } catch { console.debug("[page] sessionStorage unavailable"); }
     }
-    // Sync to IC (fire-and-forget)
     if (identity) {
       void syncLinkedAccountToIC(identity, account, agentEnabledRef.current).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
     }
@@ -361,9 +360,7 @@ function AegisAppInner() {
           filteredItems = filteredItems.filter(item => {
             // D2A content always passes if d2aAlerts enabled
             if (notifPrefs.d2aAlerts && (item.source as string) === "d2a") return true;
-            // Check min score
             if (notifPrefs.minScoreAlert && item.scores.composite < notifPrefs.minScoreAlert) return false;
-            // Check topic alerts (if specified, at least one must match)
             if (notifPrefs.topicAlerts && notifPrefs.topicAlerts.length > 0) {
               const itemTopics = (item.topics ?? []).map(t => t.toLowerCase());
               if (!notifPrefs.topicAlerts.some(alertTopic => itemTopics.includes(alertTopic.toLowerCase()))) return false;

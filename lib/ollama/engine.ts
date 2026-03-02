@@ -19,7 +19,6 @@ export async function testOllamaConnection(
 ): Promise<{ ok: boolean; models: string[]; error?: string }> {
   const base = endpoint.replace(/\/+$/, "");
 
-  // Try Ollama-native /api/tags first
   try {
     const res = await fetch(`${base}/api/tags`, {
       signal: AbortSignal.timeout(10_000),
@@ -32,11 +31,9 @@ export async function testOllamaConnection(
       return { ok: true, models };
     }
   } catch (err) {
-    // Fall through to OpenAI-compatible endpoint
     console.debug("[ollama] Native /api/tags failed, trying OpenAI-compatible endpoint:", errMsg(err));
   }
 
-  // Fallback: OpenAI-compatible /v1/models
   try {
     const res = await fetch(`${base}/v1/models`, {
       signal: AbortSignal.timeout(10_000),

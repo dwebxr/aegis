@@ -89,11 +89,9 @@ describe("IngestionScheduler — cycle integration", () => {
     await (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle();
 
     expect(collected.length).toBeGreaterThanOrEqual(1);
-    if (collected.length > 0) {
-      expect(collected[0].source).toBe("rss");
-      expect(collected[0].verdict).toBe("quality");
-      expect(collected[0].scores.composite).toBe(7.3);
-    }
+    expect(collected[0].source).toBe("rss");
+    expect(collected[0].verdict).toBe("quality");
+    expect(collected[0].scores.composite).toBe(7.3);
   });
 
   it("records source errors on fetch failure", async () => {

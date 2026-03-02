@@ -116,8 +116,8 @@ function getCache(): Map<string, ScoringCacheEntry> {
       if (raw) {
         return (_memCache = parseEntries(JSON.parse(raw)));
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.debug("[scoring-cache] Pre-init localStorage parse failed:", err);
     }
   }
   return (_memCache = new Map());

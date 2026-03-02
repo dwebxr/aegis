@@ -18,7 +18,8 @@ function readStore(): StoredComment[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
-  } catch {
+  } catch (err) {
+    console.warn("[d2a-comments] Failed to parse stored comments:", err);
     return [];
   }
 }

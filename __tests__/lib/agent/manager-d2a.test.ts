@@ -841,7 +841,7 @@ describe("AgentManager — diff-aware offer selection", () => {
   });
 
   it("skips offer when all content matches peer manifest hashes", async () => {
-    const { hashContent } = require("@/lib/d2a/manifest");
+    const { hashContent } = require("@/lib/utils/hashing");
 
     const contentItem: ContentItem = {
       id: "shared-1", owner: "owner", author: "A", avatar: "A",

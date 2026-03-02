@@ -92,8 +92,6 @@ describe("publishAndPartition — relay distribution", () => {
     );
 
     const result = await publishAndPartition(signed, ["wss://fake-relay.example.com"]);
-    expect(result).toHaveProperty("published");
-    expect(result).toHaveProperty("failed");
     expect(Array.isArray(result.published)).toBe(true);
     expect(Array.isArray(result.failed)).toBe(true);
     expect(result.published.length + result.failed.length).toBe(1);

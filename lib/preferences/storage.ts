@@ -98,7 +98,7 @@ export function loadProfile(principalId: string): UserPreferenceProfile {
     }
     return parsed;
   } catch (err) {
-    console.warn("[prefs] Failed to load preference profile:", err);
+    console.warn("[prefs] Failed to load preference profile:", errMsg(err));
     return createEmptyProfile(principalId);
   }
 }
@@ -109,7 +109,7 @@ export function saveProfile(profile: UserPreferenceProfile): boolean {
     localStorage.setItem(KEY_PREFIX + profile.principalId, JSON.stringify(profile));
     return true;
   } catch (err) {
-    console.warn("[prefs] Failed to save preference profile:", err);
+    console.warn("[prefs] Failed to save preference profile:", errMsg(err));
     return false;
   }
 }

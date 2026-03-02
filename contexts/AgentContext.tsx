@@ -273,9 +273,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     const curr = agentState;
     prevStateRef.current = curr;
 
-    // Skip if agent just became active (initial state flood)
+    // Skip initial state flood when agent first becomes active
     if (!prev.isActive && curr.isActive) return;
-    // Skip if agent stopped
     if (!curr.isActive) return;
 
     if (curr.receivedItems > prev.receivedItems) {

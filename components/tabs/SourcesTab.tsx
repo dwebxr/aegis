@@ -135,7 +135,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             .filter((r): r is PromiseFulfilledResult<typeof suggestions[0] & { discoveredFeedUrl: string | null }> => r.status === "fulfilled")
             .map(r => r.value),
         );
-      });
+      }).catch(err => console.warn("[sources] Feed suggestion discovery failed:", err));
     } else {
       setFeedSuggestions([]);
     }

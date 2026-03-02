@@ -102,6 +102,29 @@ describe("BriefingTab — Discovery source links", () => {
     expect(html).not.toContain("<a ");
   });
 
+  it("does NOT render link for mixed-case JavaScript: protocol", () => {
+    const discoveries: SerendipityItem[] = [{
+      item: makeItem({ id: "d2b", sourceUrl: "JavaScript:alert(1)" }),
+      wotScore: 5,
+      qualityComposite: 7,
+      discoveryType: "out_of_network",
+      reason: "Case bypass test",
+    }];
+
+    const html = renderToStaticMarkup(
+      <BriefingTab
+        content={[]}
+        profile={defaultProfile}
+        onValidate={noop}
+        onFlag={noop}
+        discoveries={discoveries}
+      />,
+    );
+
+    expect(html).not.toContain("JavaScript:");
+    expect(html).not.toContain("<a ");
+  });
+
   it("does NOT render link for data: protocol", () => {
     const discoveries: SerendipityItem[] = [{
       item: makeItem({ id: "d3", sourceUrl: "data:text/html,<script>alert(1)</script>" }),

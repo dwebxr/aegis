@@ -451,7 +451,7 @@ describe("IngestionScheduler — onCycleComplete callback", () => {
     await runCycle();
 
     expect(onCycleComplete).toHaveBeenCalledTimes(1);
-    expect(onCycleComplete).toHaveBeenCalledWith(1, expect.any(Array));
+    expect(onCycleComplete.mock.calls[0][0]).toBe(1);
     expect(onCycleComplete.mock.calls[0][1]).toHaveLength(1);
   });
 

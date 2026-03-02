@@ -576,9 +576,10 @@ describe("POST /api/fetch/discover-feed — thorough coverage", () => {
       const res = await POST(makeRequest({ url: "https://reddit.com/r/javascript" }));
       const data = await res.json();
       expect(Array.isArray(data.feeds)).toBe(true);
-      expect(data.feeds[0]).toHaveProperty("url");
-      expect(data.feeds[0]).toHaveProperty("title");
-      expect(data.feeds[0]).toHaveProperty("type");
+      expect(data.feeds.length).toBeGreaterThanOrEqual(1);
+      expect(typeof data.feeds[0].url).toBe("string");
+      expect(typeof data.feeds[0].title).toBe("string");
+      expect(typeof data.feeds[0].type).toBe("string");
     });
   });
 });

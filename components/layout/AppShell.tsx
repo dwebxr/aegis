@@ -67,7 +67,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
                 </span>
                 <div style={{ display: "flex", gap: space[2], flexShrink: 0 }}>
                   <button
-                    onClick={() => void promptInstall()}
+                    onClick={() => void promptInstall().catch(() => {/* user dismissed */})}
                     style={{
                       padding: `${space[1]}px ${space[3]}px`,
                       background: `${colors.cyan[500]}18`,

@@ -47,13 +47,13 @@ describe("DEMO_SOURCES", () => {
 
   it("conforms to SavedSource interface", () => {
     for (const s of DEMO_SOURCES) {
-      expect(s).toHaveProperty("id");
-      expect(s).toHaveProperty("type");
-      expect(s).toHaveProperty("label");
-      expect(s).toHaveProperty("enabled");
-      expect(s).toHaveProperty("feedUrl");
-      expect(s).toHaveProperty("createdAt");
+      expect(typeof s.id).toBe("string");
+      expect(typeof s.type).toBe("string");
+      expect(typeof s.label).toBe("string");
+      expect(typeof s.enabled).toBe("boolean");
+      expect(typeof s.feedUrl).toBe("string");
       expect(typeof s.createdAt).toBe("number");
+      expect(s.createdAt).toBeGreaterThanOrEqual(0);
     }
   });
 });

@@ -100,7 +100,6 @@ export async function discoverFeed(domain: string): Promise<string | null> {
     const data = await resp.json();
     const feedUrl = data.feeds?.[0]?.url;
     if (feedUrl && typeof feedUrl === "string") {
-      // Cache the discovered feed URL
       const validations = loadDomainValidations();
       if (validations[domain]) {
         validations[domain].feedUrl = feedUrl;

@@ -1,9 +1,9 @@
 import {
-  hashContent,
   buildManifest,
   decodeManifest,
   diffManifest,
 } from "@/lib/d2a/manifest";
+import { hashContent } from "@/lib/utils/hashing";
 import type { ContentItem } from "@/lib/types/content";
 import { MIN_OFFER_SCORE } from "@/lib/agent/protocol";
 

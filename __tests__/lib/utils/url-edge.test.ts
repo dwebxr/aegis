@@ -55,6 +55,11 @@ describe("blockPrivateUrl — protocol edge cases", () => {
     expect(blockPrivateUrl("javascript:alert(1)")).not.toBeNull();
   });
 
+  it("blocks mixed-case JavaScript: URIs", () => {
+    expect(blockPrivateUrl("JavaScript:alert(1)")).not.toBeNull();
+    expect(blockPrivateUrl("JAVASCRIPT:void(0)")).not.toBeNull();
+  });
+
   it("allows HTTPS with ports", () => {
     expect(blockPrivateUrl("https://example.com:8443/feed")).toBeNull();
   });

@@ -1,4 +1,5 @@
-import { hashContent, buildManifest, diffManifest, decodeManifest, type ContentManifest } from "@/lib/d2a/manifest";
+import { buildManifest, diffManifest, decodeManifest, type ContentManifest } from "@/lib/d2a/manifest";
+import { hashContent } from "@/lib/utils/hashing";
 import type { ContentItem } from "@/lib/types/content";
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
@@ -182,6 +183,31 @@ describe("decodeManifest", () => {
     const result = decodeManifest(JSON.stringify({ entries: [], generatedAt: 1 }));
     expect(result).not.toBeNull();
     expect(result!.entries).toHaveLength(0);
+  });
+
+  it("returns null for score above 10", () => {
+    expect(decodeManifest(JSON.stringify({
+      entries: [{ hash: "abc", topic: "tech", score: 11 }],
+      generatedAt: 1,
+    }))).toBeNull();
+  });
+
+  it("returns null for negative score", () => {
+    expect(decodeManifest(JSON.stringify({
+      entries: [{ hash: "abc", topic: "tech", score: -1 }],
+      generatedAt: 1,
+    }))).toBeNull();
+  });
+
+  it("accepts score at boundaries (0 and 10)", () => {
+    expect(decodeManifest(JSON.stringify({
+      entries: [{ hash: "a", topic: "t", score: 0 }],
+      generatedAt: 1,
+    }))).not.toBeNull();
+    expect(decodeManifest(JSON.stringify({
+      entries: [{ hash: "b", topic: "t", score: 10 }],
+      generatedAt: 1,
+    }))).not.toBeNull();
   });
 });
 

@@ -13,14 +13,15 @@ export interface CurationGroup {
   lastSynced: number;
 }
 
-function readStore(): CurationGroup[] {
+export function loadGroups(): CurationGroup[] {
   if (typeof globalThis.localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
-  } catch {
+  } catch (err) {
+    console.warn("[curation-group] Failed to parse stored groups:", err);
     return [];
   }
 }
@@ -34,18 +35,13 @@ function writeStore(groups: CurationGroup[]): void {
   }
 }
 
-export function loadGroups(): CurationGroup[] {
-  return readStore();
-}
-
 export function saveGroup(group: CurationGroup): void {
-  const groups = readStore();
+  const groups = loadGroups();
   const idx = groups.findIndex(g => g.id === group.id);
   if (idx >= 0) {
     groups[idx] = group;
   } else {
     if (groups.length >= MAX_GROUPS) {
-      // Remove oldest
       groups.sort((a, b) => a.createdAt - b.createdAt);
       groups.shift();
     }
@@ -55,11 +51,11 @@ export function saveGroup(group: CurationGroup): void {
 }
 
 export function removeGroup(id: string): void {
-  writeStore(readStore().filter(g => g.id !== id));
+  writeStore(loadGroups().filter(g => g.id !== id));
 }
 
 export function addMember(groupId: string, pubkey: string): void {
-  const groups = readStore();
+  const groups = loadGroups();
   const group = groups.find(g => g.id === groupId);
   if (!group) return;
   if (group.members.includes(pubkey)) return;
@@ -68,7 +64,7 @@ export function addMember(groupId: string, pubkey: string): void {
 }
 
 export function removeMember(groupId: string, pubkey: string): void {
-  const groups = readStore();
+  const groups = loadGroups();
   const group = groups.find(g => g.id === groupId);
   if (!group) return;
   group.members = group.members.filter(m => m !== pubkey);

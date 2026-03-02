@@ -258,7 +258,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const backfillCleanupRef = useRef<(() => void) | null>(null);
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
 
-  // Load cached content from IDB on mount
   useEffect(() => {
     let cancelled = false;
     useIDB = isIDBAvailable();
@@ -358,7 +357,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const isOnline = useOnlineStatus(drainOfflineQueue);
 
-  // Load pending count on mount
   useEffect(() => {
     let cancelled = false;
     dequeueAll().then(a => {
@@ -622,9 +620,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     setContent(prev => truncatePreservingActioned([...items, ...prev]));
   }, []);
 
-  const clearDemoContent = useCallback(() => {
-    setContent(prev => prev.filter(c => c.owner !== ""));
-  }, []);
+  const clearDemoContent = () => setContent(prev => prev.filter(c => c.owner !== ""));
 
   const backfillImageUrls = useCallback((): (() => void) => {
     const items = contentRef.current

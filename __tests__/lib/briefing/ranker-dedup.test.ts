@@ -5,17 +5,19 @@ import { createEmptyProfile } from "@/lib/preferences/types";
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
     id: Math.random().toString(36).slice(2),
-    text: "Test article content",
+    owner: "test",
     author: "Author",
+    avatar: "🧪",
+    text: "Test article content",
     source: "rss",
     verdict: "quality",
     reason: "Good content",
     topics: ["tech"],
     createdAt: Date.now() - 3600000,
-    scores: { composite: 7, originality: 7, insight: 7, credibility: 7, weight: 1 },
-    vSignal: 7,
-    cContext: 7,
-    lSlop: 3,
+    scores: { composite: 7, originality: 7, insight: 7, credibility: 7 },
+    validated: false,
+    flagged: false,
+    timestamp: "1h ago",
     ...overrides,
   };
 }
@@ -28,9 +30,9 @@ const profile = {
 describe("generateBriefing — deduplication", () => {
   it("removes duplicate articles with same sourceUrl", () => {
     const items = [
-      makeItem({ sourceUrl: "https://example.com/article-1", scores: { composite: 8, originality: 8, insight: 8, credibility: 8, weight: 1 } }),
-      makeItem({ sourceUrl: "https://example.com/article-1", scores: { composite: 6, originality: 6, insight: 6, credibility: 6, weight: 1 } }),
-      makeItem({ sourceUrl: "https://example.com/article-2", scores: { composite: 7, originality: 7, insight: 7, credibility: 7, weight: 1 } }),
+      makeItem({ sourceUrl: "https://example.com/article-1", scores: { composite: 8, originality: 8, insight: 8, credibility: 8, } }),
+      makeItem({ sourceUrl: "https://example.com/article-1", scores: { composite: 6, originality: 6, insight: 6, credibility: 6, } }),
+      makeItem({ sourceUrl: "https://example.com/article-2", scores: { composite: 7, originality: 7, insight: 7, credibility: 7, } }),
     ];
 
     const briefing = generateBriefing(items, profile);
@@ -45,8 +47,8 @@ describe("generateBriefing — deduplication", () => {
 
   it("keeps both items when sourceUrls differ", () => {
     const items = [
-      makeItem({ sourceUrl: "https://a.com/article", scores: { composite: 8, originality: 8, insight: 8, credibility: 8, weight: 1 } }),
-      makeItem({ sourceUrl: "https://b.com/article", scores: { composite: 7, originality: 7, insight: 7, credibility: 7, weight: 1 } }),
+      makeItem({ sourceUrl: "https://a.com/article", scores: { composite: 8, originality: 8, insight: 8, credibility: 8, } }),
+      makeItem({ sourceUrl: "https://b.com/article", scores: { composite: 7, originality: 7, insight: 7, credibility: 7, } }),
     ];
 
     const briefing = generateBriefing(items, profile);
@@ -67,7 +69,7 @@ describe("generateBriefing — deduplication", () => {
     const items = Array.from({ length: 10 }, (_, i) =>
       makeItem({
         sourceUrl: "https://example.com/same",
-        scores: { composite: 5 + i * 0.1, originality: 5, insight: 5, credibility: 5, weight: 1 },
+        scores: { composite: 5 + i * 0.1, originality: 5, insight: 5, credibility: 5, },
       }),
     );
 
@@ -79,8 +81,8 @@ describe("generateBriefing — deduplication", () => {
 
   it("dedup does not affect filteredOut count (uses original content.length)", () => {
     const items = [
-      makeItem({ sourceUrl: "https://example.com/a", scores: { composite: 9, originality: 9, insight: 9, credibility: 9, weight: 1 } }),
-      makeItem({ sourceUrl: "https://example.com/a", scores: { composite: 4, originality: 4, insight: 4, credibility: 4, weight: 1 } }),
+      makeItem({ sourceUrl: "https://example.com/a", scores: { composite: 9, originality: 9, insight: 9, credibility: 9, } }),
+      makeItem({ sourceUrl: "https://example.com/a", scores: { composite: 4, originality: 4, insight: 4, credibility: 4, } }),
     ];
 
     const briefing = generateBriefing(items, profile);

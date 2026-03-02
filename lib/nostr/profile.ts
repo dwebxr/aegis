@@ -143,7 +143,6 @@ export async function publishAgentProfile(
       console.warn("[agent-profile] Kind 10002 relay list publish failed:", errMsg(err));
     }
 
-    // Verify the profile was stored by fetching it back
     try {
       const verified = await fetchAgentProfile(pubkeyHex, published.slice(0, 1));
       if (!verified) {

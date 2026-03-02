@@ -46,7 +46,6 @@ export function computePeerStats(
 ): PeerStat[] {
   const d2aItems = content.filter(isD2AContent);
 
-  // Group by full pubkey (item.nostrPubkey)
   const grouped = new Map<string, ContentItem[]>();
   for (const item of d2aItems) {
     const pk = item.nostrPubkey ?? "unknown";

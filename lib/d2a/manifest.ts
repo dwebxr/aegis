@@ -2,8 +2,6 @@ import type { ContentItem } from "@/lib/types/content";
 import { MIN_OFFER_SCORE } from "@/lib/agent/protocol";
 import { hashContent } from "@/lib/utils/hashing";
 
-export { hashContent };
-
 export interface ManifestEntry {
   hash: string;
   topic: string;
@@ -50,7 +48,7 @@ export function decodeManifest(raw: string): ContentManifest | null {
     return null;
   }
   for (const entry of parsed.entries) {
-    if (!entry || typeof entry !== "object" || typeof entry.hash !== "string" || typeof entry.topic !== "string" || typeof entry.score !== "number") {
+    if (!entry || typeof entry !== "object" || typeof entry.hash !== "string" || typeof entry.topic !== "string" || typeof entry.score !== "number" || entry.score < 0 || entry.score > 10) {
       return null;
     }
   }

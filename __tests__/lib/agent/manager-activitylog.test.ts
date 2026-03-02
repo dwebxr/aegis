@@ -78,7 +78,6 @@ describe("AgentManager — activity log", () => {
     await mgr.start();
 
     const state = mgr.getState();
-    expect(state).toHaveProperty("activityLog");
     expect(Array.isArray(state.activityLog)).toBe(true);
 
     mgr.stop();
@@ -147,12 +146,9 @@ describe("AgentManager — activity log", () => {
     expect(state.activityLog.length).toBeGreaterThan(0);
 
     for (const entry of state.activityLog) {
-      expect(entry).toHaveProperty("id");
-      expect(entry).toHaveProperty("timestamp");
-      expect(entry).toHaveProperty("type");
-      expect(entry).toHaveProperty("message");
       expect(typeof entry.id).toBe("string");
       expect(typeof entry.timestamp).toBe("number");
+      expect(typeof entry.type).toBe("string");
       expect(typeof entry.message).toBe("string");
     }
 
