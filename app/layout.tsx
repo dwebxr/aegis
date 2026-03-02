@@ -114,6 +114,9 @@ export default function RootLayout({
       <head>
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <script
+          dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('aegis-theme');if(t==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}` }}
+        />
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />

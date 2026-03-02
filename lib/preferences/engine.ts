@@ -72,6 +72,15 @@ export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPr
     next.recentTopics = next.recentTopics.slice(-RECENT_TOPICS_MAX);
   }
 
+  // Update activity histogram for time-of-day adaptive ranking
+  const hour = new Date(now).getHours();
+  if (!next.activityHistogram) {
+    next.activityHistogram = { hourCounts: new Array(24).fill(0), lastActivityAt: 0, totalEvents: 0 };
+  }
+  next.activityHistogram.hourCounts[hour] += 1;
+  next.activityHistogram.lastActivityAt = now;
+  next.activityHistogram.totalEvents += 1;
+
   next.lastUpdated = now;
   return next;
 }

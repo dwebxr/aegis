@@ -11,6 +11,7 @@ function makeStats(overrides: Partial<FilterPipelineStats> = {}): FilterPipeline
     serendipityCount: 2,
     estimatedAPICost: 0.09,
     mode: "pro",
+    customRulesBurned: 0,
     ...overrides,
   };
 }

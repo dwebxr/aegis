@@ -13,24 +13,27 @@ export const breakpoints = {
 } as const;
 
 // ── Color palette ───────────────────────────────────────────
+// bg/text/border values are CSS custom properties defined in globals.css
+// and resolve to dark or light values based on [data-theme] attribute.
+// Accent colors remain as hex constants (identical in both themes).
 export const colors = {
   bg: {
-    root: "#0a0f1e",
-    surface: "#0f1729",
-    raised: "#131c33",
-    overlay: "rgba(15,23,42,0.85)",
+    root: "var(--color-bg-root)",
+    surface: "var(--color-bg-surface)",
+    raised: "var(--color-bg-raised)",
+    overlay: "var(--color-bg-overlay)",
   },
   border: {
-    subtle: "rgba(255,255,255,0.04)",
-    default: "rgba(255,255,255,0.07)",
-    emphasis: "rgba(255,255,255,0.12)",
+    subtle: "var(--color-border-subtle)",
+    default: "var(--color-border-default)",
+    emphasis: "var(--color-border-emphasis)",
   },
   text: {
-    primary: "#f1f5f9",
-    secondary: "#e2e8f0",
-    tertiary: "#94a3b8",
-    muted: "#64748b",
-    disabled: "#475569",
+    primary: "var(--color-text-primary)",
+    secondary: "var(--color-text-secondary)",
+    tertiary: "var(--color-text-tertiary)",
+    muted: "var(--color-text-muted)",
+    disabled: "var(--color-text-disabled)",
   },
   cyan: { 50: "#ecfeff", 400: "#22d3ee", 500: "#06b6d4" },
   green: {

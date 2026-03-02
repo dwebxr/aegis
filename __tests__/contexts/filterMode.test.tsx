@@ -2,6 +2,7 @@
  * FilterModeContext logic tests.
  * Tests the loadPersistedMode and persistence logic directly.
  */
+export {}; // module boundary for TS
 
 const STORAGE_KEY = "aegis-filter-mode";
 

@@ -190,7 +190,7 @@ describe("DashboardTab — mobile mode", () => {
 describe("DashboardTab — show all button", () => {
   it("shows 'Show all' button when more than 5 quality items", () => {
     const items = Array.from({ length: 8 }, (_, i) =>
-      makeItem({ id: `item-${i}` })
+      makeItem({ id: `item-${i}`, topics: [`unique-topic-${i}`], text: `Unique content ${i}` })
     );
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
@@ -201,7 +201,7 @@ describe("DashboardTab — show all button", () => {
 
   it("does not show 'Show all' button when 5 or fewer items", () => {
     const items = Array.from({ length: 5 }, (_, i) =>
-      makeItem({ id: `item-${i}` })
+      makeItem({ id: `item-${i}`, topics: [`unique-topic-${i}`], text: `Unique content ${i}` })
     );
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />

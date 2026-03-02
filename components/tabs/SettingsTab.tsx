@@ -23,6 +23,7 @@ import type { OllamaConfig, OllamaStatus } from "@/lib/ollama/types";
 import { DEFAULT_OLLAMA_CONFIG } from "@/lib/ollama/types";
 import { NostrAccountLink } from "@/components/ui/NostrAccountLink";
 import { FilterModeSelector } from "@/components/filtering/FilterModeSelector";
+import { useTheme } from "@/contexts/ThemeContext";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 
 const LS_PUSH_FREQ_KEY = "aegis-push-frequency";
@@ -61,6 +62,7 @@ const sectionTitle: React.CSSProperties = {
 export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, linkedAccount, onLinkChange }) => {
   const { isAuthenticated, principalText, login } = useAuth();
   const { isEnabled: agentEnabled } = useAgent();
+  const { theme, setTheme } = useTheme();
   const { isSubscribed } = usePushNotification();
   const { addNotification } = useNotify();
 
@@ -263,6 +265,36 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ mobile, linkedAccount,
         <p style={{ fontSize: t.body.mobileSz, color: colors.text.muted, margin: `${space[1]}px 0 0` }}>
           Notifications, agent controls & account
         </p>
+      </div>
+
+      {/* Appearance */}
+      <div style={cardStyle(mobile)}>
+        <div style={sectionTitle}>Appearance</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary }}>Theme</div>
+            <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: 2 }}>
+              {theme === "dark" ? "Dark" : "Light"} mode
+            </div>
+          </div>
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            style={{
+              position: "relative",
+              width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
+              background: theme === "light" ? colors.cyan[500] : colors.bg.raised,
+              transition: transitions.fast, flexShrink: 0,
+            }}
+          >
+            <div style={{
+              position: "absolute", top: 2, left: theme === "light" ? 20 : 2,
+              width: 18, height: 18, borderRadius: "50%",
+              background: theme === "light" ? "#fff" : colors.text.disabled,
+              transition: transitions.fast,
+            }} />
+          </button>
+        </div>
       </div>
 
       {/* Push Notifications */}

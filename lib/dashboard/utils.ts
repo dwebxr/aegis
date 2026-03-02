@@ -208,3 +208,107 @@ export function computeTopicDistribution(
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 }
+
+// ── Story Clustering ────────────────────────────────────────
+
+export interface StoryCluster {
+  representative: ContentItem;
+  members: ContentItem[];
+  sharedTopics: string[];
+}
+
+class UnionFind {
+  private parent: number[];
+  private rank: number[];
+  constructor(n: number) {
+    this.parent = Array.from({ length: n }, (_, i) => i);
+    this.rank = new Array(n).fill(0);
+  }
+  find(x: number): number {
+    if (this.parent[x] !== x) this.parent[x] = this.find(this.parent[x]);
+    return this.parent[x];
+  }
+  union(a: number, b: number): void {
+    const ra = this.find(a);
+    const rb = this.find(b);
+    if (ra === rb) return;
+    if (this.rank[ra] < this.rank[rb]) { this.parent[ra] = rb; }
+    else if (this.rank[ra] > this.rank[rb]) { this.parent[rb] = ra; }
+    else { this.parent[rb] = ra; this.rank[ra]++; }
+  }
+}
+
+export function titleWordOverlap(a: string, b: string): number {
+  const extract = (s: string) => {
+    const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    return new Set(words);
+  };
+  const sa = extract(a);
+  const sb = extract(b);
+  if (sa.size === 0 || sb.size === 0) return 0;
+  let intersection = 0;
+  for (const w of sa) if (sb.has(w)) intersection++;
+  const union = sa.size + sb.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+const CLUSTER_TIME_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+export function clusterByStory(items: ContentItem[]): StoryCluster[] {
+  if (items.length === 0) return [];
+
+  const topicSets = items.map(it =>
+    new Set((it.topics ?? []).map(t => t.toLowerCase()))
+  );
+
+  const uf = new UnionFind(items.length);
+
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const timeDiff = Math.abs(items[i].createdAt - items[j].createdAt);
+      if (timeDiff > CLUSTER_TIME_WINDOW_MS) continue;
+
+      const si = topicSets[i];
+      const sj = topicSets[j];
+      if (si.size === 0 || sj.size === 0) continue;
+
+      let shared = 0;
+      for (const t of si) if (sj.has(t)) shared++;
+
+      if (shared >= 2) {
+        uf.union(i, j);
+      } else if (shared === 1) {
+        if (titleWordOverlap(items[i].text.slice(0, 200), items[j].text.slice(0, 200)) >= 0.4) {
+          uf.union(i, j);
+        }
+      }
+    }
+  }
+
+  const groups = new Map<number, number[]>();
+  for (let i = 0; i < items.length; i++) {
+    const root = uf.find(i);
+    const arr = groups.get(root);
+    if (arr) arr.push(i); else groups.set(root, [i]);
+  }
+
+  const clusters: StoryCluster[] = [];
+  for (const indices of groups.values()) {
+    const members = indices.map(i => items[i]);
+    members.sort((a, b) => b.scores.composite - a.scores.composite);
+    const representative = members[0];
+
+    const commonTopics: string[] = [];
+    if (members.length > 1) {
+      const first = topicSets[indices[0]];
+      for (const t of first) {
+        if (indices.every(i => topicSets[i].has(t))) commonTopics.push(t);
+      }
+    }
+
+    clusters.push({ representative, members, sharedTopics: commonTopics });
+  }
+
+  clusters.sort((a, b) => b.representative.scores.composite - a.representative.scores.composite);
+  return clusters;
+}

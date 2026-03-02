@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { fonts } from "@/styles/theme";
+import { colors, fonts } from "@/styles/theme";
 import { ScoreRing } from "./ScoreRing";
 import { scoreColor } from "@/lib/utils/scores";
 import { formatICP, MIN_STAKE, MAX_STAKE } from "@/lib/ic/icpLedger";
@@ -142,19 +142,19 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
     return (
       <div style={{ textAlign: "center", padding: 24 }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>&#x1F4E1;</div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: "#34d399", marginBottom: 8 }}>Signal Published</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: colors.green[400], marginBottom: 8 }}>Signal Published</div>
         {publishResult.eventId && (
-          <div style={{ fontSize: 11, color: "#64748b", fontFamily: fonts.mono, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: colors.text.muted, fontFamily: fonts.mono, marginBottom: 12 }}>
             Event: {publishResult.eventId.slice(0, 16)}...
           </div>
         )}
-        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: colors.text.tertiary, marginBottom: 16 }}>
           Published to {publishResult.relaysPublished.length} relay{publishResult.relaysPublished.length !== 1 ? "s" : ""}
         </div>
         <button onClick={handleReset} style={{
           padding: "10px 24px", background: "rgba(37,99,235,0.15)",
           border: "1px solid rgba(37,99,235,0.3)", borderRadius: 10,
-          color: "#60a5fa", fontSize: 13, fontWeight: 600, cursor: "pointer",
+          color: colors.blue[400], fontSize: 13, fontWeight: 600, cursor: "pointer",
         }}>
           Compose Another
         </button>
@@ -165,7 +165,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
   return (
     <div>
       {nostrPubkey && (
-        <div style={{ fontSize: 10, color: "#64748b", marginBottom: 10, fontFamily: fonts.mono }}>
+        <div style={{ fontSize: 10, color: colors.text.muted, marginBottom: 10, fontFamily: fonts.mono }}>
           Nostr: {nostrPubkey.slice(0, 12)}...{nostrPubkey.slice(-8)}
         </div>
       )}
@@ -178,10 +178,10 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
           width: "100%",
           minHeight: 120,
           background: "rgba(0,0,0,0.3)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          border: `1px solid ${colors.border.default}`,
           borderRadius: 12,
           padding: 14,
-          color: "#e2e8f0",
+          color: colors.text.secondary,
           fontSize: 14,
           lineHeight: 1.6,
           fontFamily: "inherit",
@@ -203,7 +203,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
           {isUploading && (
             <div style={{
               position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-              background: "rgba(0,0,0,0.6)", borderRadius: 8, fontSize: 11, color: "#94a3b8", fontWeight: 600,
+              background: "rgba(0,0,0,0.6)", borderRadius: 8, fontSize: 11, color: colors.text.tertiary, fontWeight: 600,
             }}>
               Uploading...
             </div>
@@ -213,7 +213,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
             style={{
               position: "absolute", top: 4, right: 4, width: 20, height: 20,
               background: "rgba(0,0,0,0.7)", border: "none", borderRadius: "50%",
-              color: "#f87171", fontSize: 12, cursor: "pointer", display: "flex",
+              color: colors.red[400], fontSize: 12, cursor: "pointer", display: "flex",
               alignItems: "center", justifyContent: "center", lineHeight: 1,
             }}
           >
@@ -223,12 +223,12 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
       )}
 
       {imageError && (
-        <div style={{ fontSize: 10, color: "#f87171", marginTop: 4, fontWeight: 600 }}>{imageError}</div>
+        <div style={{ fontSize: 10, color: colors.red[400], marginTop: 4, fontWeight: 600 }}>{imageError}</div>
       )}
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 10, color: "#64748b" }}>
+          <div style={{ fontSize: 10, color: colors.text.muted }}>
             {text.length}/5000 characters
           </div>
           <input
@@ -243,13 +243,13 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
             disabled={isUploading}
             title="Attach image"
             style={{
-              background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6,
-              padding: "3px 8px", cursor: isUploading ? "not-allowed" : "pointer", color: "#64748b",
+              background: "none", border: `1px solid ${colors.border.emphasis}`, borderRadius: 6,
+              padding: "3px 8px", cursor: isUploading ? "not-allowed" : "pointer", color: colors.text.muted,
               fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center", gap: 4,
             }}
           >
             &#x1F4F7;
-            {imageUrl && <span style={{ fontSize: 9, color: "#34d399" }}>&#x2713;</span>}
+            {imageUrl && <span style={{ fontSize: 9, color: colors.green[400] }}>&#x2713;</span>}
           </button>
         </div>
 
@@ -264,7 +264,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                 : "rgba(255,255,255,0.05)",
               border: "none",
               borderRadius: 10,
-              color: text.trim() && !isAnalyzing && !isUploading ? "#fff" : "#64748b",
+              color: text.trim() && !isAnalyzing && !isUploading ? "#fff" : colors.text.muted,
               fontSize: 13,
               fontWeight: 700,
               cursor: text.trim() && !isAnalyzing && !isUploading ? "pointer" : "not-allowed",
@@ -277,7 +277,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <ScoreRing value={selfScore.composite} size={40} color={scoreColor(selfScore.composite)} />
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: selfScore.verdict === "quality" ? "#34d399" : "#f87171", textTransform: "uppercase" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: selfScore.verdict === "quality" ? colors.green[400] : colors.red[400], textTransform: "uppercase" }}>
                   {selfScore.verdict}
                 </div>
                 {selfScore.topics && selfScore.topics.length > 0 && (
@@ -313,15 +313,15 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
 
             {isGateBlocked && (
               <div style={{
-                fontSize: 11, color: "#f87171", marginTop: 4, padding: "8px 12px",
-                background: "rgba(248,113,113,0.08)", borderRadius: 8, fontWeight: 600, lineHeight: 1.5,
+                fontSize: 11, color: colors.red[400], marginTop: 4, padding: "8px 12px",
+                background: colors.red.bg, borderRadius: 8, fontWeight: 600, lineHeight: 1.5,
               }}>
                 Publishing is suspended. Your published signals have been repeatedly flagged. Reputation recovers +1 per week of inactivity.
               </div>
             )}
 
             {publishGate && !publishGate.requiresDeposit && publishGate.canPublish && publishGate.reason && (
-              <div style={{ fontSize: 10, color: "#64748b", marginTop: 4, fontStyle: "italic" }}>
+              <div style={{ fontSize: 10, color: colors.text.muted, marginTop: 4, fontStyle: "italic" }}>
                 {publishGate.reason}
               </div>
             )}
@@ -338,7 +338,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                     Quality Assurance Deposit
                   </span>
                   {icpBalance != null && (
-                    <span style={{ fontSize: 10, color: "#64748b", fontFamily: fonts.mono }}>
+                    <span style={{ fontSize: 10, color: colors.text.muted, fontFamily: fonts.mono }}>
                       Balance: {formatICP(icpBalance)} ICP
                     </span>
                   )}
@@ -359,14 +359,14 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                       {formatICP(BigInt(stakeE8s))} ICP
                     </span>
                   </div>
-                  <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>
+                  <div style={{ fontSize: 10, color: colors.text.tertiary, marginTop: 4 }}>
                     Deposit ICP as a quality assurance bond. Validated by community = deposit returned. Flagged = deposit forfeited as quality assurance cost. No verdict within 30 days = deposit auto-returned.
                   </div>
                   <div style={{ fontSize: 10, color: "#fbbf24", marginTop: 6, padding: "6px 8px", background: "rgba(251,191,36,0.08)", borderRadius: 6, lineHeight: 1.5 }}>
                     &#x26A0;&#xFE0F; Alpha &mdash; Currently in test operation. Bugs or data resets may occur. Please deposit only amounts you are comfortable treating as a tip. Refunds cannot be guaranteed if issues arise.
                   </div>
                   {!hasBalance && (
-                    <div style={{ fontSize: 10, color: "#f87171", marginTop: 4, fontWeight: 600 }}>
+                    <div style={{ fontSize: 10, color: colors.red[400], marginTop: 4, fontWeight: 600 }}>
                       Insufficient ICP balance. Min: {formatICP(MIN_STAKE)} ICP
                     </div>
                   )}

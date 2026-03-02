@@ -65,6 +65,7 @@ function makeResult(items: FilteredItem[]): FilterPipelineResult {
       serendipityCount: items.filter(fi => fi.isWoTSerendipity || fi.isContentSerendipity).length,
       estimatedAPICost: 0,
       mode: "pro",
+      customRulesBurned: 0,
     },
   };
 }

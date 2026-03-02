@@ -4,6 +4,7 @@ import type { WoTGraph } from "@/lib/wot/types";
 import type { FilterConfig, FilteredItem, FilterPipelineResult, FilterPipelineStats } from "./types";
 import { calculateWoTScore, calculateWeightedScore, isWoTSerendipity } from "@/lib/wot/scorer";
 import { isContentSerendipity } from "./serendipity";
+import { matchesCustomBurnRule } from "./customRules";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
 
 // Anthropic Claude Sonnet via /api/analyze — ~400 input tokens + ~100 output
@@ -23,10 +24,12 @@ export function runFilterPipeline(
     serendipityCount: 0,
     estimatedAPICost: 0,
     mode: config.mode,
+    customRulesBurned: 0,
   };
 
   const items: FilteredItem[] = [];
   let paidCount = 0;
+  const customRules = config.customRules ?? [];
 
   for (const item of content) {
     // Count AI/paid scoring across all items (including below-threshold) for cost stats
@@ -34,6 +37,10 @@ export function runFilterPipeline(
     if (isAI) stats.aiScoredCount++;
     if (item.scoringEngine ? PAID_ENGINES.has(item.scoringEngine) : isAI) paidCount++;
 
+    if (customRules.length > 0 && matchesCustomBurnRule(item, customRules)) {
+      stats.customRulesBurned++;
+      continue;
+    }
     if (item.scores.composite < config.qualityThreshold) continue;
 
     let wotScore = null;

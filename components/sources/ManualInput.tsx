@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { ZapIcon } from "@/components/icons";
 import { ScoreBar } from "@/components/ui/ScoreBar";
 import { ScoreRing } from "@/components/ui/ScoreRing";
+import { colors } from "@/styles/theme";
 import type { AnalyzeResponse } from "@/lib/types/api";
 
 interface ManualInputProps {
@@ -24,7 +25,7 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
 
   return (
     <div>
-      <label style={{ display: "block", fontSize: 10, color: "#64748b", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>
+      <label style={{ display: "block", fontSize: 10, color: colors.text.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>
         Content to Evaluate
       </label>
       <textarea
@@ -33,9 +34,9 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
         onChange={e => setText(e.target.value)}
         placeholder="Paste content here for AI quality analysis..."
         style={{
-          width: "100%", height: 100, background: "#0c1322",
-          border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12,
-          padding: 14, color: "#e2e8f0", fontSize: 13, fontFamily: "inherit",
+          width: "100%", height: 100, background: colors.bg.surface,
+          border: `1px solid ${colors.border.default}`, borderRadius: 12,
+          padding: 14, color: colors.text.secondary, fontSize: 13, fontFamily: "inherit",
           resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.6,
         }}
       />
@@ -72,15 +73,15 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 22 }}>{result.verdict === "quality" ? "✅" : "🔥"}</span>
               <div>
-                <div data-testid="aegis-manual-verdict" style={{ fontSize: 14, fontWeight: 800, color: result.verdict === "quality" ? "#34d399" : "#f87171", textTransform: "uppercase" }}>
+                <div data-testid="aegis-manual-verdict" style={{ fontSize: 14, fontWeight: 800, color: result.verdict === "quality" ? colors.green[400] : colors.red[400], textTransform: "uppercase" }}>
                   {result.verdict === "quality" ? "Quality" : "Slop"}
                 </div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>
+                <div style={{ fontSize: 11, color: colors.text.muted }}>
                   {result.verdict === "quality" ? "Quality confirmed" : "Slop identified"}
                 </div>
               </div>
             </div>
-            <ScoreRing value={result.composite} size={50} color={result.verdict === "quality" ? "#34d399" : "#f87171"} />
+            <ScoreRing value={result.composite} size={50} color={result.verdict === "quality" ? colors.green[400] : colors.red[400]} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: result.reason ? 12 : 0 }}>
             <ScoreBar label="Originality" score={result.originality} color="#818cf8" />
@@ -88,7 +89,7 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
             <ScoreBar label="Credibility" score={result.credibility} color="#34d399" />
           </div>
           {result.reason && (
-            <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5, fontStyle: "italic", background: "rgba(0,0,0,0.2)", padding: "9px 12px", borderRadius: 9 }}>
+            <div style={{ fontSize: 12, color: colors.text.tertiary, lineHeight: 1.5, fontStyle: "italic", background: "rgba(0,0,0,0.2)", padding: "9px 12px", borderRadius: 9 }}>
               {result.reason}
             </div>
           )}

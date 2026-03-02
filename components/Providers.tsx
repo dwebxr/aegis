@@ -8,6 +8,7 @@ import { AgentProvider } from "@/contexts/AgentContext";
 import { SourceProvider } from "@/contexts/SourceContext";
 import { DemoProvider } from "@/contexts/DemoContext";
 import { FilterModeProvider } from "@/contexts/FilterModeContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 function ContentWithPreferences({ children }: { children: React.ReactNode }) {
   const { onValidate, onFlag } = usePreferences();
@@ -20,6 +21,7 @@ function ContentWithPreferences({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
+    <ThemeProvider>
     <NotificationProvider>
       <AuthProvider>
         <DemoProvider>
@@ -37,5 +39,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         </DemoProvider>
       </AuthProvider>
     </NotificationProvider>
+    </ThemeProvider>
   );
 }

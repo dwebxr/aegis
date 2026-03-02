@@ -21,6 +21,7 @@ import {
   computeDashboardValidated,
   computeUnreviewedQueue,
   computeTopicDistribution,
+  clusterByStory,
 } from "@/lib/dashboard/utils";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
@@ -213,11 +214,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     try { return localStorage.getItem("aegis-home-mode") === "dashboard" ? "dashboard" : "feed"; }
     catch { return "feed"; }
   });
-  const { profile, setTopicAffinity, removeTopicAffinity, setQualityThreshold } = usePreferences();
+  const { profile, setTopicAffinity, removeTopicAffinity, setQualityThreshold, addFilterRule, removeFilterRule } = usePreferences();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activityRange, setActivityRange] = useState<"today" | "7d" | "30d">("today");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newTopic, setNewTopic] = useState("");
+  const [newBlockedAuthor, setNewBlockedAuthor] = useState("");
+  const [newBurnPattern, setNewBurnPattern] = useState("");
 
   useEffect(() => {
     try { localStorage.setItem("aegis-home-mode", homeMode); } catch { console.debug("[dashboard] localStorage unavailable"); }
@@ -251,12 +254,20 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   useEffect(() => {
     setExpanded(null);
     setShowAllContent(false);
+    setExpandedClusters(new Set());
   }, [verdictFilter, sourceFilter]);
 
   const filteredContent = useMemo(
     () => applyDashboardFilters(content, verdictFilter, sourceFilter),
     [content, verdictFilter, sourceFilter],
   );
+
+  const clusteredContent = useMemo(
+    () => clusterByStory(filteredContent),
+    [filteredContent],
+  );
+
+  const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set());
 
   const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
 
@@ -361,7 +372,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return () => { clearTimeout(feedbackTimerRef.current); };
   }, []);
 
-  const feedItemIds = useMemo(() => filteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.id), [filteredContent, showAllContent]);
+  const feedItemIds = useMemo(() => clusteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.representative.id), [clusteredContent, showAllContent]);
 
   const { focusedId } = useKeyboardNav({
     items: feedItemIds,
@@ -641,31 +652,72 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </>
           ) : (
             <>
-              {filteredContent.slice(0, showAllContent ? 50 : 5).map((it, i) => (
-                <div key={it.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
-                  {verdictFilter === "validated" && it.validatedAt && (
-                    <div style={{
-                      fontSize: t.caption.size, color: colors.purple[400],
-                      marginBottom: space[1], marginLeft: space[1],
-                      fontFamily: fonts.mono, fontWeight: 600,
-                    }}>
-                      Validated {new Date(it.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                      {" "}
-                      {new Date(it.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                  )}
-                  <ContentCard
-                    item={it}
-                    expanded={expanded === it.id}
-                    onToggle={() => setExpanded(expanded === it.id ? null : it.id)}
-                    onValidate={handleValidateWithFeedback}
-                    onFlag={handleFlagWithFeedback}
-                    mobile={mobile}
-                    focused={focusedId === it.id}
-                  />
-                </div>
-              ))}
-              {filteredContent.length > 5 && !showAllContent && (
+              {clusteredContent.slice(0, showAllContent ? 50 : 5).map((cluster, i) => {
+                const rep = cluster.representative;
+                const hasCluster = cluster.members.length > 1;
+                const clusterExpanded = expandedClusters.has(rep.id);
+                return (
+                  <div key={rep.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
+                    {verdictFilter === "validated" && rep.validatedAt && (
+                      <div style={{
+                        fontSize: t.caption.size, color: colors.purple[400],
+                        marginBottom: space[1], marginLeft: space[1],
+                        fontFamily: fonts.mono, fontWeight: 600,
+                      }}>
+                        Validated {new Date(rep.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                        {" "}
+                        {new Date(rep.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    )}
+                    <ContentCard
+                      item={rep}
+                      expanded={expanded === rep.id}
+                      onToggle={() => setExpanded(expanded === rep.id ? null : rep.id)}
+                      onValidate={handleValidateWithFeedback}
+                      onFlag={handleFlagWithFeedback}
+                      mobile={mobile}
+                      focused={focusedId === rep.id}
+                      clusterCount={hasCluster ? cluster.members.length - 1 : undefined}
+                    />
+                    {hasCluster && (
+                      <button
+                        onClick={() => setExpandedClusters(prev => {
+                          const next = new Set(prev);
+                          if (next.has(rep.id)) next.delete(rep.id); else next.add(rep.id);
+                          return next;
+                        })}
+                        style={{
+                          display: "flex", alignItems: "center", gap: space[1],
+                          padding: `${space[1]}px ${space[3]}px`,
+                          margin: `${space[1]}px 0 ${space[2]}px ${space[4]}px`,
+                          background: "none", border: `1px solid ${colors.border.subtle}`,
+                          borderRadius: radii.pill, color: colors.text.muted,
+                          fontSize: t.caption.size, fontWeight: 600, cursor: "pointer",
+                          fontFamily: "inherit", transition: transitions.fast,
+                        }}
+                      >
+                        <span style={{ transform: clusterExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: transitions.fast, display: "inline-block" }}>&#x25BC;</span>
+                        {clusterExpanded ? "Hide" : `+${cluster.members.length - 1} related`}
+                        {cluster.sharedTopics.length > 0 && ` \u00B7 ${cluster.sharedTopics.slice(0, 2).join(", ")}`}
+                      </button>
+                    )}
+                    {hasCluster && clusterExpanded && cluster.members.slice(1).map(m => (
+                      <div key={m.id} style={{ marginLeft: space[4], borderLeft: `2px solid ${colors.border.subtle}`, paddingLeft: space[3] }}>
+                        <ContentCard
+                          item={m}
+                          expanded={expanded === m.id}
+                          onToggle={() => setExpanded(expanded === m.id ? null : m.id)}
+                          onValidate={handleValidateWithFeedback}
+                          onFlag={handleFlagWithFeedback}
+                          mobile={mobile}
+                          focused={focusedId === m.id}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+              {clusteredContent.length > 5 && !showAllContent && (
                 <button
                   onClick={() => setShowAllContent(true)}
                   style={{
@@ -683,7 +735,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     marginTop: space[2],
                   }}
                 >
-                  Show all ({filteredContent.length} items)
+                  Show all ({filteredContent.length} items in {clusteredContent.length} groups)
                 </button>
               )}
             </>
@@ -1436,6 +1488,107 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         }}
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Blocked Authors */}
+                {(() => {
+                  const authorRules = (profile.customFilterRules ?? []).filter(r => r.field === "author");
+                  return authorRules.length > 0 || settingsOpen ? (
+                    <div style={{ marginBottom: space[4] }}>
+                      <div style={{ fontSize: t.caption.size, color: colors.text.disabled, marginBottom: space[2], fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Blocked Authors
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: space[2], alignItems: "center" }}>
+                        {authorRules.map(rule => (
+                          <span key={rule.id} style={{
+                            display: "inline-flex", alignItems: "center", gap: 4,
+                            fontSize: t.caption.size, padding: `2px ${space[2]}px`,
+                            background: `${colors.red[400]}10`, border: `1px solid ${colors.red[400]}20`,
+                            borderRadius: radii.pill, color: colors.red[400],
+                          }}>
+                            {rule.pattern}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); removeFilterRule(rule.id); }}
+                              style={{
+                                background: "transparent", border: "none", cursor: "pointer",
+                                color: colors.red[400], padding: 0, fontSize: 14, lineHeight: 1,
+                                display: "inline-flex", alignItems: "center",
+                              }}
+                            >&times;</button>
+                          </span>
+                        ))}
+                        <input
+                          value={newBlockedAuthor}
+                          onChange={(e) => setNewBlockedAuthor(e.target.value.slice(0, 60))}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newBlockedAuthor.trim()) {
+                              addFilterRule({ field: "author", pattern: newBlockedAuthor.trim() });
+                              setNewBlockedAuthor("");
+                            }
+                          }}
+                          placeholder="+ Block author"
+                          style={{
+                            width: 120, padding: `2px ${space[2]}px`,
+                            background: "transparent",
+                            border: `1px solid ${colors.border.default}`,
+                            borderRadius: radii.pill,
+                            color: colors.text.secondary,
+                            fontSize: t.caption.size,
+                            fontFamily: "inherit",
+                            outline: "none",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+
+                {/* Burn Patterns */}
+                <div style={{ marginBottom: space[4] }}>
+                  <div style={{ fontSize: t.caption.size, color: colors.text.disabled, marginBottom: space[2], fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Burn Patterns
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: space[2], alignItems: "center" }}>
+                    {(profile.customFilterRules ?? []).filter(r => r.field === "title").map(rule => (
+                      <span key={rule.id} style={{
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                        fontSize: t.caption.size, padding: `2px ${space[2]}px`,
+                        background: `${colors.orange[400]}10`, border: `1px solid ${colors.orange[400]}20`,
+                        borderRadius: radii.pill, color: colors.orange[400],
+                      }}>
+                        &ldquo;{rule.pattern}&rdquo;
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeFilterRule(rule.id); }}
+                          style={{
+                            background: "transparent", border: "none", cursor: "pointer",
+                            color: colors.orange[400], padding: 0, fontSize: 14, lineHeight: 1,
+                            display: "inline-flex", alignItems: "center",
+                          }}
+                        >&times;</button>
+                      </span>
+                    ))}
+                    <input
+                      value={newBurnPattern}
+                      onChange={(e) => setNewBurnPattern(e.target.value.slice(0, 60))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newBurnPattern.trim()) {
+                          addFilterRule({ field: "title", pattern: newBurnPattern.trim() });
+                          setNewBurnPattern("");
+                        }
+                      }}
+                      placeholder="+ Add keyword"
+                      style={{
+                        width: 120, padding: `2px ${space[2]}px`,
+                        background: "transparent",
+                        border: `1px solid ${colors.border.default}`,
+                        borderRadius: radii.pill,
+                        color: colors.text.secondary,
+                        fontSize: t.caption.size,
+                        fontFamily: "inherit",
+                        outline: "none",
+                      }}
+                    />
                   </div>
                 </div>
 

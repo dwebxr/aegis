@@ -1,9 +1,31 @@
 import type { ContentItem } from "@/lib/types/content";
-import type { UserPreferenceProfile } from "@/lib/preferences/types";
+import type { UserPreferenceProfile, ActivityHistogram } from "@/lib/preferences/types";
 import type { BriefingState, BriefingItem, BriefingClassification } from "./types";
 
 const PRIORITY_COUNT = 5;
 const RECENCY_HALF_LIFE_HOURS = 7;
+const HALF_LIFE_CATCHUP = 24;       // Catchup mode: 24-hour half-life
+const GAP_THRESHOLD_HOURS = 4;      // 4+ hour gap triggers catchup mode
+const MIN_HISTOGRAM_EVENTS = 10;    // Minimum data before adapting
+
+export function adaptiveHalfLife(
+  histogram: ActivityHistogram | undefined,
+  now: number,
+): number {
+  if (!histogram || histogram.totalEvents < MIN_HISTOGRAM_EVENTS) {
+    return RECENCY_HALF_LIFE_HOURS;
+  }
+
+  const hoursSinceLastActivity = (now - histogram.lastActivityAt) / 3600000;
+
+  if (hoursSinceLastActivity >= GAP_THRESHOLD_HOURS) {
+    // Longer gap → longer half-life (max 24h)
+    const gapFactor = Math.min(hoursSinceLastActivity / 8, 1);
+    return RECENCY_HALF_LIFE_HOURS + (HALF_LIFE_CATCHUP - RECENCY_HALF_LIFE_HOURS) * gapFactor;
+  }
+
+  return RECENCY_HALF_LIFE_HOURS;
+}
 const FAMILIAR_THRESHOLD = 0.5;
 const NOVEL_THRESHOLD = 0.15;
 const RECENT_TOPIC_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -36,8 +58,9 @@ function briefingScore(item: ContentItem, prefs: UserPreferenceProfile, now?: nu
   }, 0) || 0;
 
   const ageHours = (currentTime - item.createdAt) / 3600000;
-  // Decay factor: ln(2)/RECENCY_HALF_LIFE_HOURS gives true half-life at RECENCY_HALF_LIFE_HOURS
-  const decayRate = Math.LN2 / RECENCY_HALF_LIFE_HOURS;
+  // Adaptive half-life: longer when user returns after a gap (catchup mode)
+  const halfLife = adaptiveHalfLife(prefs.activityHistogram, currentTime);
+  const decayRate = Math.LN2 / halfLife;
   const recencyFactor = Math.exp(-decayRate * ageHours);
 
   return (baseScore + topicRelevance * 2 + authorBoost + recentBonus) * recencyFactor;

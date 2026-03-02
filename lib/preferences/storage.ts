@@ -39,6 +39,28 @@ export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile
   if (typeof p.totalValidated !== "number" || typeof p.totalFlagged !== "number") return false;
   if (typeof p.lastUpdated !== "number") return false;
 
+  // Optional: customFilterRules
+  if (p.customFilterRules !== undefined) {
+    if (!Array.isArray(p.customFilterRules)) return false;
+    for (const r of p.customFilterRules as unknown[]) {
+      if (!r || typeof r !== "object") return false;
+      const rule = r as Record<string, unknown>;
+      if (typeof rule.id !== "string" || typeof rule.pattern !== "string") return false;
+      if (!["author", "title"].includes(rule.field as string)) return false;
+      if (typeof rule.createdAt !== "number") return false;
+    }
+  }
+
+  // Optional: activityHistogram
+  if (p.activityHistogram !== undefined) {
+    const ah = p.activityHistogram as Record<string, unknown>;
+    if (!Array.isArray(ah.hourCounts) || (ah.hourCounts as unknown[]).length !== 24) return false;
+    for (const c of ah.hourCounts as unknown[]) {
+      if (typeof c !== "number") return false;
+    }
+    if (typeof ah.lastActivityAt !== "number" || typeof ah.totalEvents !== "number") return false;
+  }
+
   return true;
 }
 

@@ -13,6 +13,24 @@ export interface ScoringCalibration {
   qualityThreshold: number;
 }
 
+export type FilterRuleField = "author" | "title";
+
+export interface CustomFilterRule {
+  id: string;
+  field: FilterRuleField;
+  pattern: string;
+  createdAt: number;
+}
+
+export interface ActivityHistogram {
+  /** 24 elements, one per hour (0-23). Each counts validate/flag events. */
+  hourCounts: number[];
+  /** Timestamp of last validate/flag event */
+  lastActivityAt: number;
+  /** Total event count (for normalization) */
+  totalEvents: number;
+}
+
 export interface UserPreferenceProfile {
   version: 1;
   principalId: string;
@@ -23,6 +41,8 @@ export interface UserPreferenceProfile {
   totalValidated: number;
   totalFlagged: number;
   lastUpdated: number;
+  customFilterRules?: CustomFilterRule[];
+  activityHistogram?: ActivityHistogram;
 }
 
 export interface UserContext {

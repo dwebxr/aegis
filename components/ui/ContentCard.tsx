@@ -8,6 +8,7 @@ import { CheckIcon, XCloseIcon } from "@/components/icons";
 import { D2ABadge } from "@/components/ui/D2ABadge";
 import { isD2AContent } from "@/lib/d2a/activity";
 import type { ContentItem } from "@/lib/types/content";
+import type { CustomFilterRule } from "@/lib/preferences/types";
 
 type CardVariant = "default" | "priority" | "serendipity";
 
@@ -21,23 +22,26 @@ interface ContentCardProps {
   onToggle: () => void;
   onValidate: (id: string) => void;
   onFlag: (id: string) => void;
+  onAddFilterRule?: (rule: Omit<CustomFilterRule, "id" | "createdAt">) => void;
   mobile?: boolean;
   variant?: CardVariant;
   rank?: number;
   focused?: boolean;
+  clusterCount?: number;
 }
 
 function GradeBadge({ composite }: { composite: number }) {
   const { grade, color, bg } = scoreGrade(composite);
   return (
     <div style={{
-      width: 44, height: 44, borderRadius: radii.sm,
+      width: 44, height: 54, borderRadius: radii.sm,
       background: bg, border: `2px solid ${color}40`,
       display: "flex", alignItems: "center", justifyContent: "center",
-      flexShrink: 0,
+      flexDirection: "column", gap: 1, flexShrink: 0,
       boxShadow: `0 0 12px ${color}30`,
     }}>
-      <span style={{ fontSize: 20, fontWeight: 800, color, fontFamily: fonts.mono }}>{grade}</span>
+      <span style={{ fontSize: 18, fontWeight: 800, color, fontFamily: fonts.mono, lineHeight: 1 }}>{grade}</span>
+      <span style={{ fontSize: 10, fontWeight: 600, color, fontFamily: fonts.mono, lineHeight: 1, opacity: 0.85 }}>{composite.toFixed(1)}</span>
     </div>
   );
 }
@@ -77,7 +81,7 @@ export function TopicTags({ topics, max = 3 }: { topics: string[]; max?: number 
       {overflow > 0 && (
         <span style={{
           fontSize: t.caption.size, padding: "3px 10px", borderRadius: radii.pill,
-          background: `${colors.text.disabled}10`, color: colors.text.disabled, fontWeight: 600,
+          background: "rgba(100,116,139,0.06)", color: colors.text.disabled, fontWeight: 600,
         }}>+{overflow}</span>
       )}
     </div>
@@ -122,8 +126,9 @@ function ScoreTags({ item }: { item: ContentItem }) {
   );
 }
 
-export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, mobile, variant = "default", rank, focused }) => {
+export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, mobile, variant = "default", rank, focused, clusterCount }) => {
   const [hovered, setHovered] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const isSlop = item.verdict === "slop";
   const gr = scoreGrade(item.scores.composite);
 
@@ -291,6 +296,17 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
         <TopicTags topics={item.topics} />
       )}
 
+      {clusterCount !== undefined && clusterCount > 0 && !expanded && (
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          marginTop: space[2], padding: "2px 10px", borderRadius: radii.pill,
+          background: `${colors.blue[400]}12`, color: colors.blue[400],
+          fontSize: t.caption.size, fontWeight: 600, border: `1px solid ${colors.blue[400]}20`,
+        }}>
+          +{clusterCount} related
+        </div>
+      )}
+
       {expanded && (
         <div style={{
           marginTop: space[4],
@@ -364,6 +380,49 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
                   <XCloseIcon /> {item.flagged ? "Flagged" : "Flag Slop"}
                 </button>
               </>
+            )}
+            {onAddFilterRule && (
+              <div style={{ position: "relative" }}>
+                <button
+                  aria-label="More actions"
+                  onClick={e => { e.stopPropagation(); setMenuOpen(prev => !prev); }}
+                  style={{
+                    padding: `${space[2]}px ${space[2]}px`,
+                    background: menuOpen ? `${colors.text.muted}12` : "transparent",
+                    border: `1px solid ${colors.border.default}`, borderRadius: radii.md,
+                    color: colors.text.muted, fontSize: t.body.size, fontWeight: 700,
+                    cursor: "pointer", transition: transitions.fast, fontFamily: "inherit",
+                    lineHeight: 1, minWidth: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  ⋮
+                </button>
+                {menuOpen && (
+                  <div style={{
+                    position: "absolute", bottom: "100%", right: 0, marginBottom: 4,
+                    background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
+                    borderRadius: radii.md, boxShadow: shadows.md, zIndex: 10,
+                    minWidth: 160, overflow: "hidden",
+                  }}>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        onAddFilterRule({ field: "author", pattern: item.author });
+                        setMenuOpen(false);
+                      }}
+                      style={{
+                        width: "100%", padding: `${space[2]}px ${space[3]}px`,
+                        background: "transparent", border: "none", borderRadius: 0,
+                        color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600,
+                        cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                        transition: transitions.fast,
+                      }}
+                    >
+                      Block {item.author}
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

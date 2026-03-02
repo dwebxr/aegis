@@ -1,6 +1,6 @@
 import type { ContentItem } from "@/lib/types/content";
 import type { WoTScore } from "@/lib/wot/types";
-import type { UserPreferenceProfile } from "@/lib/preferences/types";
+import type { UserPreferenceProfile, CustomFilterRule } from "@/lib/preferences/types";
 
 export type FilterMode = "lite" | "pro";
 
@@ -9,6 +9,7 @@ export interface FilterConfig {
   wotEnabled: boolean;
   qualityThreshold: number;
   profile?: UserPreferenceProfile;
+  customRules?: CustomFilterRule[];
 }
 
 export interface FilteredItem {
@@ -31,6 +32,7 @@ export interface FilterPipelineStats {
   serendipityCount: number;
   estimatedAPICost: number;
   mode: FilterMode;
+  customRulesBurned: number;
 }
 
 export type { SerendipityItem, DiscoveryType } from "./serendipity";
