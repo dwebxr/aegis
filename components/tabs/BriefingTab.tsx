@@ -13,6 +13,7 @@ import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
 import { errMsg } from "@/lib/utils/errors";
+import { getUserApiKey } from "@/lib/apiKey/storage";
 
 interface BriefingTabProps {
   content: ContentItem[];
@@ -76,12 +77,18 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         score: b.item.scores.composite,
         topics: b.item.topics ?? [],
       }));
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const byokKey = getUserApiKey();
+      if (byokKey) headers["X-User-API-Key"] = byokKey;
       const res = await fetch("/api/briefing/digest", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ articles }),
       });
-      if (!res.ok) throw new Error(`API ${res.status}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || `API ${res.status}`);
+      }
       const data = await res.json();
       setDigest(data.digest);
       const today = new Date().toISOString().slice(0, 10);
