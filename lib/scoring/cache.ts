@@ -13,8 +13,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { hexFromBytes, computeContentFingerprint } from "@/lib/utils/hashing";
-import { isIDBAvailable, idbGet, idbPut } from "@/lib/storage/idb";
-import { STORE_SCORE_CACHE } from "@/lib/storage/idb";
+import { isIDBAvailable, idbGet, idbPut, STORE_SCORE_CACHE } from "@/lib/storage/idb";
 
 const STORAGE_KEY = "aegis-score-cache";
 const IDB_KEY = "data";

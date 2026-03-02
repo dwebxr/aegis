@@ -364,43 +364,29 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, expanded, onTogg
                 {mobile ? "\uD83D\uDD16" : (isBookmarked ? "\uD83D\uDD16 Saved" : "\uD83D\uDD16 Save")}
               </button>
             )}
-            {isSlop && !isLarge ? (
-              <button disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
+            <button disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
+              flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
+              background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
+              border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
+              color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600,
+              cursor: item.validated ? "default" : "pointer", opacity: item.validated ? 0.6 : 1,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+              transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
+            }}>
+              <CheckIcon />{!mobile && (item.validated ? " Validated" : isSlop && !isLarge ? " Not Slop" : " Validate")}
+            </button>
+            {(!isSlop || isLarge) && (
+              <button disabled={item.flagged} aria-label="Flag as slop" onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
                 flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
-                background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
-                border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
-                color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600,
-                cursor: item.validated ? "default" : "pointer", opacity: item.validated ? 0.6 : 1,
+                background: item.flagged ? `${colors.red[400]}18` : colors.red.bg,
+                border: `1px solid ${colors.red.border}`, borderRadius: radii.md,
+                color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600,
+                cursor: item.flagged ? "default" : "pointer", opacity: item.flagged ? 0.6 : 1,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                 transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
               }}>
-                <CheckIcon />{!mobile && (item.validated ? " Validated" : " Not Slop")}
+                <XCloseIcon />{!mobile && (item.flagged ? " Flagged" : " Flag Slop")}
               </button>
-            ) : (
-              <>
-                <button disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
-                  flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
-                  background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
-                  border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
-                  color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600,
-                  cursor: item.validated ? "default" : "pointer", opacity: item.validated ? 0.6 : 1,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
-                }}>
-                  <CheckIcon />{!mobile && (item.validated ? " Validated" : " Validate")}
-                </button>
-                <button disabled={item.flagged} aria-label="Flag as slop" onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
-                  flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
-                  background: item.flagged ? `${colors.red[400]}18` : colors.red.bg,
-                  border: `1px solid ${colors.red.border}`, borderRadius: radii.md,
-                  color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600,
-                  cursor: item.flagged ? "default" : "pointer", opacity: item.flagged ? 0.6 : 1,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
-                }}>
-                  <XCloseIcon />{!mobile && (item.flagged ? " Flagged" : " Flag Slop")}
-                </button>
-              </>
             )}
             {onAddFilterRule && (
               <div style={{ position: "relative" }}>

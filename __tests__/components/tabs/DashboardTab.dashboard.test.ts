@@ -7,7 +7,6 @@ import {
   computeDashboardTop3,
   computeTopicSpotlight,
   computeDashboardActivity,
-  computeDashboardValidated,
 } from "@/lib/dashboard/utils";
 import { createEmptyProfile } from "@/lib/preferences/types";
 import type { ContentItem } from "@/lib/types/content";
@@ -117,31 +116,6 @@ describe("Dashboard mode — Topic Spotlight", () => {
     const top3 = computeDashboardTop3([...fillers, ...items], profile, now);
     const spotlight = computeTopicSpotlight([...fillers, ...items], profile, top3);
     expect(spotlight.length).toBeLessThanOrEqual(5);
-  });
-});
-
-describe("Dashboard mode — Saved for Later", () => {
-  it("returns validated items sorted by validatedAt descending", () => {
-    const items = [
-      makeItem({ id: "v1", validated: true, validatedAt: 1000 }),
-      makeItem({ id: "v2", validated: true, validatedAt: 3000 }),
-      makeItem({ id: "v3", validated: true, validatedAt: 2000 }),
-      makeItem({ id: "nv", validated: false }),
-    ];
-    const result = computeDashboardValidated(items, new Set());
-
-    expect(result).toHaveLength(3);
-    expect(result[0].validatedAt).toBe(3000);
-    expect(result[1].validatedAt).toBe(2000);
-    expect(result[2].validatedAt).toBe(1000);
-  });
-
-  it("caps at 5 items", () => {
-    const items = Array.from({ length: 10 }, (_, i) =>
-      makeItem({ id: `v-${i}`, validated: true, validatedAt: i * 1000 }),
-    );
-    const result = computeDashboardValidated(items, new Set());
-    expect(result).toHaveLength(5);
   });
 });
 

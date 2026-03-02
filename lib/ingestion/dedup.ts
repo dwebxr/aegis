@@ -5,8 +5,7 @@
  */
 
 import { computeContentFingerprint } from "@/lib/utils/hashing";
-import { isIDBAvailable, idbGet, idbPut } from "@/lib/storage/idb";
-import { STORE_DEDUP } from "@/lib/storage/idb";
+import { isIDBAvailable, idbGet, idbPut, STORE_DEDUP } from "@/lib/storage/idb";
 
 const STORAGE_KEY = "aegis_article_dedup";
 const IDB_KEY = "data";
@@ -99,12 +98,12 @@ export class ArticleDeduplicator {
     return computeContentFingerprint(text);
   }
 
-  reset(): void {
+  async reset(): Promise<void> {
     this.urls.clear();
     this.fingerprints.clear();
     this.insertionOrder = [];
     this.dirty = true;
-    this.flush();
+    await this.flush();
   }
 
   get size(): number {

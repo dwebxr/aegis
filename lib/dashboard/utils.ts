@@ -157,16 +157,6 @@ export function computeDashboardActivity(
   };
 }
 
-export function computeDashboardValidated(
-  content: ContentItem[],
-  excludeIds: Set<string>,
-): ContentItem[] {
-  return content
-    .filter(c => c.validated && !excludeIds.has(c.id))
-    .sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0))
-    .slice(0, 5);
-}
-
 export function computeDashboardSaved(
   content: ContentItem[],
   bookmarkedIds: string[],

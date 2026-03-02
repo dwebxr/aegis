@@ -22,8 +22,7 @@ import { syncBriefingToCanister } from "@/lib/briefing/sync";
 import type { BriefingState } from "@/lib/briefing/types";
 import { enqueueAction, dequeueAll, removeAction, incrementRetries } from "@/lib/offline/actionQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { isIDBAvailable, idbGet, idbPut } from "@/lib/storage/idb";
-import { STORE_CONTENT_CACHE } from "@/lib/storage/idb";
+import { isIDBAvailable, idbGet, idbPut, STORE_CONTENT_CACHE } from "@/lib/storage/idb";
 
 const CONTENT_CACHE_KEY = "aegis-content-cache";
 const IDB_CONTENT_KEY = "items";
@@ -264,9 +263,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   // Load cached content from IDB on mount
   useEffect(() => {
     let cancelled = false;
+    _contentUseIDB = isIDBAvailable();
     loadCachedContentAsync().then(items => {
       if (!cancelled && items.length > 0) {
-        _contentUseIDB = isIDBAvailable();
         setContent(items);
       }
     }).catch(err => {

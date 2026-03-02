@@ -1,7 +1,6 @@
 import type { WoTCacheEntry, WoTGraph } from "./types";
 import { errMsg } from "@/lib/utils/errors";
-import { isIDBAvailable, idbGet, idbPut, idbDelete } from "@/lib/storage/idb";
-import { STORE_WOT_CACHE } from "@/lib/storage/idb";
+import { isIDBAvailable, idbGet, idbPut, idbDelete, STORE_WOT_CACHE } from "@/lib/storage/idb";
 
 const WOT_CACHE_KEY = "aegis-wot-graph";
 const IDB_KEY = "graph";

@@ -3,7 +3,6 @@ import {
   computeUnreviewedQueue,
   computeDashboardTop3,
   computeTopicSpotlight,
-  computeDashboardValidated,
   contentDedup,
 } from "@/lib/dashboard/utils";
 import { createEmptyProfile } from "@/lib/preferences/types";
@@ -340,40 +339,6 @@ describe("computeTopicSpotlight — visual hero prioritization", () => {
     const aiGroup = spotlight.find(g => g.topic === "ai");
     expect(aiGroup).toBeDefined();
     expect(aiGroup!.items[0].id).toBe("img-high");
-  });
-});
-
-// ─── computeDashboardValidated edge cases ───
-
-describe("computeDashboardValidated — edge cases", () => {
-  it("returns empty for empty content array", () => {
-    expect(computeDashboardValidated([], new Set())).toEqual([]);
-  });
-
-  it("returns empty when no items are validated", () => {
-    const items = [makeItem({ validated: false }), makeItem({ validated: false })];
-    expect(computeDashboardValidated(items, new Set())).toEqual([]);
-  });
-
-  it("sorts by validatedAt descending (most recent first)", () => {
-    const now = Date.now();
-    const items = [
-      makeItem({ id: "old", validated: true, validatedAt: now - 10000 }),
-      makeItem({ id: "new", validated: true, validatedAt: now }),
-      makeItem({ id: "mid", validated: true, validatedAt: now - 5000 }),
-    ];
-    const validated = computeDashboardValidated(items, new Set());
-    expect(validated.map(v => v.id)).toEqual(["new", "mid", "old"]);
-  });
-
-  it("excludes items in excludeIds set", () => {
-    const now = Date.now();
-    const items = [
-      makeItem({ id: "shown", validated: true, validatedAt: now }),
-      makeItem({ id: "hidden", validated: true, validatedAt: now }),
-    ];
-    const validated = computeDashboardValidated(items, new Set(["shown"]));
-    expect(validated.map(v => v.id)).toEqual(["hidden"]);
   });
 });
 

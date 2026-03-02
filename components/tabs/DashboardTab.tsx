@@ -389,14 +389,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     }
   }, [content, onFlag, showFeedback]);
 
+  const bookmarkSet = useMemo(() => new Set(profile.bookmarkedIds ?? []), [profile.bookmarkedIds]);
+
   const handleBookmark = useCallback((id: string) => {
-    const isCurrentlyBookmarked = (profile.bookmarkedIds ?? []).includes(id);
-    if (isCurrentlyBookmarked) {
+    if (bookmarkSet.has(id)) {
       unbookmarkItem(id);
     } else {
       bookmarkItem(id);
     }
-  }, [profile.bookmarkedIds, bookmarkItem, unbookmarkItem]);
+  }, [bookmarkSet, bookmarkItem, unbookmarkItem]);
 
   useEffect(() => {
     return () => { clearTimeout(feedbackTimerRef.current); };
@@ -715,7 +716,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                       onValidate={handleValidateWithFeedback}
                       onFlag={handleFlagWithFeedback}
                       onBookmark={handleBookmark}
-                      isBookmarked={(profile.bookmarkedIds ?? []).includes(rep.id)}
+                      isBookmarked={bookmarkSet.has(rep.id)}
                       onAddFilterRule={addFilterRule}
                       mobile={mobile}
                       focused={focusedId === rep.id}
@@ -752,7 +753,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           onValidate={handleValidateWithFeedback}
                           onFlag={handleFlagWithFeedback}
                           onBookmark={handleBookmark}
-                          isBookmarked={(profile.bookmarkedIds ?? []).includes(m.id)}
+                          isBookmarked={bookmarkSet.has(m.id)}
                           onAddFilterRule={addFilterRule}
                           mobile={mobile}
                           focused={focusedId === m.id}
@@ -902,7 +903,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           <ScorePill gr={gr} tag={tag} />
                           <div style={{ flex: 1 }} />
                           <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
-                            style={(profile.bookmarkedIds ?? []).includes(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
+                            style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                           <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
                             disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
                           <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
@@ -985,7 +986,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                               <ScorePill gr={heroGr} tag={heroTag} />
                               <div style={{ flex: 1 }} />
                               <button onClick={(e) => { e.stopPropagation(); handleBookmark(heroItem.id); }}
-                                style={(profile.bookmarkedIds ?? []).includes(heroItem.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
+                                style={bookmarkSet.has(heroItem.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                               <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(heroItem.id); }}
                                 disabled={heroItem.validated} style={{ ...inlineVBtnStyle, opacity: heroItem.validated ? 0.5 : 1, cursor: heroItem.validated ? "default" : "pointer" }}>&#x2713;</button>
                               <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(heroItem.id); }}
@@ -1057,7 +1058,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                                     <ScorePill gr={ruGr} tag={ruTag} />
                                     <div style={{ flex: 1 }} />
                                     <button onClick={(e) => { e.stopPropagation(); handleBookmark(ruItem.id); }}
-                                      style={(profile.bookmarkedIds ?? []).includes(ruItem.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
+                                      style={bookmarkSet.has(ruItem.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                                     <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(ruItem.id); }}
                                       disabled={ruItem.validated} style={{ ...inlineVBtnStyle, opacity: ruItem.validated ? 0.5 : 1, cursor: ruItem.validated ? "default" : "pointer" }}>&#x2713;</button>
                                     <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(ruItem.id); }}
@@ -1163,7 +1164,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             <ScorePill gr={gr} tag={tag} />
                             <div style={{ flex: 1 }} />
                             <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
-                              style={(profile.bookmarkedIds ?? []).includes(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
+                              style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
                               disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
@@ -1261,7 +1262,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             <ScorePill gr={gr} tag={tag} />
                             <div style={{ flex: 1 }} />
                             <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
-                              style={(profile.bookmarkedIds ?? []).includes(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
+                              style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
                               disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
@@ -1356,7 +1357,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             <ScorePill gr={gr} tag={tag} />
                             <div style={{ flex: 1 }} />
                             <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
-                              style={(profile.bookmarkedIds ?? []).includes(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
+                              style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
                               disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
                             <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
