@@ -97,6 +97,35 @@ describe("DashboardTab — empty state", () => {
   });
 });
 
+describe("DashboardTab — Lite/Pro deep-link", () => {
+  it("renders Lite badge linking to settings:feeds", () => {
+    const onTabChange = jest.fn();
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} onTabChange={onTabChange} />
+    );
+    // Lite badge should exist with correct tooltip
+    expect(html).toContain("Lite");
+    expect(html).toContain("Change in Settings &gt; Feeds");
+  });
+
+  it("renders Pro badge when filter mode is pro", () => {
+    // Override filterMode mock to return "pro"
+    jest.spyOn(require("@/contexts/FilterModeContext"), "useFilterMode").mockReturnValue({
+      filterMode: "pro",
+      setFilterMode: jest.fn(),
+    });
+    const html = renderToStaticMarkup(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} onTabChange={jest.fn()} />
+    );
+    expect(html).toContain("Pro");
+    // Restore
+    jest.spyOn(require("@/contexts/FilterModeContext"), "useFilterMode").mockReturnValue({
+      filterMode: "lite",
+      setFilterMode: jest.fn(),
+    });
+  });
+});
+
 describe("DashboardTab — with content", () => {
   const items: ContentItem[] = [
     makeItem({ id: "q1", verdict: "quality", source: "rss" }),

@@ -773,7 +773,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (4269 tests, 250 suites) |
+| Test | Jest + ts-jest (4439 tests, 261 suites) |
 
 ## Project Structure
 
@@ -782,6 +782,7 @@ aegis/
 ├── app/
 │   ├── page.tsx                         # Main app page
 │   ├── layout.tsx                       # Root layout + metadata + icons
+│   ├── error.tsx                        # App error boundary (Sentry capture + retry)
 │   ├── global-error.tsx                 # Root layout error boundary (Sentry capture)
 │   ├── b/[naddr]/page.tsx               # Shared briefing viewer (Nostr NIP-23)
 │   ├── offline/page.tsx                 # PWA offline fallback
@@ -814,7 +815,7 @@ aegis/
 │   │   ├── DataSection.tsx              # Export CSV/JSON (scoped), clear cache, reset preferences
 │   │   ├── AccountSection.tsx           # IC principal, Nostr account, about, danger zone (delete local data)
 │   │   └── styles.ts                    # Shared card/button/pill styles for settings sections
-│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner, CommandPalette, ShareBriefingModal, AgentProfileEditModal, D2ABadge, D2ANetworkMini, AgentStatusBadge, StatCard, ScoreRing, MiniChart, BarChart, BriefingClassificationBadge, IncineratorViz, NotificationToggle, DemoBanner
+│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner, CommandPalette, ShareBriefingModal, AgentProfileEditModal, D2ABadge, D2ANetworkMini, AgentStatusBadge, StatCard, ScoreRing, MiniChart, BarChart, BriefingClassificationBadge, IncineratorViz, NotificationToggle, DemoBanner, TabErrorBoundary
 │   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
 │   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
 │   ├── onboarding/                      # OnboardingFlow (guided setup wizard)
@@ -932,7 +933,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 4427 tests across 259 suites
+├── __tests__/                           # 4439 tests across 261 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)

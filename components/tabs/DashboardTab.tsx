@@ -321,19 +321,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, [dashboardTop3, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds]);
 
   const topicDistribution = useMemo(() => {
-    if (homeMode !== "dashboard") return null;
     return computeTopicDistribution(content);
-  }, [content, homeMode]);
+  }, [content]);
 
   const topicTrends = useMemo(() => {
-    if (homeMode !== "dashboard") return null;
     return computeTopicTrends(content);
-  }, [content, homeMode]);
+  }, [content]);
 
   const dashboardActivity = useMemo(() => {
-    if (homeMode !== "dashboard") return null;
     return computeDashboardActivity(content, activityRange);
-  }, [content, homeMode, activityRange]);
+  }, [content, activityRange]);
 
   // Signal feedback loop
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; key: number } | null>(null);
@@ -388,6 +385,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       bookmarkItem(id);
     }
   }, [bookmarkItem, unbookmarkItem]);
+
+  const handleToggle = useCallback((id: string) => {
+    setExpanded(prev => prev === id ? null : id);
+  }, []);
 
   useEffect(() => {
     return () => { clearTimeout(feedbackTimerRef.current); };
@@ -458,7 +459,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             })}
           </div>
           <button
-            onClick={() => onTabChange?.("settings")}
+            onClick={() => onTabChange?.("settings:feeds")}
             style={{
               display: "inline-flex", alignItems: "center", gap: space[1],
               padding: `${space[1]}px ${space[3]}px`,
@@ -469,7 +470,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               fontSize: t.caption.size, fontWeight: 700, cursor: "pointer",
               fontFamily: "inherit", transition: transitions.fast,
             }}
-            title="Change in Settings"
+            title="Change in Settings > Feeds"
           >
             {filterMode === "pro" ? "Pro" : "Lite"}
           </button>
@@ -686,7 +687,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     <ContentCard
                       item={rep}
                       expanded={expanded === rep.id}
-                      onToggle={() => setExpanded(expanded === rep.id ? null : rep.id)}
+                      onToggle={handleToggle}
                       onValidate={handleValidateWithFeedback}
                       onFlag={handleFlagWithFeedback}
                       onBookmark={handleBookmark}
@@ -723,7 +724,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         <ContentCard
                           item={m}
                           expanded={expanded === m.id}
-                          onToggle={() => setExpanded(expanded === m.id ? null : m.id)}
+                          onToggle={handleToggle}
                           onValidate={handleValidateWithFeedback}
                           onFlag={handleFlagWithFeedback}
                           onBookmark={handleBookmark}
@@ -1359,14 +1360,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             }}>
               <span>&#x1F4CA;</span> Topic Breakdown
             </div>
-            {(topicDistribution ?? []).length === 0 ? (
+            {topicDistribution.length === 0 ? (
               <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
                 Add sources to see topic distribution.
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
-                {(topicDistribution ?? []).map(entry => {
-                  const maxCount = (topicDistribution ?? [])[0]?.count ?? 0;
+                {topicDistribution.map(entry => {
+                  const maxCount = topicDistribution[0]?.count ?? 0;
                   const barWidth = maxCount > 0 ? Math.max((entry.count / maxCount) * 100, 8) : 0;
                   const barColor = entry.qualityRate >= 0.6 ? colors.cyan[400] : entry.qualityRate >= 0.3 ? colors.sky[400] : colors.orange[400];
                   return (
@@ -1392,7 +1393,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         {entry.count}
                       </span>
                       {(() => {
-                        const trend = topicTrends?.find(tr => tr.topic === entry.topic);
+                        const trend = topicTrends.find(tr => tr.topic === entry.topic);
                         if (!trend) return null;
                         const arrow = trend.direction === "up" ? "\u2191" : trend.direction === "down" ? "\u2193" : "\u2192";
                         const arrowColor = trend.direction === "up" ? colors.green[400] : trend.direction === "down" ? colors.red[400] : colors.text.disabled;
@@ -1536,20 +1537,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 })}
               </div>
             </div>
-            {dashboardActivity && (
-              <>
-                <div style={{ display: "flex", gap: space[4], marginBottom: space[3] }}>
-                  {[
-                    { value: dashboardActivity.qualityCount, label: "quality", color: colors.cyan[400] },
-                    { value: dashboardActivity.slopCount, label: "burned", color: colors.orange[400] },
-                    { value: dashboardActivity.totalEvaluated, label: "total", color: colors.purple[400] },
-                  ].map(m => (
-                    <span key={m.label} style={{ fontSize: t.bodySm.size, color: colors.text.muted }}>
-                      <span style={{ fontWeight: 700, color: m.color, fontFamily: fonts.mono }}>{m.value}</span>
-                      {" "}{m.label}
-                    </span>
-                  ))}
-                </div>
+            <div style={{ display: "flex", gap: space[4], marginBottom: space[3] }}>
+              {[
+                { value: dashboardActivity.qualityCount, label: "quality", color: colors.cyan[400] },
+                { value: dashboardActivity.slopCount, label: "burned", color: colors.orange[400] },
+                { value: dashboardActivity.totalEvaluated, label: "total", color: colors.purple[400] },
+              ].map(m => (
+                <span key={m.label} style={{ fontSize: t.bodySm.size, color: colors.text.muted }}>
+                  <span style={{ fontWeight: 700, color: m.color, fontFamily: fonts.mono }}>{m.value}</span>
+                  {" "}{m.label}
+                </span>
+              ))}
+            </div>
                 {dashboardActivity.chartQuality.length > 0 && (
                   <div style={{ display: "flex", gap: space[4], marginBottom: space[3], alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -1620,8 +1619,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     ))}
                   </div>
                 )}
-              </>
-            )}
             <D2ANetworkMini mobile={mobile} />
           </div>
 

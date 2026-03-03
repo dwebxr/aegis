@@ -29,6 +29,9 @@ interface BriefingTabProps {
 
 export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys, isLoading, discoveries = [], onTabChange }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const handleToggle = useCallback((id: string) => {
+    setExpanded(prev => prev === id ? null : id);
+  }, []);
   const [showFiltered, setShowFiltered] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [digest, setDigest] = useState<string | null>(null);
@@ -180,7 +183,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 variant="priority"
                 rank={i + 1}
                 expanded={expanded === b.item.id}
-                onToggle={() => setExpanded(expanded === b.item.id ? null : b.item.id)}
+                onToggle={handleToggle}
                 onValidate={onValidate}
                 onFlag={onFlag}
                 mobile={mobile}
@@ -263,7 +266,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
             item={briefing.serendipity.item}
             variant="serendipity"
             expanded={expanded === briefing.serendipity.item.id}
-            onToggle={() => setExpanded(expanded === briefing.serendipity!.item.id ? null : briefing.serendipity!.item.id)}
+            onToggle={handleToggle}
             onValidate={onValidate}
             onFlag={onFlag}
             mobile={mobile}
@@ -431,7 +434,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                   <ContentCard
                     item={it}
                     expanded={expanded === it.id}
-                    onToggle={() => setExpanded(expanded === it.id ? null : it.id)}
+                    onToggle={handleToggle}
                     onValidate={onValidate}
                     onFlag={onFlag}
                     mobile={mobile}

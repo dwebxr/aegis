@@ -10,6 +10,7 @@ import { SourcesTab } from "@/components/tabs/SourcesTab";
 import { AnalyticsTab } from "@/components/tabs/AnalyticsTab";
 import { SettingsTab } from "@/components/tabs/SettingsTab";
 import { D2ATab } from "@/components/tabs/D2ATab";
+import { TabErrorBoundary } from "@/components/ui/TabErrorBoundary";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { useNotify } from "@/contexts/NotificationContext";
 import { useContent } from "@/contexts/ContentContext";
@@ -602,27 +603,31 @@ function AegisAppInner() {
       {isAuthenticated && !linkedAccount && !wotPromptDismissed && (
         <WoTPromptBanner onGoToSettings={() => handleTabChange("settings")} onDismiss={dismissWotPrompt} />
       )}
-      {tab === "dashboard" && (
-        <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} />
-      )}
-      {tab === "briefing" && <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} onTabChange={handleTabChange} />}
+      <TabErrorBoundary tabName="Home">
+        <div style={{ display: tab === "dashboard" ? undefined : "none" }}>
+          <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} />
+        </div>
+      </TabErrorBoundary>
+      {tab === "briefing" && <TabErrorBoundary tabName="Briefing"><BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} onTabChange={handleTabChange} /></TabErrorBoundary>}
       {tab === "incinerator" && (
-        <IncineratorTab
-          isAnalyzing={isAnalyzing}
-          onAnalyze={handleAnalyze}
-          onPublishSignal={isAuthenticated ? handlePublishSignal : undefined}
-          onUploadImage={isAuthenticated ? handleUploadImage : undefined}
-          nostrPubkey={nostrKeys?.pk || null}
-          icpBalance={icpBalance}
-          stakingEnabled={isAuthenticated && (publishGate?.requiresDeposit ?? false)}
-          publishGate={publishGate}
-          mobile={mobile}
-        />
+        <TabErrorBoundary tabName="Incinerator">
+          <IncineratorTab
+            isAnalyzing={isAnalyzing}
+            onAnalyze={handleAnalyze}
+            onPublishSignal={isAuthenticated ? handlePublishSignal : undefined}
+            onUploadImage={isAuthenticated ? handleUploadImage : undefined}
+            nostrPubkey={nostrKeys?.pk || null}
+            icpBalance={icpBalance}
+            stakingEnabled={isAuthenticated && (publishGate?.requiresDeposit ?? false)}
+            publishGate={publishGate}
+            mobile={mobile}
+          />
+        </TabErrorBoundary>
       )}
-      {tab === "sources" && <SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} initialUrl={capturedDeepLinkUrl ?? undefined} />}
-      {tab === "analytics" && <AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} pipelineStats={pipelineResult?.stats ?? null} />}
-      {tab === "d2a" && <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={handleTabChange} />}
-      {tab === "settings" && <SettingsTab mobile={mobile} linkedAccount={linkedAccount} onLinkChange={handleLinkAccount} initialSubTab={settingsSubTab} content={content} />}
+      {tab === "sources" && <TabErrorBoundary tabName="Sources"><SourcesTab onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} initialUrl={capturedDeepLinkUrl ?? undefined} /></TabErrorBoundary>}
+      {tab === "analytics" && <TabErrorBoundary tabName="Analytics"><AnalyticsTab content={content} reputation={reputation} engagementIndex={engagementIndex} agentState={agentState} mobile={mobile} pipelineStats={pipelineResult?.stats ?? null} /></TabErrorBoundary>}
+      {tab === "d2a" && <TabErrorBoundary tabName="D2A"><D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={handleTabChange} /></TabErrorBoundary>}
+      {tab === "settings" && <TabErrorBoundary tabName="Settings"><SettingsTab mobile={mobile} linkedAccount={linkedAccount} onLinkChange={handleLinkAccount} initialSubTab={settingsSubTab} content={content} /></TabErrorBoundary>}
     </AppShell>
   );
 }

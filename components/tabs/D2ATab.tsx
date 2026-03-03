@@ -96,6 +96,9 @@ export const D2ATab: React.FC<D2ATabProps> = ({
   const [subTab, setSubTab] = useState<SubTab>("exchanges");
   const [peerSortKey, setPeerSortKey] = useState<PeerSortKey>("effectiveTrust");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const handleToggle = useCallback((id: string) => {
+    setExpanded(prev => prev === id ? null : id);
+  }, []);
   const [commentOpen, setCommentOpen] = useState<string | null>(null);
   const [showAllLogs, setShowAllLogs] = useState(false);
   const [npubCopyState, setNpubCopyState] = useState<"idle" | "copied" | "failed">("idle");
@@ -527,7 +530,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                   <ContentCard
                     item={item}
                     expanded={expanded === item.id}
-                    onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
+                    onToggle={handleToggle}
                     onValidate={onValidate}
                     onFlag={onFlag}
                     mobile={mobile}

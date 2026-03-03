@@ -19,7 +19,7 @@ function hasVCL(item: ContentItem): boolean {
 interface ContentCardProps {
   item: ContentItem;
   expanded: boolean;
-  onToggle: () => void;
+  onToggle: (id: string) => void;
   onValidate: (id: string) => void;
   onFlag: (id: string) => void;
   onAddFilterRule?: (rule: Omit<CustomFilterRule, "id" | "createdAt">) => void;
@@ -160,8 +160,8 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
       role="button"
       tabIndex={0}
       aria-expanded={expanded}
-      onClick={onToggle}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
+      onClick={() => onToggle(item.id)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item.id); } }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{

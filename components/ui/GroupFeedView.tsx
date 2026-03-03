@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { ContentCard } from "./ContentCard";
 import type { ContentItem } from "@/lib/types/content";
 import type { CurationGroup } from "@/lib/d2a/curationGroup";
@@ -23,6 +23,9 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
   onAddMember, onRemoveMember, onSync, mobile,
 }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const handleToggle = useCallback((id: string) => {
+    setExpanded(prev => prev === id ? null : id);
+  }, []);
   const [memberInput, setMemberInput] = useState("");
   const [showMembers, setShowMembers] = useState(false);
 
@@ -131,7 +134,7 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
             <ContentCard
               item={item}
               expanded={expanded === item.id}
-              onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
+              onToggle={handleToggle}
               onValidate={onValidate}
               onFlag={onFlag}
               mobile={mobile}
