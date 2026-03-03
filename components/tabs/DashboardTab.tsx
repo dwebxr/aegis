@@ -1549,76 +1549,76 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 </span>
               ))}
             </div>
-                {dashboardActivity.chartQuality.length > 0 && (
-                  <div style={{ display: "flex", gap: space[4], marginBottom: space[3], alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <div style={{ width: 80 }}>
-                        <MiniChart data={dashboardActivity.chartQuality} color={colors.cyan[400]} h={24} />
-                      </div>
-                      <span style={{ fontSize: t.tiny.size, color: colors.cyan[400], fontFamily: fonts.mono }}>
-                        {dashboardActivity.chartQuality[dashboardActivity.chartQuality.length - 1]}% quality
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <div style={{ width: 80 }}>
-                        <MiniChart data={dashboardActivity.chartSlop} color={colors.orange[500]} h={24} />
-                      </div>
-                      <span style={{ fontSize: t.tiny.size, color: colors.orange[500], fontFamily: fonts.mono }}>
-                        {dashboardActivity.chartSlop[dashboardActivity.chartSlop.length - 1]} slop
-                      </span>
-                    </div>
+            {dashboardActivity.chartQuality.length > 0 && (
+              <div style={{ display: "flex", gap: space[4], marginBottom: space[3], alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 80 }}>
+                    <MiniChart data={dashboardActivity.chartQuality} color={colors.cyan[400]} h={24} />
                   </div>
-                )}
-                {dashboardActivity.recentActions.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
-                    {dashboardActivity.recentActions.map(item => (
-                      <div key={item.id} style={{
-                        display: "flex", alignItems: "center", gap: space[2],
-                        fontSize: t.caption.size, color: colors.text.disabled,
-                      }}>
-                        <span style={{ color: item.validated ? colors.green[400] : colors.red[400] }}>
-                          {item.validated ? "\u2713" : "\u2717"}
-                        </span>
-                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.text.slice(0, 60)}
-                        </span>
-                        {item.topics && item.topics.length > 0 && (() => {
-                          const topic = item.topics[0];
-                          return (
-                          <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-                            <button
-                              onClick={() => {
-                                const current = profile.topicAffinities[topic] ?? 0;
-                                setTopicAffinity(topic, current + 0.1);
-                                showFeedback(`[${topic}] \u2191`);
-                              }}
-                              style={{
-                                background: "transparent", border: "none", cursor: "pointer",
-                                color: colors.green[400], fontSize: t.caption.size, padding: "0 2px",
-                                fontFamily: "inherit",
-                              }}
-                              title="More like this"
-                            >&#x25B2;</button>
-                            <button
-                              onClick={() => {
-                                const current = profile.topicAffinities[topic] ?? 0;
-                                setTopicAffinity(topic, current - 0.1);
-                                showFeedback(`[${topic}] \u2193`);
-                              }}
-                              style={{
-                                background: "transparent", border: "none", cursor: "pointer",
-                                color: colors.red[400], fontSize: t.caption.size, padding: "0 2px",
-                                fontFamily: "inherit",
-                              }}
-                              title="Less like this"
-                            >&#x25BC;</button>
-                          </div>
-                          );
-                        })()}
-                      </div>
-                    ))}
+                  <span style={{ fontSize: t.tiny.size, color: colors.cyan[400], fontFamily: fonts.mono }}>
+                    {dashboardActivity.chartQuality[dashboardActivity.chartQuality.length - 1]}% quality
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 80 }}>
+                    <MiniChart data={dashboardActivity.chartSlop} color={colors.orange[500]} h={24} />
                   </div>
-                )}
+                  <span style={{ fontSize: t.tiny.size, color: colors.orange[500], fontFamily: fonts.mono }}>
+                    {dashboardActivity.chartSlop[dashboardActivity.chartSlop.length - 1]} slop
+                  </span>
+                </div>
+              </div>
+            )}
+            {dashboardActivity.recentActions.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+                {dashboardActivity.recentActions.map(item => (
+                  <div key={item.id} style={{
+                    display: "flex", alignItems: "center", gap: space[2],
+                    fontSize: t.caption.size, color: colors.text.disabled,
+                  }}>
+                    <span style={{ color: item.validated ? colors.green[400] : colors.red[400] }}>
+                      {item.validated ? "\u2713" : "\u2717"}
+                    </span>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {item.text.slice(0, 60)}
+                    </span>
+                    {item.topics && item.topics.length > 0 && (() => {
+                      const topic = item.topics[0];
+                      return (
+                        <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                          <button
+                            onClick={() => {
+                              const current = profile.topicAffinities[topic] ?? 0;
+                              setTopicAffinity(topic, current + 0.1);
+                              showFeedback(`[${topic}] \u2191`);
+                            }}
+                            style={{
+                              background: "transparent", border: "none", cursor: "pointer",
+                              color: colors.green[400], fontSize: t.caption.size, padding: "0 2px",
+                              fontFamily: "inherit",
+                            }}
+                            title="More like this"
+                          >&#x25B2;</button>
+                          <button
+                            onClick={() => {
+                              const current = profile.topicAffinities[topic] ?? 0;
+                              setTopicAffinity(topic, current - 0.1);
+                              showFeedback(`[${topic}] \u2193`);
+                            }}
+                            style={{
+                              background: "transparent", border: "none", cursor: "pointer",
+                              color: colors.red[400], fontSize: t.caption.size, padding: "0 2px",
+                              fontFamily: "inherit",
+                            }}
+                            title="Less like this"
+                          >&#x25BC;</button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ))}
+              </div>
+            )}
             <D2ANetworkMini mobile={mobile} />
           </div>
 
