@@ -716,6 +716,10 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Notification toasts: dismiss button with `aria-label="Dismiss notification"`
 
 ### Performance
+- Cache-first loading: `cacheChecked` flag prevents loading spinner flash — cached content displays instantly on revisit
+- IC pagination timeout (15s per page via `withTimeout`) prevents indefinite hangs on slow/unreachable canisters
+- Progressive content display: each IC page merges into state immediately (no waiting for all pages to complete)
+- `syncTime()` timeout (5s) on actor creation prevents IC time-sync from blocking content loads
 - Scoring cache uses `Map` (O(1) lookup) instead of `Record` with FIFO pruning via insertion order
 - Image backfill delay reduced from 800ms to 300ms per item (24s → 9s for 30 items)
 - Timestamp refresh interval increased from 30s to 60s (50% fewer re-renders)
@@ -723,6 +727,9 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Client-side fetch timeouts set 5s below server maxDuration (avoids client-side timeout masking server errors)
 
 ### Runtime Safety
+- IC sync auto-retry: transient failures retry once (3s delay); only consecutive failures trigger offline status
+- Retry timer cleanup: tracked in ref and cleared on auth change / unmount (no orphaned timers)
+- syncStatus leak fix: `handleICSessionError` early return now sets offline status before exiting
 - Preference storage validates nested structures (topic affinities, author trust, calibration) before loading
 - IC-to-local data conversion validates types at runtime instead of unsafe `as` casts
 - useEffect async operations use cancellation flags to prevent stale state updates after unmount
@@ -773,7 +780,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (4439 tests, 261 suites) |
+| Test | Jest + ts-jest (4449 tests, 262 suites) |
 
 ## Project Structure
 
@@ -933,7 +940,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 4439 tests across 261 suites
+├── __tests__/                           # 4449 tests across 262 suites
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
