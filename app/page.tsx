@@ -59,7 +59,7 @@ const PUSH_THROTTLE: Record<string, number> = {
 function AegisAppInner() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
-  const { content, isAnalyzing, syncStatus, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, pendingCount, clearDemoContent } = useContent();
+  const { content, isAnalyzing, syncStatus, cacheChecked, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, pendingCount, clearDemoContent } = useContent();
   const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
@@ -605,12 +605,12 @@ function AegisAppInner() {
       )}
       {tab === "dashboard" && (
         <TabErrorBoundary tabName="Home">
-          <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} />
+          <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} />
         </TabErrorBoundary>
       )}
       {tab === "briefing" && (
         <TabErrorBoundary tabName="Briefing">
-          <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && syncStatus !== "synced"} discoveries={discoveries} onTabChange={handleTabChange} />
+          <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} discoveries={discoveries} onTabChange={handleTabChange} />
         </TabErrorBoundary>
       )}
       {tab === "incinerator" && (

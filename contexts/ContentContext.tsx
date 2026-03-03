@@ -158,6 +158,8 @@ interface ContentState {
   content: ContentItem[];
   isAnalyzing: boolean;
   syncStatus: "idle" | "syncing" | "synced" | "offline";
+  /** True once the local cache has been checked (IDB/localStorage). */
+  cacheChecked: boolean;
   analyze: (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
   /** Run the full scoring cascade without side effects (no state update, no IC save). Used by scheduler. */
   scoreText: (text: string, userContext?: UserContext | null) => Promise<AnalyzeResponse>;
@@ -187,6 +189,7 @@ const ContentContext = createContext<ContentState>({
   content: [],
   isAnalyzing: false,
   syncStatus: "idle",
+  cacheChecked: false,
   analyze: async () => defaultAnalyzeResponse,
   scoreText: async () => defaultAnalyzeResponse,
   validateItem: () => {},
@@ -247,6 +250,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const [content, setContent] = useState<ContentItem[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "offline">("idle");
+  const [cacheChecked, setCacheChecked] = useState(false);
   const [pendingActions, setPendingActions] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
   const pendingItemsRef = useRef<ContentItem[]>([]);
@@ -255,6 +259,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   contentRef.current = content;
   const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const drainQueueRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const syncRetryRef = useRef(0);
   const backfillCleanupRef = useRef<(() => void) | null>(null);
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
 
@@ -267,6 +272,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       }
     }).catch(err => {
       console.warn("[content] Failed to load cached content:", errMsg(err));
+    }).finally(() => {
+      if (!cancelled) setCacheChecked(true);
     });
     return () => { cancelled = true; };
   }, []);
@@ -666,75 +673,86 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (!actorRef.current || !isAuthenticated || !principal) return;
     setSyncStatus("syncing");
 
+    const IC_PAGE_TIMEOUT = 15_000; // 15 seconds per page
+
+    /** Convert a canister evaluation record to a ContentItem. */
+    function evalToContentItem(e: Awaited<ReturnType<_SERVICE["getUserEvaluations"]>>[number]): ContentItem {
+      const { engine, cleanReason: reasonWithTopics } = decodeEngineFromReason(e.reason);
+      const { topics, cleanReason } = decodeTopicsFromReason(reasonWithTopics);
+      return {
+        id: e.id,
+        owner: e.owner.toText(),
+        author: e.author,
+        avatar: e.avatar,
+        text: e.text,
+        source: mapSourceBack(e.source) as ContentItem["source"],
+        sourceUrl: e.sourceUrl.length > 0 ? e.sourceUrl[0] : undefined,
+        imageUrl: e.imageUrl?.length ? e.imageUrl[0] : undefined,
+        scores: {
+          originality: e.scores.originality,
+          insight: e.scores.insight,
+          credibility: e.scores.credibility,
+          composite: e.scores.compositeScore,
+        },
+        verdict: ("quality" in e.verdict ? "quality" : "slop") as ContentItem["verdict"],
+        reason: cleanReason,
+        topics: topics.length > 0 ? topics : undefined,
+        createdAt: Number(e.createdAt) / 1_000_000,
+        validated: e.validated,
+        flagged: e.flagged,
+        validatedAt: e.validatedAt.length > 0 ? Number(e.validatedAt[0]) / 1_000_000 : undefined,
+        timestamp: relativeTime(Number(e.createdAt) / 1_000_000),
+        scoredByAI: engine ? engine !== "heuristic" : !e.reason.startsWith("Heuristic"),
+        scoringEngine: engine,
+      };
+    }
+
+    /** Merge a batch of IC-loaded items into the content state, preserving locally-enriched fields. */
+    function mergePageIntoContent(pageItems: ContentItem[]) {
+      setContent(prev => {
+        const cachedById = new Map(prev.map(c => [c.id, c]));
+        const merged = pageItems.map(l => {
+          const cached = cachedById.get(l.id);
+          if (!cached) return l;
+          return {
+            ...l,
+            topics: l.topics ?? cached.topics,
+            vSignal: l.vSignal ?? cached.vSignal,
+            cContext: l.cContext ?? cached.cContext,
+            lSlop: l.lSlop ?? cached.lSlop,
+            imageUrl: l.imageUrl ?? cached.imageUrl,
+            platform: l.platform ?? cached.platform,
+          };
+        });
+        const loadedIds = new Set(pageItems.map(l => l.id));
+        const nonDuplicates = prev.filter(c => !loadedIds.has(c.id));
+        return [...merged, ...nonDuplicates];
+      });
+    }
+
     try {
       const PAGE_SIZE = BigInt(100);
       const MAX_PAGES = 50; // Safety limit: 5000 evaluations max
-      const allEvals: Awaited<ReturnType<_SERVICE["getUserEvaluations"]>> = [];
       let offset = BigInt(0);
       for (let pageNum = 0; pageNum < MAX_PAGES; pageNum++) {
-        const page = await actorRef.current.getUserEvaluations(principal, offset, PAGE_SIZE);
-        allEvals.push(...page);
+        const page = await withTimeout(
+          actorRef.current.getUserEvaluations(principal, offset, PAGE_SIZE),
+          IC_PAGE_TIMEOUT,
+          `IC pagination timeout (page ${pageNum})`,
+        );
+
+        // Progressive display: merge each page immediately so users see content as it arrives
+        const pageItems = page.map(evalToContentItem);
+        if (pageItems.length > 0) mergePageIntoContent(pageItems);
+
         if (BigInt(page.length) < PAGE_SIZE) break;
         offset += PAGE_SIZE;
         if (pageNum === MAX_PAGES - 1) {
-          console.warn(`[content] Pagination limit reached (${MAX_PAGES} pages, ${allEvals.length} items). Some evaluations may not be loaded.`);
+          console.warn(`[content] Pagination limit reached (${MAX_PAGES} pages). Some evaluations may not be loaded.`);
         }
       }
 
-      const loaded: ContentItem[] = allEvals.map(e => {
-        const { engine, cleanReason: reasonWithTopics } = decodeEngineFromReason(e.reason);
-        const { topics, cleanReason } = decodeTopicsFromReason(reasonWithTopics);
-        return {
-          id: e.id,
-          owner: e.owner.toText(),
-          author: e.author,
-          avatar: e.avatar,
-          text: e.text,
-          source: mapSourceBack(e.source) as ContentItem["source"],
-          sourceUrl: e.sourceUrl.length > 0 ? e.sourceUrl[0] : undefined,
-          imageUrl: e.imageUrl?.length ? e.imageUrl[0] : undefined,
-          scores: {
-            originality: e.scores.originality,
-            insight: e.scores.insight,
-            credibility: e.scores.credibility,
-            composite: e.scores.compositeScore,
-          },
-          verdict: ("quality" in e.verdict ? "quality" : "slop") as ContentItem["verdict"],
-          reason: cleanReason,
-          topics: topics.length > 0 ? topics : undefined,
-          createdAt: Number(e.createdAt) / 1_000_000,
-          validated: e.validated,
-          flagged: e.flagged,
-          validatedAt: e.validatedAt.length > 0 ? Number(e.validatedAt[0]) / 1_000_000 : undefined,
-          timestamp: relativeTime(Number(e.createdAt) / 1_000_000),
-          scoredByAI: engine ? engine !== "heuristic" : !e.reason.startsWith("Heuristic"),
-          scoringEngine: engine,
-        };
-      });
-
-      if (loaded.length > 0) {
-        setContent(prev => {
-          // Build lookup from cached items to preserve fields not stored in IC (topics, vSignal, etc.)
-          const cachedById = new Map(prev.map(c => [c.id, c]));
-          const merged = loaded.map(l => {
-            const cached = cachedById.get(l.id);
-            if (!cached) return l;
-            return {
-              ...l,
-              topics: l.topics ?? cached.topics,
-              vSignal: l.vSignal ?? cached.vSignal,
-              cContext: l.cContext ?? cached.cContext,
-              lSlop: l.lSlop ?? cached.lSlop,
-              imageUrl: l.imageUrl ?? cached.imageUrl,
-              platform: l.platform ?? cached.platform,
-            };
-          });
-          const loadedIds = new Set(loaded.map(l => l.id));
-          const nonDuplicates = prev.filter(c => !loadedIds.has(c.id));
-          return [...merged, ...nonDuplicates];
-        });
-      }
-
+      syncRetryRef.current = 0;
       setSyncStatus("synced");
 
       // Backfill missing imageUrls from OG tags (max 10, fire-and-forget)
@@ -743,6 +761,22 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     } catch (err) {
       if (handleICSessionError(err)) return;
       console.error("[content] Failed to load from IC:", errMsg(err));
+
+      // Auto-retry once after 3s for transient network errors
+      if (syncRetryRef.current < 1) {
+        syncRetryRef.current++;
+        console.info("[content] Retrying IC sync in 3s...");
+        setSyncStatus("idle");
+        setTimeout(() => {
+          loadFromICRef.current().catch(() => {
+            setSyncStatus("offline");
+            addNotification("IC sync unavailable", "error");
+          });
+        }, 3000);
+        return;
+      }
+
+      syncRetryRef.current = 0;
       setSyncStatus("offline");
       addNotification(`IC sync unavailable — ${errMsgShort(err)}`, "error");
     }
@@ -758,9 +792,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated]);
 
   const value = useMemo(() => ({
-    content, isAnalyzing, syncStatus, pendingActions, isOnline, pendingCount,
+    content, isAnalyzing, syncStatus, cacheChecked, pendingActions, isOnline, pendingCount,
     analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, clearDemoContent, loadFromIC, syncBriefing,
-  }), [content, isAnalyzing, syncStatus, pendingActions, isOnline, pendingCount, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, clearDemoContent, loadFromIC, syncBriefing]);
+  }), [content, isAnalyzing, syncStatus, cacheChecked, pendingActions, isOnline, pendingCount, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, clearDemoContent, loadFromIC, syncBriefing]);
 
   return (
     <ContentContext.Provider value={value}>
