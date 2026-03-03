@@ -84,4 +84,30 @@ describe("TabErrorBoundary", () => {
     expect(screen.getByText("Broken encountered an error")).toBeTruthy();
     expect(screen.getByText("Sibling OK")).toBeTruthy();
   });
+
+  it("re-catches error when Retry is clicked but error persists", () => {
+    render(
+      <TabErrorBoundary tabName="Stuck">
+        <ThrowingChild shouldThrow />
+      </TabErrorBoundary>,
+    );
+    expect(screen.getByText("Stuck encountered an error")).toBeTruthy();
+
+    // Click Retry — error still throws, boundary should re-catch
+    fireEvent.click(screen.getByText("Retry"));
+    expect(screen.getByText("Stuck encountered an error")).toBeTruthy();
+    expect(screen.getByText("Tab crash")).toBeTruthy();
+  });
+
+  it("handles error with empty message gracefully", () => {
+    function EmptyErrorChild(): React.ReactElement {
+      throw new Error("");
+    }
+    render(
+      <TabErrorBoundary tabName="Empty">
+        <EmptyErrorChild />
+      </TabErrorBoundary>,
+    );
+    expect(screen.getByText("Empty encountered an error")).toBeTruthy();
+  });
 });

@@ -11,6 +11,7 @@ if (typeof globalThis.TextEncoder === "undefined") {
 
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { render, fireEvent, screen } from "@testing-library/react";
 import { DashboardTab } from "@/components/tabs/DashboardTab";
 import type { ContentItem } from "@/lib/types/content";
 
@@ -123,6 +124,15 @@ describe("DashboardTab — Lite/Pro deep-link", () => {
       filterMode: "lite",
       setFilterMode: jest.fn(),
     });
+  });
+
+  it("clicking Lite badge fires onTabChange('settings:feeds')", () => {
+    const onTabChange = jest.fn();
+    render(
+      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} onTabChange={onTabChange} />
+    );
+    fireEvent.click(screen.getByText("Lite"));
+    expect(onTabChange).toHaveBeenCalledWith("settings:feeds");
   });
 });
 

@@ -260,6 +260,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const drainQueueRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const syncRetryRef = useRef(0);
+  const syncRetryTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const backfillCleanupRef = useRef<(() => void) | null>(null);
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
 
@@ -320,7 +321,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       actorRef.current = null;
       setSyncStatus("offline");
     }
-    return () => { stale = true; };
+    return () => {
+      stale = true;
+      clearTimeout(syncRetryTimerRef.current);
+      syncRetryRef.current = 0;
+    };
   }, [isAuthenticated, identity, addNotification]);
 
   const drainOfflineQueue = useCallback(async () => {
@@ -759,7 +764,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       backfillCleanupRef.current?.();
       backfillCleanupRef.current = backfillImageUrls();
     } catch (err) {
-      if (handleICSessionError(err)) return;
+      if (handleICSessionError(err)) {
+        setSyncStatus("offline");
+        return;
+      }
       console.error("[content] Failed to load from IC:", errMsg(err));
 
       // Auto-retry once after 3s for transient network errors
@@ -767,7 +775,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         syncRetryRef.current++;
         console.info("[content] Retrying IC sync in 3s...");
         setSyncStatus("idle");
-        setTimeout(() => {
+        clearTimeout(syncRetryTimerRef.current);
+        syncRetryTimerRef.current = setTimeout(() => {
           loadFromICRef.current().catch(() => {
             setSyncStatus("offline");
             addNotification("IC sync unavailable", "error");
