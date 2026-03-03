@@ -7,10 +7,19 @@
   </p>
 </div>
 
+## Latest Updates (March 2024)
+
+### Performance & UX Improvements
+- **Enhanced Content Deduplication**: Improved text normalization algorithm for better duplicate detection across sources
+- **Smart Saved Items Management**: Validated and flagged items are now automatically removed from the Saved section
+- **Dashboard Optimization**: Fixed "No quality items" display issue with faster content loading
+- **Code Quality**: Comprehensive security audit and bug fixes for production readiness
+
 ## Live
 
 - **Frontend**: https://aegis.dwebxr.xyz
 - **Backend Canister**: [`rluf3-eiaaa-aaaam-qgjuq-cai`](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=rluf3-eiaaa-aaaam-qgjuq-cai)
+- **Repository**: https://github.com/dwebxr/aegis
 
 ## Quick Start — No Deposit Required
 

@@ -13,8 +13,8 @@ interface PreferenceState {
   profile: UserPreferenceProfile;
   userContext: UserContext | null;
   isPersonalized: boolean;
-  onValidate: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string) => void;
-  onFlag: (topics: string[], author: string, composite: number, verdict: "quality" | "slop") => void;
+  onValidate: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => void;
+  onFlag: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", itemId?: string) => void;
   setTopicAffinity: (topic: string, value: number) => void;
   removeTopicAffinity: (topic: string) => void;
   setQualityThreshold: (value: number) => void;
@@ -150,16 +150,30 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   const profileRef = useRef(profile);
   profileRef.current = profile;
 
-  const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string) => {
-    const next = learn(profileRef.current, { action: "validate", topics, author, composite, verdict });
+  const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => {
+    let next = learn(profileRef.current, { action: "validate", topics, author, composite, verdict });
+    // Auto-remove validated item from bookmarks
+    if (itemId && next.bookmarkedIds?.includes(itemId)) {
+      next = {
+        ...next,
+        bookmarkedIds: next.bookmarkedIds.filter(bid => bid !== itemId),
+      };
+    }
     setProfile(next);
     debouncedSave(next);
     debouncedICSync(next);
     trackDomainValidation(sourceUrl);
   }, [debouncedSave, debouncedICSync]);
 
-  const onFlag = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop") => {
-    const next = learn(profileRef.current, { action: "flag", topics, author, composite, verdict });
+  const onFlag = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", itemId?: string) => {
+    let next = learn(profileRef.current, { action: "flag", topics, author, composite, verdict });
+    // Auto-remove flagged item from bookmarks
+    if (itemId && next.bookmarkedIds?.includes(itemId)) {
+      next = {
+        ...next,
+        bookmarkedIds: next.bookmarkedIds.filter(bid => bid !== itemId),
+      };
+    }
     setProfile(next);
     debouncedSave(next);
     debouncedICSync(next);

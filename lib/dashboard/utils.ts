@@ -13,7 +13,14 @@ function hasVisualContent(item: ContentItem): boolean {
 
 /** Content-level dedup key: same article may have different IDs/URLs across sources */
 export function contentDedup(item: ContentItem): string {
-  return item.text.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 120);
+  // Aggressive normalization to catch duplicates with minor formatting differences
+  return item.text
+    .toLowerCase()
+    .replace(/[.,!?;:()\[\]{}"'`]/g, "") // Remove punctuation
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .replace(/\n+/g, " ") // Remove newlines
+    .trim()
+    .slice(0, 150); // Slightly longer for better uniqueness
 }
 
 export function applyDashboardFilters(
@@ -164,7 +171,12 @@ export function computeDashboardSaved(
 ): ContentItem[] {
   const bookmarkSet = new Set(bookmarkedIds);
   return content
-    .filter(c => bookmarkSet.has(c.id) && !excludeIds.has(c.id))
+    .filter(c =>
+      bookmarkSet.has(c.id) &&
+      !excludeIds.has(c.id) &&
+      !c.validated && // Exclude validated items from saved
+      !c.flagged     // Exclude flagged items from saved
+    )
     .sort((a, b) => b.scores.composite - a.scores.composite)
     .slice(0, 5);
 }

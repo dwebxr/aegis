@@ -179,8 +179,8 @@ interface ContentState {
 }
 
 type PreferenceCallbacks = {
-  onValidate?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string) => void;
-  onFlag?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop") => void;
+  onValidate?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => void;
+  onFlag?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", itemId?: string) => void;
 };
 
 const defaultAnalyzeResponse: AnalyzeResponse = { originality: 0, insight: 0, credibility: 0, composite: 0, verdict: "slop" as const, reason: "" };
@@ -549,7 +549,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     const item = contentRef.current.find(c => c.id === id);
     if (!item || item.validated) return;
     setContent(prev => prev.map(c => c.id === id ? { ...c, validated: true, validatedAt: c.validatedAt ?? Date.now() } : c));
-    preferenceCallbacks?.onValidate?.(item.topics || [], item.author, item.scores.composite, item.verdict, item.sourceUrl);
+    preferenceCallbacks?.onValidate?.(item.topics || [], item.author, item.scores.composite, item.verdict, item.sourceUrl, id);
     if (item.source === "nostr" && item.nostrPubkey) recordUseful(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishValidation(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
@@ -561,7 +561,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     const item = contentRef.current.find(c => c.id === id);
     if (!item || item.flagged) return;
     setContent(prev => prev.map(c => c.id === id ? { ...c, flagged: true } : c));
-    preferenceCallbacks?.onFlag?.(item.topics || [], item.author, item.scores.composite, item.verdict);
+    preferenceCallbacks?.onFlag?.(item.topics || [], item.author, item.scores.composite, item.verdict, id);
     if (item.source === "nostr" && item.nostrPubkey) recordSlop(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishFlag(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
