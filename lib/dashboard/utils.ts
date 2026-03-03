@@ -72,6 +72,23 @@ export function computeDashboardTop3(
   return deduped.slice(0, 3);
 }
 
+/** Compute Dashboard Top 6 for expanded initial view */
+export function computeDashboardTop6(
+  content: ContentItem[],
+  profile: UserPreferenceProfile,
+  now: number,
+): BriefingItem[] {
+  const briefing = generateBriefing(content, profile, now);
+  const seenKeys = new Set<string>();
+  const deduped = briefing.priority.filter(bi => {
+    const key = contentDedup(bi.item);
+    if (seenKeys.has(key)) return false;
+    seenKeys.add(key);
+    return true;
+  });
+  return deduped.slice(0, 6);
+}
+
 /** Compute Topic Spotlight with cascading dedup from Top3 */
 export function computeTopicSpotlight(
   content: ContentItem[],

@@ -11,11 +11,10 @@ import { useFilterMode } from "@/contexts/FilterModeContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
-import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificationBadge";
 import {
   applyDashboardFilters,
-  computeDashboardTop3,
+  computeDashboardTop6,
   computeTopicSpotlight,
   computeDashboardActivity,
   computeDashboardSaved,
@@ -33,6 +32,7 @@ import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 import { NewItemsBar } from "@/components/ui/NewItemsBar";
 import { useSources } from "@/contexts/SourceContext";
 import { useDemo } from "@/contexts/DemoContext";
+import { CollapsibleSection, SectionSkeleton } from "@/components/ui/CollapsibleSection";
 
 function ScorePill({ gr, tag }: { gr: ReturnType<typeof scoreGrade>; tag: { label: string; color: string } | null }) {
   return (
@@ -273,7 +273,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set());
 
+  // State for collapsible dashboard sections
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [lazyLoadedSections, setLazyLoadedSections] = useState<Set<string>>(new Set());
+
   const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
+
+  const toggleSection = useCallback((sectionId: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(sectionId)) {
+        next.delete(sectionId);
+      } else {
+        next.add(sectionId);
+        // Mark as lazy loaded once expanded
+        setLazyLoadedSections(loaded => new Set(loaded).add(sectionId));
+      }
+      return next;
+    });
+  }, []);
 
   const agentContext = useMemo(() => {
     if (!hasEnoughData(profile)) return null;
@@ -286,43 +304,52 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   contentRef.current = content;
   const briefingNowRef = useRef(Date.now());
 
-  const dashboardTop3 = useMemo(() => {
-    return computeDashboardTop3(contentRef.current, profile, briefingNowRef.current);
+  // Use Top 6 instead of Top 3 for better initial view
+  const dashboardTop6 = useMemo(() => {
+    return computeDashboardTop6(contentRef.current, profile, briefingNowRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
+  // Lazy compute topic spotlight only when section is expanded
   const dashboardTopicSpotlight = useMemo(() => {
-    return computeTopicSpotlight(contentRef.current, profile, dashboardTop3);
+    if (!lazyLoadedSections.has('topic-spotlight')) return [];
+    return computeTopicSpotlight(contentRef.current, profile, dashboardTop6);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, dashboardTop3]);
+  }, [profile, dashboardTop6, lazyLoadedSections]);
 
-  // Cascading cross-section deduplication: Top3 → Spotlight → Discoveries → Unreviewed → Saved
-  // Consolidated into a single memo to avoid intermediate Set allocations.
+  // Lazy compute these sections only when needed
   const { filteredDiscoveries, unreviewedQueue, dashboardSaved } = useMemo(() => {
-    // 1. Top sections: Top3 + Spotlight
-    const topIds = new Set(dashboardTop3.map(c => c.item.id));
+    // 1. Top sections: Top6 + Spotlight
+    const topIds = new Set(dashboardTop6.map(c => c.item.id));
     for (const group of dashboardTopicSpotlight) {
       for (const item of group.items) topIds.add(item.id);
     }
 
-    // 2. Discoveries (exclude items already in top sections)
-    const filtDisc = discoveries.filter(d => !topIds.has(d.item.id));
+    // 2. Discoveries (compute only if expanded)
+    const filtDisc = lazyLoadedSections.has('discoveries')
+      ? discoveries.filter(d => !topIds.has(d.item.id))
+      : [];
     for (const d of filtDisc) topIds.add(d.item.id);
 
-    // 3. Unreviewed queue (exclude all shown so far)
-    const queue = computeUnreviewedQueue(contentRef.current, topIds);
+    // 3. Unreviewed queue (compute only if expanded)
+    const queue = lazyLoadedSections.has('review-queue')
+      ? computeUnreviewedQueue(contentRef.current, topIds)
+      : [];
     for (const item of queue) topIds.add(item.id);
 
-    // 4. Saved/Bookmarked (exclude everything above)
-    const saved = computeDashboardSaved(contentRef.current, profile.bookmarkedIds ?? [], topIds);
+    // 4. Saved/Bookmarked (compute only if expanded)
+    const saved = lazyLoadedSections.has('saved')
+      ? computeDashboardSaved(contentRef.current, profile.bookmarkedIds ?? [], topIds)
+      : [];
 
     return { filteredDiscoveries: filtDisc, unreviewedQueue: queue, dashboardSaved: saved };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboardTop3, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds]);
+  }, [dashboardTop6, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds, lazyLoadedSections]);
 
   const topicDistribution = useMemo(() => {
+    if (!lazyLoadedSections.has('topic-distribution')) return [];
     return computeTopicDistribution(content);
-  }, [content]);
+  }, [content, lazyLoadedSections]);
 
   const topicTrends = useMemo(() => {
     return computeTopicTrends(content);
@@ -795,14 +822,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             marginBottom: space[4],
             overflow: "hidden",
           }}>
-          {/* Today's Top 3 — full width */}
-          <div data-testid="aegis-top3-section" style={{ gridColumn: mobile ? undefined : "1 / -1", minWidth: 0 }}>
+          {/* Today's Top 6 — full width */}
+          <div data-testid="aegis-top6-section" style={{ gridColumn: mobile ? undefined : "1 / -1", minWidth: 0 }}>
             <div style={{
               fontSize: t.h3.size, fontWeight: t.h3.weight,
               color: colors.text.tertiary, marginBottom: space[3],
               display: "flex", alignItems: "center", gap: space[2],
             }}>
-              <span>&#x2B50;</span> Today&#39;s Top 3
+              <span>⭐</span> Today&#39;s Top 6
               <div style={{ flex: 1 }} />
               <button
                 onClick={() => { setHomeMode("feed"); setVerdictFilter("all"); }}
@@ -812,10 +839,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   border: "none", cursor: "pointer", fontFamily: "inherit",
                 }}
               >
-                Review All &rarr;
+                Review All →
               </button>
             </div>
-            {dashboardTop3.length === 0 ? (
+            {dashboardTop6.length === 0 ? (
               <div style={{
                 fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center",
                 padding: space[4], background: colors.bg.surface,
@@ -826,9 +853,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             ) : (
               <div style={mobile
                 ? { display: "flex", flexDirection: "column" as const, gap: space[4] }
-                : { display: "grid", gridTemplateColumns: `repeat(${Math.min(dashboardTop3.length, 3)}, minmax(0, 1fr))`, gap: space[4] }
+                : { display: "grid", gridTemplateColumns: `repeat(3, minmax(0, 1fr))`, gap: space[4] }
               }>
-                {dashboardTop3.map((bi, i) => {
+                {dashboardTop6.map((bi, i) => {
                   const item = bi.item;
                   const gr = scoreGrade(item.scores.composite);
                   const tag = deriveScoreTags(item)[0] ?? null;
@@ -1055,29 +1082,24 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           {/* Right column: Discoveries + Validated */}
           <div style={{ display: "flex", flexDirection: "column", gap: `${space[4]}px`, minWidth: 0 }}>
 
-          {/* Discoveries */}
-          {filteredDiscoveries.length > 0 && (
-            <div style={{
-              background: "transparent",
-              border: `1px solid ${colors.border.subtle}`,
-              borderRadius: radii.lg,
-              padding: `${space[3]}px ${space[4]}px`,
-            }}>
-              <div style={{
-                fontSize: t.bodySm.size, fontWeight: 600,
-                color: colors.text.tertiary, marginBottom: space[3],
-                display: "flex", alignItems: "center", gap: space[2],
-              }}>
-                <span>&#x1F52D;</span> Discoveries
-                <span style={{
-                  fontSize: t.caption.size, color: colors.text.muted,
-                  background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
-                }}>{filteredDiscoveries.length}</span>
-                <InfoTooltip
-                  text="High-quality content from outside your usual topics or network. These items scored well but cover areas you haven't explored yet."
-                  mobile={mobile}
-                />
-              </div>
+          {/* Discoveries - Collapsible */}
+          {(lazyLoadedSections.has('discoveries') ? filteredDiscoveries.length > 0 : true) && (
+            <CollapsibleSection
+              id="discoveries"
+              title="Discoveries"
+              icon="🔭"
+              isExpanded={expandedSections.has('discoveries')}
+              onToggle={toggleSection}
+              itemCount={lazyLoadedSections.has('discoveries') ? filteredDiscoveries.length : undefined}
+              mobile={mobile}
+            >
+              {!lazyLoadedSections.has('discoveries') ? (
+                <SectionSkeleton mobile={mobile} />
+              ) : filteredDiscoveries.length === 0 ? (
+                <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
+                  No discoveries found. Explore more content to find serendipitous connections.
+                </div>
+              ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
                 {filteredDiscoveries.map(d => {
                   const item = d.item;
@@ -1152,30 +1174,23 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   );
                 })}
               </div>
-            </div>
+              )}
+            </CollapsibleSection>
           )}
 
-          {/* Unreviewed Queue */}
-          <div style={{
-            background: "transparent",
-            border: `1px solid ${colors.border.subtle}`,
-            borderRadius: radii.lg,
-            padding: `${space[3]}px ${space[4]}px`,
-          }}>
-            <div style={{
-              fontSize: t.bodySm.size, fontWeight: 600,
-              color: colors.text.tertiary, marginBottom: space[3],
-              display: "flex", alignItems: "center", gap: space[2],
-            }}>
-              <span>&#x1F4CB;</span> Needs Review
-              {unreviewedQueue.length > 0 && (
-                <span style={{
-                  fontSize: t.caption.size, color: colors.text.muted,
-                  background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
-                }}>{unreviewedQueue.length}</span>
-              )}
-            </div>
-            {unreviewedQueue.length === 0 ? (
+          {/* Unreviewed Queue - Collapsible */}
+          <CollapsibleSection
+            id="review-queue"
+            title="Needs Review"
+            icon="📋"
+            isExpanded={expandedSections.has('review-queue')}
+            onToggle={toggleSection}
+            itemCount={lazyLoadedSections.has('review-queue') ? unreviewedQueue.length : undefined}
+            mobile={mobile}
+          >
+            {!lazyLoadedSections.has('review-queue') ? (
+              <SectionSkeleton mobile={mobile} />
+            ) : unreviewedQueue.length === 0 ? (
               <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
                 All caught up! No items need review.
               </div>
@@ -1254,23 +1269,21 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 </div>
               </div>
             )}
-          </div>
+          </CollapsibleSection>
 
-          {/* Saved */}
-          <div style={{
-            background: "transparent",
-            border: `1px solid ${colors.border.subtle}`,
-            borderRadius: radii.lg,
-            padding: `${space[3]}px ${space[4]}px`,
-          }}>
-            <div style={{
-              fontSize: t.bodySm.size, fontWeight: 600,
-              color: colors.text.tertiary, marginBottom: space[3],
-              display: "flex", alignItems: "center", gap: space[2],
-            }}>
-              <span>&#x1F516;</span> Saved
-            </div>
-            {dashboardSaved.length === 0 ? (
+          {/* Saved - Collapsible */}
+          <CollapsibleSection
+            id="saved"
+            title="Saved"
+            icon="🔖"
+            isExpanded={expandedSections.has('saved')}
+            onToggle={toggleSection}
+            itemCount={lazyLoadedSections.has('saved') ? dashboardSaved.length : undefined}
+            mobile={mobile}
+          >
+            {!lazyLoadedSections.has('saved') ? (
+              <SectionSkeleton mobile={mobile} />
+            ) : dashboardSaved.length === 0 ? (
               <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
                 No saved items yet. Bookmark content to save it here.
               </div>
@@ -1346,22 +1359,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 })}
               </div>
             )}
-          </div>
-          {/* Topic Distribution */}
-          <div style={{
-            background: "transparent",
-            border: `1px solid ${colors.border.subtle}`,
-            borderRadius: radii.lg,
-            padding: `${space[3]}px ${space[4]}px`,
-          }}>
-            <div style={{
-              fontSize: t.bodySm.size, fontWeight: 600,
-              color: colors.text.tertiary, marginBottom: space[3],
-              display: "flex", alignItems: "center", gap: space[2],
-            }}>
-              <span>&#x1F4CA;</span> Topic Breakdown
-            </div>
-            {topicDistribution.length === 0 ? (
+          </CollapsibleSection>
+          {/* Topic Distribution - Collapsible */}
+          <CollapsibleSection
+            id="topic-distribution"
+            title="Topic Breakdown"
+            icon="📊"
+            isExpanded={expandedSections.has('topic-distribution')}
+            onToggle={toggleSection}
+            mobile={mobile}
+          >
+            {!lazyLoadedSections.has('topic-distribution') ? (
+              <SectionSkeleton mobile={mobile} />
+            ) : topicDistribution.length === 0 ? (
               <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
                 Add sources to see topic distribution.
               </div>
@@ -1430,7 +1440,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 </div>
               </div>
             )}
-          </div>
+          </CollapsibleSection>
 
           </div>
           </div>
