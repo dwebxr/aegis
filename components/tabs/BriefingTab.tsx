@@ -110,7 +110,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
     <div style={{ animation: "fadeIn .4s ease" }}>
       <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h1 style={{
+          <h1 data-testid="aegis-briefing-heading" style={{
             fontSize: mobile ? t.display.mobileSz : t.display.size,
             fontWeight: t.display.weight,
             lineHeight: t.display.lineHeight,
@@ -144,7 +144,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
             </button>
           )}
         </div>
-        <p style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
+        <p data-testid="aegis-briefing-insight-count" style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
           {insightCount} insights selected from {briefing.totalItems} items
         </p>
       </div>
@@ -159,7 +159,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
       )}
 
       {isLoading ? (
-        <div style={{
+        <div data-testid="aegis-briefing-loading" style={{
           textAlign: "center", padding: space[10],
           color: colors.text.muted, background: colors.bg.surface,
           borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
@@ -170,7 +170,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Syncing from Internet Computer</div>
         </div>
       ) : briefing.priority.length > 0 ? (
-        <div>
+        <div data-testid="aegis-briefing-priority-list">
           {briefing.priority.map((b, i) => (
             <div key={b.item.id} style={{ animation: `slideUp .3s ease ${i * 0.06}s both` }}>
               {b.classification !== "mixed" && (
@@ -192,7 +192,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           ))}
         </div>
       ) : (
-        <div style={{
+        <div data-testid="aegis-briefing-empty" style={{
           textAlign: "center",
           padding: space[10],
           color: colors.text.muted,
@@ -206,7 +206,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Evaluate content and validate quality items to build your personalized briefing</div>
           {onTabChange && (
             <div style={{ marginTop: space[4] }}>
-              <button onClick={() => onTabChange("incinerator")} style={{
+              <button data-testid="aegis-briefing-start-eval" onClick={() => onTabChange("incinerator")} style={{
                 padding: `${space[2]}px ${space[4]}px`, background: colors.bg.raised,
                 border: `1px solid ${colors.border.emphasis}`, borderRadius: radii.md,
                 color: colors.purple[400], fontSize: t.bodySm.size, fontWeight: 600,
@@ -401,6 +401,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
       {briefing.filteredOut.length > 0 && (
         <div style={{ marginTop: space[5] }}>
           <button
+            data-testid="aegis-briefing-filtered-toggle"
             onClick={() => setShowFiltered(!showFiltered)}
             aria-expanded={showFiltered}
             style={{
@@ -426,6 +427,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
             </span>
             Filtered Out ({briefing.filteredOut.length} items)
           </button>
+
 
           {showFiltered && (
             <div style={{ marginTop: space[3] }}>

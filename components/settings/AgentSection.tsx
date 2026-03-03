@@ -82,6 +82,7 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
               </span>
             ))}
             <input
+              data-testid="aegis-settings-interest-input"
               value={newTopic}
               onChange={(e) => setNewTopic(e.target.value.slice(0, 30))}
               onKeyDown={(e) => {
@@ -130,6 +131,7 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
               </span>
             ))}
             <input
+              data-testid="aegis-settings-blocked-author-input"
               value={newBlockedAuthor}
               onChange={(e) => setNewBlockedAuthor(e.target.value.slice(0, 60))}
               onKeyDown={(e) => {
@@ -175,6 +177,7 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
               </span>
             ))}
             <input
+              data-testid="aegis-settings-burn-pattern-input"
               value={newBurnPattern}
               onChange={(e) => setNewBurnPattern(e.target.value.slice(0, 60))}
               onKeyDown={(e) => {
@@ -203,6 +206,7 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
             Quality Threshold: <span style={{ color: colors.cyan[400], fontFamily: fonts.mono }}>{profile.calibration.qualityThreshold.toFixed(1)}</span>
           </div>
           <input
+            data-testid="aegis-settings-quality-threshold"
             type="range"
             min={1} max={9} step={0.5}
             value={profile.calibration.qualityThreshold}

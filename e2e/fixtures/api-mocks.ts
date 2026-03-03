@@ -69,6 +69,20 @@ export async function setupApiMocks(page: Page) {
     });
   });
 
+  // /api/fetch/twitter — return mock tweets
+  await page.route("**/api/fetch/twitter**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        tweets: [
+          { authorHandle: "@researcher", text: "New paper on federated learning achieves SOTA results", createdAt: "2025-01-15T10:00:00Z" },
+          { authorHandle: "@clickbait", text: "WOW you won't BELIEVE this AI trick!!!", createdAt: "2025-01-15T09:00:00Z" },
+        ],
+      }),
+    });
+  });
+
   // /api/fetch/nostr — return empty events
   await page.route("**/api/fetch/nostr**", async (route) => {
     await route.fulfill({
@@ -110,6 +124,86 @@ export async function setupApiMocks(page: Page) {
         contentType: "application/xml",
         body: `<?xml version="1.0"?><rss version="2.0"><channel><title>Mock</title></channel></rss>`,
       });
+    });
+  }
+
+  // /api/briefing/digest — return mock digest
+  await page.route("**/api/briefing/digest**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ digest: "Today's top insights: Advances in transformer architecture enable edge AI deployment." }),
+    });
+  });
+
+  // /api/d2a/health — return healthy
+  await page.route("**/api/d2a/health**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "ok" }),
+    });
+  });
+
+  // /api/d2a/info — return basic info
+  await page.route("**/api/d2a/info**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "active", peers: 0, version: "1.0.0" }),
+    });
+  });
+
+  // /api/upload/image — accept uploads
+  await page.route("**/api/upload/image**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ url: "https://nostr.build/test.jpg" }),
+    });
+  });
+}
+
+/**
+ * Set up API mocks that return errors for specific endpoints.
+ * Call setupApiMocks first, then override specific routes with errors.
+ */
+export async function setupApiErrors(page: Page, config: {
+  analyzeError?: boolean;
+  rssError?: boolean;
+  urlError?: boolean;
+  healthDown?: boolean;
+  twitterError?: boolean;
+  nostrError?: boolean;
+} = {}) {
+  if (config.analyzeError) {
+    await page.route("**/api/analyze", async (route) => {
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Internal server error" }) });
+    });
+  }
+  if (config.rssError) {
+    await page.route("**/api/fetch/rss**", async (route) => {
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Feed fetch failed" }) });
+    });
+  }
+  if (config.urlError) {
+    await page.route("**/api/fetch/url**", async (route) => {
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "URL extraction failed" }) });
+    });
+  }
+  if (config.healthDown) {
+    await page.route("**/api/health**", async (route) => {
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ status: "error" }) });
+    });
+  }
+  if (config.twitterError) {
+    await page.route("**/api/fetch/twitter**", async (route) => {
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Twitter API error" }) });
+    });
+  }
+  if (config.nostrError) {
+    await page.route("**/api/fetch/nostr**", async (route) => {
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Nostr relay connection failed" }) });
     });
   }
 }

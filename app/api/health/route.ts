@@ -12,7 +12,9 @@ export async function GET(request: NextRequest) {
   const checks: Record<string, string> = {};
 
   checks.anthropicKey = process.env.ANTHROPIC_API_KEY?.trim() ? "configured" : "missing";
-  checks.sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim() ? "configured" : "missing";
+  // Mirror sentry.server.config.ts: server-only SENTRY_DSN takes precedence over public var
+  const sentryDsn = process.env.SENTRY_DSN?.trim() || process.env.NEXT_PUBLIC_SENTRY_DSN?.trim();
+  checks.sentryDsn = sentryDsn ? "configured" : "missing";
   checks.kvStore = process.env.KV_REST_API_URL?.trim() ? "configured" : "missing (budget per-instance)";
 
   const canisterId = getCanisterId();
@@ -35,12 +37,17 @@ export async function GET(request: NextRequest) {
     console.warn("[health] IC canister check failed:", err instanceof Error ? err.message : String(err));
   }
 
-  const allOk = checks.anthropicKey === "configured"
-    && checks.icCanister === "reachable"
-    && checks.sentryDsn === "configured";
+  // "ok" requires only services that make the app non-functional when absent.
+  // Sentry and KV are advisory: the app works without them.
+  const allOk = checks.anthropicKey === "configured" && checks.icCanister === "reachable";
+
+  const warnings: string[] = [];
+  if (checks.sentryDsn === "missing") warnings.push("error tracking disabled — configure SENTRY_DSN");
+  if (checks.kvStore.startsWith("missing")) warnings.push("rate limiting is per-instance only — configure KV_REST_API_URL");
 
   return NextResponse.json({
     status: allOk ? "ok" : "degraded",
+    ...(warnings.length > 0 && { warnings }),
     timestamp: new Date().toISOString(),
     version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "local",
     node: process.version,

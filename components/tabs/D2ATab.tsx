@@ -182,7 +182,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
     <div style={{ animation: "fadeIn .4s ease" }}>
       {/* Header */}
       <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
-        <h1 style={{
+        <h1 data-testid="aegis-d2a-heading" style={{
           fontSize: mobile ? t.display.mobileSz : t.display.size,
           fontWeight: t.display.weight,
           lineHeight: t.display.lineHeight,
@@ -192,7 +192,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
         }}>
           D2A Activity
         </h1>
-        <p style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
+        <p data-testid="aegis-d2a-status" style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
           {agentState?.isActive
             ? `Agent active \u2014 ${agentState.peers.length} peers, ${agentState.sentItems}\u2191 ${agentState.receivedItems}\u2193`
             : "Enable D2A Agent in Settings to exchange content with peers"}
@@ -489,6 +489,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
         {subTabs.map(st => (
           <button
             key={st.id}
+            data-testid={`d2a-tab-${st.id}`}
             onClick={() => setSubTab(st.id)}
             title={mobile ? st.label : undefined}
             style={{

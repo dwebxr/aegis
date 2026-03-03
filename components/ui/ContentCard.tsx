@@ -50,7 +50,7 @@ function GradeBadge({ composite }: { composite: number }) {
 
 export function ScoreGrid({ item }: { item: ContentItem }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: space[3], marginBottom: space[4] }}>
+    <div data-testid="aegis-card-score-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: space[3], marginBottom: space[4] }}>
       {hasVCL(item) ? (
         <>
           <Tooltip text={GLOSSARY["V-Signal"]} position="bottom"><ScoreBar label="V Signal" score={item.vSignal!} color={colors.purple[400]} /></Tooltip>
@@ -156,6 +156,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
   return (
     <div
       id={`card-${item.id}`}
+      data-testid="aegis-content-card"
       data-source-url={item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) ? item.sourceUrl : undefined}
       role="button"
       tabIndex={0}
@@ -317,7 +318,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         }}>
           <ScoreGrid item={item} />
           {item.reason && (
-            <div style={{
+            <div data-testid="aegis-card-reason" style={{
               fontSize: t.bodySm.size, color: colors.text.tertiary, lineHeight: 1.5, fontStyle: "italic",
               background: colors.bg.raised, padding: `${space[3]}px ${space[4]}px`, borderRadius: radii.md, marginBottom: space[3],
             }}>
@@ -364,7 +365,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                 {mobile ? "\uD83D\uDD16" : (isBookmarked ? "\uD83D\uDD16 Saved" : "\uD83D\uDD16 Save")}
               </button>
             )}
-            <button disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
+            <button data-testid="aegis-card-validate" disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
               flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
               background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
               border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
@@ -376,7 +377,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
               <CheckIcon />{!mobile && (item.validated ? " Validated" : isSlop && !isLarge ? " Not Slop" : " Validate")}
             </button>
             {(!isSlop || isLarge) && (
-              <button disabled={item.flagged} aria-label="Flag as slop" onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
+              <button data-testid="aegis-card-flag" disabled={item.flagged} aria-label="Flag as slop" onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
                 flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
                 background: item.flagged ? `${colors.red[400]}18` : colors.red.bg,
                 border: `1px solid ${colors.red.border}`, borderRadius: radii.md,

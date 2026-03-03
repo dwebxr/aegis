@@ -737,6 +737,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - ReadableStream readers wrapped in try-finally for guaranteed cleanup on error (ogimage)
 - IC delegation/signature expiry detection fires `aegis:session-expired` event (covers 5 @dfinity/agent error patterns)
 - All localStorage catch blocks log diagnostically (no silent swallowing)
+- Health endpoint `/api/health` separates required services (`anthropicKey`, `icCanister`) from advisory services (`sentryDsn`, `kvStore`); missing advisory services populate `warnings[]` without changing `status` to `"degraded"`
 
 ### API Hardening
 - Request body size limits on all POST routes (64KB for analyze, 512KB default)
@@ -780,7 +781,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (4449 tests, 262 suites) |
+| Test | Jest + ts-jest (4449 unit/integration tests, 262 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
 
 ## Project Structure
 
@@ -940,7 +941,8 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 4449 tests across 262 suites
+├── __tests__/                           # 4449 Jest tests across 262 suites
+├── e2e/                                 # Playwright E2E tests (299 tests, 12 specs)
 ├── canisters/
 │   └── aegis_backend/
 │       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
@@ -976,8 +978,9 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Run all tests
+npm test              # Jest unit + integration tests (4449 tests)
 npm run test:watch    # Watch mode
+npx playwright test   # E2E tests — requires dev server (npm run dev)
 ```
 
 ### Environment Variables

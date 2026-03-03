@@ -59,7 +59,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
   return (
     <div style={{ animation: "fadeIn .4s ease" }}>
       {isDemoMode && (
-        <div style={{
+        <div data-testid="aegis-analytics-demo-banner" style={{
           background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.15)",
           borderRadius: radii.md, padding: `${space[2]}px ${space[4]}px`, marginBottom: space[4],
           fontSize: t.bodySm.size, color: colors.blue[400], fontWeight: 600,
@@ -68,7 +68,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
         </div>
       )}
       <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
-        <h1 style={{
+        <h1 data-testid="aegis-analytics-heading" style={{
           fontSize: mobile ? t.display.mobileSz : t.display.size,
           fontWeight: t.display.weight,
           lineHeight: t.display.lineHeight,
@@ -78,7 +78,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
         }}>
           Analytics
         </h1>
-        <p style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
+        <p data-testid="aegis-analytics-subtitle" style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
           Performance & content metrics
         </p>
       </div>
@@ -109,7 +109,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
         </div>
       )}
 
-      <div style={surfaceCard(mobile)}>
+      <div data-testid="aegis-analytics-eval-summary" style={surfaceCard(mobile)}>
         <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[4] }}>Evaluation Summary</div>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: mobile ? space[2] : space[3] }}>
           {[

@@ -89,6 +89,7 @@ export const DataSection: React.FC<DataSectionProps> = ({ mobile, content }) => 
 
             <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
               <button
+                data-testid="aegis-settings-export-csv"
                 onClick={() => exportContentCSV(content, scope)}
                 style={{
                   ...actionBtnStyle,
@@ -100,6 +101,7 @@ export const DataSection: React.FC<DataSectionProps> = ({ mobile, content }) => 
                 Export CSV
               </button>
               <button
+                data-testid="aegis-settings-export-json"
                 onClick={() => exportContentJSON(content, scope)}
                 style={{
                   ...actionBtnStyle,
@@ -133,7 +135,7 @@ export const DataSection: React.FC<DataSectionProps> = ({ mobile, content }) => 
               <button onClick={() => setConfirmAction(null)} style={cancelBtnStyle}>Cancel</button>
             </div>
           ) : (
-            <button onClick={handleClearCache} style={actionBtnStyle}>
+            <button data-testid="aegis-settings-clear-cache" onClick={handleClearCache} style={actionBtnStyle}>
               Clear Content Cache
             </button>
           )}
@@ -145,7 +147,7 @@ export const DataSection: React.FC<DataSectionProps> = ({ mobile, content }) => 
               <button onClick={() => setConfirmAction(null)} style={cancelBtnStyle}>Cancel</button>
             </div>
           ) : (
-            <button onClick={handleResetPrefs} disabled={!isAuthenticated} style={{ ...actionBtnStyle, opacity: isAuthenticated ? 1 : 0.4, cursor: isAuthenticated ? "pointer" : "not-allowed" }}>
+            <button data-testid="aegis-settings-reset-prefs" onClick={handleResetPrefs} disabled={!isAuthenticated} style={{ ...actionBtnStyle, opacity: isAuthenticated ? 1 : 0.4, cursor: isAuthenticated ? "pointer" : "not-allowed" }}>
               Reset Preferences
             </button>
           )}

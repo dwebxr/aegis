@@ -7,6 +7,7 @@ export class IncineratorPage {
   readonly analyzeButton: Locator;
   readonly resultContainer: Locator;
   readonly verdictLabel: Locator;
+  readonly errorMessage: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -15,6 +16,7 @@ export class IncineratorPage {
     this.analyzeButton = page.getByTestId("aegis-manual-analyze");
     this.resultContainer = page.getByTestId("aegis-manual-result");
     this.verdictLabel = page.getByTestId("aegis-manual-verdict");
+    this.errorMessage = page.getByTestId("aegis-manual-error");
   }
 
   /** Type text and click Analyze, wait for result */
@@ -27,5 +29,9 @@ export class IncineratorPage {
   /** Get the verdict text (Quality or Slop) */
   async getVerdict(): Promise<string> {
     return (await this.verdictLabel.textContent()) ?? "";
+  }
+
+  async clearTextarea() {
+    await this.textarea.fill("");
   }
 }

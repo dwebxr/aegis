@@ -83,3 +83,51 @@ export const QUALITY_TEXT =
   "Researchers at MIT have published a groundbreaking study on federated learning that achieves state-of-the-art results while preserving differential privacy guarantees. The paper introduces a novel aggregation protocol that reduces communication overhead by 75% compared to existing approaches, making it practical for deployment across thousands of edge devices. The technique has been validated on medical imaging datasets across 12 hospitals.";
 
 export const SLOP_TEXT = "WOW check this out!!!";
+
+/** Pre-scored content items for dashboard content card tests. */
+export const MOCK_CONTENT_ITEMS = [
+  {
+    id: "e2e-quality-1",
+    owner: "e2e-test",
+    author: "Dr. Sarah Chen",
+    avatar: "",
+    text: "Researchers have developed a novel approach to running large language models on edge devices.",
+    source: "rss" as const,
+    sourceUrl: "https://example.com/transformers-edge",
+    scores: { originality: 8, insight: 7, credibility: 8, composite: 7.7 },
+    verdict: "quality" as const,
+    reason: "Well-sourced research with novel approach and measurable results",
+    createdAt: Date.now() - 60_000,
+    validated: false,
+    flagged: false,
+    timestamp: new Date().toISOString(),
+    topics: ["AI", "edge computing"],
+    vSignal: 7.5,
+    cContext: 6.8,
+    lSlop: 1.5,
+    scoredByAI: true,
+    scoringEngine: "heuristic",
+  },
+  {
+    id: "e2e-slop-1",
+    owner: "e2e-test",
+    author: "Content Mill",
+    avatar: "",
+    text: "10 AMAZING AI Tools You MUST Try!!!",
+    source: "rss" as const,
+    sourceUrl: "https://example.com/clickbait",
+    scores: { originality: 2, insight: 1, credibility: 2, composite: 1.7 },
+    verdict: "slop" as const,
+    reason: "Clickbait title with no substantive analysis",
+    createdAt: Date.now() - 120_000,
+    validated: false,
+    flagged: false,
+    timestamp: new Date().toISOString(),
+    topics: ["general"],
+    vSignal: 2.0,
+    cContext: 3.0,
+    lSlop: 8.0,
+    scoredByAI: true,
+    scoringEngine: "heuristic",
+  },
+];

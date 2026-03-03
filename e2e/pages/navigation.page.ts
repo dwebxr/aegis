@@ -23,14 +23,4 @@ export class NavigationPage {
   settingsButton(): Locator {
     return this.page.getByTestId("aegis-nav-settings");
   }
-
-  /** Get demo banner */
-  demoBanner(): Locator {
-    return this.page.getByTestId("aegis-demo-banner");
-  }
-
-  /** Get demo banner dismiss button */
-  demoBannerDismiss(): Locator {
-    return this.page.getByTestId("aegis-demo-banner-dismiss");
-  }
 }

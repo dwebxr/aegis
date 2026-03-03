@@ -19,19 +19,4 @@ export class LandingPage {
   async enterDemo() {
     await this.tryDemoButton.click();
   }
-
-  /** Get the "How It Works" section */
-  howItWorks() {
-    return this.page.getByText("How It Works");
-  }
-
-  /** Get the "Features" section */
-  features() {
-    return this.page.getByText("Features").first();
-  }
-
-  /** Get the "Who It's For" section */
-  whoItsFor() {
-    return this.page.getByText("Who It\u2019s For");
-  }
 }

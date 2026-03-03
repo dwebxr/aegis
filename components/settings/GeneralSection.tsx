@@ -76,6 +76,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
             </div>
           </div>
           <button
+            data-testid="aegis-settings-theme-toggle"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
             style={{
@@ -150,6 +151,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
               </div>
               <div style={{ display: "flex", gap: space[2] }}>
                 <input
+                  data-testid="aegis-settings-alert-topic-input"
                   type="text"
                   value={alertTopicInput}
                   onChange={e => setAlertTopicInput(e.target.value)}
@@ -162,7 +164,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
                     fontFamily: "inherit", outline: "none",
                   }}
                 />
-                <button onClick={handleAddAlertTopic} disabled={!alertTopicInput.trim()} style={{
+                <button data-testid="aegis-settings-alert-topic-add" onClick={handleAddAlertTopic} disabled={!alertTopicInput.trim()} style={{
                   ...actionBtnStyle,
                   opacity: alertTopicInput.trim() ? 1 : 0.4,
                   cursor: alertTopicInput.trim() ? "pointer" : "not-allowed",

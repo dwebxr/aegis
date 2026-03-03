@@ -63,22 +63,27 @@ describe("GET /api/health", () => {
   });
 
   it("reports 'ok' when all checks pass", async () => {
-    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key", NEXT_PUBLIC_SENTRY_DSN: "https://test@sentry.io/1" };
+    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key", NEXT_PUBLIC_SENTRY_DSN: "https://test@sentry.io/1", KV_REST_API_URL: "https://kv.vercel.com" };
     const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.status).toBe("ok");
     expect(data.checks.anthropicKey).toBe("configured");
     expect(data.checks.icCanister).toBe("reachable");
     expect(data.checks.sentryDsn).toBe("configured");
+    expect(data.warnings).toBeUndefined();
   });
 
-  it("reports 'degraded' when SENTRY_DSN is missing", async () => {
+  it("reports 'ok' (not degraded) when only SENTRY_DSN is missing, but includes warning", async () => {
+    // Sentry is advisory: absence degrades observability but the app still functions.
     process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key" };
     delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+    delete process.env.SENTRY_DSN;
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.status).toBe("degraded");
+    expect(data.status).toBe("ok");
     expect(data.checks.sentryDsn).toBe("missing");
+    expect(Array.isArray(data.warnings)).toBe(true);
+    expect(data.warnings.some((w: string) => w.includes("error tracking disabled"))).toBe(true);
   });
 
   it("reports kvStore status", async () => {

@@ -7,6 +7,7 @@ export class DashboardPage {
   readonly dashboardModeButton: Locator;
   readonly metricsBar: Locator;
   readonly top3Section: Locator;
+  readonly homeHeading: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -15,6 +16,7 @@ export class DashboardPage {
     this.dashboardModeButton = page.getByTestId("aegis-home-mode-dashboard");
     this.metricsBar = page.getByTestId("aegis-metrics-bar");
     this.top3Section = page.getByTestId("aegis-top3-section");
+    this.homeHeading = page.getByRole("heading", { name: "Home" });
   }
 
   filterButton(verdict: string): Locator {

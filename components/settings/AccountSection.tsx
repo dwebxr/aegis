@@ -88,6 +88,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
                 {principalText}
               </code>
               <button
+                data-testid="aegis-settings-copy-principal"
                 onClick={() => handleCopy(principalText, "principal")}
                 style={{
                   padding: `2px ${space[2]}px`, background: "transparent",
@@ -105,6 +106,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
           <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
             <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>Not connected</span>
             <button
+              data-testid="aegis-settings-login"
               onClick={login}
               style={{
                 padding: `${space[1]}px ${space[4]}px`,
@@ -157,6 +159,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
 
           {!showDeleteConfirm ? (
             <button
+              data-testid="aegis-settings-delete-data"
               onClick={() => setShowDeleteConfirm(true)}
               style={{
                 padding: `${space[2]}px ${space[4]}px`,
@@ -186,6 +189,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
               </div>
               <div style={{ display: "flex", gap: space[2], alignItems: "center", flexWrap: "wrap" }}>
                 <input
+                  data-testid="aegis-settings-delete-input"
                   type="text"
                   value={deleteInput}
                   onChange={e => setDeleteInput(e.target.value)}
@@ -198,6 +202,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
                   }}
                 />
                 <button
+                  data-testid="aegis-settings-delete-confirm"
                   onClick={handleDeleteLocalData}
                   disabled={deleteInput !== "DELETE" || deleting}
                   style={{

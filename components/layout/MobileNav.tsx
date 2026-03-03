@@ -64,7 +64,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
             {footerButtons.map(btn => {
               const active = activeTab === btn.id;
               return (
-                <button key={btn.id} onClick={() => onTabChange(btn.id)} title={btn.title} style={{
+                <button key={btn.id} data-testid={`aegis-nav-mobile-${btn.id}`} onClick={() => onTabChange(btn.id)} title={btn.title} style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 28, height: 28, padding: 0,
                   background: active ? "rgba(37,99,235,0.12)" : "transparent",

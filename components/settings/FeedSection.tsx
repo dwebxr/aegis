@@ -204,7 +204,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
                   <button onClick={() => setConfirmAction(null)} style={cancelBtnStyle}>Cancel</button>
                 </div>
               ) : (
-                <button onClick={handleClearApiKey} style={actionBtnStyle}>Clear</button>
+                <button data-testid="aegis-settings-apikey-clear" onClick={handleClearApiKey} style={actionBtnStyle}>Clear</button>
               )}
             </div>
           </div>
@@ -212,6 +212,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
           <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
             <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
               <input
+                data-testid="aegis-settings-apikey-input"
                 type="password"
                 value={apiKeyInput}
                 onChange={e => setApiKeyInput(e.target.value)}
@@ -224,6 +225,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
                 }}
               />
               <button
+                data-testid="aegis-settings-apikey-save"
                 onClick={handleSaveApiKey}
                 disabled={!apiKeyInput}
                 style={{
@@ -249,6 +251,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
         <div style={sectionTitle}>Local LLM (Ollama)</div>
         <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[3] }}>
           <button
+            data-testid="aegis-settings-ollama-toggle"
             onClick={handleOllamaToggle}
             style={{
               position: "relative",
@@ -378,6 +381,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
         <div style={sectionTitle}>Browser AI</div>
         <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[3] }}>
           <button
+            data-testid="aegis-settings-webllm-toggle"
             onClick={handleWebLLMToggle}
             style={{
               position: "relative",

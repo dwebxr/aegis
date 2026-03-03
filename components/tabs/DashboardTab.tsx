@@ -552,7 +552,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           {/* Content filters */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3], flexWrap: "wrap", gap: space[2] }}>
             <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
-              Filtered Signal {hasActiveFilter && <span style={{ fontSize: t.bodySm.size, color: colors.text.disabled }}>({filteredContent.length})</span>}
+              Filtered Signal {hasActiveFilter && <span data-testid="aegis-filter-count" style={{ fontSize: t.bodySm.size, color: colors.text.disabled }}>({filteredContent.length})</span>}
             </div>
             <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
               {([
@@ -565,6 +565,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 <button
                   key={v}
                   data-testid={`aegis-filter-${v}`}
+                  aria-pressed={verdictFilter === v}
                   onClick={() => setVerdictFilter(v)}
                   style={{
                     padding: `${space[1]}px ${space[3]}px`,

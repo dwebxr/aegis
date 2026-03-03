@@ -494,7 +494,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
 
       <div style={{ display: "flex", gap: space[1], marginBottom: space[5], flexWrap: "wrap" }}>
         {sourceTabs.map(s => (
-          <button key={s.id} onClick={() => setActiveSource(s.id)} style={{
+          <button key={s.id} data-testid={`aegis-sources-tab-${s.id}`} onClick={() => setActiveSource(s.id)} style={{
             display: "flex", alignItems: "center", gap: 6,
             padding: `${space[2]}px ${space[4]}px`, borderRadius: radii.sm, fontSize: t.bodySm.size, fontWeight: 600,
             cursor: "pointer", transition: transitions.fast,
@@ -518,14 +518,14 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
           <div>
             <label style={labelStyle}>Article URL</label>
             <div style={{ display: "flex", gap: space[2] }}>
-              <input value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="https://example.com/article" style={{ ...inputStyle, flex: 1 }} />
-              <button onClick={() => fetchUrl()} disabled={urlLoading || !urlInput.trim()} style={btnStyle(!urlInput.trim(), urlLoading)}>
+              <input data-testid="aegis-sources-url-input" value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="https://example.com/article" style={{ ...inputStyle, flex: 1 }} />
+              <button data-testid="aegis-sources-extract-btn" onClick={() => fetchUrl()} disabled={urlLoading || !urlInput.trim()} style={btnStyle(!urlInput.trim(), urlLoading)}>
                 {urlLoading ? "Extracting..." : "Extract"}
               </button>
             </div>
-            {urlError && <div style={errorStyle}>{urlError}</div>}
+            {urlError && <div data-testid="aegis-sources-url-error" style={errorStyle}>{urlError}</div>}
             {urlResult && (
-              <div style={{ marginTop: space[4], background: colors.bg.raised, borderRadius: radii.md, padding: space[4] }}>
+              <div data-testid="aegis-sources-url-result" style={{ marginTop: space[4], background: colors.bg.raised, borderRadius: radii.md, padding: space[4] }}>
                 <div style={{ display: "flex", gap: space[3], marginBottom: space[3] }}>
                   {urlResult.imageUrl && (
                     /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
@@ -559,6 +559,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             <label style={labelStyle}>RSS Feed URL</label>
             <div style={{ display: "flex", gap: space[2] }}>
               <input
+                data-testid="aegis-sources-rss-input"
                 value={rssInput}
                 onChange={e => {
                   setRssInput(e.target.value);
@@ -784,7 +785,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
       </div>
 
       {/* Popular Sources Catalog */}
-      <div style={{
+      <div data-testid="aegis-sources-catalog" style={{
         background: colors.bg.surface,
         border: `1px solid ${colors.border.default}`,
         borderRadius: radii.lg,

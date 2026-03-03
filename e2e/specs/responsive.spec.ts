@@ -1,70 +1,81 @@
-import { test as base, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/base";
 import { setupApiMocks } from "../fixtures/api-mocks";
-
-const test = base;
-
-/** Dismiss Next.js dev error overlay if present */
-async function dismissErrorOverlay(page: import("@playwright/test").Page) {
-  // The nextjs-portal error overlay can intercept pointer events in dev mode.
-  // Press Escape and remove it via JS to ensure clean interactions.
-  await page.keyboard.press("Escape");
-  await page.evaluate(() => {
-    document.querySelectorAll("nextjs-portal").forEach(el => el.remove());
-  });
-}
+import { enterDemoMode, dismissErrorOverlay } from "../fixtures/base";
+import { QUALITY_TEXT } from "../fixtures/test-data";
+import { TIMEOUTS } from "../constants";
 
 test.describe("Responsive Layout", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
-  test("mobile viewport shows bottom navigation bar", async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await setupApiMocks(page);
     await page.goto("/");
-    // Dismiss landing
-    const tryDemo = page.getByTestId("aegis-landing-try-demo");
-    await tryDemo.waitFor({ state: "visible", timeout: 10_000 });
-    await tryDemo.click();
-    await page.getByTestId("aegis-dashboard").waitFor({ state: "visible", timeout: 10_000 });
-    // Mobile bottom nav should be visible
+  });
+
+  test("mobile viewport shows bottom navigation bar, not sidebar", async ({ page }) => {
+    await enterDemoMode(page);
     await expect(page.getByTestId("aegis-nav-mobile-dashboard")).toBeVisible();
-    await expect(page.getByTestId("aegis-nav-mobile-sources")).toBeVisible();
-    // Desktop sidebar nav should NOT be visible
     await expect(page.getByTestId("aegis-nav-dashboard")).not.toBeVisible();
   });
 
-  test("mobile landing page renders properly", async ({ page }) => {
-    await setupApiMocks(page);
-    await page.goto("/");
-    await expect(page.getByTestId("aegis-landing-heading")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId("aegis-landing-try-demo")).toBeVisible();
-  });
-
-  test("Try the Demo button spans full width on mobile", async ({ page }) => {
-    await setupApiMocks(page);
-    await page.goto("/");
-    const btn = page.getByTestId("aegis-landing-try-demo");
-    await btn.waitFor({ state: "visible", timeout: 10_000 });
-    const box = await btn.boundingBox();
+  test("mobile landing page renders with full-width CTA", async ({ page }) => {
+    const tryDemo = page.getByTestId("aegis-landing-try-demo");
+    await tryDemo.waitFor({ state: "visible", timeout: TIMEOUTS.long });
+    const box = await tryDemo.boundingBox();
     expect(box).toBeTruthy();
-    // Button should be close to viewport width (375px) minus padding
     expect(box!.width).toBeGreaterThan(300);
   });
 
-  test("mobile nav switches tabs correctly", async ({ page }) => {
-    await setupApiMocks(page);
-    await page.goto("/");
-    const tryDemo = page.getByTestId("aegis-landing-try-demo");
-    await tryDemo.waitFor({ state: "visible", timeout: 10_000 });
-    await tryDemo.click();
-    await page.getByTestId("aegis-dashboard").waitFor({ state: "visible", timeout: 10_000 });
-    // Dismiss dev error overlay if present
+  test("mobile nav switches between tabs correctly", async ({ page }) => {
+    await enterDemoMode(page);
     await dismissErrorOverlay(page);
-    // Navigate to Sources via mobile nav
+
     await page.getByTestId("aegis-nav-mobile-sources").click();
-    await expect(page.getByTestId("aegis-sources-heading")).toBeVisible({ timeout: 10_000 });
-    // Dismiss overlay again after navigation
+    await expect(page.getByTestId("aegis-sources-heading")).toBeVisible();
+
     await dismissErrorOverlay(page);
-    // Navigate to Burn
+
     await page.getByTestId("aegis-nav-mobile-incinerator").click();
-    await expect(page.getByTestId("aegis-incinerator-heading")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("aegis-incinerator-heading")).toBeVisible();
+  });
+
+  test("mobile Incinerator textarea is usable", async ({ page }) => {
+    await enterDemoMode(page);
+    await dismissErrorOverlay(page);
+
+    await page.getByTestId("aegis-nav-mobile-incinerator").click();
+    await page.getByTestId("aegis-incinerator-heading").waitFor({ state: "visible", timeout: TIMEOUTS.navigation });
+
+    await page.getByTestId("aegis-manual-textarea").fill(QUALITY_TEXT);
+    await page.getByTestId("aegis-manual-analyze").click();
+    await expect(page.getByTestId("aegis-manual-result")).toBeVisible({ timeout: TIMEOUTS.api });
+  });
+
+  test("mobile Dashboard shows metrics bar", async ({ page }) => {
+    await enterDemoMode(page);
+    await expect(page.getByTestId("aegis-metrics-bar")).toBeVisible();
+  });
+
+  test("mobile nav does not show Settings in demo mode", async ({ page }) => {
+    await enterDemoMode(page);
+    await expect(page.getByTestId("aegis-nav-mobile-settings")).not.toBeVisible();
+  });
+
+  test("mobile filter pills are tappable", async ({ page }) => {
+    await enterDemoMode(page);
+    const slopFilter = page.getByTestId("aegis-filter-slop");
+    await expect(slopFilter).toBeVisible();
+    // Default is quality (aria-pressed=true); tapping slop switches the active filter
+    await slopFilter.click();
+    await expect(slopFilter).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("aegis-filter-quality")).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("mobile mode toggle buttons work", async ({ page }) => {
+    await enterDemoMode(page);
+    const dashBtn = page.getByTestId("aegis-home-mode-dashboard");
+    await expect(dashBtn).toBeVisible();
+    await dashBtn.click();
+    await expect(page.getByTestId("aegis-top3-section")).toBeVisible();
   });
 });
