@@ -9,6 +9,20 @@
 
 ## Latest Updates (March 2026)
 
+### Dashboard → Analytics UX Restructuring
+- **Action vs Observation separation**: Dashboard is now action-oriented (7 sections), Analytics is observation-oriented (9 sections)
+- **Activity Trends** moved from Dashboard to Analytics (default range: 7 days) — topic affinity buttons removed (Analytics is observation-only)
+- **Topic Breakdown** moved from Dashboard to Analytics — distribution bars with trend arrows and weekly sparklines
+- **Evaluation Summary** removed from Analytics (duplicated KPI Cards)
+- **Session Activity** merged into D2A Agent card — unified 8-metric grid (Peers/Handshakes/Sent/Received/Validated/Flagged/D2A Received/Fee Matches)
+- **D2ANetworkMini** added inside D2A Agent card in Analytics
+
+### Code Quality Audit
+- `validateContentItems` hardened: validates 8 required fields (was only checking `id` + `createdAt` — corrupt cache could crash downstream score reads)
+- `parseScoreResponse` now warns when LLM omits composite score and fallback formula is used
+- All silent `catch {}` blocks replaced with diagnostic logging
+- Zero TypeScript errors, zero ESLint warnings, zero skipped tests
+
 ### Dashboard Performance Optimization
 - **Feed-mode computation guard**: Dashboard-only calculations (Top3, Topic Spotlight, Activity, Trends) are fully skipped in Feed mode — zero wasted work
 - **Story clustering 15x speedup**: `clusterByStory` uses sorted early-break instead of full O(n²) pair comparison
@@ -687,7 +701,8 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 ### Dashboard & Briefing
 - **Top 3 + Topic Spotlight** hero cards with 16:9 thumbnails and inline Validate/Flag buttons
 - YouTube content auto-embeds as playable iframe in hero cards (Top3, Spotlight hero)
-- Unreviewed Queue, Saved Items, and Topic Distribution in collapsible sections with lazy rendering
+- Unreviewed Queue, Saved Items, and Agent Knowledge in collapsible sections with lazy rendering
+- Activity Trends and Topic Breakdown moved to Analytics tab (action/observation separation)
 - Validated items excluded from Top3 and Spotlight to always surface actionable content
 - Cascading dedup: Top3 → Spotlight → Discoveries → Queue → Saved (no item appears twice)
 - Ranks content by composite score, topic relevance, author trust, and recency
@@ -733,7 +748,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Notification toasts: dismiss button with `aria-label="Dismiss notification"`
 
 ### Performance
-- Dashboard computations (Top3, Spotlight, Activity, Trends, Distribution, Clustering) guarded by `homeMode` — zero cost in Feed mode
+- Dashboard computations (Top3, Spotlight, Clustering) guarded by `homeMode` — zero cost in Feed mode; Activity Trends and Topic Breakdown computed in Analytics tab only
 - `clusterByStory` sorted early-break: O(n²) reduced to ~O(n×k) where k = items within 48h window (15x fewer comparisons at N=171)
 - `computeDashboardActivity` / `computeTopicTrends`: single-pass day/week bucketing replaces multi-pass filter loops
 - Cache-first loading: `cacheChecked` flag prevents loading spinner flash — cached content displays instantly on revisit
@@ -801,7 +816,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (4534 unit/integration tests, 263 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
+| Test | Jest + ts-jest (4537 unit/integration tests, 264 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
 
 ## Project Structure
 
@@ -835,7 +850,7 @@ aegis/
 │           └── discover-feed/route.ts   # RSS feed auto-discovery from any URL
 ├── components/
 │   ├── layout/                          # AppShell, Sidebar, MobileNav
-│   ├── tabs/                            # Dashboard (Top3, Spotlight, Discoveries, YouTube embed), Briefing, Incinerator, Sources, Analytics, D2A Activity, Settings (sub-tab orchestrator)
+│   ├── tabs/                            # Dashboard (Top3, Spotlight, Discoveries, YouTube embed), Briefing, Incinerator, Sources, Analytics (Activity Trends, Topic Breakdown, KPI, Charts, D2A Agent), D2A Activity, Settings (sub-tab orchestrator)
 │   ├── settings/                        # Settings sub-tab sections
 │   │   ├── GeneralSection.tsx           # Theme toggle + push notification preferences
 │   │   ├── AgentSection.tsx             # Interests, blocked authors, burn patterns, quality threshold, D2A params
@@ -961,7 +976,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 4449 Jest tests across 262 suites
+├── __tests__/                           # 4537 Jest tests across 264 suites
 ├── e2e/                                 # Playwright E2E tests (299 tests, 12 specs)
 ├── canisters/
 │   └── aegis_backend/
@@ -998,7 +1013,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Jest unit + integration tests (4449 tests)
+npm test              # Jest unit + integration tests (4537 tests)
 npm run test:watch    # Watch mode
 npx playwright test   # E2E tests — requires dev server (npm run dev)
 ```
