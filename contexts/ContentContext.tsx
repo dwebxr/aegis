@@ -80,10 +80,21 @@ async function tryBYOK(text: string, uc: UserContext | null | undefined, key: st
 function validateContentItems(parsed: unknown): ContentItem[] {
   if (!Array.isArray(parsed)) return [];
   return parsed.filter(
-    (c: unknown): c is ContentItem =>
-      !!c && typeof c === "object" &&
-      typeof (c as ContentItem).id === "string" &&
-      typeof (c as ContentItem).createdAt === "number",
+    (c: unknown): c is ContentItem => {
+      if (!c || typeof c !== "object") return false;
+      const item = c as Record<string, unknown>;
+      return (
+        typeof item.id === "string" &&
+        typeof item.text === "string" &&
+        typeof item.source === "string" &&
+        typeof item.createdAt === "number" &&
+        typeof item.verdict === "string" &&
+        typeof item.validated === "boolean" &&
+        typeof item.flagged === "boolean" &&
+        !!item.scores && typeof item.scores === "object" &&
+        typeof (item.scores as Record<string, unknown>).composite === "number"
+      );
+    },
   );
 }
 

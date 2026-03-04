@@ -67,7 +67,8 @@ describe("parseScoreResponse", () => {
     expect(result!.composite).toBe(10);
   });
 
-  it("computes composite from V/C/L when composite is missing", () => {
+  it("computes composite from V/C/L when composite is missing and logs warning", () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
     const noComposite = JSON.stringify({
       vSignal: 8,
       cContext: 6,
@@ -83,6 +84,12 @@ describe("parseScoreResponse", () => {
     expect(result).not.toBeNull();
     // (8*6)/(2+0.5) = 48/2.5 = 19.2 → clamped to 10
     expect(result!.composite).toBe(10);
+    // Verify fallback warning was emitted
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("LLM omitted composite score"),
+      expect.any(String),
+    );
+    warnSpy.mockRestore();
   });
 
   it("returns null for garbage input", () => {

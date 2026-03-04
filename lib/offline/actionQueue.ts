@@ -51,8 +51,8 @@ export async function enqueueAction(type: QueuedActionType, payload: unknown): P
     try {
       const reg = await navigator.serviceWorker.ready;
       await (reg as ServiceWorkerRegistration & { sync: { register(tag: string): Promise<void> } }).sync.register("aegis-offline-queue");
-    } catch {
-      // SyncManager not supported or permission denied — falls back to onReconnect
+    } catch (err) {
+      console.debug("[offline-queue] SyncManager registration failed, falling back to onReconnect:", err);
     }
   }
 }
