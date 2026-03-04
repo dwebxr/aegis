@@ -44,7 +44,7 @@ async function fetchAnalyze(
       method: "POST",
       headers,
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(25_000),
+      signal: AbortSignal.timeout(15_000),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -442,17 +442,18 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
     // Tier 0-2: Run enabled local tiers in parallel (fastest wins)
     const localTiers: Promise<AnalyzeResponse>[] = [];
-    if (isOllamaEnabled()) localTiers.push(tryOllama(text, topics));
-    if (isWebLLMEnabled()) localTiers.push(tryWebLLM(text, topics));
-    if (userApiKey) localTiers.push(tryBYOK(text, userContext, userApiKey));
+    const tierNames: string[] = [];
+    if (isOllamaEnabled()) { localTiers.push(tryOllama(text, topics)); tierNames.push("ollama"); }
+    if (isWebLLMEnabled()) { localTiers.push(tryWebLLM(text, topics)); tierNames.push("webllm"); }
+    if (userApiKey) { localTiers.push(tryBYOK(text, userContext, userApiKey)); tierNames.push("byok"); }
 
     if (localTiers.length > 0) {
       try {
         result = await Promise.any(localTiers);
       } catch (err) {
-        // All local tiers failed — log aggregate and fall through
+        // All local tiers failed — log each tier's error for debuggability
         const reasons = err instanceof AggregateError
-          ? err.errors.map(e => errMsg(e)).join("; ")
+          ? err.errors.map((e, i) => `${tierNames[i]}: ${errMsg(e)}`).join("; ")
           : errMsg(err);
         console.warn("[scoreText] All local tiers failed:", reasons);
       }
@@ -463,8 +464,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       try {
         const icResult = await withTimeout(
           actorRef.current.analyzeOnChain(text.slice(0, 3000), topics),
-          30_000,
-          "IC LLM timeout (30s)",
+          10_000,
+          "IC LLM timeout (10s)",
         );
         if ("ok" in icResult) {
           const a = icResult.ok;
@@ -513,7 +514,14 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const analyze = useCallback(async (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }): Promise<AnalyzeResponse> => {
     setIsAnalyzing(true);
     try {
-      const result = await scoreText(text, userContext);
+      let result: AnalyzeResponse;
+      try {
+        result = await withTimeout(scoreText(text, userContext), 20_000, "Scoring cascade timeout (20s)");
+      } catch (cascadeErr) {
+        console.warn("[analyze] Scoring cascade failed/timed out, using heuristic:", errMsg(cascadeErr));
+        const { heuristicScores } = await import("@/lib/ingestion/quickFilter");
+        result = { ...heuristicScores(text), scoredByAI: false, scoringEngine: "heuristic" as const };
+      }
       if (result.scoringEngine === "heuristic") {
         addNotification("AI unavailable \u2014 scored with basic heuristics", "info");
       }
@@ -613,7 +621,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       syncToIC(actorRef.current.saveEvaluation(toICEvaluation(owned, principal)), "saveEvaluation", { itemId: owned.id });
     }
 
-    // Dedup against visible content + pending buffer
+    // Fast dedup against visible content + pending buffer.
+    // contentRef.current may be stale during React batches, but the setState
+    // updater in auto-flush / flushPendingItems re-checks against fresh `prev`,
+    // so duplicates that slip past here are caught before rendering.
     const isDup = contentRef.current.some(c =>
       (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
       (!item.sourceUrl && c.text === item.text),
@@ -631,7 +642,13 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       const items = pendingItemsRef.current;
       pendingItemsRef.current = [];
       setPendingCount(0);
-      setContent(prev => truncatePreservingActioned([...items, ...prev]));
+      setContent(prev => {
+        const fresh = items.filter(item => !prev.some(c =>
+          (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
+          (!item.sourceUrl && c.text === item.text),
+        ));
+        return truncatePreservingActioned([...fresh, ...prev]);
+      });
     }
   }, [isAuthenticated, principal, addNotification]);
 
@@ -640,7 +657,13 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     const items = pendingItemsRef.current;
     pendingItemsRef.current = [];
     setPendingCount(0);
-    setContent(prev => truncatePreservingActioned([...items, ...prev]));
+    setContent(prev => {
+      const fresh = items.filter(item => !prev.some(c =>
+        (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
+        (!item.sourceUrl && c.text === item.text),
+      ));
+      return truncatePreservingActioned([...fresh, ...prev]);
+    });
   }, []);
 
   const clearDemoContent = () => setContent(prev => prev.filter(c => c.owner !== ""));
@@ -788,7 +811,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         setSyncStatus("idle");
         clearTimeout(syncRetryTimerRef.current);
         syncRetryTimerRef.current = setTimeout(() => {
-          loadFromICRef.current().catch(() => {
+          loadFromICRef.current().catch((retryErr: unknown) => {
+            console.error("[content] IC sync retry failed:", errMsg(retryErr));
             setSyncStatus("offline");
             addNotification("IC sync unavailable", "error");
           });

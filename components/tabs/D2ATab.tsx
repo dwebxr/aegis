@@ -375,7 +375,15 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                     This account was auto-generated from your Internet Identity as your Aegis agent{"'"}s Nostr account.
                   </p>
                   <p style={{ margin: 0, marginBottom: space[2] }}>
-                    Your linked main Nostr account (npub) is used only for the follow graph (WoT). All posts come from this agent account.
+                    Your {onTabChange ? (
+                      <a
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); onTabChange("settings:account"); }}
+                        style={{ color: colors.purple[400], textDecoration: "underline", cursor: "pointer" }}
+                      >linked main Nostr account (npub)</a>
+                    ) : (
+                      "linked main Nostr account (npub)"
+                    )} is used only for the follow graph (WoT). All posts come from this agent account.
                   </p>
                   <p style={{ margin: 0 }}>
                     The icon, name, and about set here are published as a Nostr Kind 0 profile, visible from other Nostr clients.
@@ -593,8 +601,8 @@ export const D2ATab: React.FC<D2ATabProps> = ({
               emoji={"\u21C4"}
               title="Start exchanging content"
               subtitle="D2A lets your agent autonomously discover peers with shared interests and exchange quality content."
-              action={onTabChange ? () => onTabChange("settings") : undefined}
-              actionLabel="Enable in Settings"
+              action={onTabChange ? () => onTabChange("settings:agent") : undefined}
+              actionLabel="Enable in Settings →"
             />
           )}
         </div>
@@ -882,8 +890,8 @@ export const D2ATab: React.FC<D2ATabProps> = ({
               emoji={"\uD83D\uDC65"}
               title="No peers yet"
               subtitle="Peers appear here after your D2A agent exchanges content. Enable the agent in Settings to get started."
-              action={onTabChange ? () => onTabChange("settings") : undefined}
-              actionLabel="Enable in Settings"
+              action={onTabChange ? () => onTabChange("settings:agent") : undefined}
+              actionLabel="Enable in Settings →"
             />
           )}
         </div>

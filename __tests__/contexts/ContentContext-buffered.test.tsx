@@ -108,6 +108,7 @@ let testHarness: {
   addContentBuffered: (item: ContentItem) => void;
   addContent: (item: ContentItem) => void;
   flushPendingItems: () => void;
+  clearDemoContent: () => void;
 };
 
 function Harness() {
@@ -118,6 +119,7 @@ function Harness() {
     addContentBuffered: ctx.addContentBuffered,
     addContent: ctx.addContent,
     flushPendingItems: ctx.flushPendingItems,
+    clearDemoContent: ctx.clearDemoContent,
   };
   return (
     <div>
@@ -248,6 +250,60 @@ describe("ContentContext — buffered content (addContentBuffered / flushPending
     expect(screen.getByTestId("count").textContent).toBe("100");
   });
 
+  it("flush deduplicates against content added between buffer and flush", () => {
+    renderWithProvider();
+    const url = "https://example.com/race";
+
+    // Buffer an item
+    act(() => {
+      testHarness.addContentBuffered(makeItem({ id: "buf-1", sourceUrl: url, text: "article" }));
+    });
+    expect(screen.getByTestId("pending").textContent).toBe("1");
+
+    // Directly add the same sourceUrl to visible content (simulates concurrent addContent)
+    act(() => {
+      testHarness.addContent(makeItem({ id: "direct-1", sourceUrl: url, text: "article" }));
+    });
+    expect(screen.getByTestId("count").textContent).toBe("1");
+
+    // Flush — the buffered item should be deduped against the now-visible item
+    act(() => {
+      testHarness.flushPendingItems();
+    });
+
+    expect(screen.getByTestId("pending").textContent).toBe("0");
+    // Still 1: the buffered duplicate was dropped by the setState updater
+    expect(screen.getByTestId("count").textContent).toBe("1");
+  });
+
+  it("auto-flush deduplicates items that sneak past stale ref check", () => {
+    renderWithProvider();
+
+    // Fill buffer to 99, then flush to visible content
+    act(() => {
+      for (let i = 0; i < 99; i++) {
+        testHarness.addContentBuffered(makeItem({ id: `pre-${i}`, text: `prefill ${i}` }));
+      }
+    });
+    act(() => {
+      testHarness.flushPendingItems();
+    });
+    expect(screen.getByTestId("count").textContent).toBe("99");
+
+    // Now buffer 100 items where one has the same sourceUrl as an existing item.
+    // The pre-flush ref check (contentRef.current) should catch it, but even if
+    // it doesn't (stale ref), the setState updater dedup will.
+    act(() => {
+      for (let i = 0; i < 100; i++) {
+        testHarness.addContentBuffered(makeItem({ id: `new-${i}`, text: `new unique ${i}` }));
+      }
+    });
+
+    // Auto-flush triggered at 100 — all items are unique, so all should appear
+    expect(screen.getByTestId("pending").textContent).toBe("0");
+    expect(screen.getByTestId("count").textContent).toBe("199");
+  });
+
   it("addContent adds items immediately (not buffered)", () => {
     renderWithProvider();
     const item = makeItem();
@@ -258,5 +314,25 @@ describe("ContentContext — buffered content (addContentBuffered / flushPending
 
     expect(screen.getByTestId("count").textContent).toBe("1");
     expect(screen.getByTestId("pending").textContent).toBe("0");
+  });
+
+  it("clearDemoContent removes items with empty owner, keeps owned items", () => {
+    renderWithProvider();
+
+    act(() => {
+      // Demo item (no owner)
+      testHarness.addContent(makeItem({ id: "demo-1", owner: "", text: "demo" }));
+      // Owned item
+      testHarness.addContent(makeItem({ id: "owned-1", owner: "user-abc", text: "owned" }));
+    });
+    expect(screen.getByTestId("count").textContent).toBe("2");
+
+    act(() => {
+      testHarness.clearDemoContent();
+    });
+
+    // Only the owned item should remain
+    expect(screen.getByTestId("count").textContent).toBe("1");
+    expect(testHarness.content[0].id).toBe("owned-1");
   });
 });

@@ -164,7 +164,10 @@ export function parseD2AMessage(
         return null;
     }
   } catch (err) {
-    console.warn("[handshake] Failed to parse D2A message from", senderPk.slice(0, 8) + "...:", err instanceof SyntaxError ? "invalid JSON" : "decrypt failed");
+    const cause = err instanceof SyntaxError
+      ? "invalid JSON in decrypted payload"
+      : `decryption failed: ${err instanceof Error ? err.message : String(err)}`;
+    console.warn("[handshake] Failed to parse D2A message from", senderPk.slice(0, 8) + "...:", cause);
     return null;
   }
 }

@@ -249,8 +249,9 @@ export class IngestionScheduler {
           const scored = this.callbacks.getSkipAI?.()
             ? scoreItemWithHeuristics(raw, source.type, source.platform)
             : await this.scoreItem(raw, userContext, source.type, source.platform);
+          // Always mark as seen to prevent infinite re-fetch on transient scoring failures
+          this.dedup.markSeen(raw.sourceUrl, raw.text);
           if (scored) {
-            this.dedup.markSeen(raw.sourceUrl, raw.text);
             scores.push(scored.scores.composite);
             this.callbacks.onNewContent(scored);
             cycleItems.push(scored);

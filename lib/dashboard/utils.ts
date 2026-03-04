@@ -197,9 +197,16 @@ export function computeUnreviewedQueue(
   content: ContentItem[],
   excludeIds: Set<string>,
 ): ContentItem[] {
+  const seenKeys = new Set<string>();
   return content
     .filter(c => c.verdict === "quality" && !c.validated && !c.flagged && !excludeIds.has(c.id))
     .sort((a, b) => b.scores.composite - a.scores.composite)
+    .filter(c => {
+      const key = contentDedup(c);
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    })
     .slice(0, 5);
 }
 

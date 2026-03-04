@@ -89,6 +89,8 @@ export async function POST(request: NextRequest) {
           5000,
           "meta-timeout",
         );
+        let profilesParsed = 0;
+        let profilesMalformed = 0;
         for (const me of metaEvents) {
           if (profiles[me.pubkey]) continue;
           try {
@@ -97,7 +99,14 @@ export async function POST(request: NextRequest) {
               name: typeof meta.display_name === "string" ? meta.display_name : typeof meta.name === "string" ? meta.name : undefined,
               picture: typeof meta.picture === "string" ? meta.picture : undefined,
             };
-          } catch (err) { console.warn("[fetch/nostr] Skipped malformed profile JSON:", errMsg(err)); }
+            profilesParsed++;
+          } catch (err) {
+            profilesMalformed++;
+            console.warn("[fetch/nostr] Skipped malformed profile JSON for", me.pubkey.slice(0, 8) + "...:", errMsg(err));
+          }
+        }
+        if (profilesMalformed > 0) {
+          console.warn(`[fetch/nostr] Profile parse: ${profilesParsed} ok, ${profilesMalformed} malformed out of ${metaEvents.length} events`);
         }
       } catch (err) { console.warn("[fetch/nostr] Profile fetch failed (best-effort):", errMsg(err)); }
     }

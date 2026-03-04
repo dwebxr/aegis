@@ -155,6 +155,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           nostrKeys={nostrKeys}
           onClose={() => setShowShareModal(false)}
           mobile={mobile}
+          onTabChange={onTabChange}
         />
       )}
 

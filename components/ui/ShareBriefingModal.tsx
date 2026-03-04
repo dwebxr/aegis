@@ -12,6 +12,7 @@ interface ShareBriefingModalProps {
   nostrKeys: { sk: Uint8Array; pk: string };
   onClose: () => void;
   mobile?: boolean;
+  onTabChange?: (tab: string) => void;
 }
 
 type Phase = "confirm" | "publishing" | "success" | "error";
@@ -21,6 +22,7 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
   nostrKeys,
   onClose,
   mobile,
+  onTabChange,
 }) => {
   const [phase, setPhase] = useState<Phase>("confirm");
   const [shareUrl, setShareUrl] = useState("");
@@ -149,7 +151,15 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
               <ul style={{ margin: 0, paddingLeft: space[5], fontSize: t.bodySm.size, color: colors.text.tertiary, lineHeight: 1.8 }}>
                 <li>{insightCount} curated items with scores &amp; verdicts</li>
                 <li>Topics, reasons, source links</li>
-                <li>Your Nostr public key</li>
+                <li>{onTabChange ? (
+                  <a
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); onClose(); onTabChange("settings:account"); }}
+                    style={{ color: colors.purple[400], textDecoration: "underline", cursor: "pointer" }}
+                  >Your Nostr public key</a>
+                ) : (
+                  "Your Nostr public key"
+                )}</li>
               </ul>
             </div>
 
