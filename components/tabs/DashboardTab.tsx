@@ -14,7 +14,7 @@ import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
 import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificationBadge";
 import {
   applyDashboardFilters,
-  computeDashboardTop6,
+  computeDashboardTop3,
   computeTopicSpotlight,
   computeDashboardActivity,
   computeDashboardSaved,
@@ -277,6 +277,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [lazyLoadedSections, setLazyLoadedSections] = useState<Set<string>>(new Set());
 
+  // State for Topic Spotlight collapsible topics
+  // TODO: Implement collapsible topics
+  // const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
+
   const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
 
   const toggleSection = useCallback((sectionId: string) => {
@@ -293,6 +297,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     });
   }, []);
 
+  // TODO: Implement collapsible topics
+  // const toggleTopic = useCallback((topic: string) => {
+  //   setExpandedTopics(prev => {
+  //     const next = new Set(prev);
+  //     if (next.has(topic)) {
+  //       next.delete(topic);
+  //     } else {
+  //       next.add(topic);
+  //     }
+  //     return next;
+  //   });
+  // }, []);
+
   const agentContext = useMemo(() => {
     if (!hasEnoughData(profile)) return null;
     return getContext(profile);
@@ -304,47 +321,48 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   contentRef.current = content;
   const briefingNowRef = useRef(Date.now());
 
-  // Use Top 6 instead of Top 3 for better initial view
-  const dashboardTop6 = useMemo(() => {
-    return computeDashboardTop6(contentRef.current, profile, briefingNowRef.current);
+  // Dashboard Top 3
+  const dashboardTop3 = useMemo(() => {
+    return computeDashboardTop3(contentRef.current, profile, briefingNowRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
-  // Lazy compute topic spotlight only when section is expanded
+  // Compute topic spotlight
   const dashboardTopicSpotlight = useMemo(() => {
-    if (!lazyLoadedSections.has('topic-spotlight')) return [];
-    return computeTopicSpotlight(contentRef.current, profile, dashboardTop6);
+    return computeTopicSpotlight(contentRef.current, profile, dashboardTop3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, dashboardTop6, lazyLoadedSections]);
+  }, [profile, dashboardTop3]);
 
-  // Lazy compute these sections only when needed
+  // Initialize first topic as expanded
+  // TODO: Implement when collapsible topics are added
+  // useEffect(() => {
+  //   if (dashboardTopicSpotlight.length > 0 && expandedTopics.size === 0) {
+  //     setExpandedTopics(new Set([dashboardTopicSpotlight[0].topic]));
+  //   }
+  // }, [dashboardTopicSpotlight, expandedTopics.size]);
+
+  // Compute these sections
   const { filteredDiscoveries, unreviewedQueue, dashboardSaved } = useMemo(() => {
-    // 1. Top sections: Top6 + Spotlight
-    const topIds = new Set(dashboardTop6.map(c => c.item.id));
+    // 1. Top sections: Top3 + Spotlight
+    const topIds = new Set(dashboardTop3.map(c => c.item.id));
     for (const group of dashboardTopicSpotlight) {
       for (const item of group.items) topIds.add(item.id);
     }
 
-    // 2. Discoveries (compute only if expanded)
-    const filtDisc = lazyLoadedSections.has('discoveries')
-      ? discoveries.filter(d => !topIds.has(d.item.id))
-      : [];
+    // 2. Discoveries
+    const filtDisc = discoveries.filter(d => !topIds.has(d.item.id)).slice(0, 3);
     for (const d of filtDisc) topIds.add(d.item.id);
 
-    // 3. Unreviewed queue (compute only if expanded)
-    const queue = lazyLoadedSections.has('review-queue')
-      ? computeUnreviewedQueue(contentRef.current, topIds)
-      : [];
+    // 3. Unreviewed queue
+    const queue = computeUnreviewedQueue(contentRef.current, topIds).slice(0, 3);
     for (const item of queue) topIds.add(item.id);
 
-    // 4. Saved/Bookmarked (compute only if expanded)
-    const saved = lazyLoadedSections.has('saved')
-      ? computeDashboardSaved(contentRef.current, profile.bookmarkedIds ?? [], topIds)
-      : [];
+    // 4. Saved/Bookmarked
+    const saved = computeDashboardSaved(contentRef.current, profile.bookmarkedIds ?? [], topIds).slice(0, 3);
 
     return { filteredDiscoveries: filtDisc, unreviewedQueue: queue, dashboardSaved: saved };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboardTop6, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds, lazyLoadedSections]);
+  }, [dashboardTop3, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds]);
 
   const topicDistribution = useMemo(() => {
     if (!lazyLoadedSections.has('topic-distribution')) return [];
@@ -815,21 +833,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
       {homeMode === "dashboard" && (
         <div style={{ marginTop: space[3] }}>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
-            gap: space[4],
-            marginBottom: space[4],
-            overflow: "hidden",
-          }}>
-          {/* Today's Top 6 — full width */}
-          <div data-testid="aegis-top6-section" style={{ gridColumn: mobile ? undefined : "1 / -1", minWidth: 0 }}>
+          {/* Today's Top 3 — full width */}
+          <div data-testid="aegis-top3-section" style={{ marginBottom: space[4] }}>
             <div style={{
               fontSize: t.h3.size, fontWeight: t.h3.weight,
               color: colors.text.tertiary, marginBottom: space[3],
               display: "flex", alignItems: "center", gap: space[2],
             }}>
-              <span>⭐</span> Today&#39;s Top 6
+              <span>⭐</span> Today&#39;s Top 3
               <div style={{ flex: 1 }} />
               <button
                 onClick={() => { setHomeMode("feed"); setVerdictFilter("all"); }}
@@ -842,7 +853,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 Review All →
               </button>
             </div>
-            {dashboardTop6.length === 0 ? (
+            {dashboardTop3.length === 0 ? (
               <div style={{
                 fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center",
                 padding: space[4], background: colors.bg.surface,
@@ -855,7 +866,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 ? { display: "flex", flexDirection: "column" as const, gap: space[4] }
                 : { display: "grid", gridTemplateColumns: `repeat(3, minmax(0, 1fr))`, gap: space[4] }
               }>
-                {dashboardTop6.map((bi, i) => {
+                {dashboardTop3.map((bi, i) => {
                   const item = bi.item;
                   const gr = scoreGrade(item.scores.composite);
                   const tag = deriveScoreTags(item)[0] ?? null;
@@ -1078,9 +1089,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 </div>
               )}
             </div>
-
-          {/* Right column: Discoveries + Validated */}
-          <div style={{ display: "flex", flexDirection: "column", gap: `${space[4]}px`, minWidth: 0 }}>
 
           {/* Discoveries - Collapsible */}
           {(lazyLoadedSections.has('discoveries') ? filteredDiscoveries.length > 0 : true) && (
@@ -1441,9 +1449,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               </div>
             )}
           </CollapsibleSection>
-
-          </div>
-          </div>
 
           {/* Agent Knowledge — full width */}
           {agentContext && (
