@@ -16,8 +16,9 @@ test.describe("Dashboard — Feed Mode", () => {
     await expect(dashboardPage.dashboardModeButton).toBeVisible();
   });
 
-  test("shows quality, slop, and all filter pills", async ({ dashboardPage }) => {
+  test("shows quality filter pill and More filters dropdown with slop and all", async ({ dashboardPage }) => {
     await expect(dashboardPage.filterButton("quality")).toBeVisible();
+    await dashboardPage.openMoreFilters();
     await expect(dashboardPage.filterButton("slop")).toBeVisible();
     await expect(dashboardPage.filterButton("all")).toBeVisible();
   });
@@ -28,18 +29,24 @@ test.describe("Dashboard — Feed Mode", () => {
     await expect(dashboardPage.filterButton("all")).toHaveAttribute("aria-pressed", "false");
   });
 
-  test("clicking slop filter sets aria-pressed=true on slop button", async ({ dashboardPage }) => {
+  test("clicking slop filter (in More filters) sets aria-pressed=true on slop button", async ({ dashboardPage }) => {
+    await dashboardPage.openMoreFilters();
     await dashboardPage.filterButton("slop").click();
+    // Dropdown closes after selection; reopen to check aria-pressed
+    await dashboardPage.openMoreFilters();
     await expect(dashboardPage.filterButton("slop")).toHaveAttribute("aria-pressed", "true");
     await expect(dashboardPage.filterButton("quality")).toHaveAttribute("aria-pressed", "false");
   });
 
-  test("clicking all filter removes item count from Filtered Signal heading", async ({ dashboardPage }) => {
+  test("clicking all filter (in More filters) removes item count from Filtered Signal heading", async ({ dashboardPage }) => {
     // Default filter is "quality" → hasActiveFilter = true → count span visible
     await expect(dashboardPage.page.getByTestId("aegis-filter-count")).toBeVisible();
-    // Click "all" → hasActiveFilter = false → count span hidden
+    // Click "all" via More filters → hasActiveFilter = false → count span hidden
+    await dashboardPage.openMoreFilters();
     await dashboardPage.filterButton("all").click();
     await expect(dashboardPage.page.getByTestId("aegis-filter-count")).not.toBeVisible();
+    // Reopen to verify aria-pressed
+    await dashboardPage.openMoreFilters();
     await expect(dashboardPage.filterButton("all")).toHaveAttribute("aria-pressed", "true");
   });
 });
@@ -155,7 +162,10 @@ test.describe("Dashboard — Authenticated", () => {
   test("authenticated user can switch quality filter (aria-pressed)", async ({ authDashboardPage }) => {
     // Quality is default, clicking it again keeps it pressed
     await expect(authDashboardPage.filterButton("quality")).toHaveAttribute("aria-pressed", "true");
+    // Slop is in "More filters" dropdown
+    await authDashboardPage.openMoreFilters();
     await authDashboardPage.filterButton("slop").click();
+    await authDashboardPage.openMoreFilters();
     await expect(authDashboardPage.filterButton("slop")).toHaveAttribute("aria-pressed", "true");
   });
 

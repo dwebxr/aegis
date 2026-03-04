@@ -201,6 +201,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [expanded, setExpanded] = useState<string | null>(null);
   const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop" | "validated" | "bookmarked">("quality");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const moreFiltersRef = useRef<HTMLDivElement>(null);
   const [showAllContent, setShowAllContent] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const markImgFailed = (id: string) =>
@@ -256,6 +258,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     setExpandedClusters(new Set());
   }, [verdictFilter, sourceFilter]);
 
+  // Close "More filters" dropdown on click-outside or Escape
+  useEffect(() => {
+    if (!moreFiltersOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (moreFiltersRef.current && !moreFiltersRef.current.contains(e.target as Node)) {
+        setMoreFiltersOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreFiltersOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [moreFiltersOpen]);
+
   const filteredContent = useMemo(() => {
     if (verdictFilter === "bookmarked") {
       const bookmarkSet = new Set(profile.bookmarkedIds ?? []);
@@ -277,6 +298,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
   const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
+  const moreFiltersActive = verdictFilter === "all" || verdictFilter === "slop" || sourceFilter !== "all";
 
   const toggleSection = useCallback((sectionId: string) => {
     setExpandedSections(prev => {
@@ -437,6 +459,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     { label: "Filter: Slop", action: () => setVerdictFilter("slop") },
     { label: "Filter: All", action: () => setVerdictFilter("all") },
     { label: "Filter: Validated", action: () => setVerdictFilter("validated") },
+    { label: "Filter: Saved", action: () => setVerdictFilter("bookmarked") },
     { label: "Export CSV", action: () => exportContentCSV(content) },
     { label: "Export JSON", action: () => exportContentJSON(content) },
   ], [onTabChange, content]);
@@ -575,63 +598,147 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
               Filtered Signal {hasActiveFilter && <span data-testid="aegis-filter-count" style={{ fontSize: t.bodySm.size, color: colors.text.disabled }}>({filteredContent.length})</span>}
             </div>
-            <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: space[1], flexWrap: "wrap", alignItems: "center" }}>
+              {/* Primary filter buttons */}
               {([
-                { id: "quality" as const, label: "quality" },
-                { id: "all" as const, label: "all" },
-                { id: "slop" as const, label: "slop" },
-                { id: "validated" as const, label: "\u2713 validated" },
-                { id: "bookmarked" as const, label: "\uD83D\uDD16 Saved" },
-              ]).map(({ id: v, label }) => (
+                { id: "quality" as const, label: "Quality", bg: colors.green.bg, border: colors.green.border, color: colors.green[400] },
+                { id: "bookmarked" as const, label: "\uD83D\uDD16 Saved", bg: `${colors.cyan[500]}08`, border: `${colors.cyan[500]}25`, color: colors.cyan[400] },
+                { id: "validated" as const, label: "\u2713 Validated", bg: "rgba(167,139,250,0.06)", border: "rgba(167,139,250,0.15)", color: colors.purple[400] },
+              ]).map(({ id: v, label, bg, border, color }) => (
                 <button
                   key={v}
                   data-testid={`aegis-filter-${v}`}
                   aria-pressed={verdictFilter === v}
-                  onClick={() => setVerdictFilter(v)}
+                  onClick={() => { setVerdictFilter(v); setMoreFiltersOpen(false); }}
                   style={{
                     padding: `${space[1]}px ${space[3]}px`,
-                    background: verdictFilter === v
-                      ? (v === "quality" ? colors.green.bg : v === "slop" ? colors.red.bg : v === "validated" ? "rgba(167,139,250,0.06)" : v === "bookmarked" ? `${colors.cyan[500]}08` : colors.bg.raised)
-                      : "transparent",
-                    border: `1px solid ${verdictFilter === v
-                      ? (v === "quality" ? colors.green.border : v === "slop" ? colors.red.border : v === "validated" ? "rgba(167,139,250,0.15)" : v === "bookmarked" ? `${colors.cyan[500]}25` : colors.border.emphasis)
-                      : colors.border.default}`,
+                    background: verdictFilter === v ? bg : "transparent",
+                    border: `1px solid ${verdictFilter === v ? border : colors.border.default}`,
                     borderRadius: radii.pill,
-                    color: verdictFilter === v
-                      ? (v === "quality" ? colors.green[400] : v === "slop" ? colors.red[400] : v === "validated" ? colors.purple[400] : v === "bookmarked" ? colors.cyan[400] : colors.text.secondary)
-                      : colors.text.disabled,
+                    color: verdictFilter === v ? color : colors.text.disabled,
                     fontSize: t.caption.size,
                     fontWeight: 600,
                     cursor: "pointer",
                     fontFamily: "inherit",
                     transition: transitions.fast,
-                    textTransform: v === "bookmarked" ? "none" : "capitalize",
                   }}
                 >
                   {label}
                 </button>
               ))}
-              {availableSources.length > 1 && (
-                <select
-                  value={sourceFilter}
-                  onChange={e => setSourceFilter(e.target.value)}
+
+              {/* "More filters" dropdown */}
+              <div ref={moreFiltersRef} style={{ position: "relative" }}>
+                <button
+                  data-testid="aegis-filter-more"
+                  aria-expanded={moreFiltersOpen}
+                  aria-haspopup="true"
+                  onClick={() => setMoreFiltersOpen(prev => !prev)}
                   style={{
-                    padding: `${space[1]}px ${space[2]}px`,
-                    background: sourceFilter !== "all" ? colors.bg.raised : "transparent",
-                    border: `1px solid ${sourceFilter !== "all" ? colors.border.emphasis : colors.border.default}`,
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: `${space[1]}px ${space[3]}px`,
+                    background: moreFiltersActive ? colors.bg.raised : "transparent",
+                    border: `1px solid ${moreFiltersActive ? colors.border.emphasis : colors.border.default}`,
                     borderRadius: radii.pill,
-                    color: sourceFilter !== "all" ? colors.text.secondary : colors.text.disabled,
+                    color: moreFiltersActive ? colors.text.secondary : colors.text.disabled,
                     fontSize: t.caption.size,
                     fontWeight: 600,
                     cursor: "pointer",
                     fontFamily: "inherit",
-                    outline: "none",
+                    transition: transitions.fast,
                   }}
                 >
-                  <option value="all">all sources</option>
-                  {availableSources.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              )}
+                  More filters
+                  {moreFiltersActive && (
+                    <span style={{
+                      width: 6, height: 6, borderRadius: "50%",
+                      background: colors.cyan[400], flexShrink: 0,
+                    }} />
+                  )}
+                  <span style={{ fontSize: 10, lineHeight: 1 }}>{moreFiltersOpen ? "\u25B4" : "\u25BE"}</span>
+                </button>
+
+                {moreFiltersOpen && (
+                  <div
+                    data-testid="aegis-filter-more-panel"
+                    role="menu"
+                    style={{
+                      position: "absolute", right: 0, top: "calc(100% + 4px)",
+                      minWidth: 160, zIndex: 50,
+                      background: colors.bg.surface,
+                      border: `1px solid ${colors.border.default}`,
+                      borderRadius: radii.md,
+                      padding: `${space[2]}px 0`,
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                    }}
+                  >
+                    {/* VERDICT section */}
+                    <div style={{
+                      padding: `${space[1]}px ${space[3]}px`,
+                      fontSize: t.tiny.size, fontWeight: 700,
+                      color: colors.text.disabled, textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                    }}>Verdict</div>
+                    {([
+                      { id: "all" as const, label: "All" },
+                      { id: "slop" as const, label: "Slop" },
+                    ]).map(({ id: v, label }) => (
+                      <button
+                        key={v}
+                        role="menuitem"
+                        data-testid={`aegis-filter-${v}`}
+                        aria-pressed={verdictFilter === v}
+                        onClick={() => { setVerdictFilter(v); setMoreFiltersOpen(false); }}
+                        style={{
+                          display: "block", width: "100%", textAlign: "left",
+                          padding: `${space[2]}px ${space[3]}px`,
+                          background: verdictFilter === v ? `${colors.cyan[400]}10` : "transparent",
+                          border: "none",
+                          color: verdictFilter === v ? colors.cyan[400] : colors.text.muted,
+                          fontSize: t.bodySm.size,
+                          fontWeight: verdictFilter === v ? 700 : 500,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          transition: transitions.fast,
+                        }}
+                      >{label}</button>
+                    ))}
+
+                    {/* Separator */}
+                    <div style={{
+                      height: 1, background: colors.border.default,
+                      margin: `${space[2]}px 0`,
+                    }} />
+
+                    {/* SOURCE section */}
+                    <div style={{
+                      padding: `${space[1]}px ${space[3]}px`,
+                      fontSize: t.tiny.size, fontWeight: 700,
+                      color: colors.text.disabled, textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                    }}>Source</div>
+                    {["all", ...availableSources].map(s => (
+                      <button
+                        key={s}
+                        role="menuitem"
+                        onClick={() => { setSourceFilter(s); setMoreFiltersOpen(false); }}
+                        style={{
+                          display: "block", width: "100%", textAlign: "left",
+                          padding: `${space[2]}px ${space[3]}px`,
+                          background: sourceFilter === s ? `${colors.cyan[400]}10` : "transparent",
+                          border: "none",
+                          color: sourceFilter === s ? colors.cyan[400] : colors.text.muted,
+                          fontSize: t.bodySm.size,
+                          fontWeight: sourceFilter === s ? 700 : 500,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          transition: transitions.fast,
+                        }}
+                      >{s === "all" ? "All sources" : s}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

@@ -161,22 +161,24 @@ describe("DashboardTab — with content", () => {
     expect(html).not.toContain("Export JSON");
   });
 
-  it("shows filter buttons (quality, all, slop)", () => {
+  it("shows primary filter buttons (Quality, Saved, Validated) and More filters", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain(">quality<");
-    expect(html).toContain(">all<");
-    expect(html).toContain(">slop<");
+    expect(html).toContain(">Quality<");
+    expect(html).toContain("Saved");
+    expect(html).toContain("Validated");
+    expect(html).toContain("More filters");
   });
 
-  it("shows source filter when multiple sources exist", () => {
+  it("hides slop/all/source filters inside More filters dropdown (collapsed by default)", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("all sources");
-    expect(html).toContain("rss");
-    expect(html).toContain("nostr");
+    // Dropdown is closed by default, so these items are not in static markup
+    expect(html).not.toContain("all sources");
+    expect(html).not.toContain(">Slop<");
+    expect(html).not.toContain(">All<");
   });
 
   it("renders quality content cards (default filter)", () => {

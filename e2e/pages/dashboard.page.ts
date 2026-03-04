@@ -23,6 +23,15 @@ export class DashboardPage {
     return this.page.getByTestId(`aegis-filter-${verdict}`);
   }
 
+  /** Open the "More filters" dropdown (slop, all, source filters live here) */
+  async openMoreFilters() {
+    const panel = this.page.getByTestId("aegis-filter-more-panel");
+    if (!(await panel.isVisible().catch(() => false))) {
+      await this.page.getByTestId("aegis-filter-more").click();
+      await panel.waitFor({ state: "visible" });
+    }
+  }
+
   /** Switch to Dashboard mode */
   async switchToDashboard() {
     await this.dashboardModeButton.click();

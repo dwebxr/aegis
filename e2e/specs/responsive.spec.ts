@@ -63,10 +63,14 @@ test.describe("Responsive Layout", () => {
 
   test("mobile filter pills are tappable", async ({ page }) => {
     await enterDemoMode(page);
+    // Slop is now inside "More filters" dropdown
+    await page.getByTestId("aegis-filter-more").click();
+    await page.getByTestId("aegis-filter-more-panel").waitFor({ state: "visible" });
     const slopFilter = page.getByTestId("aegis-filter-slop");
-    await expect(slopFilter).toBeVisible();
-    // Default is quality (aria-pressed=true); tapping slop switches the active filter
     await slopFilter.click();
+    // Dropdown closes after selection; reopen to verify
+    await page.getByTestId("aegis-filter-more").click();
+    await page.getByTestId("aegis-filter-more-panel").waitFor({ state: "visible" });
     await expect(slopFilter).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("aegis-filter-quality")).toHaveAttribute("aria-pressed", "false");
   });
