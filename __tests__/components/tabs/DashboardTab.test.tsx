@@ -380,12 +380,13 @@ describe("DashboardTab — dashboard mode rendering", () => {
     expect(html).toContain("Topic Spotlight");
   });
 
-  it("renders Saved section", () => {
+  it("hides Saved section when no bookmarked items", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("Saved");
-    expect(html).toContain("No saved items yet");
+    // Saved section is hidden when dashboardSaved is empty;
+    // only the filter tab "🔖 Saved" appears, not the section header
+    expect(html).not.toContain("Review Saved");
   });
 
   it("renders Saved items when bookmarked", () => {
@@ -433,7 +434,7 @@ describe("DashboardTab — dashboard mode rendering", () => {
     expect(html).toContain("total");
   });
 
-  it("renders Discoveries section when discoveries prop provided", () => {
+  it("renders Discoveries section header when discoveries prop provided", () => {
     // Discovery item must differ from content items — dedup filters overlapping IDs
     const contentItems = [makeItem({ id: "content-1" })];
     const discItem = makeItem({ id: "disc-src" });
@@ -448,8 +449,8 @@ describe("DashboardTab — dashboard mode rendering", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={contentItems} onValidate={jest.fn()} onFlag={jest.fn()} discoveries={discoveries} />
     );
+    // CollapsibleSection renders title even when collapsed; children are hidden
     expect(html).toContain("Discoveries");
-    expect(html).toContain("Expanding your horizons");
   });
 
   it("does not show feed-mode sections in dashboard mode", () => {

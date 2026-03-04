@@ -82,6 +82,7 @@ Respond with ONLY the digest paragraph, no labels or formatting.`;
 
     return NextResponse.json({ digest });
   } catch (err) {
+    console.error("[briefing/digest] Anthropic request failed:", errMsg(err));
     return NextResponse.json(
       { error: `Request failed: ${errMsg(err)}` },
       { status: 502 },

@@ -352,8 +352,8 @@ describe("contentDedup — collision edge cases", () => {
     expect(contentDedup(a)).toBe("");
   });
 
-  it("items differing only after 120 chars produce same key", () => {
-    const prefix = "a".repeat(120);
+  it("items differing only after 150 chars produce same key", () => {
+    const prefix = "a".repeat(150);
     const a = makeItem({ text: prefix + " UNIQUE_SUFFIX_A" });
     const b = makeItem({ text: prefix + " UNIQUE_SUFFIX_B" });
     expect(contentDedup(a)).toBe(contentDedup(b));

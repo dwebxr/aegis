@@ -7,13 +7,20 @@
   </p>
 </div>
 
-## Latest Updates (March 2024)
+## Latest Updates (March 2026)
 
-### Performance & UX Improvements
-- **Enhanced Content Deduplication**: Improved text normalization algorithm for better duplicate detection across sources
-- **Smart Saved Items Management**: Validated and flagged items are now automatically removed from the Saved section
-- **Dashboard Optimization**: Fixed "No quality items" display issue with faster content loading
-- **Code Quality**: Comprehensive security audit and bug fixes for production readiness
+### Dashboard Performance Optimization
+- **Feed-mode computation guard**: Dashboard-only calculations (Top3, Topic Spotlight, Activity, Trends) are fully skipped in Feed mode — zero wasted work
+- **Story clustering 15x speedup**: `clusterByStory` uses sorted early-break instead of full O(n²) pair comparison
+- **Single-pass algorithms**: `computeDashboardActivity` and `computeTopicTrends` reduced from O(kn) multi-pass to O(n) single-pass bucketing
+- **Reactive dashboard**: `content.length` dependency ensures Top3/Spotlight/Sections update when new content arrives via scheduler
+- **Fresh recency scoring**: Briefing time uses live `Date.now()` instead of stale mount-time ref
+
+### Error Handling & Production Hardening
+- All 16 API routes have structured error logging with `[prefix]` namespacing
+- `discover-feed` probe errors now logged at debug level (previously swallowed silently)
+- `briefing/digest` Anthropic failures now logged with route context
+- CVE mitigations verified: no `remotePatterns` configured, no `"use server"` directives
 
 ## Live
 
@@ -680,10 +687,11 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 ### Dashboard & Briefing
 - **Top 3 + Topic Spotlight** hero cards with 16:9 thumbnails and inline Validate/Flag buttons
 - YouTube content auto-embeds as playable iframe in hero cards (Top3, Spotlight hero)
-- Unreviewed Queue and Topic Distribution panels for at-a-glance triage
+- Unreviewed Queue, Saved Items, and Topic Distribution in collapsible sections with lazy rendering
 - Validated items excluded from Top3 and Spotlight to always surface actionable content
+- Cascading dedup: Top3 → Spotlight → Discoveries → Queue → Saved (no item appears twice)
 - Ranks content by composite score, topic relevance, author trust, and recency
-- Surfaces 3–5 priority items + 1 serendipity pick (high novelty, outside your bubble)
+- Surfaces 3 priority items + 1 serendipity pick (high novelty, outside your bubble)
 - Shareable briefings via Nostr NIP-23 long-form events with `/b/[naddr]` public pages
 - Background ingestion from configured sources with quick heuristic pre-filter
 
@@ -725,6 +733,9 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Notification toasts: dismiss button with `aria-label="Dismiss notification"`
 
 ### Performance
+- Dashboard computations (Top3, Spotlight, Activity, Trends, Distribution, Clustering) guarded by `homeMode` — zero cost in Feed mode
+- `clusterByStory` sorted early-break: O(n²) reduced to ~O(n×k) where k = items within 48h window (15x fewer comparisons at N=171)
+- `computeDashboardActivity` / `computeTopicTrends`: single-pass day/week bucketing replaces multi-pass filter loops
 - Cache-first loading: `cacheChecked` flag prevents loading spinner flash — cached content displays instantly on revisit
 - IC pagination timeout (15s per page via `withTimeout`) prevents indefinite hangs on slow/unreachable canisters
 - Progressive content display: each IC page merges into state immediately (no waiting for all pages to complete)
@@ -790,7 +801,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (4449 unit/integration tests, 262 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
+| Test | Jest + ts-jest (4534 unit/integration tests, 263 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
 
 ## Project Structure
 

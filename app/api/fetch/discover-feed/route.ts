@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
-import { errMsg } from "@/lib/utils/errors";
+import { errMsg, isTimeout } from "@/lib/utils/errors";
 import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
 import { detectPlatformFeed, extractYouTubeChannelId } from "@/lib/sources/platformFeed";
 
@@ -120,7 +120,9 @@ export async function POST(request: NextRequest) {
           if (res.ok && (ct.includes("xml") || ct.includes("rss") || ct.includes("atom"))) {
             return { url: probeUrl, type: "rss" };
           }
-        } catch { /* probe 404 is expected for most paths */ }
+        } catch (err) {
+          if (!isTimeout(err)) console.debug("[discover-feed] probe failed:", probeUrl, errMsg(err));
+        }
         return null;
       })
     );

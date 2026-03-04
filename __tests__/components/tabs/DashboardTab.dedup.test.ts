@@ -45,10 +45,10 @@ describe("contentDedup — key generation", () => {
     expect(contentDedup(a)).toBe(contentDedup(b));
   });
 
-  it("truncates to 120 chars", () => {
+  it("truncates to 150 chars", () => {
     const longText = "a".repeat(300);
     const item = makeItem({ text: longText });
-    expect(contentDedup(item)).toHaveLength(120);
+    expect(contentDedup(item)).toHaveLength(150);
   });
 
   it("produces different keys for different articles", () => {
@@ -290,9 +290,9 @@ describe("Cascading dedup chain — full pipeline", () => {
   });
 });
 
-// ─── briefingNowRef pinning — ranking stability ───
+// ─── Ranking stability ───
 
-describe("Ranking stability — pinned time reference", () => {
+describe("Ranking stability — deterministic with fixed time", () => {
   it("same content + same time → identical rankings", () => {
     const profile = makeProfile({ ai: 0.5 });
     const items = Array.from({ length: 10 }, (_, i) =>

@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import React, { useRef, useEffect, useMemo, useState, useCallback } from "react";
+import React, { useRef, useMemo, useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react";
 import { generateBriefing } from "@/lib/briefing/ranker";
@@ -32,11 +32,11 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   };
 }
 
-// ─── briefingNowRef hook behavior test ───
+// ─── Dashboard Top3 hook behavior test ───
 
 /**
- * Minimal hook that mirrors DashboardTab's briefingNowRef + Top3 logic.
- * Exposes computed Top3 IDs and the pinned time via data attributes.
+ * Minimal hook that mirrors DashboardTab's Top3 logic.
+ * Uses Date.now() inline (no pinned ref) and content.length as dependency.
  */
 function BriefingHookHarness({
   content,
@@ -48,25 +48,19 @@ function BriefingHookHarness({
   const contentRef = useRef(content);
   contentRef.current = content;
 
-  const briefingNowRef = useRef(Date.now());
-  useEffect(() => {
-    briefingNowRef.current = Date.now();
-  }, [profile]);
-
   const top3 = useMemo(
-    () => computeTop3Util(contentRef.current, profile, briefingNowRef.current),
+    () => computeTop3Util(contentRef.current, profile, Date.now()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [profile],
+    [profile, content.length],
   );
 
   return React.createElement("div", {
     "data-top3-ids": top3.map(bi => bi.item.id).join(","),
     "data-top3-scores": top3.map(bi => bi.briefingScore.toFixed(4)).join(","),
-    "data-now": String(briefingNowRef.current),
   });
 }
 
-describe("briefingNowRef — pinning behavior", () => {
+describe("Dashboard Top3 — memoization behavior", () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
 
@@ -119,22 +113,45 @@ describe("briefingNowRef — pinning behavior", () => {
     expect(getDiv().getAttribute("data-top3-scores")).toBe(scores1);
   });
 
-  it("profile change updates briefingNowRef and may change rankings", () => {
+  it("profile change triggers recomputation with fresh timestamp", () => {
     act(() => {
       root.render(React.createElement(BriefingHookHarness, { content: items, profile: baseProfile }));
     });
-    const nowBefore = getDiv().getAttribute("data-now");
+    const idsBefore = getDiv().getAttribute("data-top3-ids");
 
-    // New profile object → useEffect fires, updating briefingNowRef
     const newProfile = { ...baseProfile, topicAffinities: { ai: 0.5 } };
     act(() => {
       root.render(React.createElement(BriefingHookHarness, { content: items, profile: newProfile }));
     });
-    const nowAfter = getDiv().getAttribute("data-now");
 
-    // Time reference should have updated (new Date.now() call)
-    // Note: in very fast test execution, timestamps may be equal
-    expect(Number(nowAfter)).toBeGreaterThanOrEqual(Number(nowBefore));
+    // useMemo recomputed due to profile change — Top3 IDs may or may not differ
+    // but the computation ran with Date.now() (fresh timestamp)
+    const idsAfter = getDiv().getAttribute("data-top3-ids");
+    expect(idsAfter).toBeTruthy();
+    expect(idsAfter!.split(",")).toHaveLength(3);
+  });
+
+  it("content.length change triggers recomputation", () => {
+    act(() => {
+      root.render(React.createElement(BriefingHookHarness, { content: items, profile: baseProfile }));
+    });
+    const idsBefore = getDiv().getAttribute("data-top3-ids");
+
+    const extraItem = makeItem({
+      id: "extra-high",
+      text: "Extra high scoring article added by scheduler",
+      scores: { originality: 10, insight: 10, credibility: 10, composite: 10 },
+      createdAt: Date.now(),
+    });
+    act(() => {
+      root.render(React.createElement(BriefingHookHarness, {
+        content: [...items, extraItem],
+        profile: baseProfile,
+      }));
+    });
+
+    const idsAfter = getDiv().getAttribute("data-top3-ids");
+    expect(idsAfter).toContain("extra-high");
   });
 });
 

@@ -3,3 +3,5 @@ canisters/
 Makefile
 dfx.json
 canister_ids.json
+dashboard-sections-update.tsx
+update_dashboard.py

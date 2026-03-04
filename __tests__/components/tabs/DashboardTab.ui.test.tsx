@@ -258,7 +258,7 @@ describe("DashboardTab — Needs Review section", () => {
   beforeEach(() => localStorage.setItem("aegis-home-mode", "dashboard"));
   afterEach(() => localStorage.removeItem("aegis-home-mode"));
 
-  it("renders Needs Review section with unreviewed quality items", () => {
+  it("renders Needs Review section header with unreviewed quality items", () => {
     const items = Array.from({ length: 8 }, (_, i) =>
       makeItem({
         id: `review-${i}`,
@@ -269,11 +269,11 @@ describe("DashboardTab — Needs Review section", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />,
     );
+    // CollapsibleSection renders header even when collapsed; children are hidden
     expect(html).toContain("Needs Review");
-    expect(html).toContain("Review to teach your agent");
   });
 
-  it("renders empty state when all items are validated", () => {
+  it("hides Needs Review section when all items are validated", () => {
     const items = Array.from({ length: 3 }, (_, i) =>
       makeItem({
         id: `allval-${i}`,
@@ -285,7 +285,8 @@ describe("DashboardTab — Needs Review section", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />,
     );
-    expect(html).toContain("All caught up");
+    // When all items are validated, unreviewedQueue is empty → section not rendered
+    expect(html).not.toContain("review-queue");
   });
 });
 

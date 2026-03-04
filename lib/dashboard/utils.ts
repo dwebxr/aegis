@@ -13,14 +13,12 @@ function hasVisualContent(item: ContentItem): boolean {
 
 /** Content-level dedup key: same article may have different IDs/URLs across sources */
 export function contentDedup(item: ContentItem): string {
-  // Aggressive normalization to catch duplicates with minor formatting differences
   return item.text
     .toLowerCase()
-    .replace(/[.,!?;:()\[\]{}"'`]/g, "") // Remove punctuation
-    .replace(/\s+/g, " ") // Normalize whitespace
-    .replace(/\n+/g, " ") // Remove newlines
+    .replace(/[.,!?;:()\[\]{}"'`]/g, "")
+    .replace(/\s+/g, " ") // \s+ covers newlines too
     .trim()
-    .slice(0, 150); // Slightly longer for better uniqueness
+    .slice(0, 150);
 }
 
 export function applyDashboardFilters(
@@ -70,23 +68,6 @@ export function computeDashboardTop3(
     return true;
   });
   return deduped.slice(0, 3);
-}
-
-/** Compute Dashboard Top 6 for expanded initial view */
-export function computeDashboardTop6(
-  content: ContentItem[],
-  profile: UserPreferenceProfile,
-  now: number,
-): BriefingItem[] {
-  const briefing = generateBriefing(content, profile, now);
-  const seenKeys = new Set<string>();
-  const deduped = briefing.priority.filter(bi => {
-    const key = contentDedup(bi.item);
-    if (seenKeys.has(key)) return false;
-    seenKeys.add(key);
-    return true;
-  });
-  return deduped.slice(0, 6);
 }
 
 /** Compute Topic Spotlight with cascading dedup from Top3 */
@@ -151,34 +132,48 @@ export function computeDashboardActivity(
 ): DashboardActivityStats {
   const currentTime = now ?? Date.now();
   const dayMs = 86400000;
-  const rangeDays = activityRange === "30d" ? 30 : activityRange === "7d" ? 7 : 1;
-  const rangeStart = currentTime - rangeDays * dayMs;
-  const rangeItems = content.filter(c => c.createdAt >= rangeStart);
+  const days = activityRange === "30d" ? 30 : activityRange === "7d" ? 7 : 1;
+  const rangeStart = currentTime - days * dayMs;
+
+  // Single-pass: bucket items by day and accumulate range stats
+  const dayQualityCounts = new Array<number>(days).fill(0);
+  const dayTotalCounts = new Array<number>(days).fill(0);
+  const daySlopCounts = new Array<number>(days).fill(0);
+  let qualityCount = 0;
+  let slopCount = 0;
+  let totalEvaluated = 0;
+  const actionCandidates: ContentItem[] = [];
+
+  for (const c of content) {
+    if (c.createdAt >= rangeStart) {
+      totalEvaluated++;
+      if (c.verdict === "quality") qualityCount++;
+      else if (c.verdict === "slop") slopCount++;
+
+      if (c.createdAt <= currentTime) {
+        const dayIndex = Math.min(Math.floor((c.createdAt - rangeStart) / dayMs), days - 1);
+        dayTotalCounts[dayIndex]++;
+        if (c.verdict === "quality") dayQualityCounts[dayIndex]++;
+        if (c.verdict === "slop") daySlopCounts[dayIndex]++;
+      }
+    }
+    if (c.validated || c.flagged) actionCandidates.push(c);
+  }
+
   const actionLimit = activityRange === "today" ? 3 : 5;
-  const recentActions = content
-    .filter(c => c.validated || c.flagged)
+  const recentActions = actionCandidates
     .sort((a, b) => (b.validatedAt ?? b.createdAt) - (a.validatedAt ?? a.createdAt))
     .slice(0, actionLimit);
-  const chartDays = Math.min(rangeDays, 30);
+
   const chartQuality: number[] = [];
   const chartSlop: number[] = [];
-  for (let i = chartDays - 1; i >= 0; i--) {
-    const dayStart = currentTime - (i + 1) * dayMs;
-    const dayEnd = currentTime - i * dayMs;
-    const dayItems = content.filter(c => c.createdAt >= dayStart && c.createdAt < dayEnd);
-    const dayQual = dayItems.filter(c => c.verdict === "quality").length;
-    const dayTotal = dayItems.length;
-    chartQuality.push(dayTotal > 0 ? Math.round((dayQual / dayTotal) * 100) : 0);
-    chartSlop.push(dayItems.filter(c => c.verdict === "slop").length);
+  for (let i = 0; i < days; i++) {
+    const total = dayTotalCounts[i];
+    chartQuality.push(total > 0 ? Math.round((dayQualityCounts[i] / total) * 100) : 0);
+    chartSlop.push(daySlopCounts[i]);
   }
-  return {
-    qualityCount: rangeItems.filter(c => c.verdict === "quality").length,
-    slopCount: rangeItems.filter(c => c.verdict === "slop").length,
-    totalEvaluated: rangeItems.length,
-    recentActions,
-    chartQuality,
-    chartSlop,
-  };
+
+  return { qualityCount, slopCount, totalEvaluated, recentActions, chartQuality, chartSlop };
 }
 
 export function computeDashboardSaved(
@@ -191,8 +186,8 @@ export function computeDashboardSaved(
     .filter(c =>
       bookmarkSet.has(c.id) &&
       !excludeIds.has(c.id) &&
-      !c.validated && // Exclude validated items from saved
-      !c.flagged     // Exclude flagged items from saved
+      !c.validated &&
+      !c.flagged
     )
     .sort((a, b) => b.scores.composite - a.scores.composite)
     .slice(0, 5);
@@ -222,10 +217,10 @@ export function computeTopicDistribution(
     if (!item.topics) continue;
     for (const topic of item.topics) {
       const t = topic.toLowerCase();
-      const stats = topicStats.get(t) ?? { total: 0, quality: 0 };
+      let stats = topicStats.get(t);
+      if (!stats) { stats = { total: 0, quality: 0 }; topicStats.set(t, stats); }
       stats.total++;
       if (item.verdict === "quality") stats.quality++;
-      topicStats.set(t, stats);
     }
   }
   return Array.from(topicStats.entries())
@@ -252,22 +247,20 @@ export interface TopicTrend {
 export function computeTopicTrends(content: ContentItem[], weeks = 4): TopicTrend[] {
   const now = Date.now();
   const weekMs = 7 * 86400000;
+  const windowStart = now - weeks * weekMs;
 
-  // Build per-week topic counts. weekBuckets[0] = most recent week
-  const weekBuckets: Map<string, number>[] = [];
-  for (let w = 0; w < weeks; w++) {
-    const weekStart = now - (w + 1) * weekMs;
-    const weekEnd = now - w * weekMs;
-    const topicCounts = new Map<string, number>();
-    for (const item of content) {
-      if (item.createdAt < weekStart || item.createdAt >= weekEnd) continue;
-      if (!item.topics) continue;
-      for (const topic of item.topics) {
-        const t = topic.toLowerCase();
-        topicCounts.set(t, (topicCounts.get(t) ?? 0) + 1);
-      }
+  // Single-pass: assign each item to its week bucket
+  const weekBuckets: Map<string, number>[] = Array.from({ length: weeks }, () => new Map());
+  for (const item of content) {
+    if (item.createdAt < windowStart || item.createdAt > now) continue;
+    if (!item.topics) continue;
+    // weekIndex 0 = most recent week
+    const weekIndex = Math.min(Math.floor((now - item.createdAt) / weekMs), weeks - 1);
+    const bucket = weekBuckets[weekIndex];
+    for (const topic of item.topics) {
+      const t = topic.toLowerCase();
+      bucket.set(t, (bucket.get(t) ?? 0) + 1);
     }
-    weekBuckets.push(topicCounts);
   }
 
   const allTopics = new Set<string>();
@@ -331,8 +324,8 @@ export function titleWordOverlap(a: string, b: string): number {
   if (sa.size === 0 || sb.size === 0) return 0;
   let intersection = 0;
   for (const w of sa) if (sb.has(w)) intersection++;
-  const union = sa.size + sb.size - intersection;
-  return union === 0 ? 0 : intersection / union;
+  // Jaccard similarity: |A∩B| / |A∪B|
+  return intersection / (sa.size + sb.size - intersection);
 }
 
 const CLUSTER_TIME_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -340,16 +333,18 @@ const CLUSTER_TIME_WINDOW_MS = 48 * 60 * 60 * 1000;
 export function clusterByStory(items: ContentItem[]): StoryCluster[] {
   if (items.length === 0) return [];
 
-  const topicSets = items.map(it =>
+  // Sort by createdAt descending so time-window break works
+  const sorted = [...items].sort((a, b) => b.createdAt - a.createdAt);
+  const topicSets = sorted.map(it =>
     new Set((it.topics ?? []).map(t => t.toLowerCase()))
   );
 
-  const uf = new UnionFind(items.length);
+  const uf = new UnionFind(sorted.length);
 
-  for (let i = 0; i < items.length; i++) {
-    for (let j = i + 1; j < items.length; j++) {
-      const timeDiff = Math.abs(items[i].createdAt - items[j].createdAt);
-      if (timeDiff > CLUSTER_TIME_WINDOW_MS) continue;
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length; j++) {
+      const timeDiff = sorted[i].createdAt - sorted[j].createdAt;
+      if (timeDiff > CLUSTER_TIME_WINDOW_MS) break; // sorted desc → all subsequent are older
 
       const si = topicSets[i];
       const sj = topicSets[j];
@@ -361,7 +356,7 @@ export function clusterByStory(items: ContentItem[]): StoryCluster[] {
       if (shared >= 2) {
         uf.union(i, j);
       } else if (shared === 1) {
-        if (titleWordOverlap(items[i].text.slice(0, 200), items[j].text.slice(0, 200)) >= 0.4) {
+        if (titleWordOverlap(sorted[i].text.slice(0, 200), sorted[j].text.slice(0, 200)) >= 0.4) {
           uf.union(i, j);
         }
       }
@@ -369,7 +364,7 @@ export function clusterByStory(items: ContentItem[]): StoryCluster[] {
   }
 
   const groups = new Map<number, number[]>();
-  for (let i = 0; i < items.length; i++) {
+  for (let i = 0; i < sorted.length; i++) {
     const root = uf.find(i);
     const arr = groups.get(root);
     if (arr) arr.push(i); else groups.set(root, [i]);
@@ -377,7 +372,7 @@ export function clusterByStory(items: ContentItem[]): StoryCluster[] {
 
   const clusters: StoryCluster[] = [];
   for (const indices of groups.values()) {
-    const members = indices.map(i => items[i]);
+    const members = indices.map(i => sorted[i]);
     members.sort((a, b) => b.scores.composite - a.scores.composite);
     const representative = members[0];
 
