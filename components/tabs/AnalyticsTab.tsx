@@ -21,9 +21,6 @@ import {
   computeDashboardActivity,
   computeTopicDistribution,
   computeTopicTrends,
-  type DashboardActivityStats,
-  type TopicDistEntry,
-  type TopicTrend,
 } from "@/lib/dashboard/utils";
 
 interface AnalyticsTabProps {
@@ -50,13 +47,12 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
   const topicTrends = useMemo(() => computeTopicTrends(content), [content]);
 
   // Single pass over content for all aggregated stats
-  let qualCount = 0, slopCount = 0, validatedCount = 0, flaggedCount = 0, falsePositives = 0;
+  let qualCount = 0, validatedCount = 0, flaggedCount = 0, falsePositives = 0;
   const sourceDistribution: Record<string, number> = {};
   const engineDistribution: Record<string, number> = {};
   const scoreBuckets = Array(10).fill(0);
   for (const c of content) {
     if (c.verdict === "quality") qualCount++;
-    if (c.verdict === "slop") slopCount++;
     if (c.validated) validatedCount++;
     if (c.flagged) flaggedCount++;
     if (c.verdict === "quality" && c.flagged) falsePositives++;

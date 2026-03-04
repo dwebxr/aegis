@@ -218,7 +218,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     try { return localStorage.getItem("aegis-home-mode") === "dashboard" ? "dashboard" : "feed"; }
     catch { return "feed"; }
   });
-  const { profile, setTopicAffinity, addFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
+  const { profile, addFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
