@@ -16,6 +16,7 @@ import {
 import { adaptiveHalfLife } from "@/lib/briefing/ranker";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile, ActivityHistogram } from "@/lib/preferences/types";
+import { createEmptyProfile } from "@/lib/preferences/types";
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
@@ -39,19 +40,9 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 
 function makeProfile(affinities: Record<string, number> = {}): UserPreferenceProfile {
   return {
-    principalId: "test-principal",
+    ...createEmptyProfile("test-principal"),
     topicAffinities: affinities,
-    authorTrust: {},
-    sourceWeights: {},
-    qualityThreshold: 5.5,
-    interactionHistory: [],
-    bookmarkedIds: [],
-    calibration: { qualityThreshold: 4.0 },
-    recentTopics: [],
-    totalValidated: 0,
-    totalFlagged: 0,
-    lastUpdated: Date.now(),
-  } as UserPreferenceProfile;
+  };
 }
 
 const DAY_MS = 86400000;
