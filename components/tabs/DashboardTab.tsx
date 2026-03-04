@@ -16,13 +16,9 @@ import {
   applyDashboardFilters,
   computeDashboardTop3,
   computeTopicSpotlight,
-  computeDashboardActivity,
   computeDashboardSaved,
   computeUnreviewedQueue,
-  computeTopicDistribution,
-  computeTopicTrends,
   clusterByStory,
-  type DashboardActivityStats,
 } from "@/lib/dashboard/utils";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
@@ -183,10 +179,6 @@ function AgentKnowledgePills({ agentContext, profile }: {
   );
 }
 
-const EMPTY_ACTIVITY: DashboardActivityStats = {
-  qualityCount: 0, slopCount: 0, totalEvaluated: 0,
-  recentActions: [], chartQuality: [], chartSlop: [],
-};
 const EMPTY_SECTIONS = { filteredDiscoveries: [] as SerendipityItem[], unreviewedQueue: [] as ContentItem[], dashboardSaved: [] as ContentItem[] };
 
 interface DashboardTabProps {
@@ -227,7 +219,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     catch { return "feed"; }
   });
   const { profile, setTopicAffinity, addFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
-  const [activityRange, setActivityRange] = useState<"today" | "7d" | "30d">("today");
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
@@ -361,21 +352,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return { filteredDiscoveries: filtDisc, unreviewedQueue: queue, dashboardSaved: saved };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardTop3, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds, homeMode, content.length]);
-
-  const topicDistribution = useMemo(() => {
-    if (homeMode !== "dashboard") return [];
-    return computeTopicDistribution(content);
-  }, [content, homeMode]);
-
-  const topicTrends = useMemo(() => {
-    if (homeMode !== "dashboard") return [];
-    return computeTopicTrends(content);
-  }, [content, homeMode]);
-
-  const dashboardActivity = useMemo(() => {
-    if (homeMode !== "dashboard") return EMPTY_ACTIVITY;
-    return computeDashboardActivity(content, activityRange);
-  }, [content, activityRange, homeMode]);
 
   // Signal feedback loop
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; key: number } | null>(null);
@@ -1272,228 +1248,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               </div>
             </div>
           )}
-          {/* Recent Activity + Topic Breakdown — 2-column side-by-side */}
-          <div style={mobile
-            ? { display: "flex", flexDirection: "column", gap: space[4] }
-            : { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: space[4], alignItems: "start" }
-          }>
-            {/* === Recent Activity with time-range tabs === */}
-            <div style={{
-              background: "transparent",
-              border: `1px solid ${colors.border.subtle}`,
-              borderRadius: radii.lg,
-              padding: `${space[3]}px ${space[4]}px`,
-            }}>
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                marginBottom: space[3],
-              }}>
-                <div style={{
-                  fontSize: t.bodySm.size, fontWeight: 600,
-                  color: colors.text.tertiary,
-                  display: "flex", alignItems: "center", gap: space[2],
-                }}>
-                  <span>&#x26A1;</span> Recent Activity
-                </div>
-                <div style={{
-                  display: "flex", gap: space[1],
-                  background: colors.bg.raised, borderRadius: radii.md,
-                  padding: space[1], border: `1px solid ${colors.border.default}`,
-                }}>
-                  {(["today", "7d", "30d"] as const).map(range => {
-                    const active = activityRange === range;
-                    return (
-                      <button
-                        key={range}
-                        onClick={() => setActivityRange(range)}
-                        style={{
-                          padding: `${space[1]}px ${space[2]}px`,
-                          background: active ? colors.bg.surface : "transparent",
-                          border: active ? `1px solid ${colors.border.emphasis}` : "1px solid transparent",
-                          borderRadius: radii.sm,
-                          color: active ? colors.text.primary : colors.text.muted,
-                          fontSize: t.caption.size, fontWeight: 600,
-                          cursor: "pointer", fontFamily: "inherit",
-                          transition: transitions.fast,
-                        }}
-                      >
-                        {range === "today" ? "Today" : range}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: space[4], marginBottom: space[3] }}>
-                {[
-                  { value: dashboardActivity.qualityCount, label: "quality", color: colors.cyan[400] },
-                  { value: dashboardActivity.slopCount, label: "burned", color: colors.orange[400] },
-                  { value: dashboardActivity.totalEvaluated, label: "total", color: colors.purple[400] },
-                ].map(m => (
-                  <span key={m.label} style={{ fontSize: t.bodySm.size, color: colors.text.muted }}>
-                    <span style={{ fontWeight: 700, color: m.color, fontFamily: fonts.mono }}>{m.value}</span>
-                    {" "}{m.label}
-                  </span>
-                ))}
-              </div>
-              {dashboardActivity.chartQuality.length > 0 && (
-                <div style={{ display: "flex", gap: space[4], marginBottom: space[3], alignItems: "center" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <div style={{ width: 80 }}>
-                      <MiniChart data={dashboardActivity.chartQuality} color={colors.cyan[400]} h={24} />
-                    </div>
-                    <span style={{ fontSize: t.tiny.size, color: colors.cyan[400], fontFamily: fonts.mono }}>
-                      {dashboardActivity.chartQuality[dashboardActivity.chartQuality.length - 1]}% quality
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <div style={{ width: 80 }}>
-                      <MiniChart data={dashboardActivity.chartSlop} color={colors.orange[500]} h={24} />
-                    </div>
-                    <span style={{ fontSize: t.tiny.size, color: colors.orange[500], fontFamily: fonts.mono }}>
-                      {dashboardActivity.chartSlop[dashboardActivity.chartSlop.length - 1]} slop
-                    </span>
-                  </div>
-                </div>
-              )}
-              {dashboardActivity.recentActions.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
-                  {dashboardActivity.recentActions.map(item => (
-                    <div key={item.id} style={{
-                      display: "flex", alignItems: "center", gap: space[2],
-                      fontSize: t.caption.size, color: colors.text.disabled,
-                    }}>
-                      <span style={{ color: item.validated ? colors.green[400] : colors.red[400] }}>
-                        {item.validated ? "\u2713" : "\u2717"}
-                      </span>
-                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.text.slice(0, 60)}
-                      </span>
-                      {item.topics && item.topics.length > 0 && (() => {
-                        const topic = item.topics[0];
-                        return (
-                          <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-                            <button
-                              onClick={() => {
-                                const current = profile.topicAffinities[topic] ?? 0;
-                                setTopicAffinity(topic, current + 0.1);
-                                showFeedback(`[${topic}] \u2191`);
-                              }}
-                              style={{
-                                background: "transparent", border: "none", cursor: "pointer",
-                                color: colors.green[400], fontSize: t.caption.size, padding: "0 2px",
-                                fontFamily: "inherit",
-                              }}
-                              title="More like this"
-                            >&#x25B2;</button>
-                            <button
-                              onClick={() => {
-                                const current = profile.topicAffinities[topic] ?? 0;
-                                setTopicAffinity(topic, current - 0.1);
-                                showFeedback(`[${topic}] \u2193`);
-                              }}
-                              style={{
-                                background: "transparent", border: "none", cursor: "pointer",
-                                color: colors.red[400], fontSize: t.caption.size, padding: "0 2px",
-                                fontFamily: "inherit",
-                              }}
-                              title="Less like this"
-                            >&#x25BC;</button>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  ))}
-                </div>
-              )}
-              <D2ANetworkMini mobile={mobile} />
-            </div>
-
-            {/* Topic Distribution — always open */}
-            <div style={{
-              background: "transparent",
-              border: `1px solid ${colors.border.subtle}`,
-              borderRadius: radii.lg,
-              padding: `${space[3]}px ${space[4]}px`,
-            }}>
-              <div style={{
-                fontSize: t.bodySm.size, fontWeight: 600,
-                color: colors.text.tertiary, marginBottom: space[3],
-                display: "flex", alignItems: "center", gap: space[2],
-              }}>
-                <span>📊</span> Topic Breakdown
-              </div>
-              {topicDistribution.length === 0 ? (
-                <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
-                  Add sources to see topic distribution.
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
-                  {topicDistribution.map(entry => {
-                    const maxCount = topicDistribution[0]?.count ?? 0;
-                    const barWidth = maxCount > 0 ? Math.max((entry.count / maxCount) * 100, 8) : 0;
-                    const barColor = entry.qualityRate >= 0.6 ? colors.cyan[400] : entry.qualityRate >= 0.3 ? colors.sky[400] : colors.orange[400];
-                    return (
-                      <div key={entry.topic} style={{ display: "flex", alignItems: "center", gap: space[2] }}>
-                        <span style={{
-                          width: 72, fontSize: t.caption.size, color: colors.text.muted,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          flexShrink: 0, textAlign: "right",
-                        }}>
-                          {entry.topic}
-                        </span>
-                        <div style={{ flex: 1, height: 14, background: colors.bg.raised, borderRadius: radii.sm, overflow: "hidden" }}>
-                          <div style={{
-                            width: `${barWidth}%`, height: "100%",
-                            background: `${barColor}40`, borderRadius: radii.sm,
-                            transition: "width 0.3s ease",
-                          }} />
-                        </div>
-                        <span style={{
-                          width: 28, fontSize: t.caption.size, color: colors.text.disabled,
-                          fontFamily: fonts.mono, textAlign: "right", flexShrink: 0,
-                        }}>
-                          {entry.count}
-                        </span>
-                        {(() => {
-                          const trend = topicTrends.find(tr => tr.topic === entry.topic);
-                          if (!trend) return null;
-                          const arrow = trend.direction === "up" ? "\u2191" : trend.direction === "down" ? "\u2193" : "\u2192";
-                          const arrowColor = trend.direction === "up" ? colors.green[400] : trend.direction === "down" ? colors.red[400] : colors.text.disabled;
-                          return (
-                            <>
-                              <span style={{ width: 50, fontSize: 10, color: arrowColor, fontWeight: 600, textAlign: "right", flexShrink: 0 }}>
-                                {arrow} {Math.abs(trend.changePercent)}%
-                              </span>
-                              <div style={{ display: "flex", alignItems: "flex-end", gap: 1, height: 14, width: 20, flexShrink: 0 }}>
-                                {trend.weeklyHistory.map((count, i) => {
-                                  const max = Math.max(...trend.weeklyHistory, 1);
-                                  return (
-                                    <div key={`w${i}`} style={{
-                                      width: 3, borderRadius: 1,
-                                      height: Math.max((count / max) * 14, 2),
-                                      background: i === trend.weeklyHistory.length - 1 ? barColor : `${colors.text.disabled}40`,
-                                    }} />
-                                  );
-                                })}
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    );
-                  })}
-                  <div style={{
-                    fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[1],
-                    display: "flex", gap: space[3],
-                  }}>
-                    <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: `${colors.cyan[400]}40`, marginRight: 4 }} />high quality</span>
-                    <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: `${colors.orange[400]}40`, marginRight: 4 }} />mixed</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Agent Knowledge — full width */}
           {agentContext && (
             <div style={{

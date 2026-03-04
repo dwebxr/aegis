@@ -1,10 +1,12 @@
 "use client";
-import React from "react";
-import { fonts, colors, space, type as t, radii, kpiLabelStyle } from "@/styles/theme";
+import React, { useState, useMemo } from "react";
+import { fonts, colors, space, type as t, radii, transitions, kpiLabelStyle } from "@/styles/theme";
 import { isD2AContent } from "@/lib/d2a/activity";
 import { ShieldIcon, FireIcon, ZapIcon } from "@/components/icons";
 import { StatCard } from "@/components/ui/StatCard";
 import { BarChart } from "@/components/ui/BarChart";
+import { MiniChart } from "@/components/ui/MiniChart";
+import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
 import { scoreColor } from "@/lib/utils/scores";
 import { formatICP } from "@/lib/ic/icpLedger";
 import type { ContentItem } from "@/lib/types/content";
@@ -15,6 +17,14 @@ import { CostInsights } from "@/components/filtering/CostInsights";
 import type { FilterPipelineStats } from "@/lib/filtering/types";
 import { ENGINE_LABELS } from "@/lib/scoring/types";
 import type { ScoringEngine } from "@/lib/scoring/types";
+import {
+  computeDashboardActivity,
+  computeTopicDistribution,
+  computeTopicTrends,
+  type DashboardActivityStats,
+  type TopicDistEntry,
+  type TopicTrend,
+} from "@/lib/dashboard/utils";
 
 interface AnalyticsTabProps {
   content: ContentItem[];
@@ -34,6 +44,10 @@ const surfaceCard = (m?: boolean): React.CSSProperties => ({
 
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation, engagementIndex, agentState, mobile, pipelineStats }) => {
   const { isDemoMode } = useDemo();
+  const [activityRange, setActivityRange] = useState<"today" | "7d" | "30d">("7d");
+  const activity = useMemo(() => computeDashboardActivity(content, activityRange), [content, activityRange]);
+  const topicDist = useMemo(() => computeTopicDistribution(content), [content]);
+  const topicTrends = useMemo(() => computeTopicTrends(content), [content]);
 
   // Single pass over content for all aggregated stats
   let qualCount = 0, slopCount = 0, validatedCount = 0, flaggedCount = 0, falsePositives = 0;
@@ -89,6 +103,194 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
         <StatCard icon={<ZapIcon s={16} />} label="User Reviews" value={userReviewed} sub={`${validatedCount} validated, ${flaggedCount} flagged`} color={colors.purple[400]} mobile={mobile} />
       </div>
 
+      {/* Activity Trends + Topic Breakdown — 2-column */}
+      <div data-testid="aegis-analytics-activity-trends" style={mobile
+        ? { display: "flex", flexDirection: "column" as const, gap: space[4], marginBottom: mobile ? space[12] : space[16] }
+        : { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: space[4], alignItems: "start", marginBottom: space[16] }
+      }>
+        {/* Activity Trends */}
+        <div style={{
+          background: "transparent",
+          border: `1px solid ${colors.border.subtle}`,
+          borderRadius: radii.lg,
+          padding: `${space[3]}px ${space[4]}px`,
+        }}>
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            marginBottom: space[3],
+          }}>
+            <div style={{
+              fontSize: t.bodySm.size, fontWeight: 600,
+              color: colors.text.tertiary,
+              display: "flex", alignItems: "center", gap: space[2],
+            }}>
+              <span>&#x26A1;</span> Activity Trends
+            </div>
+            <div style={{
+              display: "flex", gap: space[1],
+              background: colors.bg.raised, borderRadius: radii.md,
+              padding: space[1], border: `1px solid ${colors.border.default}`,
+            }}>
+              {(["today", "7d", "30d"] as const).map(range => {
+                const active = activityRange === range;
+                return (
+                  <button
+                    key={range}
+                    onClick={() => setActivityRange(range)}
+                    style={{
+                      padding: `${space[1]}px ${space[2]}px`,
+                      background: active ? colors.bg.surface : "transparent",
+                      border: active ? `1px solid ${colors.border.emphasis}` : "1px solid transparent",
+                      borderRadius: radii.sm,
+                      color: active ? colors.text.primary : colors.text.muted,
+                      fontSize: t.caption.size, fontWeight: 600,
+                      cursor: "pointer", fontFamily: "inherit",
+                      transition: transitions.fast,
+                    }}
+                  >
+                    {range === "today" ? "Today" : range}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: space[4], marginBottom: space[3] }}>
+            {[
+              { value: activity.qualityCount, label: "quality", color: colors.cyan[400] },
+              { value: activity.slopCount, label: "burned", color: colors.orange[400] },
+              { value: activity.totalEvaluated, label: "total", color: colors.purple[400] },
+            ].map(m => (
+              <span key={m.label} style={{ fontSize: t.bodySm.size, color: colors.text.muted }}>
+                <span style={{ fontWeight: 700, color: m.color, fontFamily: fonts.mono }}>{m.value}</span>
+                {" "}{m.label}
+              </span>
+            ))}
+          </div>
+          {activity.chartQuality.length > 0 && (
+            <div style={{ display: "flex", gap: space[4], marginBottom: space[3], alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <div style={{ width: 80 }}>
+                  <MiniChart data={activity.chartQuality} color={colors.cyan[400]} h={24} />
+                </div>
+                <span style={{ fontSize: t.tiny.size, color: colors.cyan[400], fontFamily: fonts.mono }}>
+                  {activity.chartQuality[activity.chartQuality.length - 1]}% quality
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <div style={{ width: 80 }}>
+                  <MiniChart data={activity.chartSlop} color={colors.orange[500]} h={24} />
+                </div>
+                <span style={{ fontSize: t.tiny.size, color: colors.orange[500], fontFamily: fonts.mono }}>
+                  {activity.chartSlop[activity.chartSlop.length - 1]} slop
+                </span>
+              </div>
+            </div>
+          )}
+          {activity.recentActions.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+              {activity.recentActions.map(item => (
+                <div key={item.id} style={{
+                  display: "flex", alignItems: "center", gap: space[2],
+                  fontSize: t.caption.size, color: colors.text.disabled,
+                }}>
+                  <span style={{ color: item.validated ? colors.green[400] : colors.red[400] }}>
+                    {item.validated ? "\u2713" : "\u2717"}
+                  </span>
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.text.slice(0, 60)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Topic Breakdown */}
+        <div data-testid="aegis-analytics-topic-breakdown" style={{
+          background: "transparent",
+          border: `1px solid ${colors.border.subtle}`,
+          borderRadius: radii.lg,
+          padding: `${space[3]}px ${space[4]}px`,
+        }}>
+          <div style={{
+            fontSize: t.bodySm.size, fontWeight: 600,
+            color: colors.text.tertiary, marginBottom: space[3],
+            display: "flex", alignItems: "center", gap: space[2],
+          }}>
+            <span>📊</span> Topic Breakdown
+          </div>
+          {topicDist.length === 0 ? (
+            <div style={{ fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center", padding: space[4] }}>
+              Add sources to see topic distribution.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+              {topicDist.map(entry => {
+                const maxCount = topicDist[0]?.count ?? 0;
+                const barWidth = maxCount > 0 ? Math.max((entry.count / maxCount) * 100, 8) : 0;
+                const barColor = entry.qualityRate >= 0.6 ? colors.cyan[400] : entry.qualityRate >= 0.3 ? colors.sky[400] : colors.orange[400];
+                return (
+                  <div key={entry.topic} style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+                    <span style={{
+                      width: 72, fontSize: t.caption.size, color: colors.text.muted,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      flexShrink: 0, textAlign: "right",
+                    }}>
+                      {entry.topic}
+                    </span>
+                    <div style={{ flex: 1, height: 14, background: colors.bg.raised, borderRadius: radii.sm, overflow: "hidden" }}>
+                      <div style={{
+                        width: `${barWidth}%`, height: "100%",
+                        background: `${barColor}40`, borderRadius: radii.sm,
+                        transition: "width 0.3s ease",
+                      }} />
+                    </div>
+                    <span style={{
+                      width: 28, fontSize: t.caption.size, color: colors.text.disabled,
+                      fontFamily: fonts.mono, textAlign: "right", flexShrink: 0,
+                    }}>
+                      {entry.count}
+                    </span>
+                    {(() => {
+                      const trend = topicTrends.find(tr => tr.topic === entry.topic);
+                      if (!trend) return null;
+                      const arrow = trend.direction === "up" ? "\u2191" : trend.direction === "down" ? "\u2193" : "\u2192";
+                      const arrowColor = trend.direction === "up" ? colors.green[400] : trend.direction === "down" ? colors.red[400] : colors.text.disabled;
+                      return (
+                        <>
+                          <span style={{ width: 50, fontSize: 10, color: arrowColor, fontWeight: 600, textAlign: "right", flexShrink: 0 }}>
+                            {arrow} {Math.abs(trend.changePercent)}%
+                          </span>
+                          <div style={{ display: "flex", alignItems: "flex-end", gap: 1, height: 14, width: 20, flexShrink: 0 }}>
+                            {trend.weeklyHistory.map((count, i) => {
+                              const max = Math.max(...trend.weeklyHistory, 1);
+                              return (
+                                <div key={`w${i}`} style={{
+                                  width: 3, borderRadius: 1,
+                                  height: Math.max((count / max) * 14, 2),
+                                  background: i === trend.weeklyHistory.length - 1 ? barColor : `${colors.text.disabled}40`,
+                                }} />
+                              );
+                            })}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                );
+              })}
+              <div style={{
+                fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[1],
+                display: "flex", gap: space[3],
+              }}>
+                <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: `${colors.cyan[400]}40`, marginRight: 4 }} />high quality</span>
+                <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: `${colors.orange[400]}40`, marginRight: 4 }} />mixed</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: mobile ? space[3] : space[4], marginBottom: mobile ? space[12] : space[16] }}>
         <div style={surfaceCard(mobile)}>
           <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[4] }}>Score Distribution</div>
@@ -108,23 +310,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
           </div>
         </div>
       )}
-
-      <div data-testid="aegis-analytics-eval-summary" style={surfaceCard(mobile)}>
-        <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[4] }}>Evaluation Summary</div>
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: mobile ? space[2] : space[3] }}>
-          {[
-            ["Total Evaluated", String(content.length), colors.sky[400]],
-            ["Quality Found", String(qualCount), colors.green[400]],
-            ["Slop Caught", String(slopCount), colors.orange[400]],
-            ["Accuracy", `${accuracy}%`, colors.amber[400]],
-          ].map(([l, v, c]) => (
-            <div key={l} style={{ textAlign: "center", padding: `${space[3]}px ${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
-              <div style={{ ...kpiLabelStyle, marginBottom: space[1] }}>{l}</div>
-              <div style={{ fontSize: mobile ? t.h1.mobileSz : t.h1.size, fontWeight: t.kpiValue.weight, color: c, fontFamily: fonts.mono }}>{v}</div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {pipelineStats && (
         <div style={{ marginBottom: mobile ? space[3] : space[4] }}>
@@ -251,6 +436,10 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
                   ["Handshakes", String(agentState.activeHandshakes.length), colors.sky[400]],
                   ["Sent", String(agentState.sentItems), colors.green[400]],
                   ["Received", String(agentState.receivedItems), colors.amber[400]],
+                  ["Validated", String(validatedCount), colors.green[400]],
+                  ["Flagged", String(flaggedCount), colors.red[400]],
+                  ["D2A Received", String(content.filter(isD2AContent).length), colors.purple[400]],
+                  ["Fee Matches", String(agentState.d2aMatchCount), colors.amber[400]],
                 ].map(([l, v, c]) => (
                   <div key={l} style={{ textAlign: "center", padding: `${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
                     <div style={{ ...kpiLabelStyle, marginBottom: space[1] }}>{l}</div>
@@ -258,33 +447,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
                   </div>
                 ))}
               </div>
-              {agentState.d2aMatchCount > 0 && (
-                <div style={{ marginTop: space[3], textAlign: "center", padding: `${space[2]}px`, background: "rgba(245,158,11,0.06)", borderRadius: radii.sm }}>
-                  <div style={{ fontSize: t.h2.size, fontWeight: 700, color: colors.amber[400], fontFamily: fonts.mono }}>{agentState.d2aMatchCount}</div>
-                  <div style={{ ...kpiLabelStyle }}>Fee-Paid Matches</div>
-                </div>
-              )}
+              <D2ANetworkMini mobile={mobile} />
             </div>
           )}
-
-          {/* Session Activity */}
-          <div style={surfaceCard(mobile)}>
-            <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.primary, marginBottom: space[4] }}>Session Activity</div>
-            <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr 1fr", gap: space[2] }}>
-              {[
-                ["Validated", String(validatedCount), colors.green[400]],
-                ["Flagged", String(flaggedCount), colors.red[400]],
-                ["D2A Received", String(content.filter(isD2AContent).length), colors.purple[400]],
-                ["D2A Sent", String(agentState?.sentItems ?? 0), colors.sky[400]],
-                ["Fee Matches", String(agentState?.d2aMatchCount ?? 0), colors.amber[400]],
-              ].map(([l, v, c]) => (
-                <div key={l} style={{ textAlign: "center", padding: `${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
-                  <div style={{ ...kpiLabelStyle, marginBottom: space[1] }}>{l}</div>
-                  <div style={{ fontSize: t.h2.size, fontWeight: 700, color: c, fontFamily: fonts.mono }}>{v}</div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
     </div>

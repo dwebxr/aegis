@@ -411,29 +411,6 @@ describe("DashboardTab — dashboard mode rendering", () => {
     expect(html).toContain("0 reviews");
   });
 
-  it("renders Recent Activity section with time-range tabs", () => {
-    const html = renderToStaticMarkup(
-      <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    expect(html).toContain("Recent Activity");
-    expect(html).toContain("Today");
-    expect(html).toContain("7d");
-    expect(html).toContain("30d");
-  });
-
-  it("renders activity stats with content", () => {
-    const items = [
-      makeItem({ id: "act-1", verdict: "quality", createdAt: now - 1000 }),
-      makeItem({ id: "act-2", verdict: "slop", createdAt: now - 2000 }),
-    ];
-    const html = renderToStaticMarkup(
-      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    expect(html).toContain("quality");
-    expect(html).toContain("burned");
-    expect(html).toContain("total");
-  });
-
   it("renders Discoveries section header when discoveries prop provided", () => {
     // Discovery item must differ from content items — dedup filters overlapping IDs
     const contentItems = [makeItem({ id: "content-1" })];

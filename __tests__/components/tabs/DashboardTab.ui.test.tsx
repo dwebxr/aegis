@@ -290,36 +290,6 @@ describe("DashboardTab — Needs Review section", () => {
   });
 });
 
-describe("DashboardTab — Topic Distribution section", () => {
-  beforeEach(() => localStorage.setItem("aegis-home-mode", "dashboard"));
-  afterEach(() => localStorage.removeItem("aegis-home-mode"));
-
-  it("renders Topic Breakdown section with topic data", () => {
-    const items = [
-      makeItem({ id: "td-1", topics: ["ai", "crypto"], text: "Topic dist test 1" }),
-      makeItem({ id: "td-2", topics: ["ai", "web3"], text: "Topic dist test 2" }),
-      makeItem({ id: "td-3", topics: ["crypto"], text: "Topic dist test 3" }),
-    ];
-    const html = renderToStaticMarkup(
-      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />,
-    );
-    expect(html).toContain("Topic Breakdown");
-    expect(html).toContain("ai");
-    expect(html).toContain("crypto");
-  });
-
-  it("renders empty state when no topics", () => {
-    const items = [
-      makeItem({ id: "notopic-1", topics: [], text: "No topic test 1" }),
-      makeItem({ id: "notopic-2", topics: undefined, text: "No topic test 2" }),
-    ];
-    const html = renderToStaticMarkup(
-      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />,
-    );
-    expect(html).toContain("Add sources to see topic distribution");
-  });
-});
-
 describe("DashboardTab — grade fallback rendering", () => {
   beforeEach(() => localStorage.setItem("aegis-home-mode", "dashboard"));
   afterEach(() => localStorage.removeItem("aegis-home-mode"));
