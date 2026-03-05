@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
   if (!res.ok) {
     console.error("[upload/image] nostr.build returned", res.status);
-    return NextResponse.json({ error: `Image host error: ${res.status}` }, { status: 502 });
+    return NextResponse.json({ error: "Image host error" }, { status: 502 });
   }
 
   let data;

@@ -113,7 +113,7 @@ describe("POST /api/analyze — BYOK (user API key)", () => {
 
     expect(res.status).toBe(502);
     const data = await res.json();
-    expect(data.error).toContain("Anthropic API error");
+    expect(data.error).toBe("Request failed");
     expect(data.fallback).toBeDefined();
     expect(data.fallback.tier).toBe("heuristic");
   });

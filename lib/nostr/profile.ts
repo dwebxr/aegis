@@ -77,7 +77,7 @@ export async function fetchAgentProfile(
       if (!meta || typeof meta !== "object" || Array.isArray(meta)) return null;
       return meta as NostrProfileMetadata;
     } catch {
-      console.debug("[agent-profile] Malformed Kind 0 JSON for", pubkeyHex.slice(0, 8));
+      console.warn("[agent-profile] Malformed Kind 0 JSON for", pubkeyHex.slice(0, 8));
       return null;
     }
   } finally {

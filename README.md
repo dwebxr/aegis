@@ -9,6 +9,15 @@
 
 ## Latest Updates (March 2026)
 
+### Production Readiness Audit
+- **API error sanitization**: All 16 API routes now return generic error messages to clients — no internal error details, status codes, or stack traces leaked
+- **Validate/flag mutual exclusivity**: Flagging a validated item clears validated (and vice versa) — eliminates impossible `validated=true, flagged=true` state
+- **qualityRate fix**: Peer stats use unique-judged count instead of sum of validated+flagged (which double-counted items in edge cases)
+- **clusterByStory O(n²) cap**: Pairwise clustering capped at 150 items with pre-computed word sets — overflow items become singletons
+- **Single-pass optimizations**: `peerStats` aggregation, `getContext` topic iteration, `cleanupStaleHandshakes`/`cleanupStalePeers` in agent manager
+- **Exhaustive switch**: `generateDiscoveryReason` now fails at compile time if a new discovery type is added without a case
+- **Code cleanup**: Removed redundant conditions, dead variables, over-engineered stubs, unnecessary abstractions
+
 ### Dashboard → Analytics UX Restructuring
 - **Action vs Observation separation**: Dashboard is now action-oriented (7 sections), Analytics is observation-oriented (9 sections)
 - **Activity Trends** moved from Dashboard to Analytics (default range: 7 days) — topic affinity buttons removed (Analytics is observation-only)
@@ -16,11 +25,13 @@
 - **Evaluation Summary** removed from Analytics (duplicated KPI Cards)
 - **Session Activity** merged into D2A Agent card — unified 8-metric grid (Peers/Handshakes/Sent/Received/Validated/Flagged/D2A Received/Fee Matches)
 - **D2ANetworkMini** added inside D2A Agent card in Analytics
+- **"Your Agent" personality card**: Merged "Your Agent Knows" + "Agent Settings" into single card between Topic Spotlight and Discoveries
 
 ### Code Quality Audit
 - `validateContentItems` hardened: validates 8 required fields (was only checking `id` + `createdAt` — corrupt cache could crash downstream score reads)
 - `parseScoreResponse` now warns when LLM omits composite score and fallback formula is used
-- All silent `catch {}` blocks replaced with diagnostic logging
+- All silent `catch {}` blocks replaced with diagnostic logging (`console.warn` with context prefix)
+- `console.debug` upgraded to `console.warn` in 15 error-recovery paths (debug is suppressed in production)
 - Zero TypeScript errors, zero ESLint warnings, zero skipped tests
 
 ### Dashboard Performance Optimization
@@ -816,7 +827,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (4537 unit/integration tests, 264 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
+| Test | Jest + ts-jest (4609 unit/integration tests, 265 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
 
 ## Project Structure
 
@@ -976,7 +987,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 4537 Jest tests across 264 suites
+├── __tests__/                           # 4609 Jest tests across 265 suites
 ├── e2e/                                 # Playwright E2E tests (299 tests, 12 specs)
 ├── canisters/
 │   └── aegis_backend/
@@ -1013,7 +1024,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Jest unit + integration tests (4537 tests)
+npm test              # Jest unit + integration tests (4609 tests)
 npm run test:watch    # Watch mode
 npx playwright test   # E2E tests — requires dev server (npm run dev)
 ```

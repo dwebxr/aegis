@@ -55,7 +55,7 @@ export function clearLinkedAccount(): void {
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.removeItem(STORAGE_KEY);
-  } catch { console.debug("[nostr-link] localStorage unavailable"); }
+  } catch { console.warn("[nostr-link] localStorage unavailable"); }
 }
 
 export function maskNpub(npub: string): string {
@@ -115,7 +115,7 @@ export async function fetchNostrProfile(
         try {
           const meta = JSON.parse(ev.content);
           displayName = meta.display_name || meta.name || undefined;
-        } catch { console.debug("[linkAccount] Skipped malformed profile JSON for", pubkeyHex.slice(0, 8)); }
+        } catch { console.warn("[linkAccount] Skipped malformed profile JSON for", pubkeyHex.slice(0, 8)); }
       }
       if (ev.kind === 3) {
         followCount = ev.tags.filter((t: string[]) => t[0] === "p").length;

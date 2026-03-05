@@ -5,7 +5,7 @@ export function getUserApiKey(): string | null {
   try {
     return localStorage.getItem(STORAGE_KEY);
   } catch (err) {
-    console.debug("[apiKey] localStorage read failed:", err);
+    console.warn("[apiKey] localStorage read failed:", err);
     return null;
   }
 }
@@ -18,7 +18,7 @@ export function setUserApiKey(key: string): void {
   try {
     localStorage.setItem(STORAGE_KEY, key);
   } catch (err) {
-    console.debug("[apiKey] Failed to save key (quota?):", err);
+    console.warn("[apiKey] Failed to save key (quota?):", err);
   }
 }
 
@@ -27,7 +27,7 @@ export function clearUserApiKey(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (err) {
-    console.debug("[apiKey] Failed to clear key:", err);
+    console.warn("[apiKey] Failed to clear key:", err);
   }
 }
 

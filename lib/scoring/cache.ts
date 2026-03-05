@@ -117,7 +117,7 @@ function getCache(): Map<string, ScoringCacheEntry> {
         return (_memCache = parseEntries(JSON.parse(raw)));
       }
     } catch (err) {
-      console.debug("[scoring-cache] Pre-init localStorage parse failed:", err);
+      console.warn("[scoring-cache] Pre-init localStorage parse failed:", err);
     }
   }
   return (_memCache = new Map());
@@ -194,7 +194,7 @@ export function clearScoringCache(): void {
     idbPut(STORE_SCORE_CACHE, IDB_KEY, {}).catch(err => console.warn("[scoring-cache] IDB clear failed:", err));
   }
   if (typeof globalThis.localStorage !== "undefined") {
-    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.warn("[scoring-cache] Failed to clear localStorage:", err); }
   }
   cacheHits = 0;
   cacheMisses = 0;

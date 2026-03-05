@@ -87,14 +87,14 @@ describe("DashboardTab — Agent Settings summary card", () => {
     expect(html).toContain("15 reviews");
   });
 
-  it("shows Edit button", () => {
+  it("shows Edit settings button", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("Edit");
+    expect(html).toContain("Edit settings");
   });
 
-  it("Edit button calls onTabChange with 'settings:agent'", () => {
+  it("Edit settings button calls onTabChange with 'settings:agent'", () => {
     const mockTabChange = jest.fn();
     render(
       <DashboardTab
@@ -104,9 +104,7 @@ describe("DashboardTab — Agent Settings summary card", () => {
         onTabChange={mockTabChange}
       />
     );
-    // Find the "Edit" button in the Agent Settings card
-    const editButtons = screen.getAllByText("Edit");
-    // Click the first Edit button (agent settings card)
+    const editButtons = screen.getAllByText("Edit settings");
     fireEvent.click(editButtons[0]);
     expect(mockTabChange).toHaveBeenCalledWith("settings:agent");
   });

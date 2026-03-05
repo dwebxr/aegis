@@ -109,6 +109,8 @@ let testHarness: {
   addContent: (item: ContentItem) => void;
   flushPendingItems: () => void;
   clearDemoContent: () => void;
+  validateItem: (id: string) => void;
+  flagItem: (id: string) => void;
 };
 
 function Harness() {
@@ -120,6 +122,8 @@ function Harness() {
     addContent: ctx.addContent,
     flushPendingItems: ctx.flushPendingItems,
     clearDemoContent: ctx.clearDemoContent,
+    validateItem: ctx.validateItem,
+    flagItem: ctx.flagItem,
   };
   return (
     <div>
@@ -334,5 +338,95 @@ describe("ContentContext — buffered content (addContentBuffered / flushPending
     // Only the owned item should remain
     expect(screen.getByTestId("count").textContent).toBe("1");
     expect(testHarness.content[0].id).toBe("owned-1");
+  });
+});
+
+describe("ContentContext — validate/flag mutual exclusivity", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("flagging a validated item clears validated", () => {
+    renderWithProvider();
+    const item = makeItem({ id: "vf-1" });
+
+    act(() => { testHarness.addContent(item); });
+    act(() => { testHarness.validateItem("vf-1"); });
+
+    expect(testHarness.content[0].validated).toBe(true);
+    expect(testHarness.content[0].flagged).toBe(false);
+
+    act(() => { testHarness.flagItem("vf-1"); });
+
+    expect(testHarness.content[0].validated).toBe(false);
+    expect(testHarness.content[0].flagged).toBe(true);
+  });
+
+  it("validating a flagged item clears flagged", () => {
+    renderWithProvider();
+    const item = makeItem({ id: "fv-1" });
+
+    act(() => { testHarness.addContent(item); });
+    act(() => { testHarness.flagItem("fv-1"); });
+
+    expect(testHarness.content[0].flagged).toBe(true);
+    expect(testHarness.content[0].validated).toBe(false);
+
+    act(() => { testHarness.validateItem("fv-1"); });
+
+    expect(testHarness.content[0].flagged).toBe(false);
+    expect(testHarness.content[0].validated).toBe(true);
+  });
+
+  it("validateItem is no-op if already validated", () => {
+    renderWithProvider();
+    const item = makeItem({ id: "noop-v" });
+
+    act(() => { testHarness.addContent(item); });
+    act(() => { testHarness.validateItem("noop-v"); });
+    act(() => { testHarness.validateItem("noop-v"); });
+
+    expect(testHarness.content[0].validated).toBe(true);
+    expect(testHarness.content[0].flagged).toBe(false);
+  });
+
+  it("flagItem is no-op if already flagged", () => {
+    renderWithProvider();
+    const item = makeItem({ id: "noop-f" });
+
+    act(() => { testHarness.addContent(item); });
+    act(() => { testHarness.flagItem("noop-f"); });
+    act(() => { testHarness.flagItem("noop-f"); });
+
+    expect(testHarness.content[0].flagged).toBe(true);
+    expect(testHarness.content[0].validated).toBe(false);
+  });
+
+  it("an item is never both validated and flagged after any sequence of operations", () => {
+    renderWithProvider();
+    const item = makeItem({ id: "seq-1" });
+
+    act(() => { testHarness.addContent(item); });
+
+    // Validate → flag → validate → flag
+    act(() => { testHarness.validateItem("seq-1"); });
+    expect(testHarness.content[0].validated).toBe(true);
+    expect(testHarness.content[0].flagged).toBe(false);
+
+    act(() => { testHarness.flagItem("seq-1"); });
+    expect(testHarness.content[0].validated).toBe(false);
+    expect(testHarness.content[0].flagged).toBe(true);
+
+    act(() => { testHarness.validateItem("seq-1"); });
+    expect(testHarness.content[0].validated).toBe(true);
+    expect(testHarness.content[0].flagged).toBe(false);
+
+    act(() => { testHarness.flagItem("seq-1"); });
+    expect(testHarness.content[0].validated).toBe(false);
+    expect(testHarness.content[0].flagged).toBe(true);
   });
 });

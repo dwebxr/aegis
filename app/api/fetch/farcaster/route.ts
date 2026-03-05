@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       if (msg.includes("404") || msg.includes("not found")) {
         return NextResponse.json({ error: `User "${username}" not found on Farcaster` }, { status: 404 });
       }
-      return NextResponse.json({ error: `Failed to resolve user: ${msg}` }, { status: 502 });
+      return NextResponse.json({ error: "Failed to resolve user" }, { status: 502 });
     }
   }
 
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
       if (msg.includes("timeout")) {
         return NextResponse.json({ items: [], warning: "Request timed out" });
       }
-      return NextResponse.json({ error: `Failed to fetch casts: ${msg}` }, { status: 502 });
+      return NextResponse.json({ error: "Failed to fetch casts" }, { status: 502 });
     }
   }
 

@@ -4,23 +4,17 @@ import type { D2ABriefingResponse, D2ABriefingItem } from "@/lib/d2a/types";
 import { errMsg } from "@/lib/utils/errors";
 import { APP_URL } from "@/lib/config";
 
-function toBriefingItem(bi: BriefingState["priority"][0]): D2ABriefingItem {
-  const { item } = bi;
+function toBriefingItem({ item, briefingScore }: BriefingState["priority"][0]): D2ABriefingItem {
   return {
     title: item.text.slice(0, 80),
     content: item.text,
     source: item.source,
     sourceUrl: item.sourceUrl || "",
-    scores: {
-      ...item.scores,
-      vSignal: item.vSignal,
-      cContext: item.cContext,
-      lSlop: item.lSlop,
-    },
+    scores: { ...item.scores, vSignal: item.vSignal, cContext: item.cContext, lSlop: item.lSlop },
     verdict: item.verdict,
     reason: item.reason,
     topics: item.topics || [],
-    briefingScore: bi.briefingScore,
+    briefingScore,
   };
 }
 

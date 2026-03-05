@@ -79,6 +79,10 @@ export function generateDiscoveryReason(
         return `New perspective: ${topics} from ${author} — quality ${score}/10`;
       }
       return `Emerging topic: ${topics} — ${author} scored ${score}/10 with low network overlap`;
+    default: {
+      const _exhaustive: never = discoveryType;
+      return `Discovery from ${author} — quality ${score}/10 on ${topics} (${_exhaustive})`;
+    }
   }
 }
 

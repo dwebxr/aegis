@@ -403,14 +403,15 @@ describe("DashboardTab — dashboard mode rendering", () => {
     expect(html).toContain("Test Author");
   });
 
-  it("renders Agent Settings section collapsed by default", () => {
+  it("renders Your Agent personality card with stats", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("Agent Settings");
+    expect(html).toContain("Your Agent");
     expect(html).toContain("0 interests");
     expect(html).toContain("threshold 5.5");
     expect(html).toContain("0 reviews");
+    expect(html).toContain("Edit settings");
   });
 
   it("renders Discoveries section header when discoveries prop provided", () => {

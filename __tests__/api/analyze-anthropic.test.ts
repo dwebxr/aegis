@@ -215,7 +215,7 @@ describe("POST /api/analyze — Anthropic API path", () => {
       expect(res.status).toBe(502);
 
       const data = await res.json();
-      expect(data.error).toContain("Anthropic API error: 429");
+      expect(data.error).toBe("Request failed");
       expect(data.fallback.tier).toBe("heuristic");
     });
 

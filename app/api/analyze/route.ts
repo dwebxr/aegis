@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
 
   if (!res.ok) {
     console.error(`[analyze] Anthropic API returned ${res.status}`);
-    return NextResponse.json({ error: `Anthropic API error: ${res.status}`, fallback: heuristic }, { status: 502 });
+    return NextResponse.json({ error: "Request failed", fallback: heuristic }, { status: 502 });
   }
 
   let data;

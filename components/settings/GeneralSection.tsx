@@ -41,7 +41,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
 
   const handleFreqChange = (value: PushFrequency) => {
     setPushFreq(value);
-    try { localStorage.setItem(LS_PUSH_FREQ_KEY, value); } catch { /* Safari private mode */ }
+    try { localStorage.setItem(LS_PUSH_FREQ_KEY, value); } catch (err) { console.warn("[settings] Failed to save push frequency:", err); }
   };
 
   const handleAddAlertTopic = useCallback(() => {

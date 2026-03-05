@@ -95,7 +95,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
       const data = await res.json();
       setDigest(data.digest);
       const today = new Date().toISOString().slice(0, 10);
-      try { localStorage.setItem(`aegis-digest-${today}`, data.digest); } catch { /* ignore */ }
+      try { localStorage.setItem(`aegis-digest-${today}`, data.digest); } catch (err) { console.warn("[briefing] Failed to cache digest:", err); }
     } catch (err) {
       setDigestError(errMsg(err));
     } finally {

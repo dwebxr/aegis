@@ -56,7 +56,7 @@ export async function saveWoTCache(graph: WoTGraph, ttl: number): Promise<void> 
       await idbPut(STORE_WOT_CACHE, IDB_KEY, entry);
       return;
     } catch {
-      console.debug("[wot-cache] IDB write failed, falling back to localStorage");
+      console.warn("[wot-cache] IDB write failed, falling back to localStorage");
     }
   }
 
@@ -64,7 +64,7 @@ export async function saveWoTCache(graph: WoTGraph, ttl: number): Promise<void> 
   try {
     localStorage.setItem(WOT_CACHE_KEY, JSON.stringify(entry));
   } catch {
-    console.debug("[wot-cache] localStorage write failed (quota exceeded?)");
+    console.warn("[wot-cache] localStorage write failed (quota exceeded?)");
   }
 }
 
@@ -73,11 +73,11 @@ export async function clearWoTCache(): Promise<void> {
     try {
       await idbDelete(STORE_WOT_CACHE, IDB_KEY);
     } catch {
-      console.debug("[wot-cache] IDB delete failed");
+      console.warn("[wot-cache] IDB delete failed");
     }
   }
   if (typeof globalThis.localStorage === "undefined") return;
   try {
     localStorage.removeItem(WOT_CACHE_KEY);
-  } catch { console.debug("[wot-cache] localStorage unavailable"); }
+  } catch { console.warn("[wot-cache] localStorage unavailable"); }
 }

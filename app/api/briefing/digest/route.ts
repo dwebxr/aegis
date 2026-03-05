@@ -74,7 +74,7 @@ Respond with ONLY the digest paragraph, no labels or formatting.`;
     });
 
     if (!res.ok) {
-      return NextResponse.json({ error: `API error: ${res.status}` }, { status: 502 });
+      return NextResponse.json({ error: "Request failed" }, { status: 502 });
     }
 
     const data = await res.json();
@@ -84,7 +84,7 @@ Respond with ONLY the digest paragraph, no labels or formatting.`;
   } catch (err) {
     console.error("[briefing/digest] Anthropic request failed:", errMsg(err));
     return NextResponse.json(
-      { error: `Request failed: ${errMsg(err)}` },
+      { error: "Request failed" },
       { status: 502 },
     );
   }

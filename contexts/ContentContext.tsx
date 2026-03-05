@@ -268,6 +268,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const actorRef = useRef<_SERVICE | null>(null);
   const contentRef = useRef(content);
   contentRef.current = content;
+  // Stubs replaced by real implementations synchronously during render (lines ~379, ~828),
+  // before any effect `.then()` can fire. The stubs are never actually called.
   const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const drainQueueRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const syncRetryRef = useRef(0);
@@ -567,24 +569,26 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const validateItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
     if (!item || item.validated) return;
-    setContent(prev => prev.map(c => c.id === id ? { ...c, validated: true, validatedAt: c.validatedAt ?? Date.now() } : c));
+    // Clear flagged — validate and flag are mutually exclusive (user changed their mind)
+    setContent(prev => prev.map(c => c.id === id ? { ...c, validated: true, flagged: false, validatedAt: c.validatedAt ?? Date.now() } : c));
     preferenceCallbacks?.onValidate?.(item.topics || [], item.author, item.scores.composite, item.verdict, item.sourceUrl, id);
     if (item.source === "nostr" && item.nostrPubkey) recordUseful(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishValidation(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
-      syncToIC(actorRef.current.updateEvaluation(id, true, item.flagged), "updateEvaluation", { id, validated: true, flagged: item.flagged });
+      syncToIC(actorRef.current.updateEvaluation(id, true, false), "updateEvaluation", { id, validated: true, flagged: false });
     }
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
 
   const flagItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
     if (!item || item.flagged) return;
-    setContent(prev => prev.map(c => c.id === id ? { ...c, flagged: true } : c));
+    // Clear validated — validate and flag are mutually exclusive (user changed their mind)
+    setContent(prev => prev.map(c => c.id === id ? { ...c, flagged: true, validated: false } : c));
     preferenceCallbacks?.onFlag?.(item.topics || [], item.author, item.scores.composite, item.verdict, id);
     if (item.source === "nostr" && item.nostrPubkey) recordSlop(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishFlag(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
-      syncToIC(actorRef.current.updateEvaluation(id, item.validated, true), "updateEvaluation", { id, validated: item.validated, flagged: true });
+      syncToIC(actorRef.current.updateEvaluation(id, false, true), "updateEvaluation", { id, validated: false, flagged: true });
     }
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
 

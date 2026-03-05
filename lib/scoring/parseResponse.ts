@@ -35,7 +35,7 @@ export function parseScoreResponse(raw: string): ScoreParseResult | null {
     const insight = scoreField(parsed, "insight");
     const credibility = scoreField(parsed, "credibility");
 
-    const hasComposite = parsed.composite !== undefined && parsed.composite !== null && Number.isFinite(Number(parsed.composite));
+    const hasComposite = parsed.composite != null && Number.isFinite(Number(parsed.composite));
     const rawComposite = hasComposite ? Number(parsed.composite) : (vSignal * cContext) / (lSlop + 0.5);
     if (!hasComposite) {
       console.warn("[parseResponse] LLM omitted composite score, using fallback formula:", rawComposite.toFixed(2));

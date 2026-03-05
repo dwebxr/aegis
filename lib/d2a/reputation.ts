@@ -118,8 +118,8 @@ export function calculateEffectiveTrust(wotScore: number, repScore: number): num
 export function getTrustTier(effectiveTrust: number): TrustTier {
   if (effectiveTrust >= 0.8) return "trusted";
   if (effectiveTrust >= 0.4) return "known";
-  if (effectiveTrust >= 0) return "unknown";
-  return "restricted";
+  if (effectiveTrust < 0) return "restricted";
+  return "unknown";
 }
 
 /** Map trust tier → fee. Returns 0 for "restricted" (callers typically filter this tier first). */

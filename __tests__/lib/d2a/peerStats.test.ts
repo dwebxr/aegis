@@ -93,6 +93,20 @@ describe("computePeerStats", () => {
     expect(stats[0].qualityRate).toBe(0);
   });
 
+  it("qualityRate uses unique judged count even if item is both validated and flagged", () => {
+    // Edge case: legacy data where both flags are true (before mutual exclusivity fix)
+    const items = [
+      makeItem({ nostrPubkey: PK_A, reason: "Received via D2A from aabb", validated: true, flagged: true }),
+      makeItem({ nostrPubkey: PK_A, reason: "Received via D2A from aabb", validated: true, flagged: false }),
+    ];
+    const stats = computePeerStats(items, new Map(), null);
+    // 2 validated, 1 flagged, but only 2 unique judged items (both have at least one flag)
+    expect(stats[0].validated).toBe(2);
+    expect(stats[0].flagged).toBe(1);
+    // qualityRate = validated / unique judged = 2 / 2 = 1.0
+    expect(stats[0].qualityRate).toBe(1.0);
+  });
+
   it("uses reputation data when available", () => {
     const items = [makeItem({ nostrPubkey: PK_A, reason: "Received via D2A from aabb" })];
     const reps = new Map<string, PeerReputation>([

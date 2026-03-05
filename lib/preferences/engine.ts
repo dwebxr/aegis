@@ -86,24 +86,17 @@ export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPr
 }
 
 export function getContext(profile: UserPreferenceProfile): UserContext {
-  const HIGH_THRESHOLD = 0.3;
-  const LOW_THRESHOLD = -0.2;
-  const TRUST_THRESHOLD = 0.3;
-
-  const highAffinityTopics = Object.entries(profile.topicAffinities)
-    .filter(([, v]) => v >= HIGH_THRESHOLD)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 10)
-    .map(([k]) => k);
-
-  const lowAffinityTopics = Object.entries(profile.topicAffinities)
-    .filter(([, v]) => v <= LOW_THRESHOLD)
-    .sort(([, a], [, b]) => a - b)
-    .slice(0, 5)
-    .map(([k]) => k);
+  const highEntries: [string, number][] = [];
+  const lowEntries: [string, number][] = [];
+  for (const [k, v] of Object.entries(profile.topicAffinities)) {
+    if (v >= 0.3) highEntries.push([k, v]);
+    else if (v <= -0.2) lowEntries.push([k, v]);
+  }
+  const highAffinityTopics = highEntries.sort(([, a], [, b]) => b - a).slice(0, 10).map(([k]) => k);
+  const lowAffinityTopics = lowEntries.sort(([, a], [, b]) => a - b).slice(0, 5).map(([k]) => k);
 
   const trustedAuthors = Object.entries(profile.authorTrust)
-    .filter(([, v]) => v.trust >= TRUST_THRESHOLD)
+    .filter(([, v]) => v.trust >= 0.3)
     .sort(([, a], [, b]) => b.trust - a.trust)
     .slice(0, 10)
     .map(([k]) => k);

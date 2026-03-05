@@ -2,7 +2,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard, deriveScoreTags } from "@/components/ui/ContentCard";
-import { GearIcon } from "@/components/icons";
 import { fonts, colors, space, type as t, radii, transitions, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { exportContentCSV, exportContentJSON } from "@/lib/utils/export";
@@ -134,6 +133,76 @@ const inlineBBtnActiveStyle: React.CSSProperties = {
   border: `1px solid ${colors.amber[400]}30`,
   color: colors.amber[400],
 };
+
+const cardGridStyle = (mobile?: boolean): React.CSSProperties => mobile
+  ? { display: "flex", flexDirection: "column", gap: space[4] }
+  : { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: space[4] };
+
+function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookmark, onValidate, onFlag,
+  gradeSize = 36, textClamp = 2, textSlice = 150, textWeight = 600, showPlatform, overlay, topContent, style,
+}: {
+  item: ContentItem;
+  failedImages: Set<string>;
+  markImgFailed: (id: string) => void;
+  bookmarkSet: Set<string>;
+  onBookmark: (id: string) => void;
+  onValidate: (id: string) => void;
+  onFlag: (id: string) => void;
+  gradeSize?: number;
+  textClamp?: number;
+  textSlice?: number;
+  textWeight?: number;
+  showPlatform?: boolean;
+  overlay?: React.ReactNode;
+  topContent?: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  const gr = scoreGrade(item.scores.composite);
+  const tag = deriveScoreTags(item)[0] ?? null;
+  return (
+    <div style={{
+      background: colors.bg.surface,
+      border: `1px solid ${colors.border.default}`,
+      borderRadius: radii.lg,
+      overflow: "hidden",
+      transition: transitions.fast,
+      ...style,
+    }}>
+      <ThumbnailArea item={item} gr={gr} gradeSize={gradeSize}
+        imgFailed={failedImages.has(item.id)} onImgError={() => markImgFailed(item.id)}
+        overlay={overlay}
+      />
+      <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
+        {topContent}
+        <div style={{
+          fontSize: t.body.size, fontWeight: textWeight, color: colors.text.secondary,
+          overflow: "hidden", display: "-webkit-box",
+          WebkitLineClamp: textClamp, WebkitBoxOrient: "vertical" as const,
+          lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
+        }}>
+          {item.text.slice(0, textSlice)}
+        </div>
+        <div style={{
+          fontSize: t.caption.size, color: colors.text.disabled,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          marginBottom: space[3],
+        }}>
+          {item.author} &middot; {showPlatform ? (item.platform || item.source) : item.source} &middot; {item.timestamp}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+          <ScorePill gr={gr} tag={tag} />
+          <div style={{ flex: 1 }} />
+          <button onClick={(e) => { e.stopPropagation(); onBookmark(item.id); }}
+            style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
+          <button onClick={(e) => { e.stopPropagation(); onValidate(item.id); }}
+            disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
+          <button onClick={(e) => { e.stopPropagation(); onFlag(item.id); }}
+            disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1, cursor: item.flagged ? "default" : "pointer" }}>&#x2717;</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AgentKnowledgePills({ agentContext, profile }: {
   agentContext: { highAffinityTopics: string[]; trustedAuthors: string[] };
@@ -300,28 +369,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
   const moreFiltersActive = verdictFilter === "all" || verdictFilter === "slop" || sourceFilter !== "all";
 
-  const toggleSection = useCallback((sectionId: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      if (next.has(sectionId)) {
-        next.delete(sectionId);
-      } else {
-        next.add(sectionId);
-      }
-      return next;
-    });
+  const toggleSection = useCallback((id: string) => {
+    setExpandedSections(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }, []);
 
-  const toggleTopic = useCallback((topic: string) => {
-    setExpandedTopics(prev => {
-      const next = new Set(prev);
-      if (next.has(topic)) {
-        next.delete(topic);
-      } else {
-        next.add(topic);
-      }
-      return next;
-    });
+  const toggleTopic = useCallback((id: string) => {
+    setExpandedTopics(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }, []);
 
   const agentContext = useMemo(() => {
@@ -428,6 +481,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       bookmarkItem(id);
     }
   }, [bookmarkItem, unbookmarkItem]);
+
+  const cardProps = { failedImages, markImgFailed, bookmarkSet, onBookmark: handleBookmark, onValidate: handleValidateWithFeedback, onFlag: handleFlagWithFeedback };
 
   const handleToggle = useCallback((id: string) => {
     setExpanded(prev => prev === id ? null : id);
@@ -945,71 +1000,29 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 No quality items scored yet.
               </div>
             ) : (
-              <div style={mobile
-                ? { display: "flex", flexDirection: "column" as const, gap: space[4] }
-                : { display: "grid", gridTemplateColumns: `repeat(3, minmax(0, 1fr))`, gap: space[4] }
-              }>
-                {dashboardTop3.map((bi, i) => {
-                  const item = bi.item;
-                  const gr = scoreGrade(item.scores.composite);
-                  const tag = deriveScoreTags(item)[0] ?? null;
-                  return (
-                    <div key={item.id} style={{
-                      animation: `slideUp .3s ease ${i * 0.08}s forwards`,
-                      background: colors.bg.surface,
-                      border: `1px solid ${colors.border.default}`,
-                      borderRadius: radii.lg,
-                      overflow: "hidden",
-                      transition: transitions.fast,
-                    }}>
-                      <ThumbnailArea item={item} gr={gr} gradeSize={48}
-                        imgFailed={failedImages.has(item.id)} onImgError={() => markImgFailed(item.id)}
-                        overlay={
-                          <div style={{
-                            position: "absolute", top: space[2], left: space[2],
-                            width: 28, height: 28, borderRadius: "50%",
-                            background: `linear-gradient(135deg, ${colors.blue[600]}, ${colors.purple[600]})`,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: t.bodySm.size, fontWeight: 800, color: "#fff",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-                          }}>{i + 1}</div>
-                        }
-                      />
-                      <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
-                        {bi.classification !== "mixed" && (
-                          <div style={{ marginBottom: space[1] }}>
-                            <BriefingClassificationBadge classification={bi.classification} />
-                          </div>
-                        )}
-                        <div style={{
-                          fontSize: t.body.size, fontWeight: 700, color: colors.text.secondary,
-                          overflow: "hidden", display: "-webkit-box",
-                          WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const,
-                          lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
-                        }}>
-                          {item.text.slice(0, 200)}
-                        </div>
-                        <div style={{
-                          fontSize: t.caption.size, color: colors.text.disabled,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          marginBottom: space[3],
-                        }}>
-                          {item.author} &middot; {item.platform || item.source} &middot; {item.timestamp}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
-                          <ScorePill gr={gr} tag={tag} />
-                          <div style={{ flex: 1 }} />
-                          <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
-                            style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
-                            disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
-                            disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1, cursor: item.flagged ? "default" : "pointer" }}>&#x2717;</button>
-                        </div>
+              <div style={cardGridStyle(mobile)}>
+                {dashboardTop3.map((bi, i) => (
+                  <DashboardCard
+                    key={bi.item.id} item={bi.item} {...cardProps}
+                    gradeSize={48} textClamp={3} textSlice={200} textWeight={700} showPlatform
+                    style={{ animation: `slideUp .3s ease ${i * 0.08}s forwards` }}
+                    overlay={
+                      <div style={{
+                        position: "absolute", top: space[2], left: space[2],
+                        width: 28, height: 28, borderRadius: "50%",
+                        background: `linear-gradient(135deg, ${colors.blue[600]}, ${colors.purple[600]})`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: t.bodySm.size, fontWeight: 800, color: "#fff",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+                      }}>{i + 1}</div>
+                    }
+                    topContent={bi.classification !== "mixed" ? (
+                      <div style={{ marginBottom: space[1] }}>
+                        <BriefingClassificationBadge classification={bi.classification} />
                       </div>
-                    </div>
-                  );
-                })}
+                    ) : undefined}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -1091,54 +1104,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                             borderTop: `1px solid ${colors.border.subtle}`,
                             animation: "slideDown .2s ease forwards",
                           }}>
-                            <div style={mobile
-                              ? { display: "flex", flexDirection: "column" as const, gap: space[4] }
-                              : { display: "grid", gridTemplateColumns: `repeat(3, minmax(0, 1fr))`, gap: space[4] }
-                            }>
-                              {items.map((item) => {
-                                const gr = scoreGrade(item.scores.composite);
-                                const tag = deriveScoreTags(item)[0] ?? null;
-                                return (
-                                  <div key={item.id} style={{
-                                    background: colors.bg.surface,
-                                    border: `1px solid ${colors.border.default}`,
-                                    borderRadius: radii.lg,
-                                    overflow: "hidden",
-                                    transition: transitions.fast,
-                                  }}>
-                                    <ThumbnailArea item={item} gr={gr} gradeSize={36}
-                                      imgFailed={failedImages.has(item.id)} onImgError={() => markImgFailed(item.id)}
-                                    />
-                                    <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
-                                      <div style={{
-                                        fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
-                                        overflow: "hidden", display: "-webkit-box",
-                                        WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                                        lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
-                                      }}>
-                                        {item.text.slice(0, 150)}
-                                      </div>
-                                      <div style={{
-                                        fontSize: t.caption.size, color: colors.text.disabled,
-                                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                        marginBottom: space[3],
-                                      }}>
-                                        {item.author} &middot; {item.source} &middot; {item.timestamp}
-                                      </div>
-                                      <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
-                                        <ScorePill gr={gr} tag={tag} />
-                                        <div style={{ flex: 1 }} />
-                                        <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
-                                          style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
-                                          disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1 }}>&#x2713;</button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
-                                          disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1 }}>&#x2717;</button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                            <div style={cardGridStyle(mobile)}>
+                              {items.map(item => (
+                                <DashboardCard key={item.id} item={item} {...cardProps} />
+                              ))}
                             </div>
                           </div>
                         )}
@@ -1148,6 +1117,50 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 </div>
               )}
             </div>
+
+          {/* Your Agent — merged personality card */}
+          <div style={{
+            padding: `${space[3]}px ${space[4]}px`,
+            background: colors.bg.surface,
+            border: `1px solid ${agentKnowsHighlight ? "rgba(139,92,246,0.3)" : colors.border.default}`,
+            borderRadius: radii.lg,
+            marginBottom: space[4],
+            transition: "border-color 0.5s ease, box-shadow 0.5s ease",
+            boxShadow: agentKnowsHighlight ? "0 0 12px rgba(139,92,246,0.1)" : "none",
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: space[2], marginBottom: agentContext ? space[2] : 0,
+            }}>
+              <span>&#x1F9E0;</span>
+              <span style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary }}>Your Agent</span>
+              <span style={{
+                fontSize: t.caption.size, color: colors.text.disabled, fontWeight: 400,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
+              }}>
+                {Object.entries(profile.topicAffinities).filter(([, v]) => v >= 0.2).length} interests
+                &middot; {profile.totalValidated + profile.totalFlagged} reviews
+                &middot; threshold {profile.calibration.qualityThreshold.toFixed(1)}
+              </span>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => onTabChange?.("settings:agent")}
+                style={{
+                  padding: `${space[1]}px ${space[3]}px`,
+                  background: `${colors.cyan[400]}10`,
+                  border: `1px solid ${colors.cyan[400]}25`,
+                  borderRadius: radii.md,
+                  color: colors.cyan[400],
+                  fontSize: t.caption.size, fontWeight: 600,
+                  cursor: "pointer", fontFamily: "inherit",
+                  transition: transitions.fast,
+                  whiteSpace: "nowrap", flexShrink: 0,
+                }}
+              >
+                Edit settings
+              </button>
+            </div>
+            {agentContext && <AgentKnowledgePills agentContext={agentContext} profile={profile} />}
+          </div>
 
           {/* Discoveries - Collapsible */}
           {filteredDiscoveries.length > 0 && (
@@ -1160,60 +1173,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               itemCount={filteredDiscoveries.length}
               mobile={mobile}
             >
-              <div style={mobile
-                ? { display: "flex", flexDirection: "column" as const, gap: space[4] }
-                : { display: "grid", gridTemplateColumns: `repeat(3, minmax(0, 1fr))`, gap: space[4] }
-              }>
-                {filteredDiscoveries.map(d => {
-                  const item = d.item;
-                  const gr = scoreGrade(item.scores.composite);
-                  const tag = deriveScoreTags(item)[0] ?? null;
-                  return (
-                    <div key={item.id} style={{
-                      background: colors.bg.surface,
-                      border: `1px solid ${colors.border.default}`,
-                      borderRadius: radii.lg,
-                      overflow: "hidden",
-                      transition: transitions.fast,
-                    }}>
-                      <ThumbnailArea item={item} gr={gr} gradeSize={36}
-                        imgFailed={failedImages.has(item.id)} onImgError={() => markImgFailed(item.id)}
-                        overlay={d.reason && (
-                          <div style={{ position: "absolute", bottom: space[2], left: space[2], right: space[2] }}>
-                            <SerendipityBadge discoveryType={d.discoveryType} />
-                          </div>
-                        )}
-                      />
-                      <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
-                        <div style={{
-                          fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
-                          overflow: "hidden", display: "-webkit-box",
-                          WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                          lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
-                        }}>
-                          {item.text.slice(0, 150)}
-                        </div>
-                        <div style={{
-                          fontSize: t.caption.size, color: colors.text.disabled,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          marginBottom: space[3],
-                        }}>
-                          {item.author} &middot; {item.source} &middot; {item.timestamp}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
-                          <ScorePill gr={gr} tag={tag} />
-                          <div style={{ flex: 1 }} />
-                          <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
-                            style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
-                            disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1 }}>&#x2713;</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
-                            disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1 }}>&#x2717;</button>
-                        </div>
+              <div style={cardGridStyle(mobile)}>
+                {filteredDiscoveries.map(d => (
+                  <DashboardCard key={d.item.id} item={d.item} {...cardProps}
+                    overlay={d.reason && (
+                      <div style={{ position: "absolute", bottom: space[2], left: space[2], right: space[2] }}>
+                        <SerendipityBadge discoveryType={d.discoveryType} />
                       </div>
-                    </div>
-                  );
-                })}
+                    )}
+                  />
+                ))}
               </div>
             </CollapsibleSection>
           )}
@@ -1230,54 +1199,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               itemCount={unreviewedQueue.length}
               mobile={mobile}
             >
-              <div style={mobile
-                ? { display: "flex", flexDirection: "column" as const, gap: space[4] }
-                : { display: "grid", gridTemplateColumns: `repeat(3, minmax(0, 1fr))`, gap: space[4] }
-              }>
-                {unreviewedQueue.map(item => {
-                  const gr = scoreGrade(item.scores.composite);
-                  const tag = deriveScoreTags(item)[0] ?? null;
-                  return (
-                    <div key={item.id} style={{
-                      background: colors.bg.surface,
-                      border: `1px solid ${colors.border.default}`,
-                      borderRadius: radii.lg,
-                      overflow: "hidden",
-                      transition: transitions.fast,
-                    }}>
-                      <ThumbnailArea item={item} gr={gr} gradeSize={36}
-                        imgFailed={failedImages.has(item.id)} onImgError={() => markImgFailed(item.id)}
-                      />
-                      <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
-                        <div style={{
-                          fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
-                          overflow: "hidden", display: "-webkit-box",
-                          WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                          lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
-                        }}>
-                          {item.text.slice(0, 150)}
-                        </div>
-                        <div style={{
-                          fontSize: t.caption.size, color: colors.text.disabled,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          marginBottom: space[3],
-                        }}>
-                          {item.author} &middot; {item.source} &middot; {item.timestamp}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
-                          <ScorePill gr={gr} tag={tag} />
-                          <div style={{ flex: 1 }} />
-                          <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
-                            style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
-                            disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1 }}>&#x2713;</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
-                            disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1 }}>&#x2717;</button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={cardGridStyle(mobile)}>
+                {unreviewedQueue.map(item => (
+                  <DashboardCard key={item.id} item={item} {...cardProps} />
+                ))}
               </div>
             </CollapsibleSection>
             </div>
@@ -1304,112 +1229,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   Review Saved &rarr;
                 </button>
               </div>
-              <div style={mobile
-                ? { display: "flex", flexDirection: "column" as const, gap: space[4] }
-                : { display: "grid", gridTemplateColumns: `repeat(3, minmax(0, 1fr))`, gap: space[4] }
-              }>
-                {dashboardSaved.map(item => {
-                  const gr = scoreGrade(item.scores.composite);
-                  const tag = deriveScoreTags(item)[0] ?? null;
-                  return (
-                    <div key={item.id} style={{
-                      background: colors.bg.surface,
-                      border: `1px solid ${colors.border.default}`,
-                      borderRadius: radii.lg,
-                      overflow: "hidden",
-                      transition: transitions.fast,
-                    }}>
-                      <ThumbnailArea item={item} gr={gr} gradeSize={36}
-                        imgFailed={failedImages.has(item.id)} onImgError={() => markImgFailed(item.id)}
-                      />
-                      <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
-                        <div style={{
-                          fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary,
-                          overflow: "hidden", display: "-webkit-box",
-                          WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                          lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
-                        }}>
-                          {item.text.slice(0, 150)}
-                        </div>
-                        <div style={{
-                          fontSize: t.caption.size, color: colors.text.disabled,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          marginBottom: space[3],
-                        }}>
-                          {item.author} &middot; {item.source} &middot; {item.timestamp}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
-                          <ScorePill gr={gr} tag={tag} />
-                          <div style={{ flex: 1 }} />
-                          <button onClick={(e) => { e.stopPropagation(); handleBookmark(item.id); }}
-                            style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleValidateWithFeedback(item.id); }}
-                            disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1 }}>&#x2713;</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleFlagWithFeedback(item.id); }}
-                            disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1 }}>&#x2717;</button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={cardGridStyle(mobile)}>
+                {dashboardSaved.map(item => (
+                  <DashboardCard key={item.id} item={item} {...cardProps} />
+                ))}
               </div>
             </div>
           )}
-          {/* Agent Knowledge — full width */}
-          {agentContext && (
-            <div style={{
-              padding: `${space[3]}px ${space[4]}px`,
-              background: "transparent",
-              border: `1px solid ${agentKnowsHighlight ? "rgba(139,92,246,0.3)" : colors.border.subtle}`,
-              borderRadius: radii.lg,
-              marginBottom: space[4],
-              transition: "border-color 0.5s ease, box-shadow 0.5s ease",
-              boxShadow: agentKnowsHighlight ? "0 0 12px rgba(139,92,246,0.1)" : "none",
-            }}>
-              <div style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary, marginBottom: space[2], display: "flex", alignItems: "center", gap: space[2] }}>
-                <span>&#x1F9E0;</span> Your Agent Knows
-              </div>
-              <AgentKnowledgePills agentContext={agentContext} profile={profile} />
-            </div>
-          )}
-
-          {/* Agent Settings — summary card with link to Settings > Agent */}
-          <div style={{
-            background: colors.bg.surface,
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: radii.lg,
-            padding: `${space[3]}px ${space[4]}px`,
-            marginBottom: space[4],
-          }}>
-            <div style={{
-              display: "flex", alignItems: "center", gap: space[2], width: "100%",
-            }}>
-              <GearIcon s={16} />
-              <span style={{ color: colors.text.tertiary, fontSize: t.bodySm.size, fontWeight: 600 }}>Agent Settings</span>
-              <span style={{ color: colors.text.disabled, fontWeight: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, fontSize: t.bodySm.size }}>
-                : {Object.entries(profile.topicAffinities).filter(([, v]) => v >= 0.2).length} interests
-                &middot; threshold {profile.calibration.qualityThreshold.toFixed(1)}
-                &middot; {profile.totalValidated + profile.totalFlagged} reviews
-              </span>
-              <div style={{ flex: 1 }} />
-              <button
-                onClick={() => onTabChange?.("settings:agent")}
-                style={{
-                  padding: `${space[1]}px ${space[3]}px`,
-                  background: `${colors.cyan[400]}10`,
-                  border: `1px solid ${colors.cyan[400]}25`,
-                  borderRadius: radii.md,
-                  color: colors.cyan[400],
-                  fontSize: t.caption.size, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit",
-                  transition: transitions.fast,
-                  whiteSpace: "nowrap", flexShrink: 0,
-                }}
-              >
-                Edit
-              </button>
-            </div>
-          </div>
 
         </div>
       )}

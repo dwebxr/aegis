@@ -356,8 +356,10 @@ describe("clusterByStory — sorted early-break optimization", () => {
     const c2 = clusterByStory(shuffled);
     expect(c1).toHaveLength(c2.length);
     expect(c1[0].members.length).toBe(c2[0].members.length);
-    // Same representative regardless of input order
-    expect(c1[0].representative.id).toBe(c2[0].representative.id);
+    // Same member set regardless of input order
+    const ids1 = c1[0].members.map(m => m.id).sort();
+    const ids2 = c2[0].members.map(m => m.id).sort();
+    expect(ids1).toEqual(ids2);
   });
 
   it("handles single-topic + title overlap clustering with sorted order", () => {

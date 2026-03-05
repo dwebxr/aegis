@@ -158,7 +158,7 @@ describe("POST /api/fetch/nostr — mocked relay", () => {
     const res = await POST(makeRequest({ relays: ["wss://relay.damus.io"] }));
     expect(res.status).toBe(502);
     const data = await res.json();
-    expect(data.error).toContain("Connection refused");
+    expect(data.error).toBe("Relay query failed");
   });
 
   it("closes pool in finally block after success", async () => {

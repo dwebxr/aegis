@@ -52,7 +52,7 @@ export async function enqueueAction(type: QueuedActionType, payload: unknown): P
       const reg = await navigator.serviceWorker.ready;
       await (reg as ServiceWorkerRegistration & { sync: { register(tag: string): Promise<void> } }).sync.register("aegis-offline-queue");
     } catch (err) {
-      console.debug("[offline-queue] SyncManager registration failed, falling back to onReconnect:", err);
+      console.warn("[offline-queue] SyncManager registration failed, falling back to onReconnect:", err);
     }
   }
 }

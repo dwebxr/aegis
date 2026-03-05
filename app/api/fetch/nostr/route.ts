@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
         warning: "Request timed out. Try fewer relays or a more specific filter.",
       });
     }
-    return NextResponse.json({ error: `Failed to query relays: ${msg}` }, { status: 502 });
+    return NextResponse.json({ error: "Relay query failed" }, { status: 502 });
   } finally {
     pool.close(relays);
   }

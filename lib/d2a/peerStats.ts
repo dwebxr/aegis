@@ -56,9 +56,14 @@ export function computePeerStats(
 
   const stats: PeerStat[] = [];
   for (const [pubkey, items] of grouped) {
-    const validated = items.filter(i => i.validated).length;
-    const flagged = items.filter(i => i.flagged).length;
-    const judged = validated + flagged;
+    let validated = 0;
+    let flagged = 0;
+    let judged = 0;
+    for (const i of items) {
+      if (i.validated) validated++;
+      if (i.flagged) flagged++;
+      if (i.validated || i.flagged) judged++;
+    }
     const qualityRate = judged > 0 ? validated / judged : 0;
 
     const rep = reputations.get(pubkey) ?? { ...DEFAULT_REP, pubkey };

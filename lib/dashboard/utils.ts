@@ -337,19 +337,36 @@ export function titleWordOverlap(a: string, b: string): number {
 
 const CLUSTER_TIME_WINDOW_MS = 48 * 60 * 60 * 1000;
 
+// Max items for pairwise clustering — prevents O(n²) blowup on large sets.
+// Items beyond this cap are returned as singleton clusters.
+const CLUSTER_CAP = 150;
+
 export function clusterByStory(items: ContentItem[]): StoryCluster[] {
   if (items.length === 0) return [];
 
-  // Sort by createdAt descending so time-window break works
-  const sorted = [...items].sort((a, b) => b.createdAt - a.createdAt);
+  // Sort by composite desc so we cluster the best-scored items first
+  const allSorted = [...items].sort((a, b) => b.scores.composite - a.scores.composite);
+  const sorted = allSorted.slice(0, CLUSTER_CAP);
+  const overflow = allSorted.slice(CLUSTER_CAP);
+
   const topicSets = sorted.map(it =>
     new Set((it.topics ?? []).map(t => t.toLowerCase()))
   );
+  // Pre-compute word sets for titleWordOverlap to avoid recomputing inside nested loop
+  const wordSets = sorted.map(it => {
+    const words = it.text.slice(0, 200).toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    return new Set(words);
+  });
+
+  // Re-sort by createdAt desc for time-window break
+  const timeOrder = sorted.map((_, i) => i).sort((a, b) => sorted[b].createdAt - sorted[a].createdAt);
 
   const uf = new UnionFind(sorted.length);
 
-  for (let i = 0; i < sorted.length; i++) {
-    for (let j = i + 1; j < sorted.length; j++) {
+  for (let ri = 0; ri < timeOrder.length; ri++) {
+    const i = timeOrder[ri];
+    for (let rj = ri + 1; rj < timeOrder.length; rj++) {
+      const j = timeOrder[rj];
       const timeDiff = sorted[i].createdAt - sorted[j].createdAt;
       if (timeDiff > CLUSTER_TIME_WINDOW_MS) break; // sorted desc → all subsequent are older
 
@@ -363,8 +380,14 @@ export function clusterByStory(items: ContentItem[]): StoryCluster[] {
       if (shared >= 2) {
         uf.union(i, j);
       } else if (shared === 1) {
-        if (titleWordOverlap(sorted[i].text.slice(0, 200), sorted[j].text.slice(0, 200)) >= 0.4) {
-          uf.union(i, j);
+        // Use pre-computed word sets instead of recomputing
+        const wa = wordSets[i];
+        const wb = wordSets[j];
+        if (wa.size > 0 && wb.size > 0) {
+          let intersection = 0;
+          for (const w of wa) if (wb.has(w)) intersection++;
+          const jaccard = intersection / (wa.size + wb.size - intersection);
+          if (jaccard >= 0.4) uf.union(i, j);
         }
       }
     }
@@ -392,6 +415,11 @@ export function clusterByStory(items: ContentItem[]): StoryCluster[] {
     }
 
     clusters.push({ representative, members, sharedTopics: commonTopics });
+  }
+
+  // Append overflow items as singleton clusters (already sorted by composite desc)
+  for (const item of overflow) {
+    clusters.push({ representative: item, members: [item], sharedTopics: [] });
   }
 
   clusters.sort((a, b) => b.representative.scores.composite - a.representative.scores.composite);

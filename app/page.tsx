@@ -363,7 +363,7 @@ function AegisAppInner() {
             const lastPush = Number(localStorage.getItem("aegis-push-last") || "0");
             if (Date.now() - lastPush < throttleMs) return;
           }
-        } catch { return; /* Safari private mode — skip push */ }
+        } catch (err) { console.warn("[push] localStorage unavailable, skipping push:", err); return; }
         const quality = items.filter(i => i.verdict === "quality");
         // Apply notification rules if set
         const notifPrefs = profileRef.current.notificationPrefs;
@@ -386,7 +386,7 @@ function AegisAppInner() {
           .map(i => `${i.verdict === "quality" ? "\u2713" : "\u2717"} ${i.text.slice(0, 60).replace(/\n/g, " ")}`)
           .join("\n");
         const summary = `${filteredItems.length} item${filteredItems.length !== 1 ? "s" : ""} matched`;
-        try { localStorage.setItem("aegis-push-last", String(Date.now())); } catch { /* ignore */ }
+        try { localStorage.setItem("aegis-push-last", String(Date.now())); } catch (err) { console.warn("[push] Failed to save push timestamp:", err); }
         void fetch("/api/push/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

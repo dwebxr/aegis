@@ -26,7 +26,7 @@ export function setOllamaConfig(config: OllamaConfig): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   } catch (err) {
-    console.debug("[ollama] Failed to save config (quota?):", err);
+    console.warn("[ollama] Failed to save config (quota?):", err);
   }
 }
 

@@ -220,28 +220,18 @@ export class AgentManager {
   }
 
   private cleanupStaleHandshakes(): void {
-    const toDelete: string[] = [];
     this.handshakes.forEach((hs, peerId) => {
       if (hs.phase === "completed" || hs.phase === "rejected" || isHandshakeExpired(hs)) {
-        toDelete.push(peerId);
+        this.handshakes.delete(peerId);
       }
     });
-    for (const peerId of toDelete) {
-      this.handshakes.delete(peerId);
-    }
   }
 
   private cleanupStalePeers(): void {
     const now = Date.now();
-    const toDelete: string[] = [];
     this.peers.forEach((peer, pk) => {
-      if (now - peer.lastSeen > PEER_EXPIRY_MS) {
-        toDelete.push(pk);
-      }
+      if (now - peer.lastSeen > PEER_EXPIRY_MS) this.peers.delete(pk);
     });
-    for (const pk of toDelete) {
-      this.peers.delete(pk);
-    }
   }
 
   private async discoverAndNegotiate(): Promise<void> {
