@@ -94,10 +94,14 @@ describe("GET /api/d2a/briefing — individual path", () => {
     expect(data.items).toHaveLength(1);
   });
 
-  it("passes principal to getLatestBriefing", async () => {
+  it("passes principal to getLatestBriefing and returns its data", async () => {
     mockGetLatestBriefing.mockResolvedValue(sampleBriefing);
-    await GET(makeRequest({ principal: "rrkah-fqaaa-aaaaa-aaaaq-cai" }));
+    const res = await GET(makeRequest({ principal: "rrkah-fqaaa-aaaaa-aaaaq-cai" }));
+    expect(res.status).toBe(200);
     expect(mockGetLatestBriefing).toHaveBeenCalledWith("rrkah-fqaaa-aaaaa-aaaaq-cai");
+    const data = await res.json();
+    expect(data.items).toHaveLength(1);
+    expect(data.items[0].title).toBe("Test Article");
   });
 
   it("returns 500 when getLatestBriefing throws", async () => {
