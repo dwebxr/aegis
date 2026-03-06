@@ -94,3 +94,8 @@ export function saveCachedContent(items: ContentItem[]): void {
     }
   }, SAVE_DEBOUNCE_MS);
 }
+
+export function _resetContentCache(): void {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  useIDB = false;
+}

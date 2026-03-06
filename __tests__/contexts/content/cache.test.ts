@@ -2,15 +2,16 @@
  * @jest-environment jsdom
  */
 import "fake-indexeddb/auto";
-import { truncatePreservingActioned, loadCachedContent, saveCachedContent } from "@/contexts/content/cache";
+import { truncatePreservingActioned, loadCachedContent, saveCachedContent, _resetContentCache } from "@/contexts/content/cache";
 import type { ContentItem } from "@/lib/types/content";
 
 // Reset IDB between tests
 beforeEach(() => {
   localStorage.clear();
-  // Reset module state by clearing IDB databases
   indexedDB.deleteDatabase("aegis-storage");
 });
+
+afterEach(() => _resetContentCache());
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {

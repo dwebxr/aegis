@@ -1,8 +1,3 @@
-/**
- * Source runtime state management with localStorage persistence.
- * Tracks error counts, backoff timing, adaptive intervals, and stats per source.
- */
-
 const STORAGE_KEY = "aegis_source_states";
 
 export interface SourceRuntimeState {

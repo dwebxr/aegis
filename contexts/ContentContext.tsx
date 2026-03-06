@@ -22,6 +22,7 @@ import type { ContentState, PreferenceCallbacks } from "./content/types";
 import { loadCachedContent, saveCachedContent, truncatePreservingActioned } from "./content/cache";
 import { runScoringCascade } from "./content/scoring";
 import { toICEvaluation, syncToIC, drainOfflineQueue, loadFromICCanister } from "./content/icSync";
+import { isDuplicateItem } from "./content/dedup";
 
 const MAX_PENDING_BUFFER = 100;
 
@@ -46,14 +47,6 @@ const ContentContext = createContext<ContentState>({
   pendingActions: 0,
   isOnline: true,
 });
-
-/** Check whether `item` is a duplicate of any item in `existing`. */
-function isDuplicateItem(item: ContentItem, existing: ContentItem[]): boolean {
-  return existing.some(c =>
-    (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
-    (!item.sourceUrl && c.text === item.text),
-  );
-}
 
 export function ContentProvider({ children, preferenceCallbacks }: { children: React.ReactNode; preferenceCallbacks?: PreferenceCallbacks }) {
   const { addNotification } = useNotify();

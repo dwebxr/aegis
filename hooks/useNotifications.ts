@@ -10,7 +10,6 @@ export interface Notification {
 export const DEDUPE_WINDOW_MS = 5_000;
 let nextId = 1;
 
-/** Pure function: returns true if this notification should be suppressed. Updates recentMap if not suppressed. */
 export function shouldSuppressDuplicate(
   recentMap: Map<string, number>,
   text: string,
@@ -24,7 +23,6 @@ export function shouldSuppressDuplicate(
   return false;
 }
 
-/** Pure function: returns auto-dismiss duration in ms based on notification type. */
 export function computeDismissDuration(type: Notification["type"]): number {
   return type === "error" ? 5000 : 2500;
 }

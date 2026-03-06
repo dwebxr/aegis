@@ -18,7 +18,10 @@ jest.mock("nostr-tools/nip19", () => ({
   naddrEncode: jest.fn().mockReturnValue("naddr1mock"),
 }));
 
-import { publishSignalToNostr, publishBriefingToNostr } from "@/lib/nostr/publish";
+import { publishSignalToNostr, publishBriefingToNostr, _setRelayFlushMs } from "@/lib/nostr/publish";
+
+beforeAll(() => _setRelayFlushMs(0));
+afterAll(() => _setRelayFlushMs(1500));
 import { finalizeEvent } from "nostr-tools/pure";
 import { SimplePool } from "nostr-tools/pool";
 import { naddrEncode } from "nostr-tools/nip19";

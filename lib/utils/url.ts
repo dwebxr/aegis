@@ -1,8 +1,3 @@
-/**
- * URL utilities — extraction, validation, and SSRF protection.
- */
-
-/** Extract first HTTP/HTTPS URL from text. Returns null if none found. */
 export function extractUrl(text: string | null): string | null {
   if (!text) return null;
   const trimmed = text.trim();

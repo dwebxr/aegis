@@ -11,12 +11,10 @@ export const ENGINE_LABELS: Record<ScoringEngine, string> = {
   "heuristic": "Heuristic",
 };
 
-/** Prepend `[engine-id] ` to reason text for IC canister persistence. */
 export function encodeEngineInReason(engine: ScoringEngine, reason: string): string {
   return `[${engine}] ${reason}`;
 }
 
-/** Append `[topics:tag1,tag2]` to reason for IC canister persistence. */
 export function encodeTopicsInReason(reason: string, topics?: string[]): string {
   if (!topics || topics.length === 0) return reason;
   return `${reason} [topics:${topics.join(",")}]`;

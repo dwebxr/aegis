@@ -15,6 +15,12 @@ if (dsn) {
         if (event.request.cookies) {
           event.request.cookies = {};
         }
+        if (event.request.url) {
+          try { event.request.url = event.request.url.split("?")[0]; } catch { /* keep original */ }
+        }
+        if (event.request.query_string) {
+          event.request.query_string = "";
+        }
       }
       return event;
     },

@@ -1,8 +1,3 @@
-/**
- * Source auto-discovery: track validated domains and suggest RSS feeds.
- * localStorage-based. Suggests domains with >= THRESHOLD validated items.
- */
-
 const STORAGE_KEY = "aegis-domain-validations";
 const THRESHOLD = 3;
 

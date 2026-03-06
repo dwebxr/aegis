@@ -105,7 +105,6 @@ export async function idbPutBatch<T>(store: string, entries: [string, T][]): Pro
   });
 }
 
-/** Reset cached connection (for testing). */
 export function _resetDB(): void {
   _dbPromise = null;
 }

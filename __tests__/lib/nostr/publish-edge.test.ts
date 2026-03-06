@@ -8,7 +8,10 @@ jest.mock("nostr-tools/pool", () => ({
   })),
 }));
 
-import { buildAegisTags, publishAndPartition, publishSignalToNostr } from "@/lib/nostr/publish";
+import { buildAegisTags, publishAndPartition, publishSignalToNostr, _setRelayFlushMs } from "@/lib/nostr/publish";
+
+beforeAll(() => _setRelayFlushMs(0));
+afterAll(() => _setRelayFlushMs(1500));
 import { SimplePool } from "nostr-tools/pool";
 import { finalizeEvent } from "nostr-tools/pure";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";

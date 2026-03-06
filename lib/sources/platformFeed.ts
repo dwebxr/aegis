@@ -2,7 +2,6 @@ export interface PlatformFeedResult {
   feeds: Array<{ url: string; title: string; type: string }>;
 }
 
-/** Instant URL pattern match for known platforms. Returns null → fall through to HTML fetch. */
 export function detectPlatformFeed(parsed: URL): PlatformFeedResult | null {
   const host = parsed.hostname.replace("www.", "");
 

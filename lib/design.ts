@@ -1,5 +1,3 @@
-/** Aegis Design System — Tailwind class helpers */
-
 export const typography = {
   display: "text-display font-extrabold leading-display tracking-tight",
   h1: "text-h1 font-bold leading-h1 tracking-snug",

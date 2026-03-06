@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useContent } from "@/contexts/ContentContext";
 import { useNotify } from "@/contexts/NotificationContext";
 import { NostrAccountLink } from "@/components/ui/NostrAccountLink";
 import { GitHubIcon } from "@/components/icons";
@@ -17,6 +18,7 @@ interface AccountSectionProps {
 
 export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAccount, onLinkChange }) => {
   const { isAuthenticated, principalText, login, logout } = useAuth();
+  const { syncStatus, pendingActions, isOnline } = useContent();
   const { addNotification } = useNotify();
 
   const [copied, setCopied] = useState<string | null>(null);
@@ -92,6 +94,19 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
               >
                 {copied === "principal" ? "Copied" : "Copy"}
               </button>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap mt-1">
+              <span className="text-caption text-disabled">Sync:</span>
+              {syncStatus === "syncing" && <span className="text-caption text-sky-400 font-semibold">syncing...</span>}
+              {syncStatus === "synced" && <span className="text-caption text-emerald-400 font-semibold">synced</span>}
+              {syncStatus === "offline" && <span className="text-caption text-amber-400 font-semibold">offline</span>}
+              {syncStatus === "idle" && <span className="text-caption text-muted-foreground font-semibold">idle</span>}
+              {!isOnline && <span className="text-caption text-red-400 font-semibold">(no network)</span>}
+              {pendingActions > 0 && (
+                <span className="text-caption text-amber-400">
+                  {pendingActions} pending {pendingActions === 1 ? "action" : "actions"}
+                </span>
+              )}
             </div>
           </div>
         ) : (

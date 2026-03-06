@@ -5,6 +5,10 @@ import type { AddressPointer } from "nostr-tools/nip19";
 import { KIND_TEXT_NOTE, KIND_LONG_FORM, DEFAULT_RELAYS } from "./types";
 import type { SerializedBriefing } from "@/lib/briefing/serialize";
 
+/** Delay before pool.destroy() to let relay connections flush. Shortened in tests. */
+export let RELAY_FLUSH_MS = 1500;
+export function _setRelayFlushMs(ms: number) { RELAY_FLUSH_MS = ms; }
+
 export interface PublishResult {
   eventId: string;
   relaysPublished: string[];
@@ -32,7 +36,7 @@ export async function publishAndPartition(
     return { published, failed };
   } finally {
     // Allow relay connections to flush before teardown
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, RELAY_FLUSH_MS));
     pool.destroy();
   }
 }

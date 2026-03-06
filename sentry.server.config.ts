@@ -8,13 +8,18 @@ if (dsn) {
     tracesSampleRate: 0.1,
     beforeSend(event) {
       if (event.request) {
-        // Scrub auth headers and cookies — keep request body for debugging
         if (event.request.headers) {
           const { authorization, cookie, ...safe } = event.request.headers;
           event.request.headers = safe;
         }
         if (event.request.cookies) {
           event.request.cookies = {};
+        }
+        if (event.request.url) {
+          try { event.request.url = event.request.url.split("?")[0]; } catch { /* keep original */ }
+        }
+        if (event.request.query_string) {
+          event.request.query_string = "";
         }
       }
       return event;

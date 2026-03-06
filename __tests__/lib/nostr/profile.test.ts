@@ -24,6 +24,11 @@ jest.mock("nostr-tools/pool", () => ({
   })),
 }));
 
+import { _setRelayFlushMs } from "@/lib/nostr/publish";
+
+beforeAll(() => _setRelayFlushMs(0));
+afterAll(() => _setRelayFlushMs(1500));
+
 import {
   getCachedAgentProfile,
   setCachedAgentProfile,

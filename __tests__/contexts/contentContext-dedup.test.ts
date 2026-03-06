@@ -1,25 +1,5 @@
-/**
- * Tests for ContentContext's isDuplicateItem logic and addContentBuffered.
- * Uses the ContentProvider directly to test real behavior.
- */
-
-// isDuplicateItem is private to ContentContext, but we can test its behavior
-// through the addContent/addContentBuffered functions.
-// For now, test the duplicate detection logic directly by importing and testing.
-
-// The isDuplicateItem function is not exported, so we test via behavior:
-// - addContent should skip duplicates by sourceUrl
-// - addContent should skip duplicates by text when sourceUrl is absent
-
 import type { ContentItem } from "@/lib/types/content";
-
-// Replicate the isDuplicateItem logic for direct unit testing
-function isDuplicateItem(item: ContentItem, existing: ContentItem[]): boolean {
-  return existing.some(c =>
-    (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
-    (!item.sourceUrl && c.text === item.text),
-  );
-}
+import { isDuplicateItem } from "@/contexts/content/dedup";
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
@@ -67,14 +47,12 @@ describe("isDuplicateItem", () => {
 
   it("sourceUrl match takes precedence over text comparison", () => {
     const existing = [makeItem({ sourceUrl: "https://same.com", text: "original" })];
-    // Same sourceUrl but different text — should be duplicate
     const dup = makeItem({ sourceUrl: "https://same.com", text: "modified" });
     expect(isDuplicateItem(dup, existing)).toBe(true);
   });
 
   it("items with sourceUrl are not duplicate-checked by text", () => {
     const existing = [makeItem({ sourceUrl: "https://unique.com", text: "same text" })];
-    // Different sourceUrl, same text — not duplicate (sourceUrl is checked first when present)
     const item = makeItem({ sourceUrl: "https://other.com", text: "same text" });
     expect(isDuplicateItem(item, existing)).toBe(false);
   });
@@ -85,13 +63,11 @@ describe("isDuplicateItem", () => {
 
   it("handles item without sourceUrl against existing with sourceUrl", () => {
     const existing = [makeItem({ sourceUrl: "https://a.com", text: "same" })];
-    // No sourceUrl → falls to text comparison
     const item = makeItem({ sourceUrl: undefined, text: "same" });
     expect(isDuplicateItem(item, existing)).toBe(true);
   });
 
   it("handles item with empty string sourceUrl", () => {
-    // Empty string is falsy, so falls to text comparison
     const existing = [makeItem({ sourceUrl: "", text: "match" })];
     const item = makeItem({ sourceUrl: "", text: "match" });
     expect(isDuplicateItem(item, existing)).toBe(true);

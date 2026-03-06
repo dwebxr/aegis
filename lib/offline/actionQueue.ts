@@ -1,8 +1,3 @@
-/**
- * IndexedDB-backed queue for IC canister operations that fail during offline periods.
- * Operations are stored and replayed when connectivity resumes.
- */
-
 const DB_NAME = "aegis-offline-queue";
 const DB_VERSION = 1;
 const STORE_NAME = "pending-actions";

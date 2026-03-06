@@ -4,7 +4,6 @@ import type { BriefingItem } from "@/lib/briefing/types";
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { extractYouTubeVideoId } from "@/lib/utils/youtube";
 
-/** True if item has an image or a YouTube video (matches ThumbnailArea display logic). */
 function hasVisualContent(item: ContentItem): boolean {
   if (item.imageUrl) return true;
   if (item.sourceUrl && extractYouTubeVideoId(item.sourceUrl)) return true;

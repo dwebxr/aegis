@@ -30,7 +30,6 @@ interface ScoringCacheEntry {
 let cacheHits = 0;
 let cacheMisses = 0;
 
-/** Compute a short hash of the user context to detect profile changes. */
 export function computeProfileHash(userContext?: UserContext | null): string {
   if (!userContext) return "none";
   const parts = [
@@ -42,7 +41,6 @@ export function computeProfileHash(userContext?: UserContext | null): string {
   return hexFromBytes(hash.slice(0, 8));
 }
 
-/** Compute the full cache key. Accepts optional pre-computed profileHash to avoid double hashing. */
 export function computeScoringCacheKey(text: string, userContext?: UserContext | null, precomputedHash?: string): string {
   const ph = precomputedHash ?? computeProfileHash(userContext);
   return `${computeContentFingerprint(text)}:${ph}`;
@@ -147,7 +145,6 @@ function flushCacheAsync(): void {
   }
 }
 
-/** Look up a cached scoring result. Returns null on miss or expired entry. */
 export function lookupScoringCache(key: string, profileHash: string): AnalyzeResponse | null {
   const cache = getCache();
   const entry = cache.get(key);
@@ -198,7 +195,6 @@ export function clearScoringCache(): void {
   cacheMisses = 0;
 }
 
-/** Reset internal state (for testing). */
 export function _resetScoringCache(): void {
   _memCache = null;
   _useIDB = false;

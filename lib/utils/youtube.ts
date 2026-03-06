@@ -1,4 +1,3 @@
-/** Extract YouTube video ID from common URL patterns. */
 export function extractYouTubeVideoId(url: string): string | null {
   let parsed: URL;
   try {

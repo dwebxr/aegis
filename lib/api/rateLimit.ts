@@ -54,7 +54,6 @@ export async function distributedRateLimit(
   return null;
 }
 
-/** Reset KV lazy cache for tests. */
 export function _resetKVCache(): void {
   _kv = undefined;
 }
@@ -105,7 +104,6 @@ export function _resetRateLimits(): void {
  */
 const DEFAULT_MAX_BODY = 512_000; // 512KB
 
-/** Returns 413 if Content-Length exceeds maxBytes, null otherwise. */
 export function checkBodySize(request: NextRequest, maxBytes = DEFAULT_MAX_BODY): NextResponse | null {
   const cl = request.headers.get("content-length");
   if (cl && parseInt(cl, 10) > maxBytes) {

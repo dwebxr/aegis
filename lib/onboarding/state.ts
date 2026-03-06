@@ -61,7 +61,6 @@ function isStepComplete(step: OnboardingStep, ctx: OnboardingContext): boolean {
   }
 }
 
-/** Returns the index of the first incomplete step, or -1 if all complete. */
 export function computeCurrentStepIndex(ctx: OnboardingContext): number {
   for (let i = 0; i < STEPS.length; i++) {
     if (!isStepComplete(STEPS[i], ctx)) return i;

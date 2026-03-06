@@ -46,7 +46,6 @@ export function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal
   };
 }
 
-/** Convert a canister evaluation record to a ContentItem. */
 export function evalToContentItem(e: Awaited<ReturnType<_SERVICE["getUserEvaluations"]>>[number]): ContentItem {
   const { engine, cleanReason: reasonWithTopics } = decodeEngineFromReason(e.reason);
   const { topics, cleanReason } = decodeTopicsFromReason(reasonWithTopics);
@@ -78,7 +77,6 @@ export function evalToContentItem(e: Awaited<ReturnType<_SERVICE["getUserEvaluat
   };
 }
 
-/** Merge a batch of IC-loaded items into existing content, preserving locally-enriched fields. */
 export function mergePageIntoContent(
   pageItems: ContentItem[],
   prev: ContentItem[],
@@ -125,7 +123,6 @@ export function syncToIC(
   });
 }
 
-/** Drain all queued offline actions by replaying them to the IC actor. */
 export async function drainOfflineQueue(
   actor: _SERVICE,
   principal: import("@dfinity/principal").Principal,
@@ -168,7 +165,6 @@ export async function drainOfflineQueue(
   }
 }
 
-/** Paginated load from IC canister. */
 export async function loadFromICCanister(
   actor: _SERVICE,
   principal: import("@dfinity/principal").Principal,

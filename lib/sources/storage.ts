@@ -3,7 +3,6 @@ import { errMsg } from "@/lib/utils/errors";
 
 const KEY_PREFIX = "aegis_sources_";
 
-/** Infer platform from feedUrl/label for sources saved before the platform field existed. */
 export function inferPlatform(s: SavedSource): SourcePlatform | undefined {
   if (s.type === "farcaster") return "farcaster";
   if (s.type !== "rss") return undefined;

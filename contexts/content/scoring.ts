@@ -55,7 +55,6 @@ async function tryBYOK(text: string, uc: UserContext | null | undefined, key: st
   return { ...data, scoringEngine: "claude-byok" as const };
 }
 
-/** Run the full scoring cascade: Ollama -> WebLLM -> BYOK -> IC LLM -> Server -> Heuristic. No side effects. */
 export async function runScoringCascade(
   text: string,
   userContext: UserContext | null | undefined,

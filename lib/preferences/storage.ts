@@ -4,7 +4,6 @@ import { errMsg } from "@/lib/utils/errors";
 
 const KEY_PREFIX = "aegis_prefs_";
 
-/** Validate parsed JSON is a structurally valid UserPreferenceProfile. */
 export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
   const p = parsed as Record<string, unknown>;

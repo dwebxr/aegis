@@ -9,40 +9,37 @@
 
 ## Latest Updates (March 2026)
 
+### Security Hardening & Production Audit
+- **5190 tests, 303 suites** — zero failures, zero skipped
+- **Sentry data scrubbing**: Server + edge configs strip URL query params, auth headers, and cookies from error reports; client-side breadcrumbs stripped to pathname only
+- **Error boundary sanitization**: Both `error.tsx` and `global-error.tsx` show generic messages — no `error.message` or `error.stack` leaked to users; full details captured by Sentry with `error.digest` ID for support
+- **IC sync status indicator**: Account settings now displays real-time sync status (syncing/synced/offline/idle), network connectivity, and pending offline action count
+- **Dead code & comment cleanup**: ~30 redundant JSDoc comments removed across 23 files; ~20 valuable comments preserved (algorithm intent, security rationale, design pattern documentation)
+- **isDuplicateItem extracted**: Dedup logic moved from private ContentContext function to `contexts/content/dedup.ts` — directly importable and testable
+- **Worker process leak fix**: Relay flush delay (`RELAY_FLUSH_MS`) made configurable for tests; profile tests: 35s → 0.9s; content cache debounce timer properly cleaned up
+- **Test coverage expansion**: ContentContext (65%→76%), LoginButton (61%→92%), UserBadge (50%→100%), IncineratorTab (0%→100%)
+- **LARP audit**: All 7 categories (stubs, hardcoded values, mock-self tests, silent error handling, unwaited async, validation, dead code paths) verified genuine with evidence
+
 ### Next.js 15 Migration & Architecture Improvements
 - **Next.js 15.5.12**: Migrated from 14.2.35 — resolves GHSA-9g9p-9gw9-jx7f and GHSA-h25m-26qc-wcjf CVEs
-- **ContentContext refactor**: Split 831-line monolith into slim orchestrator (~310 lines) + 4 focused modules (types, cache, scoring, icSync) — public API unchanged
+- **ContentContext refactor**: Split 831-line monolith into slim orchestrator (~310 lines) + 5 focused modules (types, cache, scoring, icSync, dedup) — public API unchanged
 - **E2E CI hardened**: Playwright tests now run against production build (`npm run build && npm run start`) instead of dev server
 - **Sentry instrumentation**: Added `onRequestError` hook for Next.js 15 server component error capture
 - **@sentry/nextjs 10.42.0**: Updated for full Next.js 15 compatibility
 
-### Production Readiness & Code Quality Audit
-- **5006 tests, 288 suites** — zero failures, zero skipped, zero ESLint warnings, zero TypeScript errors
-- **LARP audit**: Eliminated test tautologies (`expect(true).toBe(true)`), conditional assertions, and mock-self patterns; all tests now assert real behavior
+### Production Readiness
 - **Distributed rate limiting**: Per-IP rate limiting via Vercel KV (Redis) shared across serverless instances, with in-memory fallback
-- **Sentry replay rate**: Reduced `replaysOnErrorSampleRate` from 1.0 to 0.1 (production-appropriate)
-- **Test coverage expansion**: SourcesTab (29%→48%), AccountSection (41%→96%), FeedSection (49%→91%), PreferenceContext (8%→92%), OnboardingFlow (25%→100%), CreateGroupModal (18%→94%), CommentThread (31%→100%)
 - **Fail-secure design**: `calculateDynamicFee("restricted")` returns `Infinity` (was `0` — fail-open); callers pre-filter restricted tier as defense-in-depth
-- **Verdict validation**: D2A deliver payloads validate verdict is exactly `"quality"` or `"slop"` via Set; `parseResponse` warns on unexpected LLM verdict values
 - **IC call timeout protection**: All IC canister calls wrapped with `withTimeout()` (15–20s) — prevents indefinite hangs on slow/unreachable canisters
-- **Honest error notifications**: IC sync failures surface to user ("Saved locally — will sync when online" / "Failed to save — changes may be lost"); briefing sync failures notify user
-- **Dead code removal**: Removed redundant comments, unused wrapper functions (`computeFingerprint` passthrough, `const steps = STEPS` alias), over-engineered abstractions; preserved algorithm-intent comments (Jaccard, NIP-44, decay factor)
-- **Tailwind CSS v4 + shadcn/ui migration**: 1341 inline styles reduced to 71 (94.7% reduction)
-- **Tab error boundaries**: All 7 tabs wrapped in `TabErrorBoundary` with Sentry capture + retry
-- **API error sanitization**: All 16 API routes return generic error messages — no internal details leaked; all non-OK upstream responses logged
+- **API error sanitization**: All 16 API routes return generic error messages — no internal details leaked
 - **CSP hardened**: Full Content-Security-Policy with `default-src 'self'`, explicit allowlists for Google Fonts, Vercel Analytics, and Sentry CDN
-- **React hooks correctness**: All `useCallback`/`useMemo` dependency arrays verified — zero stale closure warnings
-- **Accessibility**: `aria-pressed` on `menuitem` role corrected to `aria-current`
-- **Validate/flag mutual exclusivity**: Flagging a validated item clears validated (and vice versa)
-- **clusterByStory O(n²) cap**: Pairwise clustering capped at 150 items with pre-computed word sets
-- **Single-pass optimizations**: `peerStats`, `getContext`, `cleanupStaleHandshakes`/`cleanupStalePeers`
+- **Tailwind CSS v4 + shadcn/ui migration**: 1341 inline styles reduced to 71 (94.7% reduction)
 
 ### Dashboard → Analytics UX Restructuring
 - **Action vs Observation separation**: Dashboard is now action-oriented (7 sections), Analytics is observation-oriented (9 sections)
 - **Activity Trends** moved from Dashboard to Analytics (default range: 7 days)
 - **Topic Breakdown** moved from Dashboard to Analytics — distribution bars with trend arrows and weekly sparklines
 - **Session Activity** merged into D2A Agent card — unified 8-metric grid
-- **D2ANetworkMini** added inside D2A Agent card in Analytics
 - **"Your Agent" personality card**: Merged "Your Agent Knows" + "Agent Settings" into single card
 
 ### Dashboard Performance Optimization
@@ -50,7 +47,6 @@
 - **Story clustering 15x speedup**: `clusterByStory` uses sorted early-break instead of full O(n²)
 - **Single-pass algorithms**: `computeDashboardActivity` and `computeTopicTrends` reduced from O(kn) to O(n)
 - **Reactive dashboard**: `content.length` dependency ensures sections update when new content arrives
-- **Fresh recency scoring**: Briefing time uses live `Date.now()` instead of stale mount-time ref
 
 ## Live
 

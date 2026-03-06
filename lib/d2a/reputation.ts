@@ -20,7 +20,6 @@ interface SerializedReputationStore {
 
 let _memCache: Map<string, PeerReputation> | null = null;
 
-/** Reset in-memory cache (for test isolation). */
 export function _resetReputationCache(): void { _memCache = null; }
 
 export function loadReputations(): Map<string, PeerReputation> {

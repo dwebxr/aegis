@@ -17,17 +17,9 @@ export default function Error({
   return (
     <div className="p-10 bg-[#0a0f1e] text-slate-200 min-h-screen font-mono">
       <h2 className="text-red-400">Something went wrong</h2>
-      <pre className="bg-slate-800 p-4 rounded-lg overflow-auto text-[13px] whitespace-pre-wrap">
-        {error.message || "An unexpected error occurred. Please try again."}
-      </pre>
-      {error.stack && (
-        <details className="mt-3">
-          <summary className="cursor-pointer text-slate-500">Details</summary>
-          <pre className="bg-slate-800 p-4 rounded-lg overflow-auto text-[11px] mt-2 whitespace-pre-wrap">
-            {error.stack}
-          </pre>
-        </details>
-      )}
+      <p className="bg-slate-800 p-4 rounded-lg text-[13px]">
+        An unexpected error occurred. Please try again, or contact support with the error ID below.
+      </p>
       {error.digest && (
         <p className="mt-3 text-[11px] text-slate-500">
           Error ID: {error.digest}
