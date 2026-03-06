@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { getCanisterId, getHost } from "@/lib/ic/config";
+import { errMsg } from "@/lib/utils/errors";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     checks.icCanister = icRes.status === 400 || icRes.ok ? "reachable" : `error (${icRes.status})`;
   } catch (err) {
     checks.icCanister = "unreachable";
-    console.warn("[health] IC canister check failed:", err instanceof Error ? err.message : String(err));
+    console.warn("[health] IC canister check failed:", errMsg(err));
   }
 
   // "ok" requires only services that make the app non-functional when absent.

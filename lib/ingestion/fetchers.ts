@@ -140,10 +140,15 @@ export async function fetchFarcaster(
   cb: FetcherCallbacks,
 ): Promise<RawItem[]> {
   try {
+    const numericFid = Number(fid);
+    if (!Number.isFinite(numericFid)) {
+      cb.recordSourceError(key, `Invalid fid: ${fid}`);
+      return [];
+    }
     const res = await fetch("/api/fetch/farcaster", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "feed", fid: Number(fid), limit: 20 }),
+      body: JSON.stringify({ action: "feed", fid: numericFid, limit: 20 }),
       signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) {

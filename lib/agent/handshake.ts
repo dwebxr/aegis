@@ -1,6 +1,7 @@
 import { finalizeEvent } from "nostr-tools/pure";
 import { encryptMessage, decryptMessage } from "@/lib/nostr/encrypt";
 import { publishAndPartition } from "@/lib/nostr/publish";
+import { errMsg } from "@/lib/utils/errors";
 import type { HandshakeState, D2AOfferPayload, D2ADeliverPayload, D2ACommentPayload, D2AMessage } from "./types";
 import {
   KIND_EPHEMERAL,
@@ -169,7 +170,7 @@ export function parseD2AMessage(
   } catch (err) {
     const cause = err instanceof SyntaxError
       ? "invalid JSON in decrypted payload"
-      : `decryption failed: ${err instanceof Error ? err.message : String(err)}`;
+      : `decryption failed: ${errMsg(err)}`;
     console.warn("[handshake] Failed to parse D2A message from", senderPk.slice(0, 8) + "...:", cause);
     return null;
   }

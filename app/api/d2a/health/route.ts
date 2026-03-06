@@ -3,6 +3,7 @@ import { rateLimit } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
 import { X402_RECEIVER, X402_NETWORK } from "@/lib/d2a/x402Server";
 import { getCanisterId, getHost } from "@/lib/ic/config";
+import { errMsg } from "@/lib/utils/errors";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     checks.icCanister = icRes.status === 400 || icRes.ok ? "reachable" : `error (${icRes.status})`;
   } catch (err) {
     checks.icCanister = "unreachable";
-    console.warn("[d2a/health] IC canister check failed:", err instanceof Error ? err.message : String(err));
+    console.warn("[d2a/health] IC canister check failed:", errMsg(err));
   }
 
   const allOk = checks.icCanister === "reachable" && checks.x402Receiver !== "not configured";
