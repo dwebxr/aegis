@@ -2,14 +2,16 @@
 import React, { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
+import dynamic from "next/dynamic";
 import { AppShell } from "@/components/layout/AppShell";
-import { DashboardTab } from "@/components/tabs/DashboardTab";
-import { BriefingTab } from "@/components/tabs/BriefingTab";
-import { IncineratorTab } from "@/components/tabs/IncineratorTab";
-import { SourcesTab } from "@/components/tabs/SourcesTab";
-import { AnalyticsTab } from "@/components/tabs/AnalyticsTab";
-import { SettingsTab } from "@/components/tabs/SettingsTab";
-import { D2ATab } from "@/components/tabs/D2ATab";
+
+const DashboardTab = dynamic(() => import("@/components/tabs/DashboardTab").then(m => ({ default: m.DashboardTab })), { ssr: false });
+const BriefingTab = dynamic(() => import("@/components/tabs/BriefingTab").then(m => ({ default: m.BriefingTab })), { ssr: false });
+const IncineratorTab = dynamic(() => import("@/components/tabs/IncineratorTab").then(m => ({ default: m.IncineratorTab })), { ssr: false });
+const SourcesTab = dynamic(() => import("@/components/tabs/SourcesTab").then(m => ({ default: m.SourcesTab })), { ssr: false });
+const AnalyticsTab = dynamic(() => import("@/components/tabs/AnalyticsTab").then(m => ({ default: m.AnalyticsTab })), { ssr: false });
+const SettingsTab = dynamic(() => import("@/components/tabs/SettingsTab").then(m => ({ default: m.SettingsTab })), { ssr: false });
+const D2ATab = dynamic(() => import("@/components/tabs/D2ATab").then(m => ({ default: m.D2ATab })), { ssr: false });
 import { TabErrorBoundary } from "@/components/ui/TabErrorBoundary";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { useNotify } from "@/contexts/NotificationContext";
