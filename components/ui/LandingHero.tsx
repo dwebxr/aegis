@@ -249,7 +249,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
       "w-full max-w-[640px] bg-gradient-to-br from-cyan-500/[0.06] to-blue-600/[0.03] border border-cyan-500/[0.19] rounded-xl text-center",
       mobile ? "mt-8 px-5 py-6" : "mt-10 px-6 py-8"
     )}>
-      <div className="text-cyan-400 mb-3">
+      <div className="flex justify-center text-cyan-400 mb-3">
         <ChromeIcon s={32} />
       </div>
       <div className="text-h2 font-bold text-foreground mb-2">
@@ -274,7 +274,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
       "w-full max-w-[640px] bg-card border border-border rounded-xl text-center",
       mobile ? "mt-8 p-5" : "mt-10 p-6"
     )}>
-      <div className="text-tertiary mb-3">
+      <div className="flex justify-center text-tertiary mb-3">
         <GitHubIcon s={24} />
       </div>
       <div className="text-h2 font-bold text-foreground mb-2">
