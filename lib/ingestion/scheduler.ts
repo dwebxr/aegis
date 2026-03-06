@@ -19,15 +19,7 @@ import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { errMsg } from "@/lib/utils/errors";
 import { scoreItemWithHeuristics } from "@/lib/filtering/pipeline";
-
-interface RawItem {
-  text: string;
-  author: string;
-  avatar?: string;
-  sourceUrl?: string;
-  imageUrl?: string;
-  nostrPubkey?: string;
-}
+import { fetchRSS, fetchNostr, fetchURL, fetchFarcaster, type RawItem, type HttpCacheHeaders, type FetcherCallbacks } from "./fetchers";
 
 const MAX_ITEMS_PER_SOURCE = 5;
 const MAX_ENRICH_PER_CYCLE = 3;
@@ -311,153 +303,32 @@ export class IngestionScheduler {
     return result;
   }
 
+  private get fetcherCallbacks(): FetcherCallbacks {
+    return {
+      handleFetchError: (res, key) => this.handleFetchError(res, key),
+      recordSourceError: (key, error) => this.recordSourceError(key, error),
+    };
+  }
+
   private async fetchSource(source: SchedulerSource, key: string): Promise<RawItem[]> {
+    const cb = this.fetcherCallbacks;
     switch (source.type) {
       case "rss":
-        return this.fetchRSS(source.config.feedUrl, key);
+        return fetchRSS(source.config.feedUrl, key, this.httpCacheHeaders, cb);
       case "nostr":
-        return this.fetchNostr(
+        return fetchNostr(
           source.config.relays?.split(",").map(r => r.trim()) || ["wss://relay.damus.io"],
           source.config.pubkeys?.split(",").map(p => p.trim()),
           key,
+          cb,
         );
       case "url":
-        return this.fetchURL(source.config.url, key);
+        return fetchURL(source.config.url, key, cb);
       case "farcaster":
-        return this.fetchFarcaster(source.config.fid, source.config.username, key);
+        return fetchFarcaster(source.config.fid, source.config.username, key, cb);
       default:
         console.warn(`[scheduler] Unknown source type: ${source.type}`);
         return [];
-    }
-  }
-
-  private async fetchRSS(feedUrl: string, key: string): Promise<RawItem[]> {
-    try {
-      const body: Record<string, unknown> = { feedUrl, limit: 10 };
-      const cached = this.httpCacheHeaders.get(key);
-      if (cached?.etag) body.etag = cached.etag;
-      if (cached?.lastModified) body.lastModified = cached.lastModified;
-
-      const res = await fetch("/api/fetch/rss", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (!res.ok) {
-        this.handleFetchError(res, key);
-        return [];
-      }
-      const data = await res.json();
-
-      if (data.etag || data.lastModified) {
-        this.httpCacheHeaders.set(key, { etag: data.etag, lastModified: data.lastModified });
-      }
-
-      // 304 Not Modified — no new content
-      if (data.notModified) return [];
-
-      return (data.items || []).map((item: { title: string; content: string; author?: string; link?: string; imageUrl?: string }) => ({
-        text: `${item.title}\n\n${item.content}`.slice(0, MAX_TEXT_LENGTH),
-        author: item.author || data.feedTitle || "RSS",
-        sourceUrl: item.link,
-        imageUrl: item.imageUrl,
-      }));
-    } catch (err) {
-      const msg = errMsg(err);
-      console.error("[scheduler] RSS fetch failed:", msg);
-      this.recordSourceError(key, msg);
-      return [];
-    }
-  }
-
-  private async fetchNostr(relays: string[], pubkeys: string[] | undefined, key: string): Promise<RawItem[]> {
-    try {
-      const validPubkeys = pubkeys?.filter(Boolean);
-      const res = await fetch("/api/fetch/nostr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ relays, pubkeys: validPubkeys?.length ? validPubkeys : undefined, limit: 20 }),
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (!res.ok) {
-        this.handleFetchError(res, key);
-        return [];
-      }
-      const data = await res.json();
-      const profiles: Record<string, { name?: string; picture?: string }> = data.profiles || {};
-      return (data.events || []).map((ev: { content: string; pubkey: string; id: string }) => {
-        const profile = profiles[ev.pubkey];
-        return {
-          text: ev.content.slice(0, MAX_TEXT_LENGTH),
-          author: profile?.name || ev.pubkey.slice(0, 12) + "...",
-          avatar: profile?.picture,
-          sourceUrl: `nostr:${ev.id}`,
-          nostrPubkey: ev.pubkey,
-        };
-      });
-    } catch (err) {
-      const msg = errMsg(err);
-      console.error("[scheduler] Nostr fetch failed:", msg);
-      this.recordSourceError(key, msg);
-      return [];
-    }
-  }
-
-  private async fetchURL(url: string, key: string): Promise<RawItem[]> {
-    try {
-      const res = await fetch("/api/fetch/url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (!res.ok) {
-        this.handleFetchError(res, key);
-        return [];
-      }
-      const data = await res.json();
-      let hostname = "unknown";
-      try { hostname = new URL(url).hostname; } catch (e) { console.warn("[scheduler] Malformed URL:", url, e); }
-      return [{
-        text: `${data.title || ""}\n\n${data.content || ""}`.slice(0, MAX_TEXT_LENGTH),
-        author: data.author || hostname,
-        sourceUrl: url,
-        imageUrl: data.imageUrl,
-      }];
-    } catch (err) {
-      const msg = errMsg(err);
-      console.error("[scheduler] URL fetch failed:", msg);
-      this.recordSourceError(key, msg);
-      return [];
-    }
-  }
-
-  private async fetchFarcaster(fid: string, username: string, key: string): Promise<RawItem[]> {
-    try {
-      const res = await fetch("/api/fetch/farcaster", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "feed", fid: Number(fid), limit: 20 }),
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (!res.ok) {
-        this.handleFetchError(res, key);
-        return [];
-      }
-      const data = await res.json();
-      return (data.items || []).map((item: { text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string }) => ({
-        text: item.text.slice(0, MAX_TEXT_LENGTH),
-        author: item.author || username || `fid:${fid}`,
-        avatar: item.avatar,
-        sourceUrl: item.sourceUrl,
-        imageUrl: item.imageUrl,
-      }));
-    } catch (err) {
-      const msg = errMsg(err);
-      console.error("[scheduler] Farcaster fetch failed:", msg);
-      this.recordSourceError(key, msg);
-      return [];
     }
   }
 
