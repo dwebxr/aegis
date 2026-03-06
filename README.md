@@ -9,6 +9,13 @@
 
 ## Latest Updates (March 2026)
 
+### Next.js 15 Migration & Architecture Improvements
+- **Next.js 15.5.12**: Migrated from 14.2.35 — resolves GHSA-9g9p-9gw9-jx7f and GHSA-h25m-26qc-wcjf CVEs
+- **ContentContext refactor**: Split 831-line monolith into slim orchestrator (~310 lines) + 4 focused modules (types, cache, scoring, icSync) — public API unchanged
+- **E2E CI hardened**: Playwright tests now run against production build (`npm run build && npm run start`) instead of dev server
+- **Sentry instrumentation**: Added `onRequestError` hook for Next.js 15 server component error capture
+- **@sentry/nextjs 10.42.0**: Updated for full Next.js 15 compatibility
+
 ### Production Readiness & Code Quality Audit
 - **4718 tests, 272 suites** — zero failures, zero skipped, zero tautologies
 - **LARP audit**: Eliminated test tautologies (`expect(true).toBe(true)`), conditional assertions, and mock-self patterns; all tests now assert real behavior
@@ -122,7 +129,7 @@ Non-BYOK users: Ollama\* → WebLLM\* → IC LLM → Server Claude → Heuristic
 ```
 Browser                                  Internet Computer (Mainnet)
 ┌───────────────────────────────────┐    ┌──────────────────────────┐
-│  Next.js 14 (App Router)          │    │  aegis_backend canister  │
+│  Next.js 15 (App Router)          │    │  aegis_backend canister  │
 │                                   │    │  (Motoko)                │
 │  Tabs:                            │    │                          │
 │    Dashboard / Briefing / Burn    │◄──►│  - Evaluation storage    │
@@ -803,7 +810,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 14 (App Router), React 18, TypeScript |
+| Frontend | Next.js 15 (App Router), React 18, TypeScript |
 | Styling | Tailwind CSS v4 + shadcn/ui, dark theme |
 | Backend API | Next.js API Routes (Vercel Serverless) |
 | AI (Free) | IC LLM Canister — Llama 3.1 8B (on-chain, mo:llm 2.1.0) |
