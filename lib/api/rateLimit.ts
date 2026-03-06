@@ -114,6 +114,26 @@ export function checkBodySize(request: NextRequest, maxBytes = DEFAULT_MAX_BODY)
   return null;
 }
 
+/**
+ * Combined guard: rate limit + body size + JSON parse.
+ * Returns { body } on success, or { error: NextResponse } on failure.
+ */
+export async function guardAndParse<T = Record<string, unknown>>(
+  request: NextRequest,
+  opts?: { limit?: number; windowMs?: number; maxBytes?: number },
+): Promise<{ body: T; error?: undefined } | { body?: undefined; error: NextResponse }> {
+  const limited = rateLimit(request, opts?.limit, opts?.windowMs);
+  if (limited) return { error: limited };
+  const tooLarge = checkBodySize(request, opts?.maxBytes);
+  if (tooLarge) return { error: tooLarge };
+  try {
+    const body = await request.json() as T;
+    return { body };
+  } catch {
+    return { error: NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }) };
+  }
+}
+
 export function rateLimit(request: NextRequest, limit = 30, windowMs = 60_000): NextResponse | null {
   const ip = getClientIP(request);
   const now = Date.now();

@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { guardAndParse } from "@/lib/api/rateLimit";
 import { safeFetch } from "@/lib/utils/url";
 import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 15;
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 60, 60_000);
-  if (limited) return limited;
-  const tooLarge = checkBodySize(request);
-  if (tooLarge) return tooLarge;
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const { body, error } = await guardAndParse<{ url?: string }>(request, { limit: 60 });
+  if (error) return error;
 
   const { url } = body;
   if (!url || typeof url !== "string") {

@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useCurrentRef } from "@/hooks/useCurrentRef";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
 import { usePreferences } from "./PreferenceContext";
@@ -81,10 +82,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const [agentProfileLoading, setAgentProfileLoading] = useState(false);
   const managerRef = useRef<AgentManager | null>(null);
   const profileFetchId = useRef(0);
-  const profileRef = useRef(profile);
-  profileRef.current = profile;
-  const contentRef = useRef(content);
-  contentRef.current = content;
+  const profileRef = useCurrentRef(profile);
+  const contentRef = useCurrentRef(content);
 
   const nostrKeys = useMemo(() => {
     if (!principalText) return null;

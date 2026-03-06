@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Parser from "rss-parser";
-import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
 
@@ -71,17 +71,8 @@ function extractImage(item: Record<string, unknown>, rawContent: string): string
 }
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 30, 60_000);
-  if (limited) return limited;
-  const tooLarge = checkBodySize(request);
-  if (tooLarge) return tooLarge;
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const { body, error } = await guardAndParse<{ feedUrl?: string; limit?: number; etag?: string; lastModified?: string }>(request);
+  if (error) return error;
   const { feedUrl, limit: rawLimit, etag, lastModified } = body;
   const limit = typeof rawLimit === "number" && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 50) : 20;
 

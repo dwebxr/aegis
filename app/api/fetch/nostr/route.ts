@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateRelay } from "@/lib/utils/url";
 import { withTimeout } from "@/lib/utils/timeout";
@@ -7,17 +7,8 @@ import { withTimeout } from "@/lib/utils/timeout";
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 30, 60_000);
-  if (limited) return limited;
-  const tooLarge = checkBodySize(request);
-  if (tooLarge) return tooLarge;
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const { body, error } = await guardAndParse<{ relays?: string[]; pubkeys?: string[]; hashtags?: string[]; limit?: number; since?: number }>(request);
+  if (error) return error;
   const { relays, pubkeys, hashtags, limit = 20, since } = body;
 
   if (!relays || !Array.isArray(relays) || relays.length === 0) {

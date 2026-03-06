@@ -1,95 +1,95 @@
 /**
- * Tests for shared settings styles — verifies correct responsive behavior and active states.
+ * Tests for shared settings Tailwind class helpers.
  */
-import { cardStyle, sectionTitle, actionBtnStyle, confirmBtnStyle, cancelBtnStyle, pillBtn } from "@/components/settings/styles";
+import { cardClass, sectionTitleClass, actionBtnClass, confirmBtnClass, cancelBtnClass, pillBtnClass } from "@/components/settings/styles";
 
-describe("cardStyle", () => {
+describe("cardClass", () => {
   it("returns larger padding for desktop", () => {
-    const style = cardStyle(false);
-    expect(style.padding).toBe(20); // space[5]
-    expect(style.marginBottom).toBe(16); // space[4]
+    const cls = cardClass(false);
+    expect(cls).toContain("p-5");
+    expect(cls).toContain("mb-4");
   });
 
   it("returns smaller padding for mobile", () => {
-    const style = cardStyle(true);
-    expect(style.padding).toBe(16); // space[4]
-    expect(style.marginBottom).toBe(12); // space[3]
+    const cls = cardClass(true);
+    expect(cls).toContain("p-4");
+    expect(cls).toContain("mb-3");
   });
 
   it("defaults to desktop when mobile is undefined", () => {
-    const style = cardStyle();
-    expect(style.padding).toBe(20);
+    const cls = cardClass();
+    expect(cls).toContain("p-5");
   });
 
-  it("has surface background and border", () => {
-    const style = cardStyle();
-    expect(style.background).toBe("var(--color-bg-surface)");
-    expect(style.border).toBe("1px solid var(--color-border-default)");
-    expect(style.borderRadius).toBe(16); // radii.lg
-  });
-});
-
-describe("sectionTitle", () => {
-  it("has correct font weight and letter spacing", () => {
-    expect(sectionTitle.fontWeight).toBe(700);
-    expect(sectionTitle.letterSpacing).toBe(0.3);
-  });
-
-  it("has bottom margin for spacing", () => {
-    expect(sectionTitle.marginBottom).toBe(12); // space[3]
+  it("has card background and border", () => {
+    const cls = cardClass();
+    expect(cls).toContain("bg-card");
+    expect(cls).toContain("border");
+    expect(cls).toContain("rounded-lg");
   });
 });
 
-describe("actionBtnStyle", () => {
-  it("has pointer cursor and transition", () => {
-    expect(actionBtnStyle.cursor).toBe("pointer");
-    expect(actionBtnStyle.transition).toBe("all 0.15s ease"); // transitions.fast
+describe("sectionTitleClass", () => {
+  it("has bold weight and tracking", () => {
+    expect(sectionTitleClass).toContain("font-bold");
+    expect(sectionTitleClass).toContain("tracking-");
+  });
+
+  it("has bottom margin", () => {
+    expect(sectionTitleClass).toContain("mb-3");
+  });
+});
+
+describe("actionBtnClass", () => {
+  it("has cursor and transition", () => {
+    expect(actionBtnClass).toContain("cursor-pointer");
+    expect(actionBtnClass).toContain("transition-fast");
   });
 
   it("inherits font family", () => {
-    expect(actionBtnStyle.fontFamily).toBe("inherit");
+    expect(actionBtnClass).toContain("font-[inherit]");
   });
 });
 
-describe("confirmBtnStyle", () => {
+describe("confirmBtnClass", () => {
   it("uses amber/warning color", () => {
-    expect(String(confirmBtnStyle.color)).toContain("#fbbf24");
-    expect(String(confirmBtnStyle.border)).toContain("#fbbf24");
+    expect(confirmBtnClass).toContain("text-amber-400");
+    expect(confirmBtnClass).toContain("border-amber-400");
   });
 });
 
-describe("cancelBtnStyle", () => {
+describe("cancelBtnClass", () => {
   it("has transparent background", () => {
-    expect(cancelBtnStyle.background).toBe("transparent");
+    expect(cancelBtnClass).toContain("bg-transparent");
   });
 
   it("has muted text color", () => {
-    expect(cancelBtnStyle.color).toBe("var(--color-text-muted)");
+    expect(cancelBtnClass).toContain("text-muted-foreground");
   });
 });
 
-describe("pillBtn", () => {
+describe("pillBtnClass", () => {
   it("returns highlighted style when active", () => {
-    const active = pillBtn(true);
-    expect(active.fontWeight).toBe(700);
-    expect(String(active.background)).toContain("#06b6d4");
-    expect(String(active.color)).toContain("#22d3ee");
+    const cls = pillBtnClass(true);
+    expect(cls).toContain("font-bold");
+    expect(cls).toContain("text-cyan-400");
+    expect(cls).toContain("bg-cyan-500");
   });
 
   it("returns muted style when inactive", () => {
-    const inactive = pillBtn(false);
-    expect(inactive.fontWeight).toBe(500);
-    expect(inactive.background).toBe("transparent");
-    expect(inactive.color).toBe("var(--color-text-muted)");
+    const cls = pillBtnClass(false);
+    expect(cls).toContain("font-medium");
+    expect(cls).toContain("text-muted-foreground");
+    expect(cls).toContain("bg-transparent");
   });
 
   it("always has pointer cursor", () => {
-    expect(pillBtn(true).cursor).toBe("pointer");
-    expect(pillBtn(false).cursor).toBe("pointer");
+    expect(pillBtnClass(true)).toContain("cursor-pointer");
+    expect(pillBtnClass(false)).toContain("cursor-pointer");
   });
 
   it("always has transition", () => {
-    expect(pillBtn(true).transition).toBe("all 0.15s ease");
-    expect(pillBtn(false).transition).toBe("all 0.15s ease");
+    expect(pillBtnClass(true)).toContain("transition-fast");
+    expect(pillBtnClass(false)).toContain("transition-fast");
   });
 });

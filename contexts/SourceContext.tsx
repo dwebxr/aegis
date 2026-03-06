@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useCurrentRef } from "@/hooks/useCurrentRef";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
 import { useDemo } from "./DemoContext";
@@ -44,15 +45,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const [syncError, setSyncError] = useState("");
   const actorRef = useRef<_SERVICE | null>(null);
   const pendingDeletesRef = useRef<Set<string>>(new Set());
-  const sourcesRef = useRef(sources);
-  sourcesRef.current = sources;
-
-  const identityRef = useRef(identity);
-  identityRef.current = identity;
-  const isAuthRef = useRef(isAuthenticated);
-  isAuthRef.current = isAuthenticated;
-  const principalTextRef = useRef(principalText);
-  principalTextRef.current = principalText;
+  const sourcesRef = useCurrentRef(sources);
+  const identityRef = useCurrentRef(identity);
+  const isAuthRef = useCurrentRef(isAuthenticated);
+  const principalTextRef = useCurrentRef(principalText);
 
   useEffect(() => {
     actorRef.current = null;

@@ -1,23 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extract } from "@extractus/article-extractor";
-import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { guardAndParse } from "@/lib/api/rateLimit";
 import { blockPrivateUrl } from "@/lib/utils/url";
 import { withTimeout } from "@/lib/utils/timeout";
 
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 30, 60_000);
-  if (limited) return limited;
-  const tooLarge = checkBodySize(request);
-  if (tooLarge) return tooLarge;
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const { body, error } = await guardAndParse<{ url?: string }>(request);
+  if (error) return error;
   const { url } = body;
 
   if (!url || typeof url !== "string") {

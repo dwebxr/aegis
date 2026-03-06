@@ -1,23 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TwitterApi } from "twitter-api-v2";
-import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { withTimeout } from "@/lib/utils/timeout";
 
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 30, 60_000);
-  if (limited) return limited;
-  const tooLarge = checkBodySize(request);
-  if (tooLarge) return tooLarge;
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const { body, error } = await guardAndParse<{ bearerToken?: string; query?: string; maxResults?: number }>(request);
+  if (error) return error;
   const { bearerToken, query, maxResults = 10 } = body;
 
   if (!bearerToken || typeof bearerToken !== "string" || bearerToken.trim().length === 0) {

@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useCurrentRef } from "@/hooks/useCurrentRef";
 import { useAuth } from "./AuthContext";
 import type { UserPreferenceProfile, UserContext, CustomFilterRule, NotificationPrefs } from "@/lib/preferences/types";
 import { createEmptyProfile, TOPIC_AFFINITY_CAP, TOPIC_AFFINITY_FLOOR } from "@/lib/preferences/types";
@@ -49,10 +50,8 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const icSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const identityRef = useRef(identity);
-  identityRef.current = identity;
-  const isAuthRef = useRef(isAuthenticated);
-  isAuthRef.current = isAuthenticated;
+  const identityRef = useCurrentRef(identity);
+  const isAuthRef = useCurrentRef(isAuthenticated);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,8 +141,7 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     return () => clearInterval(interval);
   }, [isAuthenticated, identity]);
 
-  const profileRef = useRef(profile);
-  profileRef.current = profile;
+  const profileRef = useCurrentRef(profile);
 
   /** Clone current profile, apply mutation, stamp lastUpdated, persist & sync. */
   const updateProfile = useCallback((mutate: (p: UserPreferenceProfile) => void) => {

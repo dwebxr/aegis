@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg, isTimeout } from "@/lib/utils/errors";
 import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
 import { detectPlatformFeed, extractYouTubeChannelId } from "@/lib/sources/platformFeed";
@@ -9,17 +9,8 @@ export const maxDuration = 30;
 const COMMON_PATHS = ["/feed", "/rss", "/feed.xml", "/atom.xml", "/rss.xml", "/index.xml"];
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 15, 60_000);
-  if (limited) return limited;
-  const tooLarge = checkBodySize(request);
-  if (tooLarge) return tooLarge;
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const { body, error } = await guardAndParse<{ url?: string }>(request, { limit: 15 });
+  if (error) return error;
 
   const { url } = body;
   if (!url || typeof url !== "string") {

@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useCurrentRef } from "@/hooks/useCurrentRef";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./AuthContext";
 import { createBackendActorAsync } from "@/lib/ic/actor";
@@ -65,8 +66,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const [pendingCount, setPendingCount] = useState(0);
   const pendingItemsRef = useRef<ContentItem[]>([]);
   const actorRef = useRef<_SERVICE | null>(null);
-  const contentRef = useRef(content);
-  contentRef.current = content;
+  const contentRef = useCurrentRef(content);
   const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const drainQueueRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const syncRetryRef = useRef(0);

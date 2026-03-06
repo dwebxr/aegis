@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 30;
@@ -92,17 +92,8 @@ function extractImageUrl(embeds?: Array<{ url?: string }>): string | undefined {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 20, 60_000);
-  if (limited) return limited;
-  const tooLarge = checkBodySize(request);
-  if (tooLarge) return tooLarge;
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const { body, error } = await guardAndParse<{ action?: string; username?: string; fid?: number; limit?: number; cursor?: string }>(request, { limit: 20 });
+  if (error) return error;
 
   const { action } = body;
 
