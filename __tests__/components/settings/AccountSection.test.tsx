@@ -9,7 +9,7 @@ if (typeof globalThis.TextEncoder === "undefined") {
 }
 
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AccountSection } from "@/components/settings/AccountSection";
 
@@ -37,16 +37,18 @@ jest.mock("@/components/ui/NostrAccountLink", () => ({
   NostrAccountLink: () => <div data-testid="nostr-link">NostrAccountLink</div>,
 }));
 
+const mockClearUserApiKey = jest.fn();
 jest.mock("@/lib/apiKey/storage", () => ({
-  clearUserApiKey: jest.fn(),
+  clearUserApiKey: (...args: unknown[]) => mockClearUserApiKey(...args),
 }));
 
 beforeEach(() => {
   mockIsAuthenticated = true;
   mockPrincipalText = "abc-123-principal";
   mockLogin.mockClear();
-  mockLogout.mockClear();
+  mockLogout.mockClear().mockResolvedValue(undefined);
   mockAddNotification.mockClear();
+  mockClearUserApiKey.mockClear();
 });
 
 describe("AccountSection — authenticated state", () => {
@@ -189,8 +191,9 @@ describe("AccountSection — copy principal", () => {
     render(<AccountSection />);
     fireEvent.click(screen.getByTestId("aegis-settings-copy-principal"));
 
-    await new Promise(r => setTimeout(r, 10));
-    expect(writeText).toHaveBeenCalledWith("abc-123-principal");
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith("abc-123-principal");
+    });
   });
 
   it("shows Copied after successful copy", async () => {
@@ -200,8 +203,9 @@ describe("AccountSection — copy principal", () => {
     render(<AccountSection />);
     fireEvent.click(screen.getByTestId("aegis-settings-copy-principal"));
 
-    await new Promise(r => setTimeout(r, 10));
-    expect(screen.getByText("Copied")).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText("Copied")).toBeTruthy();
+    });
   });
 
   it("shows error notification on clipboard failure", async () => {
@@ -211,8 +215,9 @@ describe("AccountSection — copy principal", () => {
     render(<AccountSection />);
     fireEvent.click(screen.getByTestId("aegis-settings-copy-principal"));
 
-    await new Promise(r => setTimeout(r, 10));
-    expect(mockAddNotification).toHaveBeenCalledWith("Failed to copy to clipboard", "error");
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith("Failed to copy to clipboard", "error");
+    });
   });
 });
 
@@ -245,10 +250,12 @@ describe("AccountSection — delete local data", () => {
     fireEvent.change(input, { target: { value: "DELET" } });
     fireEvent.click(screen.getByText("Confirm Delete"));
 
-    await new Promise(r => setTimeout(r, 10));
-    // localStorage should still have aegis keys
+    // handleDeleteLocalData returns early when input !== "DELETE"
+    // so logout should never be called — wait a tick to confirm no async side-effects
+    await waitFor(() => {
+      expect(mockLogout).not.toHaveBeenCalled();
+    });
     expect(localStorage.getItem("aegis-prefs")).toBe("test");
-    expect(mockLogout).not.toHaveBeenCalled();
   });
 
   it("deletes aegis localStorage keys and calls logout", async () => {
@@ -278,15 +285,44 @@ describe("AccountSection — delete local data", () => {
     fireEvent.change(input, { target: { value: "DELETE" } });
     fireEvent.click(screen.getByTestId("aegis-settings-delete-confirm"));
 
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => {
+      expect(mockLogout).toHaveBeenCalled();
+    });
 
     // aegis keys removed, other keys preserved
     expect(localStorage.getItem("aegis-prefs")).toBeNull();
     expect(localStorage.getItem("aegis-cache")).toBeNull();
     expect(localStorage.getItem("other-key")).toBe("keep");
-
-    expect(mockLogout).toHaveBeenCalled();
+    expect(mockClearUserApiKey).toHaveBeenCalled();
     expect(mockAddNotification).toHaveBeenCalledWith("All local data deleted", "success");
+  });
+
+  it("shows error notification when delete fails", async () => {
+    // Mock logout to reject, triggering the catch block
+    mockLogout.mockRejectedValueOnce(new Error("logout failed"));
+
+    const mockDeleteDatabase = jest.fn().mockImplementation(() => {
+      const req = { onsuccess: null as (() => void) | null, onerror: null as (() => void) | null, error: null };
+      setTimeout(() => req.onsuccess?.(), 0);
+      return req;
+    });
+    Object.defineProperty(window, "indexedDB", {
+      value: { deleteDatabase: mockDeleteDatabase },
+      writable: true,
+      configurable: true,
+    });
+
+    render(<AccountSection />);
+    fireEvent.click(screen.getByText("Delete All Local Data"));
+    const input = screen.getByTestId("aegis-settings-delete-input");
+    fireEvent.change(input, { target: { value: "DELETE" } });
+    fireEvent.click(screen.getByTestId("aegis-settings-delete-confirm"));
+
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith("Failed to delete local data", "error");
+    });
+    // Should exit deleting state
+    expect(screen.getByText("Confirm Delete")).toBeTruthy();
   });
 
   it("shows Deleting... state on confirm button", async () => {

@@ -9,7 +9,7 @@ if (typeof globalThis.TextEncoder === "undefined") {
 }
 
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FeedSection } from "@/components/settings/FeedSection";
 
@@ -96,10 +96,12 @@ describe("FeedSection — Filter Mode", () => {
   it("shows green dot for engines that are enabled", () => {
     mockAgentEnabled = true;
     mockStoredKey = "sk-ant-test";
-    render(<FeedSection />);
-    // Both API Key and D2A Agent should show as on
-    const html = renderToStaticMarkup(<FeedSection />);
-    expect(html).toContain("Filter Mode");
+    const { container } = render(<FeedSection />);
+    // Status dots: bg-emerald-400 = enabled, bg-[var(--color-text-disabled)] = disabled
+    // With agentEnabled=true and hasApiKey=true, 2 of 4 should be green
+    const allDots = container.querySelectorAll(".bg-emerald-400");
+    // At least the BYOK and D2A dots should be green (+ possibly the AI Scoring section dot)
+    expect(allDots.length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -149,9 +151,9 @@ describe("FeedSection — AI Scoring (BYOK)", () => {
   });
 
   it("Save button is disabled when input is empty", () => {
-    const html = renderToStaticMarkup(<FeedSection />);
-    // Save button should have not-allowed cursor when disabled
-    expect(html).toContain("not-allowed");
+    render(<FeedSection />);
+    const saveBtn = screen.getByText("Save") as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(true);
   });
 
   it("Clear key requires confirmation", () => {
@@ -246,16 +248,18 @@ describe("FeedSection — WebLLM toggle", () => {
     mockWebLLMEnabled = false;
     render(<FeedSection />);
     fireEvent.click(screen.getByTestId("aegis-settings-webllm-toggle"));
-    await new Promise(r => setTimeout(r, 10));
-    expect(mockAddNotification).toHaveBeenCalledWith("Browser AI enabled", "success");
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith("Browser AI enabled", "success");
+    });
   });
 
   it("disables WebLLM on toggle click when enabled", async () => {
     mockWebLLMEnabled = true;
     render(<FeedSection />);
     fireEvent.click(screen.getByTestId("aegis-settings-webllm-toggle"));
-    await new Promise(r => setTimeout(r, 10));
-    expect(mockAddNotification).toHaveBeenCalledWith("Browser AI disabled", "success");
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith("Browser AI disabled", "success");
+    });
   });
 });
 
@@ -263,18 +267,20 @@ describe("FeedSection — Ollama toggle and interactions", () => {
   it("enables Ollama and shows connection test notification", async () => {
     render(<FeedSection />);
     fireEvent.click(screen.getByTestId("aegis-settings-ollama-toggle"));
-    await new Promise(r => setTimeout(r, 10));
-    expect(mockAddNotification).toHaveBeenCalledWith(
-      expect.stringContaining("Local LLM enabled"),
-      "success"
-    );
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.stringContaining("Local LLM enabled"),
+        "success"
+      );
+    });
   });
 
   it("shows Enabled text after toggle", async () => {
     render(<FeedSection />);
     fireEvent.click(screen.getByTestId("aegis-settings-ollama-toggle"));
-    await new Promise(r => setTimeout(r, 50));
-    expect(screen.getAllByText("Enabled").length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getAllByText("Enabled").length).toBeGreaterThan(0);
+    });
   });
 
   it("shows endpoint and model inputs when enabled", async () => {
@@ -310,19 +316,81 @@ describe("FeedSection — Ollama toggle and interactions", () => {
     mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: true };
     render(<FeedSection />);
     fireEvent.click(screen.getByText("Test"));
-    await new Promise(r => setTimeout(r, 50));
-    expect(mockAddNotification).toHaveBeenCalledWith(
-      expect.stringContaining("Connected"),
-      "success"
-    );
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.stringContaining("Connected"),
+        "success"
+      );
+    });
   });
 
   it("disables Ollama on second toggle", async () => {
     mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: true };
     render(<FeedSection />);
     fireEvent.click(screen.getByTestId("aegis-settings-ollama-toggle"));
-    await new Promise(r => setTimeout(r, 10));
-    expect(mockAddNotification).toHaveBeenCalledWith("Local LLM disabled", "success");
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith("Local LLM disabled", "success");
+    });
+  });
+});
+
+describe("FeedSection — Ollama connection failure", () => {
+  it("shows error notification when Ollama connection fails", async () => {
+    const { testOllamaConnection } = require("@/lib/ollama/engine");
+    testOllamaConnection.mockResolvedValueOnce({ ok: false, models: [], error: "Connection refused" });
+
+    render(<FeedSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-ollama-toggle"));
+
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.stringContaining("Cannot reach Ollama"),
+        "error"
+      );
+    });
+  });
+
+  it("shows error notification when Test button connection fails", async () => {
+    const { testOllamaConnection } = require("@/lib/ollama/engine");
+    testOllamaConnection.mockResolvedValueOnce({ ok: false, models: [], error: "ECONNREFUSED" });
+
+    mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: true };
+    render(<FeedSection />);
+    fireEvent.click(screen.getByText("Test"));
+
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.stringContaining("Connection failed"),
+        "error"
+      );
+    });
+  });
+
+  it("shows Connected status after successful toggle", async () => {
+    render(<FeedSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-ollama-toggle"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Connected — using/)).toBeTruthy();
+    });
+  });
+});
+
+describe("FeedSection — WebGPU unavailable", () => {
+  it("shows error when WebGPU is not usable on enable", async () => {
+    const engine = require("@/lib/webllm/engine");
+    engine.isWebGPUUsable = jest.fn().mockResolvedValueOnce(false);
+
+    mockWebLLMEnabled = false;
+    render(<FeedSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-webllm-toggle"));
+
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.stringContaining("WebGPU not available"),
+        "error"
+      );
+    });
   });
 });
 

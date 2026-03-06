@@ -3,7 +3,6 @@ import { NextRequest } from "next/server";
 // Mock KV store
 let kvStore: Record<string, number> = {};
 let kvTtls: Record<string, number> = {};
-let kvAvailable = false;
 
 jest.mock("@vercel/kv", () => ({
   kv: {

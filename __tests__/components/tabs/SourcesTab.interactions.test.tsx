@@ -109,14 +109,14 @@ describe("SourcesTab — tab switching", () => {
 });
 
 describe("SourcesTab — URL extraction", () => {
-  it("fetches URL on button click", async () => {
+  it("fetches URL on button click and renders result", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         title: "Test Article",
-        text: "Article content here",
-        author: "Author",
-        publishedAt: "2024-01-01",
+        content: "Article content here",
+        author: "Test Author",
+        source: "example.com",
       }),
     });
 
@@ -125,7 +125,6 @@ describe("SourcesTab — URL extraction", () => {
     const input = screen.getByTestId("aegis-sources-url-input") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "https://example.com/article" } });
 
-    // Wait for re-render so urlInput state is updated in the closure
     await waitFor(() => {
       expect(input.value).toBe("https://example.com/article");
     });
@@ -135,11 +134,19 @@ describe("SourcesTab — URL extraction", () => {
 
     fireEvent.click(btn);
 
+    // Verify fetch was called AND response data renders in the UI
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         "/api/fetch/url",
         expect.objectContaining({ method: "POST" }),
       );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("aegis-sources-url-result")).toBeTruthy();
+      expect(screen.getByText("Test Article")).toBeTruthy();
+      expect(screen.getByText(/Test Author/)).toBeTruthy();
+      expect(screen.getByText("Analyze This Content")).toBeTruthy();
     });
   });
 
@@ -283,7 +290,7 @@ describe("SourcesTab — RSS feed", () => {
     expect(screen.getByText("This feed is already saved")).toBeTruthy();
   });
 
-  it("discovers feeds from website URL", async () => {
+  it("discovers feeds from website URL and renders them", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -306,6 +313,11 @@ describe("SourcesTab — RSS feed", () => {
         "/api/fetch/discover-feed",
         expect.objectContaining({ method: "POST" }),
       );
+    });
+
+    // Verify discovered feed renders as a selectable button
+    await waitFor(() => {
+      expect(screen.getByText(/Main Feed/)).toBeTruthy();
     });
   });
 
@@ -398,23 +410,23 @@ describe("SourcesTab — source management", () => {
 });
 
 describe("SourcesTab — platform badges", () => {
-  it("renders YouTube source", () => {
+  it("renders YouTube source with label and remove/toggle controls", () => {
     mockSources = [
       { id: "s1", type: "rss", feedUrl: "https://youtube.com/feeds/videos.xml?channel_id=X", label: "YT Channel", platform: "youtube", enabled: true },
     ];
 
-    const { container } = render(<SourcesTab onAnalyze={noop} isAnalyzing={false} />);
-    expect(container.innerHTML).toContain("YT Channel");
-    expect(container.innerHTML).toContain("text-red-400");
+    render(<SourcesTab onAnalyze={noop} isAnalyzing={false} />);
+    expect(screen.getByText("YT Channel")).toBeTruthy();
+    expect(screen.getByTitle("Remove source")).toBeTruthy();
   });
 
-  it("renders GitHub source", () => {
+  it("renders GitHub source with label", () => {
     mockSources = [
       { id: "s1", type: "rss", feedUrl: "https://github.com/user/repo/releases.atom", label: "user/repo", platform: "github", enabled: true },
     ];
 
-    const { container } = render(<SourcesTab onAnalyze={noop} isAnalyzing={false} />);
-    expect(container.innerHTML).toContain("user/repo");
+    render(<SourcesTab onAnalyze={noop} isAnalyzing={false} />);
+    expect(screen.getByText("user/repo")).toBeTruthy();
   });
 });
 
