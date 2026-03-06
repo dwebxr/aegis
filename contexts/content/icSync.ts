@@ -108,7 +108,7 @@ export function syncToIC(
   payload: unknown,
   setSyncStatus: (s: "idle" | "syncing" | "synced" | "offline") => void,
   setPendingActions: React.Dispatch<React.SetStateAction<number>>,
-  addNotification: (msg: string, type: string) => void,
+  addNotification: (msg: string, type: "error" | "info" | "success") => void,
 ) {
   void promise.catch(async (err: unknown) => {
     console.warn("[content] IC sync failed:", errMsg(err));
@@ -176,7 +176,7 @@ export async function loadFromICCanister(
   syncRetryRef: React.MutableRefObject<number>,
   syncRetryTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | undefined>,
   loadFromICRef: React.MutableRefObject<() => Promise<void>>,
-  addNotification: (msg: string, type: string) => void,
+  addNotification: (msg: string, type: "error" | "info" | "success") => void,
   backfillImageUrls: () => (() => void),
   backfillCleanupRef: React.MutableRefObject<(() => void) | null>,
 ) {
