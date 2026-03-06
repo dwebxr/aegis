@@ -180,6 +180,65 @@ describe("isHandshakeExpired — boundary conditions", () => {
   });
 });
 
+describe("parseD2AMessage — value bounds validation", () => {
+  const sk1 = new Uint8Array(32).fill(1);
+  const pk1 = getPublicKey(sk1);
+  const sk2 = new Uint8Array(32).fill(2);
+  const pk2 = getPublicKey(sk2);
+
+  function encrypt(msg: unknown) {
+    return encryptMessage(JSON.stringify(msg), sk1, pk2);
+  }
+
+  it("rejects offer with NaN score", () => {
+    const msg = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "ai", score: NaN, contentPreview: "x" } };
+    expect(parseD2AMessage(encrypt(msg), sk2, pk1)).toBeNull();
+  });
+
+  it("rejects offer with Infinity score", () => {
+    const msg = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "ai", score: Infinity, contentPreview: "x" } };
+    expect(parseD2AMessage(encrypt(msg), sk2, pk1)).toBeNull();
+  });
+
+  it("rejects offer with score > 10", () => {
+    const msg = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "ai", score: 11, contentPreview: "x" } };
+    expect(parseD2AMessage(encrypt(msg), sk2, pk1)).toBeNull();
+  });
+
+  it("rejects offer with negative score", () => {
+    const msg = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "ai", score: -1, contentPreview: "x" } };
+    expect(parseD2AMessage(encrypt(msg), sk2, pk1)).toBeNull();
+  });
+
+  it("rejects offer with empty topic", () => {
+    const msg = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "", score: 5, contentPreview: "x" } };
+    expect(parseD2AMessage(encrypt(msg), sk2, pk1)).toBeNull();
+  });
+
+  it("rejects offer with oversized contentPreview", () => {
+    const msg = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "ai", score: 5, contentPreview: "x".repeat(600) } };
+    expect(parseD2AMessage(encrypt(msg), sk2, pk1)).toBeNull();
+  });
+
+  it("rejects deliver with oversized text", () => {
+    const msg = { type: "deliver", fromPubkey: pk1, toPubkey: pk2, payload: { text: "x".repeat(6000), author: "A", verdict: "quality", topics: ["ai"] } };
+    expect(parseD2AMessage(encrypt(msg), sk2, pk1)).toBeNull();
+  });
+
+  it("rejects deliver with too many topics", () => {
+    const topics = Array.from({ length: 25 }, (_, i) => `topic-${i}`);
+    const msg = { type: "deliver", fromPubkey: pk1, toPubkey: pk2, payload: { text: "ok", author: "A", verdict: "quality", topics } };
+    expect(parseD2AMessage(encrypt(msg), sk2, pk1)).toBeNull();
+  });
+
+  it("accepts offer with score at boundary (0 and 10)", () => {
+    const msg0 = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "ai", score: 0, contentPreview: "x" } };
+    expect(parseD2AMessage(encrypt(msg0), sk2, pk1)).not.toBeNull();
+    const msg10 = { type: "offer", fromPubkey: pk1, toPubkey: pk2, payload: { topic: "ai", score: 10, contentPreview: "x" } };
+    expect(parseD2AMessage(encrypt(msg10), sk2, pk1)).not.toBeNull();
+  });
+});
+
 describe("parseD2AMessage — payload validation", () => {
   const sk1 = new Uint8Array(32).fill(1);
   const pk1 = getPublicKey(sk1);

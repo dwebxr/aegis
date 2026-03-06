@@ -57,7 +57,11 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     let cancelled = false;
 
     if (isAuthenticated && principalText && identity) {
-      const local = loadProfile(principalText);
+      const local = loadProfile(principalText, (reason) => {
+        window.dispatchEvent(new CustomEvent("aegis:notification", {
+          detail: { message: reason, type: "error" },
+        }));
+      });
       setProfile(local);
 
       loadPreferencesFromIC(identity, principalText).then((icProfile) => {

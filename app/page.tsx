@@ -100,6 +100,16 @@ function AegisAppInner() {
     initScoringCache().catch(err => console.warn("[page] Scoring cache init failed:", err));
   }, []);
 
+  // Listen for cross-context notification events (e.g. preference corruption)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { message, type } = (e as CustomEvent).detail;
+      addNotification(message, type);
+    };
+    window.addEventListener("aegis:notification", handler);
+    return () => window.removeEventListener("aegis:notification", handler);
+  }, [addNotification]);
+
   // Web Share Target + Deep Link → Sources tab with auto-Extract
   // Both paths capture the URL in state before replaceState clears searchParams,
   // then pass it to SourcesTab as initialUrl for auto-fill + Extract.

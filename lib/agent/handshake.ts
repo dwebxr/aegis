@@ -11,6 +11,10 @@ import {
   TAG_D2A_DELIVER,
   TAG_D2A_COMMENT,
   MAX_COMMENT_LENGTH,
+  MAX_PREVIEW_LENGTH,
+  MAX_DELIVER_TEXT_LENGTH,
+  MAX_TOPIC_LENGTH,
+  MAX_TOPICS_COUNT,
   HANDSHAKE_TIMEOUT_MS,
 } from "./protocol";
 
@@ -91,21 +95,23 @@ export async function sendComment(
 const VALID_D2A_TYPES = new Set<D2AMessage["type"]>(["offer", "accept", "reject", "deliver", "comment"]);
 
 function isValidOfferPayload(p: unknown): p is D2AOfferPayload {
-  return !!p && typeof p === "object" &&
-    typeof (p as D2AOfferPayload).topic === "string" &&
-    typeof (p as D2AOfferPayload).score === "number" &&
-    typeof (p as D2AOfferPayload).contentPreview === "string";
+  if (!p || typeof p !== "object") return false;
+  const o = p as D2AOfferPayload;
+  return typeof o.topic === "string" && o.topic.length > 0 && o.topic.length <= MAX_TOPIC_LENGTH &&
+    typeof o.score === "number" && Number.isFinite(o.score) && o.score >= 0 && o.score <= 10 &&
+    typeof o.contentPreview === "string" && o.contentPreview.length <= MAX_PREVIEW_LENGTH;
 }
 
 const VALID_VERDICTS = new Set(["quality", "slop"]);
 
 function isValidDeliverPayload(p: unknown): p is D2ADeliverPayload {
-  return !!p && typeof p === "object" &&
-    typeof (p as D2ADeliverPayload).text === "string" &&
-    typeof (p as D2ADeliverPayload).author === "string" &&
-    typeof (p as D2ADeliverPayload).verdict === "string" &&
-    VALID_VERDICTS.has((p as D2ADeliverPayload).verdict) &&
-    Array.isArray((p as D2ADeliverPayload).topics);
+  if (!p || typeof p !== "object") return false;
+  const d = p as D2ADeliverPayload;
+  return typeof d.text === "string" && d.text.length > 0 && d.text.length <= MAX_DELIVER_TEXT_LENGTH &&
+    typeof d.author === "string" && d.author.length > 0 && d.author.length <= 200 &&
+    typeof d.verdict === "string" && VALID_VERDICTS.has(d.verdict) &&
+    Array.isArray(d.topics) && d.topics.length <= MAX_TOPICS_COUNT &&
+    d.topics.every((t: unknown) => typeof t === "string" && t.length <= MAX_TOPIC_LENGTH);
 }
 
 function isValidCommentPayload(p: unknown): p is D2ACommentPayload {

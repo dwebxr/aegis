@@ -85,19 +85,26 @@ export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile
   return true;
 }
 
-export function loadProfile(principalId: string): UserPreferenceProfile {
+export function loadProfile(
+  principalId: string,
+  onCorrupted?: (reason: string) => void,
+): UserPreferenceProfile {
   if (typeof window === "undefined") return createEmptyProfile(principalId);
   try {
     const raw = localStorage.getItem(KEY_PREFIX + principalId);
     if (!raw) return createEmptyProfile(principalId);
     const parsed = JSON.parse(raw);
     if (!isValidProfile(parsed) || parsed.principalId !== principalId) {
-      console.warn("[prefs] Stored profile failed validation for", principalId.slice(0, 12), "— resetting to empty");
+      const reason = "Stored preferences failed validation — reset to defaults";
+      console.warn("[prefs]", reason, principalId.slice(0, 12));
+      onCorrupted?.(reason);
       return createEmptyProfile(principalId);
     }
     return parsed;
   } catch (err) {
-    console.warn("[prefs] Failed to load preference profile:", errMsg(err));
+    const reason = `Failed to load preferences: ${errMsg(err)}`;
+    console.warn("[prefs]", reason);
+    onCorrupted?.(reason);
     return createEmptyProfile(principalId);
   }
 }
