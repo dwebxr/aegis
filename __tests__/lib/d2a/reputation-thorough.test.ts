@@ -197,8 +197,8 @@ describe("calculateDynamicFee", () => {
     expect(calculateDynamicFee("unknown")).toBe(200_000);
   });
 
-  it("restricted → 0 (can't transact)", () => {
-    expect(calculateDynamicFee("restricted")).toBe(0);
+  it("restricted → Infinity (fail-secure, blocks transacting)", () => {
+    expect(calculateDynamicFee("restricted")).toBe(Infinity);
   });
 });
 

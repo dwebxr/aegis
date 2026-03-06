@@ -47,7 +47,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const sourcesRef = useRef(sources);
   sourcesRef.current = sources;
 
-  // Keep refs in sync with latest values to avoid stale closures
   const identityRef = useRef(identity);
   identityRef.current = identity;
   const isAuthRef = useRef(isAuthenticated);
@@ -140,7 +139,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           const icIds = new Set(icSources.map(s => s.id));
           const localById = new Map(prev.map(s => [s.id, s]));
           localOnly = prev.filter(s => !icIds.has(s.id));
-          // Backfill platform on IC sources: prefer local platform, then infer
           for (const ic of icSources) {
             if (!ic.platform) {
               ic.platform = localById.get(ic.id)?.platform || inferPlatform(ic) || undefined;
@@ -218,7 +216,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
 
   const removeSource = useCallback((id: string) => {
     if (isDemoMode) return;
-    // Reset error state so re-adding the same source starts fresh
     const toRemove = sourcesRef.current.find(s => s.id === id);
     if (toRemove) {
       const config: Record<string, string> = {};
@@ -263,7 +260,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       persist(next);
       return next;
     });
-    // Reset error state when re-enabling a source
     queueMicrotask(() => {
       if (toggled) {
         saveToIC(toggled);

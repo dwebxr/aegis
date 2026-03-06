@@ -29,8 +29,3 @@ export function extractYouTubeVideoId(url: string): string | null {
 
   return null;
 }
-
-/** Build a YouTube embed URL from a video ID. No autoplay. */
-export function youTubeEmbedUrl(videoId: string): string {
-  return `https://www.youtube.com/embed/${videoId}`;
-}

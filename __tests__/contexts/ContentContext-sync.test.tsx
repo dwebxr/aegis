@@ -125,6 +125,10 @@ async function renderAndSettle() {
 }
 
 describe("ContentContext — IC sync, cacheChecked, field mapping", () => {
+  const originalConsoleError = console.error;
+  const originalConsoleWarn = console.warn;
+  const originalConsoleInfo = console.info;
+
   beforeEach(() => {
     jest.useFakeTimers();
     mockGetUserEvaluations.mockReset();
@@ -145,6 +149,9 @@ describe("ContentContext — IC sync, cacheChecked, field mapping", () => {
     cleanup();
     jest.clearAllTimers();
     jest.useRealTimers();
+    console.error = originalConsoleError;
+    console.warn = originalConsoleWarn;
+    console.info = originalConsoleInfo;
   });
 
   it("cacheChecked becomes true after cache load completes", async () => {

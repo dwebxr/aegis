@@ -118,7 +118,6 @@ export class IngestionScheduler {
       state.rateLimitedUntil = 0;
       this.persistStates();
     } else {
-      // Also reset in localStorage for cases where scheduler hasn't loaded the key yet
       resetSourceErrors(key);
     }
   }
@@ -222,9 +221,8 @@ export class IngestionScheduler {
         const key = getSourceKey(source.type, source.config);
         const state = this.getOrCreateState(key);
 
-        // Auto-recover disabled sources after AUTO_RECOVERY_MS (6h)
         if (state.errorCount >= MAX_CONSECUTIVE_FAILURES && state.lastErrorAt > 0 && now - state.lastErrorAt >= AUTO_RECOVERY_MS) {
-          state.errorCount = MAX_CONSECUTIVE_FAILURES - 1; // allow one retry
+          state.errorCount = MAX_CONSECUTIVE_FAILURES - 1;
           state.nextFetchAt = 0;
           this.persistStates();
         }
@@ -238,7 +236,6 @@ export class IngestionScheduler {
 
         const passed = items.filter(raw => quickSlopFilter(raw.text));
 
-        // Deduplicate before scoring (saves Claude API calls)
         const unique = passed.filter(raw => !this.dedup.isDuplicate(raw.sourceUrl, raw.text));
 
         const enriched = await this.enrichItems(unique, source.type);
@@ -249,7 +246,6 @@ export class IngestionScheduler {
           const scored = this.callbacks.getSkipAI?.()
             ? scoreItemWithHeuristics(raw, source.type, source.platform)
             : await this.scoreItem(raw, userContext, source.type, source.platform);
-          // Always mark as seen to prevent infinite re-fetch on transient scoring failures
           this.dedup.markSeen(raw.sourceUrl, raw.text);
           if (scored) {
             scores.push(scored.scores.composite);
@@ -258,7 +254,6 @@ export class IngestionScheduler {
           }
         }
 
-        // Mark remaining passed items as seen (even if not scored) to avoid re-fetching
         for (const raw of unique.slice(MAX_ITEMS_PER_SOURCE)) {
           this.dedup.markSeen(raw.sourceUrl, raw.text);
         }

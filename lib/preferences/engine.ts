@@ -68,11 +68,9 @@ export function learn(profile: UserPreferenceProfile, event: LearnEvent): UserPr
     next.recentTopics.push({ topic, timestamp: now });
   }
   if (next.recentTopics.length > RECENT_TOPICS_MAX) {
-    // Entries are pushed chronologically — keep the tail (newest)
     next.recentTopics = next.recentTopics.slice(-RECENT_TOPICS_MAX);
   }
 
-  // Update activity histogram for time-of-day adaptive ranking
   const hour = new Date(now).getHours();
   if (!next.activityHistogram) {
     next.activityHistogram = { hourCounts: new Array(24).fill(0), lastActivityAt: 0, totalEvents: 0 };

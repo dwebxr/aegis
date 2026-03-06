@@ -5,6 +5,7 @@ import { ContentCard } from "@/components/ui/ContentCard";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { AgentProfileEditModal } from "@/components/ui/AgentProfileEditModal";
 import { PencilIcon } from "@/components/icons";
+import { relativeTime } from "@/lib/utils/scores";
 import { isD2AContent } from "@/lib/d2a/activity";
 import { computePeerStats, sortPeerStats } from "@/lib/d2a/peerStats";
 import type { PeerSortKey } from "@/lib/d2a/peerStats";
@@ -23,8 +24,7 @@ import { hashContent } from "@/lib/utils/hashing";
 import type { D2ACommentPayload } from "@/lib/agent/types";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { formatICP } from "@/lib/ic/icpLedger";
-import { handleICSessionError } from "@/lib/utils/errors";
-import { errMsg } from "@/lib/utils/errors";
+import { handleICSessionError, errMsg } from "@/lib/utils/errors";
 import { Principal } from "@dfinity/principal";
 import { npubEncode } from "nostr-tools/nip19";
 import { maskNpub } from "@/lib/nostr/linkAccount";
@@ -64,12 +64,14 @@ function truncPrincipal(p: Principal): string {
   return t.length > 16 ? t.slice(0, 8) + "..." + t.slice(-5) : t;
 }
 
-function relativeTime(ts: number): string {
-  const diff = Math.max(0, Date.now() - ts);
-  if (diff < 60_000) return "just now";
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}h ago`;
-  return `${Math.floor(diff / 86400_000)}d ago`;
+function formatNpub(pk: string | null | undefined, fallback: string): string {
+  if (!pk) return fallback;
+  try { return maskNpub(npubEncode(pk)); } catch { return fallback; }
+}
+
+function fullNpub(pk: string | null | undefined): string {
+  if (!pk) return "";
+  try { return npubEncode(pk); } catch { return ""; }
 }
 
 const LOG_ICONS: Record<string, { icon: string; colorClass: string }> = {
@@ -232,23 +234,19 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                 {/* npub + copy */}
                 <div className="flex items-center gap-2 relative mb-1">
                   <code className="font-mono text-caption text-purple-400 tracking-wide">
-                    {(() => { try { return maskNpub(npubEncode(agentState.myPubkey!)); } catch { return agentState.myPubkey?.slice(0, 12) + "\u2026"; } })()}
+                    {formatNpub(agentState.myPubkey, (agentState.myPubkey?.slice(0, 12) ?? "") + "\u2026")}
                   </code>
                   <button
                     onClick={() => {
-                      try {
-                        const fullNpub = npubEncode(agentState.myPubkey!);
-                        navigator.clipboard.writeText(fullNpub).then(() => {
-                          setNpubCopyState("copied");
-                          setTimeout(() => setNpubCopyState("idle"), 2000);
-                        }).catch(() => {
-                          setNpubCopyState("failed");
-                          setTimeout(() => setNpubCopyState("idle"), 2000);
-                        });
-                      } catch {
+                      const npub = fullNpub(agentState.myPubkey);
+                      if (!npub) { setNpubCopyState("failed"); setTimeout(() => setNpubCopyState("idle"), 2000); return; }
+                      navigator.clipboard.writeText(npub).then(() => {
+                        setNpubCopyState("copied");
+                        setTimeout(() => setNpubCopyState("idle"), 2000);
+                      }).catch(() => {
                         setNpubCopyState("failed");
                         setTimeout(() => setNpubCopyState("idle"), 2000);
-                      }
+                      });
                     }}
                     className={cn(
                       "bg-transparent border border-border rounded-sm px-1.5 py-px text-[10px] cursor-pointer transition-fast font-sans leading-snug",
@@ -261,7 +259,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                   </button>
                   {npubCopyState === "copied" && (
                     <div className="absolute top-full left-0 mt-1 bg-navy-lighter border border-border rounded-sm px-2 py-1 font-mono text-[10px] text-purple-400 whitespace-nowrap z-10 shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                      {(() => { try { return npubEncode(agentState.myPubkey!); } catch { return ""; } })()}
+                      {fullNpub(agentState.myPubkey)}
                     </div>
                   )}
                 </div>

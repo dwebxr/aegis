@@ -77,7 +77,7 @@ function parseEntries(parsed: unknown): Map<string, ScoringCacheEntry> {
 
 /** Initialize the scoring cache from IDB (preferred) or localStorage (fallback). */
 export async function initScoringCache(): Promise<void> {
-  if (_memCache) return; // already initialized
+  if (_memCache) return;
 
   if (isIDBAvailable()) {
     try {
@@ -109,7 +109,6 @@ export async function initScoringCache(): Promise<void> {
 
 function getCache(): Map<string, ScoringCacheEntry> {
   if (_memCache) return _memCache;
-  // Synchronous fallback for pre-init access
   if (typeof globalThis.localStorage !== "undefined") {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -170,7 +169,6 @@ export function storeScoringCache(key: string, profileHash: string, result: Anal
   const cache = getCache();
   cache.set(key, { result, storedAt: Date.now(), profileHash });
 
-  // Map preserves insertion order — FIFO prune oldest entries in O(excess)
   if (cache.size > MAX_ENTRIES) {
     const excess = cache.size - MAX_ENTRIES;
     const iter = cache.keys();

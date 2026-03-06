@@ -4,6 +4,7 @@ import { idlFactory } from "@/lib/ic/declarations/idlFactory";
 import { getCanisterId, getHost } from "@/lib/ic/agent";
 import type { _SERVICE } from "@/lib/ic/declarations/aegis_backend.did";
 import type { D2ABriefingResponse } from "./types";
+import { withTimeout } from "@/lib/utils/timeout";
 
 export async function getLatestBriefing(principalText?: string): Promise<D2ABriefingResponse | null> {
   if (!principalText) return null;
@@ -11,7 +12,7 @@ export async function getLatestBriefing(principalText?: string): Promise<D2ABrie
   const agent = await HttpAgent.create({ host: getHost() });
   const actor = Actor.createActor<_SERVICE>(idlFactory, { agent, canisterId: getCanisterId() });
   const p = Principal.fromText(principalText);
-  const result = await actor.getLatestBriefing(p);
+  const result = await withTimeout(actor.getLatestBriefing(p), 15_000, "getLatestBriefing");
 
   if (result.length === 0) return null;
   try {
@@ -69,7 +70,7 @@ export async function getGlobalBriefingSummaries(
   const agent = await HttpAgent.create({ host: getHost() });
   const actor = Actor.createActor<_SERVICE>(idlFactory, { agent, canisterId: getCanisterId() });
 
-  const result = await actor.getGlobalBriefingSummaries(BigInt(offset), BigInt(limit));
+  const result = await withTimeout(actor.getGlobalBriefingSummaries(BigInt(offset), BigInt(limit)), 20_000, "getGlobalBriefingSummaries");
 
   if (result.items.length === 0 && Number(result.total) === 0) return null;
 

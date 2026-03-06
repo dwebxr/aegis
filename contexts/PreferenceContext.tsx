@@ -49,7 +49,6 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const icSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Refs for async callbacks (avoid stale closures)
   const identityRef = useRef(identity);
   identityRef.current = identity;
   const isAuthRef = useRef(isAuthenticated);
@@ -65,7 +64,6 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
       loadPreferencesFromIC(identity, principalText).then((icProfile) => {
         if (cancelled) return;
         if (!icProfile) {
-          // No IC data yet: push local to IC as initial backup (if non-empty)
           const hasData = local.totalValidated > 0 || local.totalFlagged > 0
             || Object.keys(local.topicAffinities).length > 0;
           if (hasData) void syncPreferencesToIC(identity, local).catch(err => {
@@ -77,7 +75,6 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
         setProfile(merged);
         saveProfile(merged);
 
-        // If local was newer, push to IC
         if (merged.lastUpdated > icProfile.lastUpdated) {
           void syncPreferencesToIC(identity, merged).catch(err => {
             console.warn("[prefs] IC merge sync failed:", errMsg(err));
@@ -92,8 +89,6 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
 
     return () => {
       cancelled = true;
-      // Flush pending debounced IC sync before auth state changes.
-      // `identity` is captured from this closure (valid when effect was created).
       if (icSyncTimeoutRef.current && identity) {
         clearTimeout(icSyncTimeoutRef.current);
         icSyncTimeoutRef.current = null;
@@ -150,14 +145,20 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   const profileRef = useRef(profile);
   profileRef.current = profile;
 
+  /** Clone current profile, apply mutation, stamp lastUpdated, persist & sync. */
+  const updateProfile = useCallback((mutate: (p: UserPreferenceProfile) => void) => {
+    const next = structuredClone(profileRef.current);
+    mutate(next);
+    next.lastUpdated = Date.now();
+    setProfile(next);
+    debouncedSave(next);
+    debouncedICSync(next);
+  }, [debouncedSave, debouncedICSync]);
+
   const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => {
     let next = learn(profileRef.current, { action: "validate", topics, author, composite, verdict });
-    // Auto-remove validated item from bookmarks
     if (itemId && next.bookmarkedIds?.includes(itemId)) {
-      next = {
-        ...next,
-        bookmarkedIds: next.bookmarkedIds.filter(bid => bid !== itemId),
-      };
+      next = { ...next, bookmarkedIds: next.bookmarkedIds.filter(bid => bid !== itemId) };
     }
     setProfile(next);
     debouncedSave(next);
@@ -167,12 +168,8 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
 
   const onFlag = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", itemId?: string) => {
     let next = learn(profileRef.current, { action: "flag", topics, author, composite, verdict });
-    // Auto-remove flagged item from bookmarks
     if (itemId && next.bookmarkedIds?.includes(itemId)) {
-      next = {
-        ...next,
-        bookmarkedIds: next.bookmarkedIds.filter(bid => bid !== itemId),
-      };
+      next = { ...next, bookmarkedIds: next.bookmarkedIds.filter(bid => bid !== itemId) };
     }
     setProfile(next);
     debouncedSave(next);
@@ -180,84 +177,44 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   }, [debouncedSave, debouncedICSync]);
 
   const setTopicAffinity = useCallback((topic: string, value: number) => {
-    const next = structuredClone(profileRef.current);
-    next.topicAffinities[topic] = clamp(value, TOPIC_AFFINITY_FLOOR, TOPIC_AFFINITY_CAP);
-    next.lastUpdated = Date.now();
-    setProfile(next);
-    debouncedSave(next);
-    debouncedICSync(next);
-  }, [debouncedSave, debouncedICSync]);
+    updateProfile(p => { p.topicAffinities[topic] = clamp(value, TOPIC_AFFINITY_FLOOR, TOPIC_AFFINITY_CAP); });
+  }, [updateProfile]);
 
   const removeTopicAffinity = useCallback((topic: string) => {
-    const next = structuredClone(profileRef.current);
-    delete next.topicAffinities[topic];
-    next.lastUpdated = Date.now();
-    setProfile(next);
-    debouncedSave(next);
-    debouncedICSync(next);
-  }, [debouncedSave, debouncedICSync]);
+    updateProfile(p => { delete p.topicAffinities[topic]; });
+  }, [updateProfile]);
 
   const setQualityThreshold = useCallback((value: number) => {
-    const next = structuredClone(profileRef.current);
-    next.calibration.qualityThreshold = clamp(value, 1, 9);
-    next.lastUpdated = Date.now();
-    setProfile(next);
-    debouncedSave(next);
-    debouncedICSync(next);
-  }, [debouncedSave, debouncedICSync]);
+    updateProfile(p => { p.calibration.qualityThreshold = clamp(value, 1, 9); });
+  }, [updateProfile]);
 
   const addFilterRule = useCallback((rule: Omit<CustomFilterRule, "id" | "createdAt">) => {
-    const next = structuredClone(profileRef.current);
-    const newRule: CustomFilterRule = {
-      ...rule,
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      createdAt: Date.now(),
-    };
-    next.customFilterRules = [...(next.customFilterRules ?? []), newRule];
-    next.lastUpdated = Date.now();
-    setProfile(next);
-    debouncedSave(next);
-    debouncedICSync(next);
-  }, [debouncedSave, debouncedICSync]);
+    updateProfile(p => {
+      p.customFilterRules = [...(p.customFilterRules ?? []), {
+        ...rule,
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        createdAt: Date.now(),
+      }];
+    });
+  }, [updateProfile]);
 
   const removeFilterRule = useCallback((ruleId: string) => {
-    const next = structuredClone(profileRef.current);
-    next.customFilterRules = (next.customFilterRules ?? []).filter(r => r.id !== ruleId);
-    next.lastUpdated = Date.now();
-    setProfile(next);
-    debouncedSave(next);
-    debouncedICSync(next);
-  }, [debouncedSave, debouncedICSync]);
+    updateProfile(p => { p.customFilterRules = (p.customFilterRules ?? []).filter(r => r.id !== ruleId); });
+  }, [updateProfile]);
 
   const bookmarkItem = useCallback((id: string) => {
-    const next = structuredClone(profileRef.current);
-    const existing = next.bookmarkedIds ?? [];
-    if (!existing.includes(id)) {
-      next.bookmarkedIds = [...existing, id];
-      next.lastUpdated = Date.now();
-      setProfile(next);
-      debouncedSave(next);
-      debouncedICSync(next);
-    }
-  }, [debouncedSave, debouncedICSync]);
+    const existing = profileRef.current.bookmarkedIds ?? [];
+    if (existing.includes(id)) return;
+    updateProfile(p => { p.bookmarkedIds = [...(p.bookmarkedIds ?? []), id]; });
+  }, [updateProfile]);
 
   const unbookmarkItem = useCallback((id: string) => {
-    const next = structuredClone(profileRef.current);
-    next.bookmarkedIds = (next.bookmarkedIds ?? []).filter(bid => bid !== id);
-    next.lastUpdated = Date.now();
-    setProfile(next);
-    debouncedSave(next);
-    debouncedICSync(next);
-  }, [debouncedSave, debouncedICSync]);
+    updateProfile(p => { p.bookmarkedIds = (p.bookmarkedIds ?? []).filter(bid => bid !== id); });
+  }, [updateProfile]);
 
   const setNotificationPrefs = useCallback((prefs: NotificationPrefs) => {
-    const next = structuredClone(profileRef.current);
-    next.notificationPrefs = prefs;
-    next.lastUpdated = Date.now();
-    setProfile(next);
-    debouncedSave(next);
-    debouncedICSync(next);
-  }, [debouncedSave, debouncedICSync]);
+    updateProfile(p => { p.notificationPrefs = prefs; });
+  }, [updateProfile]);
 
   const isPersonalized = useMemo(() => hasEnoughData(profile), [profile]);
   const userContext = useMemo(() => isPersonalized ? getContext(profile) : null, [profile, isPersonalized]);

@@ -19,7 +19,6 @@ export function adaptiveHalfLife(
   const hoursSinceLastActivity = (now - histogram.lastActivityAt) / 3600000;
 
   if (hoursSinceLastActivity >= GAP_THRESHOLD_HOURS) {
-    // Longer gap → longer half-life (max 24h)
     const gapFactor = Math.min(hoursSinceLastActivity / 8, 1);
     return RECENCY_HALF_LIFE_HOURS + (HALF_LIFE_CATCHUP - RECENCY_HALF_LIFE_HOURS) * gapFactor;
   }
@@ -57,7 +56,6 @@ function briefingScore(item: ContentItem, prefs: UserPreferenceProfile, now?: nu
   }, 0) || 0;
 
   const ageHours = (currentTime - item.createdAt) / 3600000;
-  // Adaptive half-life: longer when user returns after a gap (catchup mode)
   const halfLife = adaptiveHalfLife(prefs.activityHistogram, currentTime);
   const decayRate = Math.LN2 / halfLife;
   const recencyFactor = Math.exp(-decayRate * ageHours);
@@ -70,10 +68,8 @@ function serendipityScore(item: ContentItem, prefs: UserPreferenceProfile): numb
   const vSignal = item.vSignal ?? item.scores.composite;
   const cContext = item.cContext ?? 5;
 
-  // Novelty: topics user has NOT seen or has low affinity for
   const topicNovelty = item.topics?.reduce((sum, t) => {
     const affinity = prefs.topicAffinities[t] ?? 0;
-    // Lower affinity = more novel for this user
     return sum + Math.max(0, 0.5 - affinity);
   }, 0) || 0;
 

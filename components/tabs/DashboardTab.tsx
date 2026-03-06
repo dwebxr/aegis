@@ -7,7 +7,7 @@ import { ContentCard, deriveScoreTags } from "@/components/ui/ContentCard";
 import { colors, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { exportContentCSV, exportContentJSON } from "@/lib/utils/export";
-import { extractYouTubeVideoId, youTubeEmbedUrl } from "@/lib/utils/youtube";
+import { extractYouTubeVideoId } from "@/lib/utils/youtube";
 import { useFilterMode } from "@/contexts/FilterModeContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { getContext, hasEnoughData } from "@/lib/preferences/engine";
@@ -71,7 +71,7 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
     >
       {ytVideoId ? (
         <iframe
-          src={youTubeEmbedUrl(ytVideoId)}
+          src={`https://www.youtube.com/embed/${ytVideoId}`}
           title={item.text?.slice(0, 60) || "YouTube video"}
           className="w-full h-full border-none block"
           loading="lazy"
@@ -447,7 +447,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     }
   }, [bookmarkItem, unbookmarkItem]);
 
-  const cardProps = { failedImages, markImgFailed, bookmarkSet, onBookmark: handleBookmark, onValidate: handleValidateWithFeedback, onFlag: handleFlagWithFeedback };
+  const cardProps = useMemo(() => ({ failedImages, markImgFailed, bookmarkSet, onBookmark: handleBookmark, onValidate: handleValidateWithFeedback, onFlag: handleFlagWithFeedback }), [failedImages, markImgFailed, bookmarkSet, handleBookmark, handleValidateWithFeedback, handleFlagWithFeedback]);
 
   const handleToggle = useCallback((id: string) => {
     setExpanded(prev => prev === id ? null : id);

@@ -9,43 +9,35 @@
 
 ## Latest Updates (March 2026)
 
-### Production Readiness Audit
-- **API error sanitization**: All 16 API routes now return generic error messages to clients — no internal error details, status codes, or stack traces leaked
-- **Validate/flag mutual exclusivity**: Flagging a validated item clears validated (and vice versa) — eliminates impossible `validated=true, flagged=true` state
-- **qualityRate fix**: Peer stats use unique-judged count instead of sum of validated+flagged (which double-counted items in edge cases)
-- **clusterByStory O(n²) cap**: Pairwise clustering capped at 150 items with pre-computed word sets — overflow items become singletons
-- **Single-pass optimizations**: `peerStats` aggregation, `getContext` topic iteration, `cleanupStaleHandshakes`/`cleanupStalePeers` in agent manager
-- **Exhaustive switch**: `generateDiscoveryReason` now fails at compile time if a new discovery type is added without a case
-- **Code cleanup**: Removed redundant conditions, dead variables, over-engineered stubs, unnecessary abstractions
+### Production Readiness & Code Quality Audit
+- **4718 tests, 272 suites** — zero failures, zero skipped, zero tautologies
+- **LARP audit**: Eliminated test tautologies (`expect(true).toBe(true)`), conditional assertions, and mock-self patterns; all tests now assert real behavior
+- **Fail-secure design**: `calculateDynamicFee("restricted")` returns `Infinity` (was `0` — fail-open); callers pre-filter restricted tier as defense-in-depth
+- **Verdict validation**: D2A deliver payloads validate verdict is exactly `"quality"` or `"slop"` via Set; `parseResponse` warns on unexpected LLM verdict values
+- **IC call timeout protection**: All IC canister calls wrapped with `withTimeout()` (15–20s) — prevents indefinite hangs on slow/unreachable canisters
+- **Honest error notifications**: IC sync failures surface to user ("Saved locally — will sync when online" / "Failed to save — changes may be lost"); briefing sync failures notify user
+- **Dead code removal**: Removed redundant comments (94.7% reduction), unused wrapper functions, over-engineered abstractions; preserved algorithm-intent comments (Jaccard, NIP-44, decay factor)
+- **Tailwind CSS v4 + shadcn/ui migration**: 1341 inline styles reduced to 71 (94.7% reduction)
+- **Tab error boundaries**: All 7 tabs wrapped in `TabErrorBoundary` with Sentry capture + retry
+- **API error sanitization**: All 16 API routes return generic error messages — no internal details leaked
+- **Validate/flag mutual exclusivity**: Flagging a validated item clears validated (and vice versa)
+- **clusterByStory O(n²) cap**: Pairwise clustering capped at 150 items with pre-computed word sets
+- **Single-pass optimizations**: `peerStats`, `getContext`, `cleanupStaleHandshakes`/`cleanupStalePeers`
 
 ### Dashboard → Analytics UX Restructuring
 - **Action vs Observation separation**: Dashboard is now action-oriented (7 sections), Analytics is observation-oriented (9 sections)
-- **Activity Trends** moved from Dashboard to Analytics (default range: 7 days) — topic affinity buttons removed (Analytics is observation-only)
+- **Activity Trends** moved from Dashboard to Analytics (default range: 7 days)
 - **Topic Breakdown** moved from Dashboard to Analytics — distribution bars with trend arrows and weekly sparklines
-- **Evaluation Summary** removed from Analytics (duplicated KPI Cards)
-- **Session Activity** merged into D2A Agent card — unified 8-metric grid (Peers/Handshakes/Sent/Received/Validated/Flagged/D2A Received/Fee Matches)
+- **Session Activity** merged into D2A Agent card — unified 8-metric grid
 - **D2ANetworkMini** added inside D2A Agent card in Analytics
-- **"Your Agent" personality card**: Merged "Your Agent Knows" + "Agent Settings" into single card between Topic Spotlight and Discoveries
-
-### Code Quality Audit
-- `validateContentItems` hardened: validates 8 required fields (was only checking `id` + `createdAt` — corrupt cache could crash downstream score reads)
-- `parseScoreResponse` now warns when LLM omits composite score and fallback formula is used
-- All silent `catch {}` blocks replaced with diagnostic logging (`console.warn` with context prefix)
-- `console.debug` upgraded to `console.warn` in 15 error-recovery paths (debug is suppressed in production)
-- Zero TypeScript errors, zero ESLint warnings, zero skipped tests
+- **"Your Agent" personality card**: Merged "Your Agent Knows" + "Agent Settings" into single card
 
 ### Dashboard Performance Optimization
-- **Feed-mode computation guard**: Dashboard-only calculations (Top3, Topic Spotlight, Activity, Trends) are fully skipped in Feed mode — zero wasted work
-- **Story clustering 15x speedup**: `clusterByStory` uses sorted early-break instead of full O(n²) pair comparison
-- **Single-pass algorithms**: `computeDashboardActivity` and `computeTopicTrends` reduced from O(kn) multi-pass to O(n) single-pass bucketing
-- **Reactive dashboard**: `content.length` dependency ensures Top3/Spotlight/Sections update when new content arrives via scheduler
+- **Feed-mode computation guard**: Dashboard-only calculations fully skipped in Feed mode — zero wasted work
+- **Story clustering 15x speedup**: `clusterByStory` uses sorted early-break instead of full O(n²)
+- **Single-pass algorithms**: `computeDashboardActivity` and `computeTopicTrends` reduced from O(kn) to O(n)
+- **Reactive dashboard**: `content.length` dependency ensures sections update when new content arrives
 - **Fresh recency scoring**: Briefing time uses live `Date.now()` instead of stale mount-time ref
-
-### Error Handling & Production Hardening
-- All 16 API routes have structured error logging with `[prefix]` namespacing
-- `discover-feed` probe errors now logged at debug level (previously swallowed silently)
-- `briefing/digest` Anthropic failures now logged with route context
-- CVE mitigations verified: no `remotePatterns` configured, no `"use server"` directives
 
 ## Live
 
@@ -812,7 +804,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Next.js 14 (App Router), React 18, TypeScript |
-| Styling | CSS-in-JS (inline styles), dark theme |
+| Styling | Tailwind CSS v4 + shadcn/ui, dark theme |
 | Backend API | Next.js API Routes (Vercel Serverless) |
 | AI (Free) | IC LLM Canister — Llama 3.1 8B (on-chain, mo:llm 2.1.0) |
 | AI (Premium) | Anthropic Claude (claude-sonnet-4-20250514) + BYOK + fallback heuristics |
@@ -827,7 +819,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (4609 unit/integration tests, 265 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
+| Test | Jest + ts-jest (4718 unit/integration tests, 272 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
 
 ## Project Structure
 
@@ -971,7 +963,7 @@ aegis/
 │       ├── export.ts                    # Content export (CSV/JSON with period + type scope filtering)
 │       ├── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
 │       ├── math.ts                      # Shared clamp() utility
-│       ├── youtube.ts                   # YouTube video ID extraction + embed URL builder
+│       ├── youtube.ts                   # YouTube video ID extraction from URL patterns
 │       └── statusEmitter.ts            # Generic status emitter factory (used by Ollama/WebLLM engines)
 │   ├── offline/
 │   │   └── actionQueue.ts              # IndexedDB-backed queue for IC operations during offline
@@ -987,7 +979,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 4609 Jest tests across 265 suites
+├── __tests__/                           # 4718 Jest tests across 272 suites
 ├── e2e/                                 # Playwright E2E tests (299 tests, 12 specs)
 ├── canisters/
 │   └── aegis_backend/
@@ -1024,7 +1016,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Jest unit + integration tests (4609 tests)
+npm test              # Jest unit + integration tests (4718 tests)
 npm run test:watch    # Watch mode
 npx playwright test   # E2E tests — requires dev server (npm run dev)
 ```

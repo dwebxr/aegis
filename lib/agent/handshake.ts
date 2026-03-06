@@ -96,11 +96,14 @@ function isValidOfferPayload(p: unknown): p is D2AOfferPayload {
     typeof (p as D2AOfferPayload).contentPreview === "string";
 }
 
+const VALID_VERDICTS = new Set(["quality", "slop"]);
+
 function isValidDeliverPayload(p: unknown): p is D2ADeliverPayload {
   return !!p && typeof p === "object" &&
     typeof (p as D2ADeliverPayload).text === "string" &&
     typeof (p as D2ADeliverPayload).author === "string" &&
     typeof (p as D2ADeliverPayload).verdict === "string" &&
+    VALID_VERDICTS.has((p as D2ADeliverPayload).verdict) &&
     Array.isArray((p as D2ADeliverPayload).topics);
 }
 

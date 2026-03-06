@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
 
 export type ThemeMode = "dark" | "light";
 
@@ -25,11 +25,12 @@ const ThemeContext = createContext<ThemeState>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeRaw] = useState<ThemeMode>(loadPersistedTheme);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+  const [theme, setThemeRaw] = useState<ThemeMode>(() => {
+    const t = loadPersistedTheme();
+    // Set DOM attribute on initial load (SSR-safe: runs only on client)
+    if (typeof document !== "undefined") document.documentElement.setAttribute("data-theme", t);
+    return t;
+  });
 
   const setTheme = useCallback((mode: ThemeMode) => {
     setThemeRaw(mode);

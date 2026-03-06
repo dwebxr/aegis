@@ -1,4 +1,4 @@
-import { extractYouTubeVideoId, youTubeEmbedUrl } from "@/lib/utils/youtube";
+import { extractYouTubeVideoId } from "@/lib/utils/youtube";
 
 describe("extractYouTubeVideoId", () => {
   // ─── Standard URL patterns ───
@@ -132,12 +132,3 @@ describe("extractYouTubeVideoId", () => {
   });
 });
 
-describe("youTubeEmbedUrl", () => {
-  it("builds correct embed URL from video ID", () => {
-    expect(youTubeEmbedUrl("dQw4w9WgXcQ")).toBe("https://www.youtube.com/embed/dQw4w9WgXcQ");
-  });
-
-  it("builds embed URL with hyphens and underscores in ID", () => {
-    expect(youTubeEmbedUrl("a-b_c-d_e-f")).toBe("https://www.youtube.com/embed/a-b_c-d_e-f");
-  });
-});

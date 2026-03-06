@@ -118,6 +118,14 @@ async function loadCachedContentAsync(): Promise<ContentItem[]> {
   }
 }
 
+/** Check whether `item` is a duplicate of any item in `existing`. */
+function isDuplicateItem(item: ContentItem, existing: ContentItem[]): boolean {
+  return existing.some(c =>
+    (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
+    (!item.sourceUrl && c.text === item.text),
+  );
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let useIDB = false;
 
@@ -157,7 +165,6 @@ function truncatePreservingActioned(items: ContentItem[]): ContentItem[] {
   const unactionedBudget = Math.max(0, MAX_CACHED_ITEMS - actioned.length);
   const trimmedUnactioned = unactioned.slice(0, unactionedBudget);
 
-  // Preserve original order (newest-first)
   const preservedIds = new Set([
     ...actioned.map(c => c.id),
     ...trimmedUnactioned.map(c => c.id),
@@ -268,8 +275,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const actorRef = useRef<_SERVICE | null>(null);
   const contentRef = useRef(content);
   contentRef.current = content;
-  // Stubs replaced by real implementations synchronously during render (lines ~379, ~828),
-  // before any effect `.then()` can fire. The stubs are never actually called.
   const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const drainQueueRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const syncRetryRef = useRef(0);
@@ -300,10 +305,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       try {
         await enqueueAction(actionType, payload);
         setPendingActions(p => p + 1);
+        addNotification("Saved locally \u2014 will sync when online", "info");
       } catch (qErr) {
         console.error("[content] Failed to enqueue offline action:", errMsg(qErr));
+        addNotification("Failed to save \u2014 changes may be lost", "error");
       }
-      addNotification("Saved locally \u2014 will sync when online", "error");
     });
   }
 
@@ -312,10 +318,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (isAuthenticated && identity) {
       createBackendActorAsync(identity)
         .then(actor => {
-          if (stale) return; // identity changed during async creation
+          if (stale) return;
           actorRef.current = actor;
           setSyncStatus("idle");
-          // Actor is now ready — auto-load IC data + drain offline queue
           loadFromICRef.current().catch((err: unknown) => {
             console.warn("[content] Auto-loadFromIC after actor creation failed:", errMsg(err));
           });
@@ -324,7 +329,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           });
         })
         .catch((err: unknown) => {
-          if (stale) return; // identity changed — ignore stale error
+          if (stale) return;
           console.error("[content] Failed to create IC actor:", errMsg(err));
           actorRef.current = null;
           setSyncStatus("offline");
@@ -416,7 +421,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     const onVisible = () => {
       if (!document.hidden) {
         updateTimestamps();
-        // Re-trigger backfill for items still missing thumbnails
         backfillCleanupRef.current?.();
         backfillCleanupRef.current = backfillFnRef.current();
       }
@@ -569,7 +573,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const validateItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
     if (!item || item.validated) return;
-    // Clear flagged — validate and flag are mutually exclusive (user changed their mind)
     setContent(prev => prev.map(c => c.id === id ? { ...c, validated: true, flagged: false, validatedAt: c.validatedAt ?? Date.now() } : c));
     preferenceCallbacks?.onValidate?.(item.topics || [], item.author, item.scores.composite, item.verdict, item.sourceUrl, id);
     if (item.source === "nostr" && item.nostrPubkey) recordUseful(item.nostrPubkey);
@@ -582,7 +585,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const flagItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
     if (!item || item.flagged) return;
-    // Clear validated — validate and flag are mutually exclusive (user changed their mind)
     setContent(prev => prev.map(c => c.id === id ? { ...c, flagged: true, validated: false } : c));
     preferenceCallbacks?.onFlag?.(item.topics || [], item.author, item.scores.composite, item.verdict, id);
     if (item.source === "nostr" && item.nostrPubkey) recordSlop(item.nostrPubkey);
@@ -598,15 +600,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       : item;
 
     setContent(prev => {
-      // Dedup check inside updater so `prev` is always the latest state
-      // (contentRef.current can be stale when multiple addContent calls are batched)
-      const isDuplicate = prev.some(c =>
-        (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
-        (!item.sourceUrl && c.text === item.text),
-      );
-      if (isDuplicate) return prev;
+      if (isDuplicateItem(item, prev)) return prev;
 
-      // IC save (fire-and-forget) — safe to call inside updater
       if (actorRef.current && isAuthenticated && principal) {
         syncToIC(actorRef.current.saveEvaluation(toICEvaluation(owned, principal)), "saveEvaluation", { itemId: owned.id });
       }
@@ -620,37 +615,21 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       ? { ...item, owner: principal.toText() }
       : item;
 
-    // IC save immediately (don't wait for flush)
     if (actorRef.current && isAuthenticated && principal) {
       syncToIC(actorRef.current.saveEvaluation(toICEvaluation(owned, principal)), "saveEvaluation", { itemId: owned.id });
     }
 
-    // Fast dedup against visible content + pending buffer.
-    // contentRef.current may be stale during React batches, but the setState
-    // updater in auto-flush / flushPendingItems re-checks against fresh `prev`,
-    // so duplicates that slip past here are caught before rendering.
-    const isDup = contentRef.current.some(c =>
-      (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
-      (!item.sourceUrl && c.text === item.text),
-    ) || pendingItemsRef.current.some(c =>
-      (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
-      (!item.sourceUrl && c.text === item.text),
-    );
-    if (isDup) return;
+    if (isDuplicateItem(item, contentRef.current) || isDuplicateItem(item, pendingItemsRef.current)) return;
 
     pendingItemsRef.current.push(owned);
     setPendingCount(pendingItemsRef.current.length);
 
-    // Auto-flush at MAX_PENDING_BUFFER
     if (pendingItemsRef.current.length >= MAX_PENDING_BUFFER) {
       const items = pendingItemsRef.current;
       pendingItemsRef.current = [];
       setPendingCount(0);
       setContent(prev => {
-        const fresh = items.filter(item => !prev.some(c =>
-          (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
-          (!item.sourceUrl && c.text === item.text),
-        ));
+        const fresh = items.filter(item => !isDuplicateItem(item, prev));
         return truncatePreservingActioned([...fresh, ...prev]);
       });
     }
@@ -662,10 +641,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     pendingItemsRef.current = [];
     setPendingCount(0);
     setContent(prev => {
-      const fresh = items.filter(item => !prev.some(c =>
-        (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
-        (!item.sourceUrl && c.text === item.text),
-      ));
+      const fresh = items.filter(item => !isDuplicateItem(item, prev));
       return truncatePreservingActioned([...fresh, ...prev]);
     });
   }, []);
@@ -678,7 +654,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       .slice(0, 30);
     if (items.length === 0) return () => {};
 
-    // Stagger requests to avoid rate limiting; return cleanup function
     const timers: ReturnType<typeof setTimeout>[] = [];
     items.forEach((item, i) => {
       timers.push(setTimeout(async () => {
@@ -700,6 +675,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
             if (updated && principal) {
               void actorRef.current.saveEvaluation(toICEvaluation({ ...updated, imageUrl: data.imageUrl }, principal)).catch((err: unknown) => {
                 console.warn("[content] IC imageUrl backfill save failed:", errMsg(err));
+                setSyncStatus("offline");
               });
             }
           }
@@ -784,7 +760,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           `IC pagination timeout (page ${pageNum})`,
         );
 
-        // Progressive display: merge each page immediately so users see content as it arrives
         const pageItems = page.map(evalToContentItem);
         if (pageItems.length > 0) mergePageIntoContent(pageItems);
 
@@ -798,7 +773,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       syncRetryRef.current = 0;
       setSyncStatus("synced");
 
-      // Backfill missing imageUrls from OG tags (max 10, fire-and-forget)
       backfillCleanupRef.current?.();
       backfillCleanupRef.current = backfillImageUrls();
     } catch (err) {
@@ -808,7 +782,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       }
       console.error("[content] Failed to load from IC:", errMsg(err));
 
-      // Auto-retry once after 3s for transient network errors
       if (syncRetryRef.current < 1) {
         syncRetryRef.current++;
         console.info("[content] Retrying IC sync in 3s...");
@@ -836,8 +809,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     void syncBriefingToCanister(actorRef.current, state, nostrPubkey ?? null).catch((err: unknown) => {
       console.warn("[content] Briefing sync to IC failed:", errMsg(err));
       setSyncStatus("offline");
+      addNotification("Briefing sync failed — will retry on next cycle", "error");
     });
-  }, [isAuthenticated]);
+  }, [isAuthenticated, addNotification]);
 
   const value = useMemo(() => ({
     content, isAnalyzing, syncStatus, cacheChecked, pendingActions, isOnline, pendingCount,

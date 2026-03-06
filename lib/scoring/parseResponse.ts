@@ -42,7 +42,11 @@ export function parseScoreResponse(raw: string): ScoreParseResult | null {
     }
     const composite = clamp(rawComposite, 0, 10);
 
-    const verdict: "quality" | "slop" = parsed.verdict === "quality" ? "quality" : "slop";
+    const rawVerdict = parsed.verdict;
+    if (rawVerdict !== "quality" && rawVerdict !== "slop") {
+      console.warn("[parseResponse] Unexpected verdict from LLM:", JSON.stringify(rawVerdict), "— defaulting to slop");
+    }
+    const verdict: "quality" | "slop" = rawVerdict === "quality" ? "quality" : "slop";
     const reason = typeof parsed.reason === "string" ? parsed.reason.slice(0, 500) : "";
     const topics = Array.isArray(parsed.topics)
       ? parsed.topics.filter((t: unknown) => typeof t === "string").slice(0, 10)

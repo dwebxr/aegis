@@ -40,21 +40,25 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
   const activity = useMemo(() => computeDashboardActivity(content, activityRange), [content, activityRange]);
   const topicDist = useMemo(() => computeTopicDistribution(content), [content]);
   const topicTrends = useMemo(() => computeTopicTrends(content), [content]);
+  const trendsMap = useMemo(() => new Map(topicTrends.map(t => [t.topic, t])), [topicTrends]);
 
-  let qualCount = 0, validatedCount = 0, flaggedCount = 0, falsePositives = 0;
-  const sourceDistribution: Record<string, number> = {};
-  const engineDistribution: Record<string, number> = {};
-  const scoreBuckets = Array(10).fill(0);
-  for (const c of content) {
-    if (c.verdict === "quality") qualCount++;
-    if (c.validated) validatedCount++;
-    if (c.flagged) flaggedCount++;
-    if (c.verdict === "quality" && c.flagged) falsePositives++;
-    sourceDistribution[c.source] = (sourceDistribution[c.source] || 0) + 1;
-    const eng = c.scoringEngine || (c.scoredByAI ? "claude-server" : "heuristic");
-    engineDistribution[eng] = (engineDistribution[eng] || 0) + 1;
-    scoreBuckets[Math.max(0, Math.min(9, Math.floor(c.scores.composite)))]++;
-  }
+  const { qualCount, validatedCount, flaggedCount, falsePositives, sourceDistribution, engineDistribution, scoreBuckets } = useMemo(() => {
+    let qual = 0, validated = 0, flagged = 0, fp = 0;
+    const srcDist: Record<string, number> = {};
+    const engDist: Record<string, number> = {};
+    const buckets = Array(10).fill(0) as number[];
+    for (const c of content) {
+      if (c.verdict === "quality") qual++;
+      if (c.validated) validated++;
+      if (c.flagged) flagged++;
+      if (c.verdict === "quality" && c.flagged) fp++;
+      srcDist[c.source] = (srcDist[c.source] || 0) + 1;
+      const eng = c.scoringEngine || (c.scoredByAI ? "claude-server" : "heuristic");
+      engDist[eng] = (engDist[eng] || 0) + 1;
+      buckets[Math.max(0, Math.min(9, Math.floor(c.scores.composite)))]++;
+    }
+    return { qualCount: qual, validatedCount: validated, flaggedCount: flagged, falsePositives: fp, sourceDistribution: srcDist, engineDistribution: engDist, scoreBuckets: buckets };
+  }, [content]);
 
   const accuracy = content.length > 0 ? ((qualCount / content.length) * 100).toFixed(1) : "--";
   const userReviewed = validatedCount + flaggedCount;
@@ -192,7 +196,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
                       {entry.count}
                     </span>
                     {(() => {
-                      const trend = topicTrends.find(tr => tr.topic === entry.topic);
+                      const trend = trendsMap.get(entry.topic);
                       if (!trend) return null;
                       const arrow = trend.direction === "up" ? "\u2191" : trend.direction === "down" ? "\u2193" : "\u2192";
                       const arrowColor = trend.direction === "up" ? colors.green[400] : trend.direction === "down" ? colors.red[400] : colors.text.disabled;

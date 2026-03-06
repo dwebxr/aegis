@@ -190,7 +190,7 @@ describe("calculateDynamicFee", () => {
     expect(calculateDynamicFee("trusted")).toBe(D2A_FEE_TRUSTED);
     expect(calculateDynamicFee("known")).toBe(D2A_FEE_KNOWN);
     expect(calculateDynamicFee("unknown")).toBe(D2A_FEE_UNKNOWN);
-    expect(calculateDynamicFee("restricted")).toBe(0);
+    expect(calculateDynamicFee("restricted")).toBe(Infinity);
   });
 
   it("trusted fee is lowest", () => {
