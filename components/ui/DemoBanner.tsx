@@ -18,7 +18,7 @@ export const DemoBanner: React.FC<{ mobile?: boolean }> = ({ mobile }) => {
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <span className="text-sm shrink-0">&#x1F6E1;&#xFE0F;</span>
         <span className={cn(
-          "leading-[1.4] text-[var(--color-text-tertiary)]",
+          "leading-[1.4] text-tertiary",
           mobile ? "text-caption" : "text-body-sm"
         )}>
           <strong className="text-blue-400">Demo Mode</strong>
@@ -38,7 +38,7 @@ export const DemoBanner: React.FC<{ mobile?: boolean }> = ({ mobile }) => {
         <button
           data-testid="aegis-demo-banner-dismiss"
           onClick={dismissBanner}
-          className="bg-none border-none cursor-pointer text-[var(--color-text-disabled)] text-sm p-1 leading-none"
+          className="bg-none border-none cursor-pointer text-disabled text-sm p-1 leading-none"
         >
           &#x2715;
         </button>

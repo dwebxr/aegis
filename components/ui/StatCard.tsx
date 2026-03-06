@@ -47,7 +47,7 @@ export const StatCard: React.FC<StatCardProps> = ({ icon, label, value, sub, col
       </div>
 
       {sub && (
-        <div className="text-caption font-medium text-[var(--color-text-disabled)] mt-1">
+        <div className="text-caption font-medium text-disabled mt-1">
           {sub}
         </div>
       )}

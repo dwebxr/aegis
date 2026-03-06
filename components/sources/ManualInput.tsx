@@ -35,7 +35,7 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
 
   return (
     <div>
-      <label className="block text-[10px] text-muted-foreground mb-1.5 uppercase tracking-[1px] font-semibold">
+      <label className="block text-caption text-muted-foreground mb-1.5 uppercase tracking-[1px] font-semibold">
         Content to Evaluate
       </label>
       <textarea
@@ -92,7 +92,7 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
                 )}>
                   {result.verdict === "quality" ? "Quality" : "Slop"}
                 </div>
-                <div className="text-[11px] text-muted-foreground">
+                <div className="text-kpi-sub text-muted-foreground">
                   {result.verdict === "quality" ? "Quality confirmed" : "Slop identified"}
                 </div>
               </div>
@@ -105,7 +105,7 @@ export const ManualInput: React.FC<ManualInputProps> = ({ onAnalyze, isAnalyzing
             <ScoreBar label="Credibility" score={result.credibility} color="#34d399" />
           </div>
           {result.reason && (
-            <div className="text-body-sm text-[var(--color-text-tertiary)] leading-[1.5] italic bg-black/20 px-3 py-[9px] rounded-[9px]">
+            <div className="text-body-sm text-tertiary leading-body-sm italic bg-black/20 px-3 py-[9px] rounded-[9px]">
               {result.reason}
             </div>
           )}

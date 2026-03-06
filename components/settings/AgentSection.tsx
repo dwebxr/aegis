@@ -17,7 +17,7 @@ interface AgentSectionProps {
   mobile?: boolean;
 }
 
-const subsectionLabel = "text-caption text-[var(--color-text-disabled)] mb-2 font-semibold uppercase tracking-[0.5px]";
+const subsectionLabel = "text-caption text-disabled mb-2 font-semibold uppercase tracking-[0.5px]";
 
 const pillChip = (colorClass: string) => cn(
   "inline-flex items-center gap-1 text-caption px-2 py-px rounded-full",
@@ -61,7 +61,7 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
         <div className="flex gap-4 mb-4 flex-wrap">
           {AGENT_PARAMS.map(s => (
             <div key={s.label}>
-              <div className="text-tiny text-[var(--color-text-disabled)] mb-0.5">{s.label}</div>
+              <div className="text-tiny text-disabled mb-0.5">{s.label}</div>
               <div className={cn("text-caption font-bold font-mono", s.colorClass)}>{s.value}</div>
             </div>
           ))}
@@ -167,13 +167,13 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
             className="w-full cursor-pointer"
             style={{ accentColor: "var(--color-cyan-400, #22d3ee)" }}
           />
-          <div className="flex justify-between text-tiny text-[var(--color-text-disabled)] mt-1">
+          <div className="flex justify-between text-tiny text-disabled mt-1">
             <span>More content</span>
             <span>Stricter filtering</span>
           </div>
         </div>
 
-        <div className="text-tiny text-[var(--color-text-disabled)] mt-3 leading-normal">
+        <div className="text-tiny text-disabled mt-3 leading-normal">
           Changes apply in real time. Add topics to boost, block authors to suppress, set threshold to filter.
         </div>
       </div>
@@ -190,7 +190,7 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
               { label: "Approval", value: `${(D2A_APPROVE_AMOUNT / 1e8).toFixed(1)} ICP`, colorClass: "text-muted-foreground" },
             ].map(p => (
               <div key={p.label} className="min-w-[70px]">
-                <div className="text-tiny text-[var(--color-text-disabled)] mb-0.5">{p.label}</div>
+                <div className="text-tiny text-disabled mb-0.5">{p.label}</div>
                 <div className={cn("text-caption font-bold font-mono", p.colorClass)}>{p.value}</div>
               </div>
             ))}

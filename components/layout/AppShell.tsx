@@ -70,7 +70,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
                   <button
                     onClick={() => setInstallDismissed(true)}
                     aria-label="Dismiss install banner"
-                    className="px-2 py-1 bg-transparent border-none text-[var(--color-text-disabled)] text-body cursor-pointer font-[inherit] leading-none hover:text-[var(--color-text-tertiary)]"
+                    className="px-2 py-1 bg-transparent border-none text-disabled text-body cursor-pointer font-[inherit] leading-none hover:text-tertiary"
                   >
                     &times;
                   </button>

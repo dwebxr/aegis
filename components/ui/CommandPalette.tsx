@@ -73,7 +73,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, c
     >
       <div
         className={cn(
-          "max-h-[400px] bg-card border border-[var(--color-border-emphasis)] rounded-xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
+          "max-h-[400px] bg-card border border-emphasis rounded-xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
           mobile ? "w-[calc(100%-32px)]" : "w-[520px]"
         )}
         onClick={e => e.stopPropagation()}
@@ -89,13 +89,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, c
             placeholder="Type a command..."
             className="flex-1 bg-transparent border-none outline-none text-foreground text-body font-sans"
           />
-          <span className="text-tiny text-[var(--color-text-disabled)] px-1.5 py-0.5 border border-border rounded-sm font-mono">ESC</span>
+          <span className="text-tiny text-disabled px-1.5 py-0.5 border border-border rounded-sm font-mono">ESC</span>
         </div>
 
         {/* Command list */}
         <div className="max-h-[320px] overflow-y-auto py-2">
           {filtered.length === 0 ? (
-            <div className="p-4 text-center text-[var(--color-text-disabled)] text-body-sm">
+            <div className="p-4 text-center text-disabled text-body-sm">
               No matching commands
             </div>
           ) : (

@@ -43,7 +43,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({ compact }) => {
         onClick={handleLogout}
         className={cn(
           "bg-red-400/[0.06] border border-red-400/[0.15] rounded-sm text-red-400 font-semibold cursor-pointer font-[inherit] transition-fast",
-          compact ? "px-3 py-1.5 text-[11px]" : "px-4 py-2 text-body-sm"
+          compact ? "px-3 py-1.5 text-kpi-sub" : "px-4 py-2 text-body-sm"
         )}
       >
         Logout
@@ -58,7 +58,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({ compact }) => {
       onMouseLeave={() => setHovered(false)}
       className={cn(
         "bg-gradient-to-br from-blue-600 to-cyan-500 border-none rounded-md text-white font-bold cursor-pointer font-[inherit] flex items-center gap-1.5 transition-fast",
-        compact ? "px-3 py-1.5 text-[11px]" : "px-[18px] py-3 text-[13px]"
+        compact ? "px-3 py-1.5 text-kpi-sub" : "px-[18px] py-3 text-[13px]"
       )}
       style={{
         boxShadow: hovered ? "0 0 20px rgba(6,182,212,0.4)" : "none",

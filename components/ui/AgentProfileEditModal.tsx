@@ -18,7 +18,7 @@ interface AgentProfileEditModalProps {
 
 type Phase = "edit" | "uploading" | "publishing" | "success" | "error";
 
-const inputClass = "w-full bg-[var(--color-bg-root)] border border-border rounded-sm px-3 py-2 text-secondary-foreground text-body font-sans outline-none box-border";
+const inputClass = "w-full bg-background border border-border rounded-sm px-3 py-2 text-secondary-foreground text-body font-sans outline-none box-border";
 const labelClass = "text-caption font-semibold text-muted-foreground uppercase tracking-[1px] mb-1.5 block";
 
 export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
@@ -114,7 +114,7 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
     }
   };
 
-  const cancelBtnClass = "px-4 py-2 bg-transparent border border-border rounded-md text-[var(--color-text-tertiary)] text-body cursor-pointer font-[inherit] transition-fast";
+  const cancelBtnClass = "px-4 py-2 bg-transparent border border-border rounded-md text-tertiary text-body cursor-pointer font-[inherit] transition-fast";
   const primaryBtnClass = "px-5 py-2 bg-gradient-to-br from-purple-600 to-blue-600 border-none rounded-md text-white text-body font-semibold cursor-pointer font-[inherit] transition-fast";
 
   return (
@@ -125,7 +125,7 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
       <div
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "max-w-[480px] max-h-[90vh] overflow-y-auto bg-navy-lighter border border-[var(--color-border-emphasis)] rounded-lg shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
+          "max-w-[480px] max-h-[90vh] overflow-y-auto bg-navy-lighter border border-emphasis rounded-lg shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
           mobile ? "w-[92vw] p-5" : "w-[480px] p-6"
         )}
       >
@@ -153,7 +153,7 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
               <div>
                 <button
                   onClick={() => fileRef.current?.click()}
-                  className="flex items-center gap-1 px-3 py-1 bg-card border border-border rounded-sm text-[var(--color-text-tertiary)] text-body-sm font-semibold cursor-pointer font-sans transition-fast"
+                  className="flex items-center gap-1 px-3 py-1 bg-card border border-border rounded-sm text-tertiary text-body-sm font-semibold cursor-pointer font-sans transition-fast"
                 >
                   <CameraIcon s={14} /> Upload Image
                 </button>
@@ -228,7 +228,7 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
             <h2 className="text-h2 font-bold text-foreground m-0 mb-4">
               Profile Published!
             </h2>
-            <p className="text-body-sm text-[var(--color-text-tertiary)] mb-5">
+            <p className="text-body-sm text-tertiary mb-5">
               Your agent profile is now visible on Nostr relays.
             </p>
             <button

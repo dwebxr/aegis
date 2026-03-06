@@ -83,7 +83,7 @@ describe("CommentThread", () => {
       <CommentThread comments={[makeComment({ timestamp: 1700000000000 })]} />,
     );
     // Should contain some formatted date string (locale-dependent)
-    const timeEl = container.querySelector(".text-\\[9px\\]");
+    const timeEl = container.querySelector(".text-tiny");
     expect(timeEl).toBeTruthy();
     expect(timeEl!.textContent!.length).toBeGreaterThan(5);
   });

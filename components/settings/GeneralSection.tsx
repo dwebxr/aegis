@@ -24,12 +24,12 @@ interface GeneralSectionProps {
 
 const toggleTrack = (on: boolean) => cn(
   "relative w-10 h-[22px] rounded-[11px] border-none cursor-pointer shrink-0 transition-fast",
-  on ? "bg-cyan-500" : "bg-[var(--color-bg-raised)]"
+  on ? "bg-cyan-500" : "bg-raised"
 );
 
 const toggleThumb = (on: boolean) => cn(
   "absolute top-[2px] w-[18px] h-[18px] rounded-full transition-fast",
-  on ? "left-5 bg-white" : "left-[2px] bg-[var(--color-text-disabled)]"
+  on ? "left-5 bg-white" : "left-[2px] bg-disabled"
 );
 
 export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
@@ -118,19 +118,19 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
                 </button>
               ))}
             </div>
-            <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-normal">
+            <div className="text-tiny text-disabled mt-2 leading-normal">
               Controls how often briefing alerts are sent. &quot;Off&quot; mutes without unsubscribing.
             </div>
           </div>
         )}
         {isSubscribed && (
-          <div className="mt-4 border-t border-[var(--color-border-subtle)] pt-3">
+          <div className="mt-4 border-t border-subtle pt-3">
             <div className="text-caption font-semibold text-muted-foreground mb-2">
               Notification Rules
             </div>
 
             <div className="mb-3">
-              <div className="text-tiny text-[var(--color-text-disabled)] mb-1">Alert Topics</div>
+              <div className="text-tiny text-disabled mb-1">Alert Topics</div>
               <div className="flex flex-wrap gap-1 mb-2">
                 {(profile.notificationPrefs?.topicAlerts ?? []).map(topic => (
                   <span key={topic} className="inline-flex items-center gap-1 text-caption px-2 py-px bg-cyan-400/[0.06] border border-cyan-400/[0.12] rounded-full text-cyan-400">
@@ -152,7 +152,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
                   onChange={e => setAlertTopicInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") handleAddAlertTopic(); }}
                   placeholder="Add topic..."
-                  className="flex-1 min-w-[100px] px-3 py-1 bg-[var(--color-bg-overlay)] border border-[var(--color-border-subtle)] rounded-sm text-foreground text-caption font-[inherit] outline-none"
+                  className="flex-1 min-w-[100px] px-3 py-1 bg-overlay border border-subtle rounded-sm text-foreground text-caption font-[inherit] outline-none"
                 />
                 <button
                   data-testid="aegis-settings-alert-topic-add"
@@ -167,7 +167,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
 
             <div className="mb-3">
               <div className="flex justify-between items-center">
-                <div className="text-tiny text-[var(--color-text-disabled)]">Min Score Alert</div>
+                <div className="text-tiny text-disabled">Min Score Alert</div>
                 <div className="text-caption font-bold font-mono text-secondary-foreground">
                   {profile.notificationPrefs?.minScoreAlert ?? 5}/10
                 </div>
@@ -189,8 +189,8 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
 
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-tiny text-[var(--color-text-disabled)]">D2A Content Alerts</div>
-                <div className="text-tiny text-[var(--color-text-disabled)] mt-0.5">
+                <div className="text-tiny text-disabled">D2A Content Alerts</div>
+                <div className="text-tiny text-disabled mt-0.5">
                   Always notify for D2A agent content
                 </div>
               </div>
@@ -204,7 +204,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
                 <div className={toggleThumb(d2aOn)} />
               </button>
             </div>
-            <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-normal">
+            <div className="text-tiny text-disabled mt-2 leading-normal">
               Only send notifications for items matching these rules. Leave topics empty to match all.
             </div>
           </div>

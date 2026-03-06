@@ -26,11 +26,11 @@ export const UserBadge: React.FC<UserBadgeProps> = ({ compact }) => {
         <div className="overflow-hidden flex-1">
           <div className={cn(
             "font-semibold text-secondary-foreground font-mono whitespace-nowrap overflow-hidden text-ellipsis",
-            compact ? "text-[10px]" : "text-[11px]"
+            compact ? "text-caption" : "text-kpi-sub"
           )}>
             {short}
           </div>
-          <div className="text-[9px] text-muted-foreground font-medium">
+          <div className="text-tiny text-muted-foreground font-medium">
             Connected
           </div>
         </div>
@@ -39,7 +39,7 @@ export const UserBadge: React.FC<UserBadgeProps> = ({ compact }) => {
         onClick={logout}
         className={cn(
           "bg-red-400/[0.08] border border-red-400/15 rounded-lg text-red-400 font-semibold cursor-pointer font-[inherit] w-full",
-          compact ? "px-2.5 py-1 text-[10px]" : "px-3.5 py-1.5 text-[11px]"
+          compact ? "px-2.5 py-1 text-caption" : "px-3.5 py-1.5 text-kpi-sub"
         )}
       >
         Logout

@@ -95,7 +95,7 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
     }
   };
 
-  const cancelBtnClass = "px-4 py-2 bg-transparent border border-border rounded-md text-[var(--color-text-tertiary)] text-body cursor-pointer font-[inherit] transition-fast";
+  const cancelBtnClass = "px-4 py-2 bg-transparent border border-border rounded-md text-tertiary text-body cursor-pointer font-[inherit] transition-fast";
   const primaryBtnClass = "px-5 py-2 bg-gradient-to-br from-purple-600 to-blue-600 border-none rounded-md text-white text-body font-semibold cursor-pointer font-[inherit] transition-fast";
 
   return (
@@ -106,7 +106,7 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
       <div
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "max-w-[480px] bg-navy-lighter border border-[var(--color-border-emphasis)] rounded-lg shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
+          "max-w-[480px] bg-navy-lighter border border-emphasis rounded-lg shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
           mobile ? "w-[92vw] p-5" : "w-[480px] p-6"
         )}
       >
@@ -129,7 +129,7 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
               <div className="text-body-sm font-semibold text-green-400 mb-2">
                 What&apos;s shared:
               </div>
-              <ul className="m-0 pl-5 text-body-sm text-[var(--color-text-tertiary)] leading-loose">
+              <ul className="m-0 pl-5 text-body-sm text-tertiary leading-loose">
                 <li>{insightCount} curated items with scores &amp; verdicts</li>
                 <li>Topics, reasons, source links</li>
                 <li>{onTabChange ? (
@@ -195,7 +195,7 @@ export const ShareBriefingModal: React.FC<ShareBriefingModalProps> = ({
                   "px-3 py-1 rounded-sm text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast whitespace-nowrap border",
                   copied
                     ? "bg-green-400/[0.06] border-green-400/15 text-green-400"
-                    : "bg-navy-lighter border-border text-[var(--color-text-tertiary)]"
+                    : "bg-navy-lighter border-border text-tertiary"
                 )}
               >
                 {copied ? "Copied!" : "Copy"}

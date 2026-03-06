@@ -70,7 +70,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               className={cn(
                 "px-3 py-2 rounded-sm text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast whitespace-nowrap shrink-0",
                 active
-                  ? "bg-card border border-[var(--color-border-emphasis)] text-foreground"
+                  ? "bg-card border border-emphasis text-foreground"
                   : "bg-transparent border border-transparent text-muted-foreground"
               )}
             >

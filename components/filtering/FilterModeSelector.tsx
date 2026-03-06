@@ -32,7 +32,7 @@ export const FilterModeSelector: React.FC<FilterModeSelectorProps> = ({ mobile }
   }, [filterMode, isAuthenticated, hasAIScoring, setFilterMode]);
 
   return (
-    <div className="flex gap-1 bg-[var(--color-bg-raised)] rounded-md p-1 border border-border">
+    <div className="flex gap-1 bg-raised rounded-md p-1 border border-border">
       {MODES.map(m => {
         const active = filterMode === m.key;
         const locked = m.key === "pro" && (!isAuthenticated || !hasAIScoring);
@@ -45,15 +45,15 @@ export const FilterModeSelector: React.FC<FilterModeSelectorProps> = ({ mobile }
             className={cn(
               "flex-1 px-3 py-2 rounded-sm text-body-sm font-semibold font-[inherit] transition-fast text-center",
               active
-                ? "bg-card border border-[var(--color-border-emphasis)] text-foreground"
+                ? "bg-card border border-emphasis text-foreground"
                 : "bg-transparent border border-transparent text-muted-foreground",
-              locked && "text-[var(--color-text-disabled)] cursor-not-allowed opacity-50",
+              locked && "text-disabled cursor-not-allowed opacity-50",
               !locked && "cursor-pointer"
             )}
           >
             <span>{m.label}</span>
             {!mobile && (
-              <div className="text-caption text-[var(--color-text-disabled)] mt-0.5">
+              <div className="text-caption text-disabled mt-0.5">
                 {locked ? lockReason : m.sub}
               </div>
             )}

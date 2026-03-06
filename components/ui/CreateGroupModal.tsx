@@ -88,7 +88,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               {tp}
               <button
                 onClick={() => setTopics(topics.filter(x => x !== tp))}
-                className="bg-transparent border-none cursor-pointer text-[var(--color-text-disabled)] text-[12px] p-0 leading-none font-[inherit]"
+                className="bg-transparent border-none cursor-pointer text-disabled text-[12px] p-0 leading-none font-[inherit]"
               >
                 &times;
               </button>
@@ -117,7 +117,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             "px-4 py-2 rounded-sm text-body-sm font-bold font-[inherit] transition-fast border",
             canCreate
               ? "bg-purple-400/[0.09] border-purple-400/20 text-purple-400 cursor-pointer"
-              : "bg-transparent border-border text-[var(--color-text-disabled)] cursor-default"
+              : "bg-transparent border-border text-disabled cursor-default"
           )}>
             Create Group
           </button>

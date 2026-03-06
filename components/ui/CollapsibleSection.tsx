@@ -30,7 +30,7 @@ export function CollapsibleSection({
   return (
     <div
       data-testid={`aegis-section-${id}`}
-      className="border border-[var(--color-border-subtle)] rounded-lg overflow-hidden transition-all duration-150"
+      className="border border-subtle rounded-lg overflow-hidden transition-all duration-150"
     >
       <button
         onClick={() => onToggle(id)}
@@ -40,7 +40,7 @@ export function CollapsibleSection({
         )}
       >
         <span className={mobile ? "text-base" : "text-sm"}>{icon}</span>
-        <span className="text-body-sm font-semibold text-[var(--color-text-tertiary)]">
+        <span className="text-body-sm font-semibold text-tertiary">
           {title}
         </span>
         {itemCount !== undefined && itemCount > 0 && (
@@ -70,7 +70,7 @@ export function CollapsibleSection({
         </span>
       </button>
       {isExpanded && (
-        <div className="px-4 py-3 border-t border-[var(--color-border-subtle)] animate-slide-up">
+        <div className="px-4 py-3 border-t border-subtle animate-slide-up">
           {children}
         </div>
       )}

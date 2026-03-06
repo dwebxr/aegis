@@ -146,7 +146,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
       {isLoading ? (
         <div data-testid="aegis-briefing-loading" className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
           <div className="text-[32px] mb-3 animate-pulse">&#x1F6E1;</div>
-          <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">Loading briefing...</div>
+          <div className="text-h3 font-semibold text-tertiary">Loading briefing...</div>
           <div className="text-body-sm mt-2">Syncing from Internet Computer</div>
         </div>
       ) : briefing.priority.length > 0 ? (
@@ -174,14 +174,14 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
       ) : (
         <div data-testid="aegis-briefing-empty" className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
           <div className="text-[32px] mb-3">&#x1F50D;</div>
-          <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">No priority items yet</div>
+          <div className="text-h3 font-semibold text-tertiary">No priority items yet</div>
           <div className="text-body-sm mt-2">Evaluate content and validate quality items to build your personalized briefing</div>
           {onTabChange && (
             <div className="mt-4">
               <button
                 data-testid="aegis-briefing-start-eval"
                 onClick={() => onTabChange("incinerator")}
-                className="px-4 py-2 bg-navy-lighter border border-[var(--color-border-emphasis)] rounded-md text-purple-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-all duration-150 hover:bg-navy-hover"
+                className="px-4 py-2 bg-navy-lighter border border-emphasis rounded-md text-purple-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-all duration-150 hover:bg-navy-hover"
               >
                 Start Evaluating &rarr;
               </button>
@@ -194,7 +194,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
       {briefing.priority.length > 0 && getUserApiKey() && (
         <div className="my-4 px-5 py-4 bg-card border border-border rounded-lg">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-h3 font-semibold text-[var(--color-text-tertiary)]">
+            <span className="text-h3 font-semibold text-tertiary">
               Today&apos;s Digest
             </span>
             {!digest && (
@@ -204,7 +204,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 className={cn(
                   "px-3 py-1 rounded-md text-caption font-semibold cursor-pointer font-[inherit] transition-all duration-150",
                   digestLoading
-                    ? "bg-[var(--color-bg-overlay)] border border-[var(--color-border-subtle)] text-[var(--color-text-disabled)] cursor-not-allowed"
+                    ? "bg-overlay border border-subtle text-disabled cursor-not-allowed"
                     : "bg-cyan-500/[0.09] border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/[0.15]"
                 )}
               >
@@ -217,7 +217,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           ) : digestError ? (
             <p className="text-caption text-red-400 m-0">{digestError}</p>
           ) : (
-            <p className="text-caption text-[var(--color-text-disabled)] m-0">
+            <p className="text-caption text-disabled m-0">
               AI-generated summary of your top priority articles.
             </p>
           )}
@@ -269,7 +269,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 </div>
 
                 <div
-                  className="flex items-center gap-2 pb-2 border-b border-[var(--color-border-subtle)] mb-2"
+                  className="flex items-center gap-2 pb-2 border-b border-subtle mb-2"
                   style={{ paddingRight: mobile ? 40 : 130 }}
                 >
                   {d.item.avatar && d.item.avatar.startsWith("http") ? (
@@ -298,7 +298,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                     className="inline-flex items-center gap-1 mt-2 text-caption text-cyan-400 no-underline font-semibold break-all hover:underline"
                   >
                     {(() => { try { return new URL(d.item.sourceUrl).hostname; } catch { return d.item.sourceUrl; } })()}
-                    <span className="text-[10px]">{"\u2197"}</span>
+                    <span className="text-caption">{"\u2197"}</span>
                   </a>
                 )}
               </div>
@@ -314,7 +314,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
             data-testid="aegis-briefing-filtered-toggle"
             onClick={() => setShowFiltered(!showFiltered)}
             aria-expanded={showFiltered}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer transition-all duration-250 font-[inherit] hover:border-[var(--color-border-emphasis)]"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer transition-all duration-250 font-[inherit] hover:border-emphasis"
           >
             <span className={cn("inline-block transition-transform duration-200", showFiltered && "rotate-180")}>
               &#x25BC;

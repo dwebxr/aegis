@@ -16,22 +16,22 @@ interface FeedSectionProps {
   mobile?: boolean;
 }
 
-const inputClass = "flex-1 min-w-[180px] px-3 py-1 bg-[var(--color-bg-overlay)] border border-[var(--color-border-subtle)] rounded-sm text-foreground text-caption font-mono outline-none";
+const inputClass = "flex-1 min-w-[180px] px-3 py-1 bg-overlay border border-subtle rounded-sm text-foreground text-caption font-mono outline-none";
 
 const statusDot = (on: boolean) => cn(
   "size-[7px] rounded-full shrink-0",
-  on ? "bg-emerald-400" : "bg-[var(--color-text-disabled)]"
+  on ? "bg-emerald-400" : "bg-disabled"
 );
 
 const toggleBase = (on: boolean) => cn(
   "relative w-10 h-[22px] rounded-[11px] border-none cursor-pointer shrink-0 transition-fast",
-  on ? "bg-cyan-500" : "bg-[var(--color-bg-overlay)]"
+  on ? "bg-cyan-500" : "bg-overlay"
 );
 
 const toggleKnob = (on: boolean): React.CSSProperties => ({
   position: "absolute", top: 2, left: on ? 20 : 2,
   width: 18, height: 18, borderRadius: "50%",
-  background: on ? "#fff" : "var(--color-text-disabled)",
+  background: on ? "#fff" : "var(--color-text-disabled)", /* dynamic JS value */
   transition: "left 0.15s ease",
 });
 
@@ -181,13 +181,13 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
           ] as const).map(e => (
             <div key={e.label} className="flex items-center gap-2">
               <div className={statusDot(e.on)} />
-              <span className={cn("text-caption", e.on ? "text-secondary-foreground" : "text-[var(--color-text-disabled)]")}>
+              <span className={cn("text-caption", e.on ? "text-secondary-foreground" : "text-disabled")}>
                 {e.label}
               </span>
             </div>
           ))}
         </div>
-        <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-tight">
+        <div className="text-tiny text-disabled mt-2 leading-tight">
           Pro requires at least one AI engine or an active D2A Agent.
         </div>
       </div>
@@ -196,7 +196,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
         <div className={sectionTitleClass}>AI Scoring</div>
         <div className="flex items-center gap-2 mb-3">
           <div className={statusDot(hasApiKey)} />
-          <span className={cn("text-caption font-semibold", hasApiKey ? "text-emerald-400" : "text-[var(--color-text-disabled)]")}>
+          <span className={cn("text-caption font-semibold", hasApiKey ? "text-emerald-400" : "text-disabled")}>
             {hasApiKey ? "API Key Set" : "Using server default"}
           </span>
         </div>
@@ -204,7 +204,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
         {hasApiKey ? (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <code className="text-tiny font-mono text-secondary-foreground bg-[var(--color-bg-overlay)] px-2 py-0.5 rounded-sm">
+              <code className="text-tiny font-mono text-secondary-foreground bg-overlay px-2 py-0.5 rounded-sm">
                 {maskedKey}
               </code>
               {confirmAction === "clearApiKey" ? (
@@ -237,7 +237,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
                   "px-3 py-1 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
                   apiKeyInput
                     ? "bg-cyan-500/[0.09] border border-cyan-500/20 text-cyan-400 opacity-100"
-                    : "bg-[var(--color-bg-overlay)] border border-[var(--color-border-subtle)] text-muted-foreground opacity-40 cursor-not-allowed"
+                    : "bg-overlay border border-subtle text-muted-foreground opacity-40 cursor-not-allowed"
                 )}
               >
                 Save
@@ -245,7 +245,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
             </div>
           </div>
         )}
-        <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-tight">
+        <div className="text-tiny text-disabled mt-2 leading-tight">
           Enter your Anthropic API key to use Pro mode with your own quota. Key is stored in localStorage only.
         </div>
       </div>
@@ -260,7 +260,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
           >
             <div style={toggleKnob(ollamaConfig.enabled)} />
           </button>
-          <span className={cn("text-caption font-semibold", ollamaConfig.enabled ? "text-cyan-400" : "text-[var(--color-text-disabled)]")}>
+          <span className={cn("text-caption font-semibold", ollamaConfig.enabled ? "text-cyan-400" : "text-disabled")}>
             {ollamaConfig.enabled ? "Enabled" : "Disabled"}
           </span>
           {ollamaConfig.enabled && (
@@ -269,7 +269,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
               ollamaStatus.connected ? "bg-emerald-400"
                 : ollamaStatus.loading ? "bg-amber-400"
                 : ollamaStatus.error ? "bg-red-400"
-                : "bg-[var(--color-text-disabled)]"
+                : "bg-disabled"
             )} />
           )}
         </div>
@@ -277,7 +277,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
         {ollamaConfig.enabled && (
           <div className="flex flex-col gap-3">
             <div>
-              <div className="text-tiny text-[var(--color-text-disabled)] mb-1">Endpoint</div>
+              <div className="text-tiny text-disabled mb-1">Endpoint</div>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -297,12 +297,12 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
             </div>
 
             <div>
-              <div className="text-tiny text-[var(--color-text-disabled)] mb-1">Model</div>
+              <div className="text-tiny text-disabled mb-1">Model</div>
               {ollamaStatus.models.length > 0 ? (
                 <select
                   value={ollamaConfig.model}
                   onChange={e => handleOllamaModelChange(e.target.value)}
-                  className="w-full px-3 py-1 bg-[var(--color-bg-overlay)] border border-[var(--color-border-subtle)] rounded-sm text-foreground text-caption font-mono outline-none"
+                  className="w-full px-3 py-1 bg-overlay border border-subtle rounded-sm text-foreground text-caption font-mono outline-none"
                 >
                   {ollamaStatus.models.map(m => (
                     <option key={m} value={m}>{m}</option>
@@ -317,7 +317,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
                     handleOllamaModelChange(e.target.value);
                   }}
                   placeholder={DEFAULT_OLLAMA_CONFIG.model}
-                  className="w-full px-3 py-1 bg-[var(--color-bg-overlay)] border border-[var(--color-border-subtle)] rounded-sm text-foreground text-caption font-mono outline-none"
+                  className="w-full px-3 py-1 bg-overlay border border-subtle rounded-sm text-foreground text-caption font-mono outline-none"
                 />
               )}
             </div>
@@ -342,7 +342,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
             )}
           </div>
         )}
-        <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-tight">
+        <div className="text-tiny text-disabled mt-2 leading-tight">
           Connect to Ollama or any OpenAI-compatible local LLM server. Tried first when enabled — zero cost, fully private.
         </div>
       </div>
@@ -357,7 +357,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
           >
             <div style={toggleKnob(webllmOn)} />
           </button>
-          <span className={cn("text-caption font-semibold", webllmOn ? "text-cyan-400" : "text-[var(--color-text-disabled)]")}>
+          <span className={cn("text-caption font-semibold", webllmOn ? "text-cyan-400" : "text-disabled")}>
             {webllmOn ? "Enabled" : "Disabled"}
           </span>
         </div>
@@ -382,7 +382,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
             </div>
 
             {webllmStatus.loading && (
-              <div className="h-1 rounded-sm bg-[var(--color-bg-overlay)] overflow-hidden">
+              <div className="h-1 rounded-sm bg-overlay overflow-hidden">
                 <div
                   className="h-full rounded-sm bg-gradient-to-r from-cyan-500 to-blue-500"
                   style={{ width: `${webllmStatus.progress}%`, transition: "width 0.3s ease" }}
@@ -391,7 +391,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
             )}
           </div>
         )}
-        <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-tight">
+        <div className="text-tiny text-disabled mt-2 leading-tight">
           Run AI scoring locally via WebGPU (Llama 3.1 8B). Requires a WebGPU-capable browser and ~4GB download. No data leaves your device.
         </div>
       </div>

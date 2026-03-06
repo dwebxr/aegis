@@ -28,13 +28,13 @@ export const CommentThread: React.FC<CommentThreadProps> = ({ comments, currentU
               "max-w-[80%] px-2 py-1 rounded-sm",
               isSent
                 ? "bg-cyan-400/[0.07] border border-cyan-400/[0.14]"
-                : "bg-[var(--color-bg-raised)] border border-border"
+                : "bg-raised border border-border"
             )}>
-              <div className="text-body-sm text-secondary-foreground leading-[1.5] break-words">
+              <div className="text-body-sm text-secondary-foreground leading-body-sm break-words">
                 {c.comment}
               </div>
               <div className={cn(
-                "text-[9px] text-[var(--color-text-disabled)] mt-0.5",
+                "text-tiny text-disabled mt-0.5",
                 isSent ? "text-right" : "text-left"
               )}>
                 {isSent ? "You" : c.senderPk.slice(0, 8) + "..."} · {formatTime(c.timestamp)}

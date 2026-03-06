@@ -52,19 +52,19 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
                 "size-2 rounded-full transition-fast",
                 i < completedCount ? "bg-green-400"
                   : i === currentIdx ? "bg-blue-400 animate-pulse"
-                  : "bg-[var(--color-border-emphasis)]"
+                  : "bg-emphasis"
               )}
             />
             {i < STEPS.length - 1 && (
               <div
-                className={cn("h-px", i < completedCount ? "bg-green-400" : "bg-[var(--color-border-emphasis)]")}
+                className={cn("h-px", i < completedCount ? "bg-green-400" : "bg-emphasis")}
                 style={{ width: mobile ? 12 : 24 }}
               />
             )}
           </div>
         ))}
         <div className="flex-1" />
-        <span className="text-caption text-[var(--color-text-disabled)]">
+        <span className="text-caption text-disabled">
           {completedCount}/{STEPS.length}
         </span>
       </div>
@@ -81,7 +81,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
           </div>
 
           {current.id === "wait-content" && (
-            <div className="text-caption text-[var(--color-text-disabled)] mt-2">
+            <div className="text-caption text-disabled mt-2">
               {context.contentCount > 0
                 ? `${context.contentCount} item${context.contentCount !== 1 ? "s" : ""} received so far...`
                 : "This usually takes a minute after adding sources."}
@@ -99,7 +99,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
             )}
             <button
               onClick={handleDismiss}
-              className="px-3 py-2 bg-transparent border-none text-[var(--color-text-disabled)] text-caption cursor-pointer font-[inherit]"
+              className="px-3 py-2 bg-transparent border-none text-disabled text-caption cursor-pointer font-[inherit]"
             >
               Dismiss
             </button>

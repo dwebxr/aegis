@@ -227,7 +227,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                 <div className={cn("font-bold text-foreground mb-0.5 flex items-center gap-2", mobile ? "text-body" : "text-h3")}>
                   {profileName}
                   {agentProfileLoading && (
-                    <span className="text-caption text-[var(--color-text-disabled)] font-normal">...</span>
+                    <span className="text-caption text-disabled font-normal">...</span>
                   )}
                 </div>
 
@@ -249,7 +249,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                       });
                     }}
                     className={cn(
-                      "bg-transparent border border-border rounded-sm px-1.5 py-px text-[10px] cursor-pointer transition-fast font-sans leading-snug",
+                      "bg-transparent border border-border rounded-sm px-1.5 py-px text-caption cursor-pointer transition-fast font-sans leading-snug",
                       npubCopyState === "copied" ? "text-green-400"
                         : npubCopyState === "failed" ? "text-red-400"
                         : "text-muted-foreground"
@@ -258,7 +258,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                     {npubCopyState === "copied" ? "Copied!" : npubCopyState === "failed" ? "Failed" : "Copy npub"}
                   </button>
                   {npubCopyState === "copied" && (
-                    <div className="absolute top-full left-0 mt-1 bg-navy-lighter border border-border rounded-sm px-2 py-1 font-mono text-[10px] text-purple-400 whitespace-nowrap z-10 shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                    <div className="absolute top-full left-0 mt-1 bg-navy-lighter border border-border rounded-sm px-2 py-1 font-mono text-caption text-purple-400 whitespace-nowrap z-10 shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
                       {fullNpub(agentState.myPubkey)}
                     </div>
                   )}
@@ -266,7 +266,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
 
                 {/* About (optional) */}
                 {agentProfile?.about && (
-                  <p className="text-body-sm text-[var(--color-text-tertiary)] leading-normal m-0 mb-1 overflow-hidden text-ellipsis [-webkit-line-clamp:2] [-webkit-box-orient:vertical] [display:-webkit-box]">
+                  <p className="text-body-sm text-tertiary leading-normal m-0 mb-1 overflow-hidden text-ellipsis [-webkit-line-clamp:2] [-webkit-box-orient:vertical] [display:-webkit-box]">
                     {agentProfile.about}
                   </p>
                 )}
@@ -286,7 +286,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
 
               {/* Right: status + edit */}
               <div className="text-right shrink-0 flex flex-col gap-2 items-end">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-emerald-400/[0.12] text-green-400">
+                <span className="text-caption font-bold px-2 py-0.5 rounded-full uppercase bg-emerald-400/[0.12] text-green-400">
                   Active
                 </span>
                 <div className="text-caption text-muted-foreground">
@@ -336,7 +336,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
             {!showProfileInfo && (
               <button
                 onClick={() => setShowProfileInfo(true)}
-                className="bg-transparent border-none cursor-pointer text-[var(--color-text-disabled)] text-caption font-[inherit] mb-4 p-0"
+                className="bg-transparent border-none cursor-pointer text-disabled text-caption font-[inherit] mb-4 p-0"
               >
                 Learn more about this agent account
               </button>
@@ -375,12 +375,12 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                 <span className="text-secondary-foreground flex-1">
                   {entry.message}
                   {entry.peerId && (
-                    <span className="text-[var(--color-text-disabled)] font-mono ml-1">
+                    <span className="text-disabled font-mono ml-1">
                       {entry.peerId.slice(0, 8)}...
                     </span>
                   )}
                 </span>
-                <span className="text-[var(--color-text-disabled)] shrink-0 text-[10px]">
+                <span className="text-disabled shrink-0 text-caption">
                   {relativeTime(entry.timestamp)}
                 </span>
               </div>
@@ -418,8 +418,8 @@ export const D2ATab: React.FC<D2ATabProps> = ({
             {!mobile && st.label}
             {counts[st.id] > 0 && (
               <span className={cn(
-                "text-[10px] font-bold px-1.5 py-px rounded-full",
-                subTab === st.id ? "bg-purple-400/15 text-purple-400" : "bg-navy-lighter text-[var(--color-text-disabled)]"
+                "text-caption font-bold px-1.5 py-px rounded-full",
+                subTab === st.id ? "bg-purple-400/15 text-purple-400" : "bg-navy-lighter text-disabled"
               )}>
                 {counts[st.id]}
               </span>
@@ -516,7 +516,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="font-bold text-secondary-foreground font-mono text-body-sm">{item.author}</span>
                       <span className="text-caption text-muted-foreground bg-navy-lighter px-2 py-0.5 rounded-sm">{item.platform || item.source}</span>
-                      <span className="text-caption text-[var(--color-text-disabled)]">{item.timestamp}</span>
+                      <span className="text-caption text-disabled">{item.timestamp}</span>
                     </div>
                     <p className={cn(
                       "text-secondary-foreground leading-normal m-0 overflow-hidden text-ellipsis [-webkit-line-clamp:3] [-webkit-box-orient:vertical] [display:-webkit-box]",
@@ -530,7 +530,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                       <div className="text-h3 font-bold text-green-400 font-mono">
                         {item.scores.composite.toFixed(1)}
                       </div>
-                      <div className="text-[9px] text-muted-foreground uppercase">Score</div>
+                      <div className="text-tiny text-muted-foreground uppercase">Score</div>
                     </div>
                   )}
                 </div>
@@ -585,7 +585,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                     <div className="flex justify-between items-center flex-wrap gap-2">
                       <div>
                         <span className={cn(
-                          "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase",
+                          "text-caption font-bold px-2 py-0.5 rounded-full uppercase",
                           isSender ? "bg-emerald-400/[0.12] text-green-400" : "bg-sky-400/[0.12] text-sky-400"
                         )}>
                           {isSender ? "Sent" : "Received"}
@@ -594,20 +594,20 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                           {isSender ? truncPrincipal(m.receiverPrincipal) : truncPrincipal(m.senderPrincipal)}
                         </span>
                       </div>
-                      <span className="text-caption text-[var(--color-text-disabled)]">
+                      <span className="text-caption text-disabled">
                         {formatTimestamp(m.createdAt)}
                       </span>
                     </div>
                     <div className="flex gap-4 mt-2 flex-wrap">
                       <div>
-                        <span className="text-[10px] text-muted-foreground uppercase">Fee </span>
+                        <span className="text-caption text-muted-foreground uppercase">Fee </span>
                         <span className="font-mono font-semibold text-amber-400 text-body-sm">
                           {formatICP(m.feeAmount)} ICP
                         </span>
                       </div>
                       {isSender && (
                         <div>
-                          <span className="text-[10px] text-muted-foreground uppercase">Earned </span>
+                          <span className="text-caption text-muted-foreground uppercase">Earned </span>
                           <span className="font-mono font-semibold text-green-400 text-body-sm">
                             {formatICP(m.senderPayout)} ICP
                           </span>
@@ -697,7 +697,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                       )}>
                         {(peer.qualityRate * 100).toFixed(0)}%
                       </div>
-                      <div className="text-[9px] text-muted-foreground uppercase">Quality</div>
+                      <div className="text-tiny text-muted-foreground uppercase">Quality</div>
                       {/* Mini quality bar */}
                       <div className="w-12 h-[3px] bg-navy-lighter rounded-sm mt-0.5 overflow-hidden">
                         <div
@@ -714,19 +714,19 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                   {/* Bottom row: trust details */}
                   <div className="flex gap-4 mt-2 pt-2 border-t border-border flex-wrap">
                     <div>
-                      <span className="text-[10px] text-muted-foreground uppercase">WoT </span>
+                      <span className="text-caption text-muted-foreground uppercase">WoT </span>
                       <span className="font-mono font-semibold text-body-sm text-purple-400">
                         {(peer.wotScore * 100).toFixed(0)}%
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-muted-foreground uppercase">Rep </span>
+                      <span className="text-caption text-muted-foreground uppercase">Rep </span>
                       <span className={cn("font-mono font-semibold text-body-sm", peer.reputation.score >= 0 ? "text-green-400" : "text-red-400")}>
                         {peer.reputation.score > 0 ? "+" : ""}{peer.reputation.score}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-muted-foreground uppercase">Trust </span>
+                      <span className="text-caption text-muted-foreground uppercase">Trust </span>
                       <span className="font-mono font-semibold text-body-sm text-cyan-400">
                         {(peer.effectiveTrust * 100).toFixed(0)}%
                       </span>
@@ -867,7 +867,7 @@ function EmptyState({ emoji, title, subtitle, action, actionLabel, checklist }: 
           {checklist.map((item) => (
             <div key={item.text} className={cn(
               "flex gap-2 items-center text-body-sm py-1",
-              item.done ? "text-green-400" : "text-[var(--color-text-disabled)]"
+              item.done ? "text-green-400" : "text-disabled"
             )}>
               <span className="shrink-0">{item.done ? "\u2713" : "\u25CC"}</span>
               <span>{item.text}</span>
@@ -877,7 +877,7 @@ function EmptyState({ emoji, title, subtitle, action, actionLabel, checklist }: 
       )}
       {action && actionLabel && (
         <div className="mt-4">
-          <button onClick={action} className="px-4 py-2 bg-navy-lighter border border-[var(--color-border-emphasis)] rounded-md text-purple-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast">
+          <button onClick={action} className="px-4 py-2 bg-navy-lighter border border-emphasis rounded-md text-purple-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast">
             {actionLabel} &rarr;
           </button>
         </div>

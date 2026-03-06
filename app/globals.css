@@ -170,6 +170,15 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Aegis semantic tokens (eliminates arbitrary values) */
+  --color-disabled: var(--color-text-disabled);
+  --color-tertiary: var(--color-text-tertiary);
+  --color-subtle: var(--color-border-subtle);
+  --color-emphasis: var(--color-border-emphasis);
+  --color-overlay: var(--color-bg-overlay);
+  --color-raised: var(--color-bg-raised);
+  --color-surface: var(--color-bg-surface);
 }
 
 /* ── Aegis Dark Theme (default) ──────────────────────────── */

@@ -16,7 +16,7 @@ function ItemCard({ item }: { item: ParsedBriefingItem }) {
     <div className="bg-card border border-border rounded-lg p-5 mb-3">
       <div className="flex items-start gap-3 mb-3">
         {item.rank && (
-          <div className="size-7 rounded-sm bg-[var(--color-bg-raised)] border border-[var(--color-border-emphasis)] flex items-center justify-center text-body-sm font-bold text-muted-foreground shrink-0">
+          <div className="size-7 rounded-sm bg-raised border border-emphasis flex items-center justify-center text-body-sm font-bold text-muted-foreground shrink-0">
             #{item.rank}
           </div>
         )}
@@ -36,7 +36,7 @@ function ItemCard({ item }: { item: ParsedBriefingItem }) {
       </div>
 
       {item.reason && (
-        <div className="border-l-[3px] border-[var(--color-border-emphasis)] pl-3 mb-3 text-body text-[var(--color-text-tertiary)] leading-normal italic">
+        <div className="border-l-[3px] border-emphasis pl-3 mb-3 text-body text-tertiary leading-normal italic">
           {item.reason}
         </div>
       )}
@@ -54,7 +54,7 @@ function ItemCard({ item }: { item: ParsedBriefingItem }) {
         {item.topics.map((topic) => (
           <span
             key={topic}
-            className="px-2 py-1 rounded-sm bg-[var(--color-bg-raised)] border border-[var(--color-border-subtle)] text-tiny text-muted-foreground"
+            className="px-2 py-1 rounded-sm bg-raised border border-subtle text-tiny text-muted-foreground"
           >
             #{topic}
           </span>
@@ -177,7 +177,7 @@ export const SharedBriefingView: React.FC<SharedBriefingViewProps> = ({ briefing
 
         {/* CTA */}
         <div className="text-center px-5 py-10 border-t border-border">
-          <p className="text-body-lg text-[var(--color-text-tertiary)] mb-5">
+          <p className="text-body-lg text-tertiary mb-5">
             Zero-noise briefings powered by AI + Nostr + Internet Computer
           </p>
           <Link
@@ -190,7 +190,7 @@ export const SharedBriefingView: React.FC<SharedBriefingViewProps> = ({ briefing
       </main>
 
       {/* Footer */}
-      <footer className="text-center p-5 border-t border-[var(--color-border-subtle)] text-caption text-[var(--color-text-disabled)]">
+      <footer className="text-center p-5 border-t border-subtle text-caption text-disabled">
         Curated by Aegis — AI Content Quality Filter
       </footer>
     </div>

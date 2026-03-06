@@ -30,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
   return (
     <nav
       className={cn(
-        "flex flex-col shrink-0 bg-[var(--color-bg-overlay)] backdrop-blur-[20px] border-r border-[var(--color-border-subtle)] transition-[width] duration-300",
+        "flex flex-col shrink-0 bg-overlay backdrop-blur-lg border-r border-subtle transition-[width] duration-300",
         collapsed ? "w-[68px] px-2 py-5" : "w-[200px] px-3 py-6"
       )}
     >
@@ -45,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         {!collapsed && (
           <div>
             <div className="text-[17px] font-extrabold tracking-[3px] text-foreground">AEGIS</div>
-            <div className="text-tiny text-[var(--color-text-disabled)] tracking-[2px]">v3.0</div>
+            <div className="text-tiny text-disabled tracking-[2px]">v3.0</div>
           </div>
         )}
       </div>
@@ -63,7 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
               collapsed ? "py-3 px-0 justify-center" : "py-3 px-4 justify-start",
               active
                 ? "bg-blue-600/[0.12] border-blue-600/20 border-l-4 border-l-blue-400 text-blue-400 shadow-[inset_0_0_20px_rgba(37,99,235,0.08)]"
-                : "bg-transparent border-transparent border-l-4 border-l-transparent text-[var(--color-text-disabled)] hover:text-[var(--color-text-tertiary)] hover:bg-navy-lighter/50"
+                : "bg-transparent border-transparent border-l-4 border-l-transparent text-disabled hover:text-tertiary hover:bg-navy-lighter/50"
             )}
           >
             {it.icon}
@@ -71,7 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
               <div>
                 <div className={cn("text-[13px]", active ? "font-bold" : "font-normal")}>{it.label}</div>
                 {it.description && (
-                  <div className="text-tiny text-[var(--color-text-disabled)] font-normal mt-px leading-[1.2]">{it.description}</div>
+                  <div className="text-tiny text-disabled font-normal mt-px leading-h1">{it.description}</div>
                 )}
               </div>
             )}
@@ -101,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
               collapsed ? "py-2 px-0 justify-center" : "py-2 px-3 justify-start",
               active
                 ? "bg-blue-600/[0.12] border-blue-600/20 text-blue-400"
-                : "bg-transparent border-transparent text-[var(--color-text-disabled)] hover:text-[var(--color-text-tertiary)]"
+                : "bg-transparent border-transparent text-disabled hover:text-tertiary"
             )}
           >
             {n.icon}
@@ -117,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         rel="noopener noreferrer"
         title="Open Source on GitHub"
         className={cn(
-          "flex items-center gap-2 mb-2 text-caption text-[var(--color-text-disabled)] no-underline rounded-sm transition-all duration-150 hover:text-[var(--color-text-tertiary)]",
+          "flex items-center gap-2 mb-2 text-caption text-disabled no-underline rounded-sm transition-all duration-150 hover:text-tertiary",
           collapsed ? "py-2 px-0 justify-center" : "py-2 px-3 justify-start"
         )}
       >
@@ -143,7 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
           <div className="flex items-center gap-2">
             <div className="size-[7px] rounded-full bg-emerald-400 animate-pulse shrink-0" />
             <span className="text-caption font-semibold text-emerald-400 uppercase tracking-wider">Online</span>
-            <span className="text-tiny text-[var(--color-text-disabled)]">·</span>
+            <span className="text-tiny text-disabled">·</span>
             <span className="text-caption font-bold text-secondary-foreground font-mono">Aegis AI</span>
           </div>
         )}

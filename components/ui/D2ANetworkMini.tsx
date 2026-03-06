@@ -61,7 +61,7 @@ export const D2ANetworkMini: React.FC<D2ANetworkMiniProps> = ({ mobile }) => {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
           <div className="size-1.5 rounded-full bg-purple-400 shadow-[0_0_6px_rgba(167,139,250,0.5)] animate-pulse" />
-          <span className="text-body-sm font-semibold text-[var(--color-text-tertiary)]">
+          <span className="text-body-sm font-semibold text-tertiary">
             D2A Network
           </span>
         </div>

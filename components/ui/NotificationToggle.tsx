@@ -50,7 +50,7 @@ export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact 
           "flex items-center justify-center size-7 rounded-sm p-0 shrink-0 transition-fast",
           isSubscribed
             ? "bg-cyan-500/[0.09] border border-cyan-500/20"
-            : "bg-transparent border border-[var(--color-border-subtle)]",
+            : "bg-transparent border border-subtle",
           (denied || isLoading) && "opacity-40 cursor-not-allowed",
           !(denied || isLoading) && "cursor-pointer"
         )}
@@ -69,13 +69,13 @@ export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact 
       "flex items-center justify-between px-3 py-2 rounded-md transition-fast",
       isSubscribed
         ? "bg-cyan-500/[0.04] border border-cyan-500/20"
-        : "bg-card border border-[var(--color-border-subtle)]"
+        : "bg-card border border-subtle"
     )}>
       <div className="min-w-0">
         <div className={cn("text-caption font-semibold tracking-[0.3px]", isSubscribed ? "text-cyan-400" : "text-muted-foreground")}>
           Push Notifications
         </div>
-        <div className={cn("text-tiny mt-px leading-tight", error ? "text-red-400" : "text-[var(--color-text-disabled)]")}>
+        <div className={cn("text-tiny mt-px leading-tight", error ? "text-red-400" : "text-disabled")}>
           {error
             ? error
             : isSubscribed
@@ -93,7 +93,7 @@ export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact 
           (denied || isLoading) && "opacity-40 cursor-not-allowed",
           !(denied || isLoading) && "cursor-pointer",
           isSubscribed
-            ? "bg-transparent text-muted-foreground border border-[var(--color-border-subtle)]"
+            ? "bg-transparent text-muted-foreground border border-subtle"
             : "bg-cyan-500/[0.09] text-cyan-400 border border-cyan-500/20"
         )}
       >

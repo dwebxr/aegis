@@ -93,9 +93,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
           : "grid grid-cols-2 gap-4 items-start mb-16"
       )}>
         {/* Activity Trends */}
-        <div className="bg-transparent border border-[var(--color-border-subtle)] rounded-lg px-4 py-3">
+        <div className="bg-transparent border border-subtle rounded-lg px-4 py-3">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-body-sm font-semibold text-[var(--color-text-tertiary)] flex items-center gap-2">
+            <div className="text-body-sm font-semibold text-tertiary flex items-center gap-2">
               <span>&#x26A1;</span> Activity Trends
             </div>
             <div className="flex gap-1 bg-navy-lighter rounded-md p-1 border border-border">
@@ -108,7 +108,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
                     className={cn(
                       "px-2 py-1 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
                       active
-                        ? "bg-card border border-[var(--color-border-emphasis)] text-foreground"
+                        ? "bg-card border border-emphasis text-foreground"
                         : "bg-transparent border border-transparent text-muted-foreground"
                     )}
                   >
@@ -153,7 +153,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
           {activity.recentActions.length > 0 && (
             <div className="flex flex-col gap-2">
               {activity.recentActions.map(item => (
-                <div key={item.id} className="flex items-center gap-2 text-caption text-[var(--color-text-disabled)]">
+                <div key={item.id} className="flex items-center gap-2 text-caption text-disabled">
                   <span className={item.validated ? "text-emerald-400" : "text-red-400"}>
                     {item.validated ? "\u2713" : "\u2717"}
                   </span>
@@ -167,12 +167,12 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
         </div>
 
         {/* Topic Breakdown */}
-        <div data-testid="aegis-analytics-topic-breakdown" className="bg-transparent border border-[var(--color-border-subtle)] rounded-lg px-4 py-3">
-          <div className="text-body-sm font-semibold text-[var(--color-text-tertiary)] mb-3 flex items-center gap-2">
+        <div data-testid="aegis-analytics-topic-breakdown" className="bg-transparent border border-subtle rounded-lg px-4 py-3">
+          <div className="text-body-sm font-semibold text-tertiary mb-3 flex items-center gap-2">
             <span>&#x1F4CA;</span> Topic Breakdown
           </div>
           {topicDist.length === 0 ? (
-            <div className="text-body-sm text-[var(--color-text-disabled)] text-center p-4">
+            <div className="text-body-sm text-disabled text-center p-4">
               Add sources to see topic distribution.
             </div>
           ) : (
@@ -192,7 +192,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
                         style={{ width: `${barWidth}%`, background: `${barColor}40`, transition: "width 0.3s ease" }}
                       />
                     </div>
-                    <span className="w-7 text-caption text-[var(--color-text-disabled)] font-mono text-right shrink-0">
+                    <span className="w-7 text-caption text-disabled font-mono text-right shrink-0">
                       {entry.count}
                     </span>
                     {(() => {
@@ -202,7 +202,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
                       const arrowColor = trend.direction === "up" ? colors.green[400] : trend.direction === "down" ? colors.red[400] : colors.text.disabled;
                       return (
                         <>
-                          <span className="w-[50px] text-[10px] font-semibold text-right shrink-0" style={{ color: arrowColor }}>
+                          <span className="w-[50px] text-caption font-semibold text-right shrink-0" style={{ color: arrowColor }}>
                             {arrow} {Math.abs(trend.changePercent)}%
                           </span>
                           <div className="flex items-end gap-px h-3.5 w-5 shrink-0">
@@ -223,7 +223,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
                   </div>
                 );
               })}
-              <div className="text-tiny text-[var(--color-text-disabled)] mt-1 flex gap-3">
+              <div className="text-tiny text-disabled mt-1 flex gap-3">
                 <span><span className="inline-block size-2 rounded-[2px] mr-1" style={{ background: `${colors.cyan[400]}40` }} />high quality</span>
                 <span><span className="inline-block size-2 rounded-[2px] mr-1" style={{ background: `${colors.orange[400]}40` }} />mixed</span>
               </div>
@@ -234,11 +234,11 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
 
       <div className={cn("grid gap-4 mb-16", mobile ? "grid-cols-1 gap-3 mb-12" : "grid-cols-2")}>
         <div className={cn("bg-card border border-border rounded-lg", mobile ? "p-4" : "p-5")}>
-          <div className="text-h3 font-semibold text-[var(--color-text-tertiary)] mb-4">Score Distribution</div>
+          <div className="text-h3 font-semibold text-tertiary mb-4">Score Distribution</div>
           <BarChart data={scoreBuckets} labels={["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]} color={colors.sky[400]} />
         </div>
         <div className={cn("bg-card border border-border rounded-lg", mobile ? "p-4" : "p-5")}>
-          <div className="text-h3 font-semibold text-[var(--color-text-tertiary)] mb-4">Content Sources</div>
+          <div className="text-h3 font-semibold text-tertiary mb-4">Content Sources</div>
           <BarChart data={Object.values(sourceDistribution)} labels={Object.keys(sourceDistribution)} color={colors.purple[400]} />
         </div>
       </div>
@@ -246,7 +246,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
       {Object.keys(engineDistribution).length > 0 && (
         <div className={cn("grid grid-cols-1 gap-4 mb-16", mobile && "gap-3 mb-12")}>
           <div className={cn("bg-card border border-border rounded-lg", mobile ? "p-4" : "p-5")}>
-            <div className="text-h3 font-semibold text-[var(--color-text-tertiary)] mb-4">Scoring Engines</div>
+            <div className="text-h3 font-semibold text-tertiary mb-4">Scoring Engines</div>
             <BarChart data={Object.values(engineDistribution)} labels={Object.keys(engineDistribution).map(k => ENGINE_LABELS[k as ScoringEngine] || k)} color={colors.cyan[400]} />
           </div>
         </div>
@@ -282,8 +282,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
                 />
               </div>
               <div className="flex justify-between mt-1">
-                <span className="text-[9px] text-muted-foreground">0</span>
-                <span className="text-[9px] text-muted-foreground">10</span>
+                <span className="text-tiny text-muted-foreground">0</span>
+                <span className="text-tiny text-muted-foreground">10</span>
               </div>
             </div>
           </div>
@@ -337,7 +337,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
                       }}
                     />
                   </div>
-                  <div className="text-[10px] text-muted-foreground mt-1.5">
+                  <div className="text-caption text-muted-foreground mt-1.5">
                     Measures how effectively your signals engage the community.
                     Higher = more validated, higher-quality signals.
                   </div>
@@ -351,7 +351,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
               <div className="flex items-center gap-2 mb-4">
                 <div className="text-h3 font-semibold text-purple-400">D2A Agent</div>
                 <div className={cn(
-                  "text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase",
+                  "text-tiny font-bold px-2 py-0.5 rounded-lg uppercase",
                   agentState.isActive
                     ? "bg-emerald-500/15 text-emerald-400"
                     : "bg-slate-500/15 text-muted-foreground"

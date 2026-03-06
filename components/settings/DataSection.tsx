@@ -66,7 +66,7 @@ export const DataSection: React.FC<DataSectionProps> = ({ mobile, content }) => 
         {content.length > 0 ? (
           <>
             <div className="mb-3">
-              <div className="text-tiny text-[var(--color-text-disabled)] mb-1">Period</div>
+              <div className="text-tiny text-disabled mb-1">Period</div>
               <div className="flex gap-1 flex-wrap">
                 {PERIOD_OPTIONS.map(opt => (
                   <button key={opt.value} onClick={() => setExportPeriod(opt.value)} className={pillBtnClass(exportPeriod === opt.value)}>
@@ -77,7 +77,7 @@ export const DataSection: React.FC<DataSectionProps> = ({ mobile, content }) => 
             </div>
 
             <div className="mb-3">
-              <div className="text-tiny text-[var(--color-text-disabled)] mb-1">Content</div>
+              <div className="text-tiny text-disabled mb-1">Content</div>
               <div className="flex gap-1 flex-wrap">
                 {TYPE_OPTIONS.map(opt => (
                   <button key={opt.value} onClick={() => setExportType(opt.value)} className={pillBtnClass(exportType === opt.value)}>
@@ -105,12 +105,12 @@ export const DataSection: React.FC<DataSectionProps> = ({ mobile, content }) => 
             </div>
           </>
         ) : (
-          <div className="text-caption text-[var(--color-text-disabled)]">
+          <div className="text-caption text-disabled">
             No content to export yet. Evaluate some content first.
           </div>
         )}
 
-        <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-tight">
+        <div className="text-tiny text-disabled mt-2 leading-tight">
           Download your evaluations as CSV or JSON. Choose a time period and content type to filter.
         </div>
       </div>
@@ -147,7 +147,7 @@ export const DataSection: React.FC<DataSectionProps> = ({ mobile, content }) => 
             </button>
           )}
         </div>
-        <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-tight">
+        <div className="text-tiny text-disabled mt-2 leading-tight">
           Cache stores dedup hashes &amp; source state. Preferences include your topic weights &amp; author quality data.
         </div>
       </div>

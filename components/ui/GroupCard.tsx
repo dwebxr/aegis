@@ -40,13 +40,13 @@ export const GroupCard: React.FC<GroupCardProps> = ({
           <div className="text-h3 font-bold font-mono text-purple-400">
             {feedCount}
           </div>
-          <div className="text-[9px] text-muted-foreground uppercase">Items</div>
+          <div className="text-tiny text-muted-foreground uppercase">Items</div>
         </div>
       </div>
 
       {/* Tags and meta */}
       <div className="flex gap-2 mt-2 flex-wrap items-center">
-        <span className="text-caption text-[var(--color-text-disabled)] bg-navy-lighter px-2 py-px rounded-sm">
+        <span className="text-caption text-disabled bg-navy-lighter px-2 py-px rounded-sm">
           {group.members.length} member{group.members.length !== 1 ? "s" : ""}
         </span>
         {group.topics.map(tp => (
@@ -55,7 +55,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
           </span>
         ))}
         {isOwner && (
-          <span className="text-[9px] font-bold px-1.5 py-px rounded-full bg-purple-400/[0.12] text-purple-400 uppercase">
+          <span className="text-tiny font-bold px-1.5 py-px rounded-full bg-purple-400/[0.12] text-purple-400 uppercase">
             Owner
           </span>
         )}

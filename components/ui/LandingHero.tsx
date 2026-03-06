@@ -146,7 +146,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
     </p>
 
     <p className={cn(
-      "leading-relaxed text-[var(--color-text-tertiary)] mt-2 mb-0 max-w-[480px]",
+      "leading-relaxed text-tertiary mt-2 mb-0 max-w-[480px]",
       mobile ? "text-body-sm" : "text-body"
     )}>
       Built for researchers, analysts, and anyone whose work depends on finding signal.
@@ -170,7 +170,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
       <button
         data-testid="aegis-landing-login"
         onClick={onLogin}
-        className="px-4 py-1 bg-transparent border-none rounded-sm text-[var(--color-text-tertiary)] text-body-sm font-medium cursor-pointer font-sans underline decoration-[var(--color-border-emphasis)] underline-offset-[3px] transition-normal"
+        className="px-4 py-1 bg-transparent border-none rounded-sm text-tertiary text-body-sm font-medium cursor-pointer font-sans underline decoration-emphasis underline-offset-[3px] transition-normal"
       >
         or sign in with Internet Identity
       </button>
@@ -178,7 +178,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
 
     {/* HOW IT WORKS */}
     <div className={cn("w-full max-w-[640px]", mobile ? "mt-10" : "mt-12")}>
-      <div className="text-caption font-bold text-[var(--color-text-disabled)] tracking-[2px] uppercase mb-3 text-center">How It Works</div>
+      <div className="text-caption font-bold text-disabled tracking-[2px] uppercase mb-3 text-center">How It Works</div>
       <div className={cn("grid gap-4", mobile ? "grid-cols-1 gap-3" : "grid-cols-3")}>
         {HOW_IT_WORKS.map(s => (
           <div key={s.step} className={cn(
@@ -202,7 +202,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
 
     {/* WHAT YOU GET */}
     <div className={cn("w-full max-w-[640px]", mobile ? "mt-8" : "mt-10")}>
-      <div className="text-caption font-bold text-[var(--color-text-disabled)] tracking-[2px] uppercase mb-3 text-center">What You Get</div>
+      <div className="text-caption font-bold text-disabled tracking-[2px] uppercase mb-3 text-center">What You Get</div>
       <div className={cn("grid gap-4", mobile ? "grid-cols-1 gap-3" : "grid-cols-2")}>
         {OUTCOMES.map(o => (
           <div key={o.title} className={cn(
@@ -224,7 +224,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
 
     {/* FEATURES */}
     <div className={cn("w-full max-w-[640px]", mobile ? "mt-8" : "mt-10")}>
-      <div className="text-caption font-bold text-[var(--color-text-disabled)] tracking-[2px] uppercase mb-3 text-center">Features</div>
+      <div className="text-caption font-bold text-disabled tracking-[2px] uppercase mb-3 text-center">Features</div>
       <div className={cn("grid gap-4", mobile ? "grid-cols-1 gap-3" : "grid-cols-2")}>
         {FEATURES.map(f => (
           <div key={f.title} className={cn(
@@ -274,7 +274,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
       "w-full max-w-[640px] bg-card border border-border rounded-xl text-center",
       mobile ? "mt-8 p-5" : "mt-10 p-6"
     )}>
-      <div className="text-[var(--color-text-tertiary)] mb-3">
+      <div className="text-tertiary mb-3">
         <GitHubIcon s={24} />
       </div>
       <div className="text-h2 font-bold text-foreground mb-2">
@@ -285,7 +285,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
       </p>
       <div className="flex justify-center gap-2 mt-4 flex-wrap">
         {TRUST_PILLS.map(label => (
-          <span key={label} className="border border-[var(--color-border-emphasis)] rounded-full px-3 py-1 text-tiny font-semibold text-[var(--color-text-tertiary)]">
+          <span key={label} className="border border-emphasis rounded-full px-3 py-1 text-tiny font-semibold text-tertiary">
             {label}
           </span>
         ))}
@@ -294,11 +294,11 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
 
     {/* WHO IT'S FOR */}
     <div className={cn("w-full max-w-[640px]", mobile ? "mt-8" : "mt-10")}>
-      <div className="text-caption font-bold text-[var(--color-text-disabled)] tracking-[2px] uppercase mb-3 text-center">Who It&rsquo;s For</div>
+      <div className="text-caption font-bold text-disabled tracking-[2px] uppercase mb-3 text-center">Who It&rsquo;s For</div>
       <div className={cn("grid gap-4", mobile ? "grid-cols-1 gap-3" : "grid-cols-3")}>
         {PERSONAS.map(p => (
           <div key={p.role} className={cn(
-            "bg-navy-lighter border border-[var(--color-border-subtle)] border-t-2 rounded-lg",
+            "bg-navy-lighter border border-subtle border-t-2 rounded-lg",
             p.borderClass,
             mobile ? "p-4" : "p-5"
           )}>
@@ -317,7 +317,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
     </div>
 
     {/* Footer */}
-    <div className="mt-8 text-caption text-[var(--color-text-disabled)] text-center">
+    <div className="mt-8 text-caption text-disabled text-center">
       <span className="font-mono">v3.0</span>
       <span> &middot; Use your browser&rsquo;s translate feature to read in your language.</span>
     </div>

@@ -11,7 +11,7 @@ interface CostInsightsProps {
   expanded?: boolean;
 }
 
-const kpiLabel = "text-tiny font-bold uppercase tracking-[0.5px] text-[var(--color-text-disabled)]";
+const kpiLabel = "text-tiny font-bold uppercase tracking-[0.5px] text-disabled";
 
 export const CostInsights: React.FC<CostInsightsProps> = ({ stats, mobile, expanded = false }) => {
   const costSaved = stats.mode === "lite" && stats.totalInput > 0
@@ -128,9 +128,9 @@ function LiteVsProTable() {
         {rows.map((row, i) => (
           <div key={row.feature} className={cn(
             "grid grid-cols-[2fr_1fr_1fr] px-3 py-2",
-            i < rows.length - 1 && "border-b border-[var(--color-border-subtle)]"
+            i < rows.length - 1 && "border-b border-subtle"
           )}>
-            <div className="text-body-sm text-[var(--color-text-tertiary)]">{row.feature}</div>
+            <div className="text-body-sm text-tertiary">{row.feature}</div>
             <div className="text-body-sm text-secondary-foreground text-center">{row.lite}</div>
             <div className="text-body-sm text-secondary-foreground text-center">{row.pro}</div>
           </div>
@@ -187,7 +187,7 @@ function CompetitorComparison({ mobile }: { mobile?: boolean }) {
             "px-4 py-3 rounded-md border",
             c.highlight
               ? "bg-emerald-400/[0.06] border-green-400/15"
-              : "bg-navy-lighter border-[var(--color-border-subtle)]"
+              : "bg-navy-lighter border-subtle"
           )}>
             <div className={cn("text-body-sm font-bold mb-1", c.colorClass)}>
               {c.name}

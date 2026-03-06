@@ -74,7 +74,7 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
         <div className="flex gap-2 justify-end">
           <button
             onClick={handleCancel}
-            className="px-3 py-1 bg-transparent border border-[var(--color-border-subtle)] rounded-sm text-muted-foreground text-tiny font-semibold cursor-pointer font-[inherit]"
+            className="px-3 py-1 bg-transparent border border-subtle rounded-sm text-muted-foreground text-tiny font-semibold cursor-pointer font-[inherit]"
           >
             Cancel
           </button>
@@ -95,11 +95,11 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
         "flex items-center gap-1.5 rounded-sm px-2 py-1 border",
         isEnabled
           ? "bg-purple-600/[0.06] border-purple-600/20"
-          : "bg-[var(--color-border-subtle)] border-[var(--color-border-subtle)]"
+          : "bg-subtle border-subtle"
       )}>
         <div className={cn(
           "size-1.5 rounded-full shrink-0",
-          isEnabled ? "bg-purple-400 shadow-[0_0_6px_rgba(167,139,250,0.5)] animate-pulse" : "bg-[var(--color-text-disabled)]"
+          isEnabled ? "bg-purple-400 shadow-[0_0_6px_rgba(167,139,250,0.5)] animate-pulse" : "bg-disabled"
         )} />
         <span className={cn("text-tiny font-semibold", isEnabled ? "text-purple-400" : "text-muted-foreground")}>
           D2A
@@ -124,13 +124,13 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
       "rounded-md px-4 py-3 border",
       isEnabled
         ? "bg-purple-600/[0.06] border-purple-600/20"
-        : "bg-[var(--color-border-subtle)] border-[var(--color-border-subtle)]"
+        : "bg-subtle border-subtle"
     )}>
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
           <div className={cn(
             "size-[7px] rounded-full",
-            isEnabled ? "bg-purple-400 shadow-[0_0_6px_rgba(167,139,250,0.5)] animate-pulse" : "bg-[var(--color-text-disabled)]"
+            isEnabled ? "bg-purple-400 shadow-[0_0_6px_rgba(167,139,250,0.5)] animate-pulse" : "bg-disabled"
           )} />
           <span className={cn("text-caption font-semibold", isEnabled ? "text-purple-400" : "text-muted-foreground")}>
             D2A Agent
@@ -150,7 +150,7 @@ export const AgentStatusBadge: React.FC<AgentStatusBadgeProps> = ({ compact }) =
       </div>
       {isEnabled && (
         <>
-          <div className="flex gap-3 text-caption text-[var(--color-text-tertiary)]">
+          <div className="flex gap-3 text-caption text-tertiary">
             <span><strong className="text-purple-400 font-mono">{peerCount}</strong> peers</span>
             <span><strong className="text-sky-400 font-mono">{activeHS}</strong> active</span>
             <span>

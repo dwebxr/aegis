@@ -24,7 +24,7 @@ const STAGES = [
   { id: "S1", name: "Heuristic Filter", activatable: true, colorClass: "text-purple-400" },
   { id: "S2", name: "Structural", activatable: true, colorClass: "text-sky-400" },
   { id: "S3", name: "LLM Score", activatable: true, colorClass: "text-amber-400" },
-  { id: "S4", name: "Cross-Valid", activatable: false, colorClass: "text-[var(--color-text-tertiary)]" },
+  { id: "S4", name: "Cross-Valid", activatable: false, colorClass: "text-tertiary" },
 ] as const;
 
 export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, onUploadImage, nostrPubkey, icpBalance, stakingEnabled, publishGate, mobile }) => {

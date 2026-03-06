@@ -44,7 +44,7 @@ const HEALTH_BG: Record<string, string> = {
   healthy: "bg-green-400",
   degraded: "bg-amber-400",
   error: "bg-red-400",
-  disabled: "bg-[var(--color-text-disabled)]",
+  disabled: "bg-disabled",
   rate_limited: "bg-sky-400",
 };
 
@@ -58,7 +58,7 @@ const btnClass = (disabled: boolean, loading: boolean) => cn(
 
 const saveBtnClass = "px-4 py-2 bg-gradient-to-br from-green-500 to-green-400 border-none rounded-md text-white text-body-sm font-bold cursor-pointer transition-fast font-[inherit]";
 
-const kpiLabel = "text-tiny font-bold uppercase tracking-[0.5px] text-[var(--color-text-disabled)]";
+const kpiLabel = "text-tiny font-bold uppercase tracking-[0.5px] text-disabled";
 
 function platformBadgeClass(platform?: string, type?: string): string {
   const key = platform || type;
@@ -490,7 +490,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         {sourceTabs.map(s => (
           <button key={s.id} data-testid={`aegis-sources-tab-${s.id}`} onClick={() => setActiveSource(s.id)} className={cn(
             "flex items-center gap-1.5 px-4 py-2 rounded-sm text-body-sm font-semibold cursor-pointer transition-fast font-[inherit] border",
-            activeSource === s.id ? s.activeClass : "bg-[var(--color-border-subtle)] border-[var(--color-border-subtle)] text-muted-foreground"
+            activeSource === s.id ? s.activeClass : "bg-subtle border-subtle text-muted-foreground"
           )}>
             {s.icon} {s.label}
           </button>
@@ -529,7 +529,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     </a>
                   </div>
                 </div>
-                <div className="text-body-sm text-[var(--color-text-tertiary)] leading-relaxed max-h-[200px] overflow-auto mb-3">{urlResult.content.slice(0, 1000)}{urlResult.content.length > 1000 ? "..." : ""}</div>
+                <div className="text-body-sm text-tertiary leading-relaxed max-h-[200px] overflow-auto mb-3">{urlResult.content.slice(0, 1000)}{urlResult.content.length > 1000 ? "..." : ""}</div>
                 <button onClick={() => handleAnalyzeOnce(urlResult.content, { sourceUrl: urlInput, imageUrl: urlResult.imageUrl })} disabled={isAnalyzing || analyzedUrls.has(urlInput)} className={btnClass(isAnalyzing || analyzedUrls.has(urlInput), isAnalyzing)}>
                   {analyzedUrls.has(urlInput) ? "Already Analyzed" : isAnalyzing ? "Analyzing..." : "Analyze This Content"}
                 </button>
@@ -601,7 +601,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                         onClick={() => { setQuickAddMode(quickAddMode === p.id ? "" : p.id); setQuickAddInput(""); setQuickAddError(""); setRssError(""); setResolvedFarcaster(null); setResolvedPlatform(null); }}
                         className={cn(
                           "flex items-center gap-1 px-3 py-1 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast border",
-                          quickAddMode === p.id ? p.activeClass : "bg-[var(--color-border-subtle)] border-[var(--color-border-subtle)] text-muted-foreground"
+                          quickAddMode === p.id ? p.activeClass : "bg-subtle border-subtle text-muted-foreground"
                         )}
                       >
                         {p.id === "github" ? <GitHubIcon s={12} /> : <span>{p.icon}</span>} {p.label}
@@ -698,7 +698,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     <div className="flex justify-between items-start gap-3">
                       <div className="flex-1">
                         <div className="text-body-sm text-secondary-foreground font-semibold font-mono">{tweet.authorHandle}</div>
-                        <div className="text-body-sm text-[var(--color-text-tertiary)] leading-normal mt-1">{tweet.text}</div>
+                        <div className="text-body-sm text-tertiary leading-normal mt-1">{tweet.text}</div>
                         <div className="text-caption text-muted-foreground mt-1">{tweet.createdAt}</div>
                       </div>
                       <button onClick={() => handleAnalyzeOnce(tweet.text)} disabled={isAnalyzing || analyzedUrls.has(tweet.text.slice(0, 200))} className={cn(btnClass(isAnalyzing || analyzedUrls.has(tweet.text.slice(0, 200)), false), "!px-3 !py-1.5 !text-caption")}>
@@ -737,7 +737,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     <div className="flex justify-between items-start gap-3">
                       <div className="flex-1">
                         <div className="text-caption text-purple-400 font-mono">{event.pubkey.slice(0, 12)}...{event.pubkey.slice(-8)}</div>
-                        <div className="text-body-sm text-[var(--color-text-tertiary)] leading-normal mt-1">{event.content}</div>
+                        <div className="text-body-sm text-tertiary leading-normal mt-1">{event.content}</div>
                         <div className="text-caption text-muted-foreground mt-1">{new Date(event.createdAt * 1000).toLocaleString()}</div>
                       </div>
                       <button onClick={() => handleAnalyzeOnce(event.content)} disabled={isAnalyzing || analyzedUrls.has(event.content.slice(0, 200))} className={cn(btnClass(isAnalyzing || analyzedUrls.has(event.content.slice(0, 200)), false), "!px-3 !py-1.5 !text-caption")}>
@@ -830,12 +830,12 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
               &#x1F4A1; Suggested Sources
             </div>
             {feedSuggestions.map(s => (
-              <div key={s.domain} className="flex items-center gap-3 py-2 border-t border-[var(--color-border-subtle)]">
+              <div key={s.domain} className="flex items-center gap-3 py-2 border-t border-subtle">
                 <div className="flex-1">
                   <div className="text-body-sm text-secondary-foreground font-semibold">
                     {s.domain}
                   </div>
-                  <div className="text-caption text-[var(--color-text-disabled)]">
+                  <div className="text-caption text-disabled">
                     {s.count} validated items from this domain
                   </div>
                 </div>
@@ -850,14 +850,14 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     Add Feed
                   </button>
                 ) : (
-                  <span className="text-caption text-[var(--color-text-disabled)]">No feed found</span>
+                  <span className="text-caption text-disabled">No feed found</span>
                 )}
                 <button
                   onClick={() => {
                     dismissSuggestion(s.domain);
                     setFeedSuggestions(prev => prev.filter(p => p.domain !== s.domain));
                   }}
-                  className="bg-transparent border-none text-[var(--color-text-disabled)] text-caption cursor-pointer font-[inherit]"
+                  className="bg-transparent border-none text-disabled text-caption cursor-pointer font-[inherit]"
                 >
                   Dismiss
                 </button>
@@ -901,7 +901,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   <div className="flex-1 min-w-0">
                     <div className={cn(
                       "text-body-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap",
-                      s.enabled ? "text-secondary-foreground" : "text-[var(--color-text-disabled)]"
+                      s.enabled ? "text-secondary-foreground" : "text-disabled"
                     )}>
                       {s.label}
                     </div>
@@ -910,7 +910,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     </div>
                     {/* Runtime stats */}
                     {state && (
-                      <div className="text-tiny text-[var(--color-text-disabled)] mt-0.5">
+                      <div className="text-tiny text-disabled mt-0.5">
                         {state.lastFetchedAt > 0 && (
                           <span>Last fetch: {relativeTime(state.lastFetchedAt)}</span>
                         )}
@@ -956,7 +956,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     onClick={() => editingId === s.id ? cancelEdit() : startEdit(s)}
                     className={cn(
                       "bg-transparent border-none cursor-pointer px-1.5 py-0.5 text-caption font-[inherit] transition-fast",
-                      editingId === s.id ? "text-blue-400" : "text-[var(--color-text-disabled)]"
+                      editingId === s.id ? "text-blue-400" : "text-disabled"
                     )}
                     title="Edit source"
                   >
@@ -964,7 +964,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   </button>}
                   {!isDemoMode && <button
                     onClick={() => removeSource(s.id)}
-                    className="bg-transparent border-none cursor-pointer px-1.5 py-0.5 text-caption text-[var(--color-text-disabled)] font-[inherit] transition-fast"
+                    className="bg-transparent border-none cursor-pointer px-1.5 py-0.5 text-caption text-disabled font-[inherit] transition-fast"
                     title="Remove source"
                   >
                     &#x2715;
@@ -992,7 +992,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                           <label className={cn(kpiLabel, "block mb-1")}>Relays ({editRelays.length})</label>
                           {editRelays.map((relay, i) => (
                             <div key={relay} className="flex items-center gap-2 mb-0.5">
-                              <span className="flex-1 text-body-sm text-[var(--color-text-tertiary)] font-mono overflow-hidden text-ellipsis whitespace-nowrap">{relay}</span>
+                              <span className="flex-1 text-body-sm text-tertiary font-mono overflow-hidden text-ellipsis whitespace-nowrap">{relay}</span>
                               <button
                                 onClick={() => setEditRelays(prev => prev.filter((_, idx) => idx !== i))}
                                 className="bg-transparent border-none cursor-pointer px-1 py-px text-caption text-red-400 font-[inherit]"
@@ -1028,7 +1028,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                           <label className={cn(kpiLabel, "block mb-1")}>Public Keys ({editPubkeys.length})</label>
                           {editPubkeys.map((pk, i) => (
                             <div key={pk} className="flex items-center gap-2 mb-0.5">
-                              <span className="flex-1 text-body-sm text-[var(--color-text-tertiary)] font-mono overflow-hidden text-ellipsis whitespace-nowrap">{pk}</span>
+                              <span className="flex-1 text-body-sm text-tertiary font-mono overflow-hidden text-ellipsis whitespace-nowrap">{pk}</span>
                               <button
                                 onClick={() => setEditPubkeys(prev => prev.filter((_, idx) => idx !== i))}
                                 className="bg-transparent border-none cursor-pointer px-1 py-px text-caption text-red-400 font-[inherit]"

@@ -34,12 +34,12 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ text, mobile }) => {
       aria-label="Info"
       tabIndex={0}
     >
-      <span className="text-caption font-semibold text-[var(--color-text-disabled)] size-4 inline-flex items-center justify-center border border-[var(--color-border-emphasis)] rounded-full">
+      <span className="text-caption font-semibold text-disabled size-4 inline-flex items-center justify-center border border-emphasis rounded-full">
         i
       </span>
       <span
         className={cn(
-          "absolute top-[calc(100%+6px)] bg-navy-lighter border border-[var(--color-border-emphasis)] rounded-sm px-3 py-2 text-caption text-[var(--color-text-tertiary)] leading-[1.5] whitespace-normal w-max z-[100] shadow-md transition-opacity duration-150",
+          "absolute top-[calc(100%+6px)] bg-navy-lighter border border-emphasis rounded-sm px-3 py-2 text-caption text-tertiary leading-body-sm whitespace-normal w-max z-[100] shadow-md transition-opacity duration-150",
           mobile ? "right-0 max-w-[calc(100vw-32px)]" : "left-0 max-w-[260px] pointer-events-none aegis-tooltip-content",
           mobile ? (open ? "opacity-100" : "opacity-0") : "opacity-0",
         )}

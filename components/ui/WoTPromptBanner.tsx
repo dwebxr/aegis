@@ -9,7 +9,7 @@ interface WoTPromptBannerProps {
 export const WoTPromptBanner: React.FC<WoTPromptBannerProps> = ({ onGoToSettings, onDismiss }) => (
   <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-2 bg-gradient-to-br from-emerald-500/[0.08] to-cyan-500/[0.08] border border-emerald-500/20 rounded-md mb-4">
     <div className="flex items-center gap-2 flex-1 min-w-0">
-      <span className="text-body-sm text-[var(--color-text-tertiary)] leading-snug">
+      <span className="text-body-sm text-tertiary leading-snug">
         <strong className="text-emerald-400">Web of Trust</strong>
         {" \u2014 Link your Nostr account to activate trust-based content filtering"}
       </span>
@@ -23,7 +23,7 @@ export const WoTPromptBanner: React.FC<WoTPromptBannerProps> = ({ onGoToSettings
       </button>
       <button
         onClick={onDismiss}
-        className="bg-transparent border-none cursor-pointer text-[var(--color-text-disabled)] text-sm p-1 leading-none"
+        className="bg-transparent border-none cursor-pointer text-disabled text-sm p-1 leading-none"
       >
         &#x2715;
       </button>

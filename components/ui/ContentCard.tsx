@@ -45,7 +45,7 @@ function GradeBadge({ composite }: { composite: number }) {
       }}
     >
       <span className="text-lg font-extrabold font-mono leading-none" style={{ color }}>{grade}</span>
-      <span className="text-[10px] font-semibold font-mono leading-none opacity-85" style={{ color }}>{composite.toFixed(1)}</span>
+      <span className="text-caption font-semibold font-mono leading-none opacity-85" style={{ color }}>{composite.toFixed(1)}</span>
     </div>
   );
 }
@@ -85,7 +85,7 @@ export function TopicTags({ topics, max = 3 }: { topics: string[]; max?: number 
         </span>
       ))}
       {overflow > 0 && (
-        <span className="text-caption px-2.5 py-[3px] rounded-full bg-[rgba(100,116,139,0.06)] text-[var(--color-text-disabled)] font-semibold">
+        <span className="text-caption px-2.5 py-[3px] rounded-full bg-muted-foreground/5 text-disabled font-semibold">
           +{overflow}
         </span>
       )}
@@ -199,7 +199,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
 
       {/* Header row */}
       <div className={cn(
-        "flex items-center gap-2 flex-wrap pb-2 border-b border-[var(--color-border-subtle)] mb-2",
+        "flex items-center gap-2 flex-wrap pb-2 border-b border-subtle mb-2",
         variant === "serendipity" && "mt-1"
       )}>
         {item.avatar?.startsWith("http") ? (
@@ -219,7 +219,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         <span className={cn("font-bold text-secondary-foreground font-mono", isLarge ? "text-body" : "text-[13px]")}>{item.author}</span>
         <span className="text-caption text-muted-foreground bg-navy-lighter px-2 py-0.5 rounded-sm">{item.platform || item.source}</span>
         {isD2AContent(item) && <D2ABadge mobile={mobile} />}
-        {variant !== "serendipity" && <span className="text-caption text-[var(--color-text-disabled)]">{item.timestamp}</span>}
+        {variant !== "serendipity" && <span className="text-caption text-disabled">{item.timestamp}</span>}
         {variant === "priority" && <div className="flex-1" />}
       </div>
 
@@ -241,7 +241,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
           <p className={cn(
             "m-0 break-words",
             isSlop && !isLarge && "line-through opacity-50",
-            variant === "serendipity" ? "text-purple-300" : "text-[var(--color-text-tertiary)]",
+            variant === "serendipity" ? "text-purple-300" : "text-tertiary",
             mobile ? "text-[13px]" : (isLarge ? "text-body-lg leading-body-lg" : "text-body leading-body"),
           )}>
             {item.text}
@@ -293,7 +293,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         )}>
           <ScoreGrid item={item} />
           {item.reason && (
-            <div data-testid="aegis-card-reason" className="text-body-sm text-[var(--color-text-tertiary)] leading-[1.5] italic bg-navy-lighter px-4 py-3 rounded-md mb-3">
+            <div data-testid="aegis-card-reason" className="text-body-sm text-tertiary leading-body-sm italic bg-navy-lighter px-4 py-3 rounded-md mb-3">
               {item.reason}
             </div>
           )}
@@ -367,7 +367,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                   onClick={e => { e.stopPropagation(); setMenuOpen(prev => !prev); }}
                   className={cn(
                     "p-2 border border-border rounded-md text-muted-foreground text-body font-bold cursor-pointer transition-all duration-150 font-[inherit] leading-none min-w-8 flex items-center justify-center",
-                    menuOpen && "bg-[var(--color-text-muted)]/[0.07]"
+                    menuOpen && "bg-muted-foreground/[0.07]"
                   )}
                 >
                   &#x22EE;

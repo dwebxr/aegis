@@ -41,8 +41,8 @@ function ScorePill({ gr, tag }: { gr: ReturnType<typeof scoreGrade>; tag: { labe
       <span className="font-mono" style={{ color: gr.color }}>{gr.grade}</span>
       {tag && (
         <>
-          <span className="text-[var(--color-text-disabled)]">&middot;</span>
-          <span className="uppercase text-[9px] tracking-wide whitespace-nowrap" style={{ color: tag.color }}>{tag.label}</span>
+          <span className="text-disabled">&middot;</span>
+          <span className="uppercase text-tiny tracking-wide whitespace-nowrap" style={{ color: tag.color }}>{tag.label}</span>
         </>
       )}
     </div>
@@ -86,7 +86,7 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
       ) : (
         <>
           <span className="font-mono" style={{ fontSize: gradeSize, fontWeight: 800, color: gr.color }}>{gr.grade}</span>
-          <span className="text-caption text-[var(--color-text-disabled)]">{item.platform || item.source}</span>
+          <span className="text-caption text-disabled">{item.platform || item.source}</span>
         </>
       )}
       {overlay && (
@@ -148,7 +148,7 @@ function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookm
         >
           {item.text.slice(0, textSlice)}
         </div>
-        <div className="text-caption text-[var(--color-text-disabled)] overflow-hidden text-ellipsis whitespace-nowrap mb-3">
+        <div className="text-caption text-disabled overflow-hidden text-ellipsis whitespace-nowrap mb-3">
           {item.author} &middot; {showPlatform ? (item.platform || item.source) : item.source} &middot; {item.timestamp}
         </div>
         <div className="flex items-center gap-2">
@@ -190,7 +190,7 @@ function AgentKnowledgePills({ agentContext, profile }: {
       <div className="flex flex-wrap gap-2">
         {agentContext.highAffinityTopics.length > 0 && (
           <div className="flex flex-wrap gap-1 items-center">
-            <span className="text-caption text-[var(--color-text-disabled)]">Interests:</span>
+            <span className="text-caption text-disabled">Interests:</span>
             {agentContext.highAffinityTopics.slice(0, 6).map(topic => (
               <span key={topic} className="text-caption px-2 py-px bg-cyan-400/[0.06] border border-cyan-400/[0.12] rounded-full text-cyan-400">
                 {topic}
@@ -200,7 +200,7 @@ function AgentKnowledgePills({ agentContext, profile }: {
         )}
         {agentContext.trustedAuthors.length > 0 && (
           <div className="flex flex-wrap gap-1 items-center">
-            <span className="text-caption text-[var(--color-text-disabled)]">Trusted:</span>
+            <span className="text-caption text-disabled">Trusted:</span>
             {agentContext.trustedAuthors.slice(0, 4).map(author => (
               <span key={author} className="text-caption px-2 py-px bg-emerald-400/[0.06] border border-emerald-400/[0.12] rounded-full text-emerald-400">
                 {author}
@@ -209,12 +209,12 @@ function AgentKnowledgePills({ agentContext, profile }: {
           </div>
         )}
         {agentContext.highAffinityTopics.length === 0 && agentContext.trustedAuthors.length === 0 && (
-          <span className="text-caption text-[var(--color-text-disabled)]">
+          <span className="text-caption text-disabled">
             Validate or flag content to teach your agent.
           </span>
         )}
       </div>
-      <div className="text-tiny text-[var(--color-text-disabled)] mt-2">
+      <div className="text-tiny text-disabled mt-2">
         Threshold: {profile.calibration.qualityThreshold.toFixed(1)} &middot; Reviews: {profile.totalValidated + profile.totalFlagged}
       </div>
     </>
@@ -502,7 +502,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   className={cn(
                     "px-3 py-2 rounded-sm text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast capitalize",
                     active
-                      ? "bg-card border border-[var(--color-border-emphasis)] text-foreground"
+                      ? "bg-card border border-emphasis text-foreground"
                       : "bg-transparent border border-transparent text-muted-foreground"
                   )}
                 >
@@ -524,7 +524,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             {filterMode === "pro" ? "Pro" : "Lite"}
           </button>
           {wotLoading && (
-            <span className="text-caption text-[var(--color-text-disabled)] animate-pulse">
+            <span className="text-caption text-disabled animate-pulse">
               &#x1F310; WoT...
             </span>
           )}
@@ -583,8 +583,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
           {/* Content filters */}
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">
-              Filtered Signal {hasActiveFilter && <span data-testid="aegis-filter-count" className="text-body-sm text-[var(--color-text-disabled)]">({filteredContent.length})</span>}
+            <div className="text-h3 font-semibold text-tertiary">
+              Filtered Signal {hasActiveFilter && <span data-testid="aegis-filter-count" className="text-body-sm text-disabled">({filteredContent.length})</span>}
             </div>
             <div className="flex gap-1 flex-wrap items-center">
               {/* Primary filter buttons */}
@@ -602,7 +602,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     "px-3 py-1 rounded-full text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
                     verdictFilter === v
                       ? `border ${activeClass}`
-                      : "bg-transparent border border-border text-[var(--color-text-disabled)]"
+                      : "bg-transparent border border-border text-disabled"
                   )}
                 >
                   {label}
@@ -619,15 +619,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   className={cn(
                     "inline-flex items-center gap-1 px-3 py-1 rounded-full text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
                     moreFiltersActive
-                      ? "bg-navy-lighter border border-[var(--color-border-emphasis)] text-secondary-foreground"
-                      : "bg-transparent border border-border text-[var(--color-text-disabled)]"
+                      ? "bg-navy-lighter border border-emphasis text-secondary-foreground"
+                      : "bg-transparent border border-border text-disabled"
                   )}
                 >
                   More filters
                   {moreFiltersActive && (
                     <span className="size-1.5 rounded-full bg-cyan-400 shrink-0" />
                   )}
-                  <span className="text-[10px] leading-none">{moreFiltersOpen ? "\u25B4" : "\u25BE"}</span>
+                  <span className="text-caption leading-none">{moreFiltersOpen ? "\u25B4" : "\u25BE"}</span>
                 </button>
 
                 {moreFiltersOpen && (
@@ -637,7 +637,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     className="absolute right-0 top-[calc(100%+4px)] min-w-[160px] z-50 bg-card border border-border rounded-md py-2 shadow-lg"
                   >
                     {/* VERDICT section */}
-                    <div className="px-3 py-1 text-tiny font-bold text-[var(--color-text-disabled)] uppercase tracking-wide">Verdict</div>
+                    <div className="px-3 py-1 text-tiny font-bold text-disabled uppercase tracking-wide">Verdict</div>
                     {([
                       { id: "all" as const, label: "All" },
                       { id: "slop" as const, label: "Slop" },
@@ -661,7 +661,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     <div className="h-px bg-border my-2" />
 
                     {/* SOURCE section */}
-                    <div className="px-3 py-1 text-tiny font-bold text-[var(--color-text-disabled)] uppercase tracking-wide">Source</div>
+                    <div className="px-3 py-1 text-tiny font-bold text-disabled uppercase tracking-wide">Source</div>
                     {["all", ...availableSources].map(s => (
                       <button
                         key={s}
@@ -685,7 +685,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           {isLoading ? (
             <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
               <div className="text-[32px] mb-3 animate-pulse">&#x1F6E1;</div>
-              <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">Loading content...</div>
+              <div className="text-h3 font-semibold text-tertiary">Loading content...</div>
               <div className="text-body-sm mt-2">Syncing from Internet Computer</div>
             </div>
           ) : filteredContent.length === 0 ? (
@@ -693,7 +693,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               {hasActiveFilter ? (
                 <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
                   <div className="text-[32px] mb-3">&#x1F50D;</div>
-                  <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">No matching content</div>
+                  <div className="text-h3 font-semibold text-tertiary">No matching content</div>
                   <div className="text-body-sm mt-2">Try adjusting your filters</div>
                 </div>
               ) : !isDemoMode ? (
@@ -710,7 +710,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               ) : (
                 <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
                   <div className="text-[32px] mb-3">&#x1F50D;</div>
-                  <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">No content yet</div>
+                  <div className="text-h3 font-semibold text-tertiary">No content yet</div>
                   <div className="text-body-sm mt-2">Add sources to start filtering, or try the incinerator for manual evaluation</div>
                 </div>
               )}
@@ -753,7 +753,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           if (next.has(rep.id)) next.delete(rep.id); else next.add(rep.id);
                           return next;
                         })}
-                        className="flex items-center gap-1 px-3 py-1 my-1 ml-4 mb-2 bg-transparent border border-[var(--color-border-subtle)] rounded-full text-muted-foreground text-caption font-semibold cursor-pointer font-[inherit] transition-fast"
+                        className="flex items-center gap-1 px-3 py-1 my-1 ml-4 mb-2 bg-transparent border border-subtle rounded-full text-muted-foreground text-caption font-semibold cursor-pointer font-[inherit] transition-fast"
                       >
                         <span className={cn("inline-block transition-fast", clusterExpanded && "rotate-180")}>&#x25BC;</span>
                         {clusterExpanded ? "Hide" : `+${cluster.members.length - 1} related`}
@@ -761,7 +761,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                       </button>
                     )}
                     {hasCluster && clusterExpanded && cluster.members.slice(1).map(m => (
-                      <div key={m.id} className="ml-4 border-l-2 border-[var(--color-border-subtle)] pl-3">
+                      <div key={m.id} className="ml-4 border-l-2 border-subtle pl-3">
                         <ContentCard
                           item={m}
                           expanded={expanded === m.id}
@@ -800,7 +800,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   : "border border-border"
               )}
             >
-              <div className="text-body-sm font-semibold text-[var(--color-text-tertiary)] mb-2">
+              <div className="text-body-sm font-semibold text-tertiary mb-2">
                 Your Agent Knows
               </div>
               <AgentKnowledgePills agentContext={agentContext} profile={profile} />
@@ -816,7 +816,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         <div className="mt-3">
           {/* Today's Top 3 */}
           <div data-testid="aegis-top3-section" className="mb-4">
-            <div className="text-h3 font-semibold text-[var(--color-text-tertiary)] mb-3 flex items-center gap-2">
+            <div className="text-h3 font-semibold text-tertiary mb-3 flex items-center gap-2">
               <span>&#x2B50;</span> Today&#39;s Top 3
               <div className="flex-1" />
               <button
@@ -827,7 +827,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               </button>
             </div>
             {dashboardTop3.length === 0 ? (
-              <div className="text-body-sm text-[var(--color-text-disabled)] text-center p-4 bg-card border border-border rounded-lg">
+              <div className="text-body-sm text-disabled text-center p-4 bg-card border border-border rounded-lg">
                 No quality items scored yet.
               </div>
             ) : (
@@ -855,11 +855,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
             {/* Topic Spotlight */}
             <div className="mb-4">
-              <div className="text-h3 font-semibold text-[var(--color-text-tertiary)] mb-3 flex items-center gap-2">
+              <div className="text-h3 font-semibold text-tertiary mb-3 flex items-center gap-2">
                 <span>&#x1F3AF;</span> Topic Spotlight
               </div>
               {dashboardTopicSpotlight.length === 0 ? (
-                <div className="text-body-sm text-[var(--color-text-disabled)] text-center p-4 bg-card border border-border rounded-lg">
+                <div className="text-body-sm text-disabled text-center p-4 bg-card border border-border rounded-lg">
                   Validate more content to refine recommendations.
                 </div>
               ) : (
@@ -867,7 +867,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   {dashboardTopicSpotlight.map(({ topic, items }) => {
                     const isExpanded = expandedTopics.has(topic);
                     return (
-                      <div key={topic} className="bg-transparent border border-[var(--color-border-subtle)] rounded-lg overflow-hidden">
+                      <div key={topic} className="bg-transparent border border-subtle rounded-lg overflow-hidden">
                         <button
                           onClick={() => toggleTopic(topic)}
                           className={cn(
@@ -890,7 +890,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           </span>
                         </button>
                         {isExpanded && (
-                          <div className="px-4 py-3 border-t border-[var(--color-border-subtle)]" style={{ animation: "slideDown .2s ease forwards" }}>
+                          <div className="px-4 py-3 border-t border-subtle" style={{ animation: "slideDown .2s ease forwards" }}>
                             <div className={cn(mobile ? "flex flex-col gap-4" : "grid grid-cols-3 gap-4")}>
                               {items.map(item => (
                                 <DashboardCard key={item.id} item={item} {...cardProps} />
@@ -914,8 +914,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           )}>
             <div className={cn("flex items-center gap-2", agentContext && "mb-2")}>
               <span>&#x1F9E0;</span>
-              <span className="text-body-sm font-semibold text-[var(--color-text-tertiary)]">Your Agent</span>
-              <span className="text-caption text-[var(--color-text-disabled)] font-normal overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
+              <span className="text-body-sm font-semibold text-tertiary">Your Agent</span>
+              <span className="text-caption text-disabled font-normal overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
                 {Object.entries(profile.topicAffinities).filter(([, v]) => v >= 0.2).length} interests
                 &middot; {profile.totalValidated + profile.totalFlagged} reviews
                 &middot; threshold {profile.calibration.qualityThreshold.toFixed(1)}
@@ -980,7 +980,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           {/* Saved */}
           {dashboardSaved.length > 0 && (
             <div className="mb-4">
-              <div className="text-h3 font-semibold text-[var(--color-text-tertiary)] mb-3 flex items-center gap-2">
+              <div className="text-h3 font-semibold text-tertiary mb-3 flex items-center gap-2">
                 <span>&#x1F516;</span> Saved
                 <div className="flex-1" />
                 <button
@@ -1024,7 +1024,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
       {/* Keyboard shortcut hint */}
       {!mobile && homeMode === "feed" && (
-        <div className="text-center mt-3 text-tiny text-[var(--color-text-disabled)]">
+        <div className="text-center mt-3 text-tiny text-disabled">
           <span className="font-mono">J/K</span> navigate &middot; <span className="font-mono">V</span> validate &middot; <span className="font-mono">F</span> flag &middot; <span className="font-mono">{navigator?.platform?.includes("Mac") ? "\u2318" : "Ctrl"}+K</span> commands
         </div>
       )}

@@ -154,11 +154,11 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
         <div className="text-[40px] mb-3">&#x1F4E1;</div>
         <div className="text-lg font-bold text-green-400 mb-2">Signal Published</div>
         {publishResult.eventId && (
-          <div className="text-[11px] text-muted-foreground font-mono mb-3">
+          <div className="text-kpi-sub text-muted-foreground font-mono mb-3">
             Event: {publishResult.eventId.slice(0, 16)}...
           </div>
         )}
-        <div className="text-body-sm text-[var(--color-text-tertiary)] mb-4">
+        <div className="text-body-sm text-tertiary mb-4">
           Published to {publishResult.relaysPublished.length} relay{publishResult.relaysPublished.length !== 1 ? "s" : ""}
         </div>
         <button onClick={handleReset} className="px-6 py-2.5 bg-blue-600/15 border border-blue-600/30 rounded-[10px] text-blue-400 text-[13px] font-semibold cursor-pointer">
@@ -171,7 +171,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
   return (
     <div>
       {nostrPubkey && (
-        <div className="text-[10px] text-muted-foreground mb-2.5 font-mono">
+        <div className="text-caption text-muted-foreground mb-2.5 font-mono">
           Nostr: {nostrPubkey.slice(0, 12)}...{nostrPubkey.slice(-8)}
         </div>
       )}
@@ -193,7 +193,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
             className="max-h-[120px] max-w-full rounded-lg border border-white/10"
           />
           {isUploading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg text-[11px] text-[var(--color-text-tertiary)] font-semibold">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg text-kpi-sub text-tertiary font-semibold">
               Uploading...
             </div>
           )}
@@ -207,12 +207,12 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
       )}
 
       {imageError && (
-        <div className="text-[10px] text-red-400 mt-1 font-semibold">{imageError}</div>
+        <div className="text-caption text-red-400 mt-1 font-semibold">{imageError}</div>
       )}
 
       <div className="flex items-center justify-between mt-3 gap-2.5 flex-wrap">
         <div className="flex items-center gap-2.5">
-          <div className="text-[10px] text-muted-foreground">
+          <div className="text-caption text-muted-foreground">
             {text.length}/5000 characters
           </div>
           <input
@@ -227,12 +227,12 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
             disabled={isUploading}
             title="Attach image"
             className={cn(
-              "bg-transparent border border-[var(--color-border-emphasis)] rounded-md px-2 py-[3px] text-muted-foreground text-sm leading-none flex items-center gap-1",
+              "bg-transparent border border-emphasis rounded-md px-2 py-[3px] text-muted-foreground text-sm leading-none flex items-center gap-1",
               isUploading ? "cursor-not-allowed" : "cursor-pointer"
             )}
           >
             &#x1F4F7;
-            {imageUrl && <span className="text-[9px] text-green-400">&#x2713;</span>}
+            {imageUrl && <span className="text-tiny text-green-400">&#x2713;</span>}
           </button>
         </div>
 
@@ -252,7 +252,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
               {isAnalyzing ? "Evaluating..." : "Self-Evaluate"}
             </button>
             {evalError && (
-              <div className="text-[10px] text-red-400 font-semibold">
+              <div className="text-caption text-red-400 font-semibold">
                 {evalError}
               </div>
             )}
@@ -263,7 +263,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
               <ScoreRing value={selfScore.composite} size={40} color={scoreColor(selfScore.composite)} />
               <div>
                 <div className={cn(
-                  "text-[11px] font-bold uppercase",
+                  "text-kpi-sub font-bold uppercase",
                   selfScore.verdict === "quality" ? "text-green-400" : "text-red-400"
                 )}>
                   {selfScore.verdict}
@@ -271,7 +271,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                 {selfScore.topics && selfScore.topics.length > 0 && (
                   <div className="flex gap-1 mt-[3px]">
                     {selfScore.topics.map(t => (
-                      <span key={t} className="text-[9px] px-1.5 py-px rounded-lg bg-violet-500/[0.12] text-purple-400 font-semibold">{t}</span>
+                      <span key={t} className="text-tiny px-1.5 py-px rounded-lg bg-violet-500/[0.12] text-purple-400 font-semibold">{t}</span>
                     ))}
                   </div>
                 )}
@@ -294,13 +294,13 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
             </div>
 
             {isGateBlocked && (
-              <div className="text-[11px] text-red-400 mt-1 px-3 py-2 bg-red-400/[0.06] rounded-lg font-semibold leading-[1.5]">
+              <div className="text-kpi-sub text-red-400 mt-1 px-3 py-2 bg-red-400/[0.06] rounded-lg font-semibold leading-body-sm">
                 Publishing is suspended. Your published signals have been repeatedly flagged. Reputation recovers +1 per week of inactivity.
               </div>
             )}
 
             {publishGate && !publishGate.requiresDeposit && publishGate.canPublish && publishGate.reason && (
-              <div className="text-[10px] text-muted-foreground mt-1 italic">
+              <div className="text-caption text-muted-foreground mt-1 italic">
                 {publishGate.reason}
               </div>
             )}
@@ -312,7 +312,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                     Quality Assurance Deposit
                   </span>
                   {icpBalance != null && (
-                    <span className="text-[10px] text-muted-foreground font-mono">
+                    <span className="text-caption text-muted-foreground font-mono">
                       Balance: {formatICP(icpBalance)} ICP
                     </span>
                   )}
@@ -327,21 +327,20 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                       step={100_000}
                       value={stakeE8s}
                       onChange={e => setStakeE8s(Number(e.target.value))}
-                      className="flex-1"
-                      style={{ accentColor: "#f59e0b" }}
+                      className="flex-1 accent-amber-500"
                     />
                     <span className="text-[13px] font-bold text-amber-500 font-mono min-w-[80px] text-right">
                       {formatICP(BigInt(stakeE8s))} ICP
                     </span>
                   </div>
-                  <div className="text-[10px] text-[var(--color-text-tertiary)] mt-1">
+                  <div className="text-caption text-tertiary mt-1">
                     Deposit ICP as a quality assurance bond. Validated by community = deposit returned. Flagged = deposit forfeited as quality assurance cost. No verdict within 30 days = deposit auto-returned.
                   </div>
-                  <div className="text-[10px] text-[#fbbf24] mt-1.5 px-2 py-1.5 bg-[rgba(251,191,36,0.08)] rounded-md leading-[1.5]">
+                  <div className="text-caption text-amber-400 mt-1.5 px-2 py-1.5 bg-amber-dim rounded-md leading-body-sm">
                     &#x26A0;&#xFE0F; Alpha &mdash; Currently in test operation. Bugs or data resets may occur. Please deposit only amounts you are comfortable treating as a tip. Refunds cannot be guaranteed if issues arise.
                   </div>
                   {!hasBalance && (
-                    <div className="text-[10px] text-red-400 mt-1 font-semibold">
+                    <div className="text-caption text-red-400 mt-1 font-semibold">
                       Insufficient ICP balance. Min: {formatICP(MIN_STAKE)} ICP
                     </div>
                   )}

@@ -78,15 +78,15 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
               <span className="text-caption font-semibold text-emerald-400">Connected</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-caption text-[var(--color-text-disabled)]">Principal:</span>
-              <code className="text-tiny font-mono text-secondary-foreground bg-[var(--color-bg-overlay)] px-2 py-0.5 rounded-sm break-all">
+              <span className="text-caption text-disabled">Principal:</span>
+              <code className="text-tiny font-mono text-secondary-foreground bg-overlay px-2 py-0.5 rounded-sm break-all">
                 {principalText}
               </code>
               <button
                 data-testid="aegis-settings-copy-principal"
                 onClick={() => handleCopy(principalText, "principal")}
                 className={cn(
-                  "px-2 py-0.5 bg-transparent border border-[var(--color-border-subtle)] rounded-sm text-tiny font-semibold cursor-pointer font-[inherit] transition-fast shrink-0",
+                  "px-2 py-0.5 bg-transparent border border-subtle rounded-sm text-tiny font-semibold cursor-pointer font-[inherit] transition-fast shrink-0",
                   copied === "principal" ? "text-emerald-400" : "text-muted-foreground"
                 )}
               >
@@ -96,7 +96,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <span className="text-caption text-[var(--color-text-disabled)]">Not connected</span>
+            <span className="text-caption text-disabled">Not connected</span>
             <button
               data-testid="aegis-settings-login"
               onClick={login}
@@ -120,7 +120,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <span className="text-caption font-[800] text-foreground tracking-[2px]">AEGIS</span>
-            <span className="text-tiny text-[var(--color-text-disabled)] ml-2">v3.0 — D2A Social Agent Platform</span>
+            <span className="text-tiny text-disabled ml-2">v3.0 — D2A Social Agent Platform</span>
           </div>
           <a
             href="https://github.com/dwebxr/aegis"
@@ -151,7 +151,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
               <div className="text-caption text-secondary-foreground leading-snug">
                 This will clear all local data including preferences, cache, API keys, and IndexedDB. You will be logged out.
               </div>
-              <div className="text-tiny text-[var(--color-text-disabled)] p-2 bg-amber-400/[0.05] rounded-sm border border-amber-400/10 leading-tight">
+              <div className="text-tiny text-disabled p-2 bg-amber-400/[0.05] rounded-sm border border-amber-400/10 leading-tight">
                 Data stored on the Internet Computer (evaluations, sources) remains and will re-sync on next login.
               </div>
               <div className="flex gap-2 items-center flex-wrap">
@@ -161,7 +161,7 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
                   value={deleteInput}
                   onChange={e => setDeleteInput(e.target.value)}
                   placeholder='Type "DELETE" to confirm'
-                  className="w-[200px] px-3 py-1 bg-[var(--color-bg-overlay)] border border-red-400/20 rounded-sm text-foreground text-caption font-[inherit] outline-none"
+                  className="w-[200px] px-3 py-1 bg-overlay border border-red-400/20 rounded-sm text-foreground text-caption font-[inherit] outline-none"
                 />
                 <button
                   data-testid="aegis-settings-delete-confirm"
