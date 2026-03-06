@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { colors, fonts } from "@/styles/theme";
 
 interface UserBadgeProps {
   compact?: boolean;
@@ -17,54 +17,30 @@ export const UserBadge: React.FC<UserBadgeProps> = ({ compact }) => {
     : principalText;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: compact ? "6px 10px" : "8px 14px",
-        background: colors.green.bg,
-        border: `1px solid ${colors.green.border}`,
-        borderRadius: 10,
-      }}>
-        <div style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: colors.green[400],
-          boxShadow: "0 0 6px rgba(52,211,153,0.5)",
-        }} />
-        <div style={{ overflow: "hidden", flex: 1 }}>
-          <div style={{
-            fontSize: compact ? 10 : 11,
-            fontWeight: 600,
-            color: colors.text.secondary,
-            fontFamily: fonts.mono,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}>
+    <div className="flex flex-col gap-1.5">
+      <div className={cn(
+        "flex items-center gap-2 bg-green-400/[0.06] border border-green-400/[0.15] rounded-[10px]",
+        compact ? "px-2.5 py-1.5" : "px-3.5 py-2"
+      )}>
+        <div className="size-2 rounded-full bg-green-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]" />
+        <div className="overflow-hidden flex-1">
+          <div className={cn(
+            "font-semibold text-secondary-foreground font-mono whitespace-nowrap overflow-hidden text-ellipsis",
+            compact ? "text-[10px]" : "text-[11px]"
+          )}>
             {short}
           </div>
-          <div style={{ fontSize: 9, color: colors.text.muted, fontWeight: 500 }}>
+          <div className="text-[9px] text-muted-foreground font-medium">
             Connected
           </div>
         </div>
       </div>
       <button
         onClick={logout}
-        style={{
-          padding: compact ? "4px 10px" : "6px 14px",
-          background: "rgba(248,113,113,0.08)",
-          border: "1px solid rgba(248,113,113,0.15)",
-          borderRadius: 8,
-          color: colors.red[400],
-          fontSize: compact ? 10 : 11,
-          fontWeight: 600,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          width: "100%",
-        }}
+        className={cn(
+          "bg-red-400/[0.08] border border-red-400/15 rounded-lg text-red-400 font-semibold cursor-pointer font-[inherit] w-full",
+          compact ? "px-2.5 py-1 text-[10px]" : "px-3.5 py-1.5 text-[11px]"
+        )}
       >
         Logout
       </button>

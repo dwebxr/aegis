@@ -209,8 +209,9 @@ describe("DashboardTab — clickable thumbnail links", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />,
     );
-    // Should not have any external article links (only internal nav)
-    expect(html).not.toContain('target="_blank"');
+    // Should not have article-level external links (Chrome extension link is OK)
+    const articleLinkRegex = /href="https?:\/\/(?!chromewebstore\.google\.com)[^"]*"[^>]*target="_blank"/;
+    expect(html).not.toMatch(articleLinkRegex);
   });
 });
 
@@ -250,7 +251,7 @@ describe("DashboardTab — inline Validate/Flag buttons", () => {
     );
     // Validated item should have disabled button with reduced opacity
     expect(html).toContain("disabled");
-    expect(html).toContain("opacity:0.5");
+    expect(html).toContain("opacity-50");
   });
 });
 

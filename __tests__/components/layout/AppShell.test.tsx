@@ -78,7 +78,7 @@ describe("AppShell — desktop layout", () => {
         <div>Content</div>
       </AppShell>,
     );
-    expect(html).toContain("max-width:1200px");
+    expect(html).toContain("max-w-[1200px]");
   });
 
   it("PullToRefresh disabled on desktop (no pull indicator text)", () => {
@@ -91,13 +91,13 @@ describe("AppShell — desktop layout", () => {
     expect(html).not.toContain("Pull to refresh");
   });
 
-  it("applies overscroll-behavior-y:contain to main", () => {
+  it("applies overscroll-contain class to main", () => {
     const html = renderToStaticMarkup(
       <AppShell activeTab="dashboard" onTabChange={jest.fn()}>
         <div>Content</div>
       </AppShell>,
     );
-    expect(html).toContain("overscroll-behavior-y:contain");
+    expect(html).toContain("overscroll-y-contain");
   });
 
   it("uses row flex direction on desktop", () => {
@@ -106,7 +106,7 @@ describe("AppShell — desktop layout", () => {
         <div>Content</div>
       </AppShell>,
     );
-    expect(html).toContain("flex-direction:row");
+    expect(html).toContain("flex-row");
   });
 });
 
@@ -139,7 +139,7 @@ describe("AppShell — mobile layout", () => {
         <div>Content</div>
       </AppShell>,
     );
-    expect(html).toContain("flex-direction:column");
+    expect(html).toContain("flex-col");
   });
 
   it("renders PullToRefresh with enabled=true on mobile", () => {
@@ -151,13 +151,13 @@ describe("AppShell — mobile layout", () => {
     expect(html).toContain("Pull to refresh");
   });
 
-  it("applies 100px bottom padding for mobile nav clearance", () => {
+  it("applies bottom padding for mobile nav clearance", () => {
     const html = renderToStaticMarkup(
       <AppShell activeTab="dashboard" onTabChange={jest.fn()}>
         <div>Content</div>
       </AppShell>,
     );
-    expect(html).toMatch(/padding:\d+px \d+px 100px/);
+    expect(html).toContain("pb-[100px]");
   });
 });
 
@@ -174,7 +174,7 @@ describe("AppShell — tablet layout", () => {
     );
     expect(html).toContain("aegis-nav-dashboard");
     expect(html).toContain("aegis-nav-briefing");
-    expect(html).toContain("width:68px");
+    expect(html).toContain("w-[68px]");
   });
 
   it("does NOT render MobileNav on tablet", () => {
@@ -192,7 +192,7 @@ describe("AppShell — tablet layout", () => {
         <div>Content</div>
       </AppShell>,
     );
-    expect(html).toContain("flex-direction:row");
+    expect(html).toContain("flex-row");
   });
 
   it("renders PullToRefresh disabled on tablet", () => {
@@ -223,14 +223,14 @@ describe("AppShell — nav configuration", () => {
     expect(html).toContain("Sources");
   });
 
-  it("highlights active tab in sidebar with blue color", () => {
+  it("highlights active tab in sidebar with blue color class", () => {
     const html = renderToStaticMarkup(
       <AppShell activeTab="briefing" onTabChange={jest.fn()}>
         <div>X</div>
       </AppShell>,
     );
     expect(html).toContain("aegis-nav-briefing");
-    expect(html).toContain("rgba(37,99,235,0.12)");
+    expect(html).toContain("bg-blue-600/[0.12]");
   });
 
   it("renders with empty children", () => {

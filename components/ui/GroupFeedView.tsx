@@ -1,9 +1,9 @@
 "use client";
 import React, { useState, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { ContentCard } from "./ContentCard";
 import type { ContentItem } from "@/lib/types/content";
 import type { CurationGroup } from "@/lib/d2a/curationGroup";
-import { colors, space, radii, type as t, transitions, fonts } from "@/styles/theme";
 
 interface GroupFeedViewProps {
   group: CurationGroup;
@@ -30,34 +30,22 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
   const [showMembers, setShowMembers] = useState(false);
 
   return (
-    <div style={{ marginTop: space[2] }}>
+    <div className="mt-2">
       {/* Header actions */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: space[2],
-        marginBottom: space[3], flexWrap: "wrap",
-      }}>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         <button
           onClick={() => setShowMembers(!showMembers)}
-          style={{
-            background: showMembers ? `${colors.purple[400]}12` : "transparent",
-            border: `1px solid ${showMembers ? `${colors.purple[400]}33` : colors.border.default}`,
-            borderRadius: radii.sm, padding: `${space[1]}px ${space[2]}px`,
-            fontSize: t.caption.size, fontWeight: 600,
-            color: showMembers ? colors.purple[400] : colors.text.muted,
-            cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
-          }}
+          className={cn(
+            "rounded-sm px-2 py-1 text-caption font-semibold cursor-pointer font-[inherit] transition-fast border",
+            showMembers
+              ? "bg-purple-400/[0.07] border-purple-400/20 text-purple-400"
+              : "bg-transparent border-border text-muted-foreground"
+          )}
         >
           Members ({group.members.length})
         </button>
         {onSync && (
-          <button onClick={onSync} style={{
-            background: "transparent",
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: radii.sm, padding: `${space[1]}px ${space[2]}px`,
-            fontSize: t.caption.size, fontWeight: 600,
-            color: colors.text.muted, cursor: "pointer",
-            fontFamily: "inherit", transition: transitions.fast,
-          }}>
+          <button onClick={onSync} className="bg-transparent border border-border rounded-sm px-2 py-1 text-caption font-semibold text-muted-foreground cursor-pointer font-[inherit] transition-fast">
             Sync
           </button>
         )}
@@ -65,44 +53,28 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
 
       {/* Members panel */}
       {showMembers && (
-        <div style={{
-          background: colors.bg.surface, border: `1px solid ${colors.border.default}`,
-          borderRadius: radii.md, padding: space[3], marginBottom: space[3],
-        }}>
+        <div className="bg-card border border-border rounded-md p-3 mb-3">
           {group.members.map(pk => (
-            <div key={pk} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: `${space[1]}px 0`,
-              borderBottom: `1px solid ${colors.border.default}`,
-            }}>
-              <code style={{ fontFamily: fonts.mono, fontSize: t.caption.size, color: colors.text.secondary }}>
+            <div key={pk} className="flex items-center justify-between py-1 border-b border-border">
+              <code className="font-mono text-caption text-secondary-foreground">
                 {pk.slice(0, 12)}...{pk.slice(-4)}
                 {pk === currentUserPk && " (you)"}
                 {pk === group.ownerPk && " (owner)"}
               </code>
               {isOwner && pk !== group.ownerPk && onRemoveMember && (
-                <button onClick={() => onRemoveMember(pk)} style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  fontSize: t.caption.size, color: colors.red[400],
-                  fontFamily: "inherit",
-                }}>
+                <button onClick={() => onRemoveMember(pk)} className="bg-transparent border-none cursor-pointer text-caption text-red-400 font-[inherit]">
                   Remove
                 </button>
               )}
             </div>
           ))}
           {isOwner && onAddMember && (
-            <div style={{ display: "flex", gap: space[1], marginTop: space[2] }}>
+            <div className="flex gap-1 mt-2">
               <input
                 value={memberInput}
                 onChange={e => setMemberInput(e.target.value)}
                 placeholder="npub or hex pubkey..."
-                style={{
-                  flex: 1, padding: `${space[1]}px ${space[2]}px`,
-                  background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-                  borderRadius: radii.sm, color: colors.text.secondary,
-                  fontSize: t.caption.size, fontFamily: fonts.sans,
-                }}
+                className="flex-1 px-2 py-1 bg-navy-lighter border border-border rounded-sm text-secondary-foreground text-caption font-sans"
               />
               <button
                 onClick={() => {
@@ -111,14 +83,7 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
                     setMemberInput("");
                   }
                 }}
-                style={{
-                  padding: `${space[1]}px ${space[2]}px`,
-                  background: `${colors.purple[400]}12`,
-                  border: `1px solid ${colors.purple[400]}33`,
-                  borderRadius: radii.sm, color: colors.purple[400],
-                  fontSize: t.caption.size, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit",
-                }}
+                className="px-2 py-1 bg-purple-400/[0.07] border border-purple-400/20 rounded-sm text-purple-400 text-caption font-semibold cursor-pointer font-[inherit]"
               >
                 Add
               </button>
@@ -142,10 +107,7 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
           </div>
         ))
       ) : (
-        <div style={{
-          textAlign: "center", padding: space[8],
-          color: colors.text.muted, fontSize: t.bodySm.size,
-        }}>
+        <div className="text-center p-8 text-muted-foreground text-body-sm">
           No validated content from group members yet.
         </div>
       )}

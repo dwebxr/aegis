@@ -15,25 +15,28 @@ export default function Error({
   }, [error]);
 
   return (
-    <div style={{ padding: 40, background: "#0a0f1e", color: "#e2e8f0", minHeight: "100vh", fontFamily: "monospace" }}>
-      <h2 style={{ color: "#f87171" }}>Something went wrong</h2>
-      <pre style={{ background: "#1e293b", padding: 16, borderRadius: 8, overflow: "auto", fontSize: 13, whiteSpace: "pre-wrap" }}>
+    <div className="p-10 bg-[#0a0f1e] text-slate-200 min-h-screen font-mono">
+      <h2 className="text-red-400">Something went wrong</h2>
+      <pre className="bg-slate-800 p-4 rounded-lg overflow-auto text-[13px] whitespace-pre-wrap">
         {error.message || "An unexpected error occurred. Please try again."}
       </pre>
       {error.stack && (
-        <details style={{ marginTop: 12 }}>
-          <summary style={{ cursor: "pointer", color: "#64748b" }}>Details</summary>
-          <pre style={{ background: "#1e293b", padding: 16, borderRadius: 8, overflow: "auto", fontSize: 11, marginTop: 8, whiteSpace: "pre-wrap" }}>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-slate-500">Details</summary>
+          <pre className="bg-slate-800 p-4 rounded-lg overflow-auto text-[11px] mt-2 whitespace-pre-wrap">
             {error.stack}
           </pre>
         </details>
       )}
       {error.digest && (
-        <p style={{ marginTop: 12, fontSize: 11, color: "#64748b" }}>
+        <p className="mt-3 text-[11px] text-slate-500">
           Error ID: {error.digest}
         </p>
       )}
-      <button onClick={reset} style={{ marginTop: 20, padding: "10px 20px", background: "#2563eb", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 14 }}>
+      <button
+        onClick={reset}
+        className="mt-5 px-5 py-2.5 bg-blue-600 border-none rounded-lg text-white cursor-pointer text-sm"
+      >
         Try again
       </button>
     </div>

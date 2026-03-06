@@ -1,12 +1,12 @@
 "use client";
 import React from "react";
-import { colors, space, radii, shadows, type as t } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 import type { Notification } from "@/hooks/useNotifications";
 
-const COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  success: { bg: "rgba(52,211,153,0.15)", border: colors.green.border, text: colors.green[400] },
-  error:   { bg: "rgba(248,113,113,0.15)", border: colors.red.border, text: colors.red[400] },
-  info:    { bg: "rgba(56,189,248,0.15)", border: "rgba(56,189,248,0.3)", text: colors.sky[400] },
+const TOAST_STYLES: Record<string, string> = {
+  success: "bg-emerald-400/15 border-emerald-border text-emerald-400",
+  error:   "bg-red-400/15 border-red-border text-red-400",
+  info:    "bg-sky-400/15 border-sky-400/30 text-sky-400",
 };
 
 interface NotificationToastProps {
@@ -16,34 +16,30 @@ interface NotificationToastProps {
 }
 
 export const NotificationToast: React.FC<NotificationToastProps> = ({ notifications, mobile, onDismiss }) => (
-  <div style={{ position: "fixed", bottom: mobile ? 84 : space[5], right: mobile ? space[4] : space[5], display: "flex", flexDirection: "column", gap: 6, zIndex: 100 }}>
-    {notifications.map(n => {
-      const c = COLORS[n.type] || COLORS.info;
-      return (
-        <div key={n.id} role="alert" style={{
-          padding: `${space[3]}px ${space[4]}px`, borderRadius: radii.md,
-          fontSize: t.bodySm.size, fontWeight: 600, animation: "fadeIn .3s ease",
-          background: c.bg, border: `1px solid ${c.border}`, color: c.text,
-          backdropFilter: "blur(12px)", boxShadow: shadows.md,
-          display: "flex", alignItems: "center", gap: space[2],
-        }}>
-          <span style={{ flex: 1 }}>{n.text}</span>
-          {onDismiss && (
-            <button
-              onClick={() => onDismiss(n.id)}
-              aria-label="Dismiss notification"
-              style={{
-                background: "none", border: "none", color: c.text,
-                cursor: "pointer", fontSize: "1rem", fontWeight: 700,
-                padding: "0 2px", opacity: 0.7, fontFamily: "inherit",
-                lineHeight: 1,
-              }}
-            >
-              &times;
-            </button>
-          )}
-        </div>
-      );
-    })}
+  <div className={cn(
+    "fixed flex flex-col gap-1.5 z-[100]",
+    mobile ? "bottom-[84px] right-4" : "bottom-5 right-5"
+  )}>
+    {notifications.map(n => (
+      <div
+        key={n.id}
+        role="alert"
+        className={cn(
+          "px-4 py-3 rounded-md text-body-sm font-semibold animate-fade-in backdrop-blur-sm shadow-md border flex items-center gap-2",
+          TOAST_STYLES[n.type] || TOAST_STYLES.info
+        )}
+      >
+        <span className="flex-1">{n.text}</span>
+        {onDismiss && (
+          <button
+            onClick={() => onDismiss(n.id)}
+            aria-label="Dismiss notification"
+            className="bg-none border-none text-inherit cursor-pointer text-base font-bold px-0.5 opacity-70 font-[inherit] leading-none"
+          >
+            &times;
+          </button>
+        )}
+      </div>
+    ))}
   </div>
 );

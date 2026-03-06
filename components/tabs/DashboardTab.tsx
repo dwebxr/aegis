@@ -1,8 +1,10 @@
 "use client";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { cn } from "@/lib/utils";
+import { typography } from "@/lib/design";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard, deriveScoreTags } from "@/components/ui/ContentCard";
-import { fonts, colors, space, type as t, radii, transitions, scoreGrade } from "@/styles/theme";
+import { colors, fonts, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { exportContentCSV, exportContentJSON } from "@/lib/utils/export";
 import { extractYouTubeVideoId, youTubeEmbedUrl } from "@/lib/utils/youtube";
@@ -32,17 +34,15 @@ import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 
 function ScorePill({ gr, tag }: { gr: ReturnType<typeof scoreGrade>; tag: { label: string; color: string } | null }) {
   return (
-    <div style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: "3px 10px", borderRadius: radii.pill,
-      background: `${gr.color}12`, border: `1px solid ${gr.color}25`,
-      fontSize: t.caption.size, fontWeight: 700, flexShrink: 0,
-    }}>
-      <span style={{ color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
+    <div
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-caption font-bold shrink-0"
+      style={{ background: `${gr.color}12`, border: `1px solid ${gr.color}25` }}
+    >
+      <span className="font-mono" style={{ color: gr.color }}>{gr.grade}</span>
       {tag && (
         <>
-          <span style={{ color: colors.text.disabled }}>&middot;</span>
-          <span style={{ color: tag.color, textTransform: "uppercase", fontSize: 9, letterSpacing: 0.5, whiteSpace: "nowrap" }}>{tag.label}</span>
+          <span className="text-[var(--color-text-disabled)]">&middot;</span>
+          <span className="uppercase text-[9px] tracking-wide whitespace-nowrap" style={{ color: tag.color }}>{tag.label}</span>
         </>
       )}
     </div>
@@ -62,19 +62,18 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
   const ytVideoId = item.sourceUrl ? extractYouTubeVideoId(item.sourceUrl) : null;
 
   const inner = (
-    <div style={{
-      position: "relative", width: "100%", aspectRatio: "16/9",
-      overflow: "hidden",
-      background: showImg ? colors.bg.raised : `linear-gradient(135deg, ${gr.bg}, ${colors.bg.raised})`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      flexDirection: "column", gap: space[1],
-      cursor: !ytVideoId && hasLink ? "pointer" : undefined,
-    }}>
+    <div
+      className={cn(
+        "relative w-full aspect-video overflow-hidden flex items-center justify-center flex-col gap-1",
+        !showImg && !ytVideoId && "bg-navy-lighter"
+      )}
+      style={showImg ? undefined : { background: `linear-gradient(135deg, ${gr.bg}, var(--color-bg-raised))` }}
+    >
       {ytVideoId ? (
         <iframe
           src={youTubeEmbedUrl(ytVideoId)}
           title={item.text?.slice(0, 60) || "YouTube video"}
-          style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+          className="w-full h-full border-none block"
           loading="lazy"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
@@ -82,26 +81,25 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
       ) : showImg ? (
         /* eslint-disable-next-line @next/next/no-img-element -- dashboard card OG thumbnail */
         <img src={item.imageUrl!} alt="" loading="lazy"
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          className="w-full h-full object-cover block"
           onError={onImgError} />
       ) : (
         <>
-          <span style={{ fontSize: gradeSize, fontWeight: 800, color: gr.color, fontFamily: fonts.mono }}>{gr.grade}</span>
-          <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.platform || item.source}</span>
+          <span className="font-mono" style={{ fontSize: gradeSize, fontWeight: 800, color: gr.color }}>{gr.grade}</span>
+          <span className="text-caption text-[var(--color-text-disabled)]">{item.platform || item.source}</span>
         </>
       )}
       {overlay && (
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: ytVideoId ? "none" : "auto" as const }}>
+        <div className={cn("absolute inset-0", ytVideoId && "pointer-events-none")}>
           {overlay}
         </div>
       )}
     </div>
   );
 
-  // When YouTube is embedded, don't wrap in <a> — the iframe is the interaction
   if (!ytVideoId && hasLink) {
     return (
-      <a href={item.sourceUrl!} target="_blank" rel="noopener noreferrer" style={{ display: "block", textDecoration: "none" }}>
+      <a href={item.sourceUrl!} target="_blank" rel="noopener noreferrer" className="block no-underline">
         {inner}
       </a>
     );
@@ -109,37 +107,8 @@ function ThumbnailArea({ item, gr, gradeSize, imgFailed, onImgError, overlay }: 
   return inner;
 }
 
-const inlineVBtnStyle: React.CSSProperties = {
-  padding: `2px ${space[2]}px`, borderRadius: radii.sm,
-  background: colors.green.bg, border: `1px solid ${colors.green.border}`,
-  color: colors.green[400], fontSize: t.caption.size, fontWeight: 600,
-  cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
-};
-const inlineFBtnStyle: React.CSSProperties = {
-  padding: `2px ${space[2]}px`, borderRadius: radii.sm,
-  background: colors.red.bg, border: `1px solid ${colors.red.border}`,
-  color: colors.red[400], fontSize: t.caption.size, fontWeight: 600,
-  cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
-};
-const inlineBBtnStyle: React.CSSProperties = {
-  padding: `2px ${space[2]}px`, borderRadius: radii.sm,
-  background: "transparent", border: `1px solid ${colors.border.default}`,
-  color: colors.text.muted, fontSize: t.caption.size, fontWeight: 600,
-  cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
-};
-const inlineBBtnActiveStyle: React.CSSProperties = {
-  ...inlineBBtnStyle,
-  background: `${colors.amber[400]}18`,
-  border: `1px solid ${colors.amber[400]}30`,
-  color: colors.amber[400],
-};
-
-const cardGridStyle = (mobile?: boolean): React.CSSProperties => mobile
-  ? { display: "flex", flexDirection: "column", gap: space[4] }
-  : { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: space[4] };
-
 function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookmark, onValidate, onFlag,
-  gradeSize = 36, textClamp = 2, textSlice = 150, textWeight = 600, showPlatform, overlay, topContent, style,
+  gradeSize = 36, textClamp = 2, textSlice = 150, textWeight = 600, showPlatform, overlay, topContent, className: extraClass,
 }: {
   item: ContentItem;
   failedImages: Set<string>;
@@ -155,49 +124,57 @@ function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookm
   showPlatform?: boolean;
   overlay?: React.ReactNode;
   topContent?: React.ReactNode;
-  style?: React.CSSProperties;
+  className?: string;
 }) {
   const gr = scoreGrade(item.scores.composite);
   const tag = deriveScoreTags(item)[0] ?? null;
   return (
-    <div style={{
-      background: colors.bg.surface,
-      border: `1px solid ${colors.border.default}`,
-      borderRadius: radii.lg,
-      overflow: "hidden",
-      transition: transitions.fast,
-      ...style,
-    }}>
+    <div className={cn("bg-card border border-border rounded-lg overflow-hidden transition-fast", extraClass)}>
       <ThumbnailArea item={item} gr={gr} gradeSize={gradeSize}
         imgFailed={failedImages.has(item.id)} onImgError={() => markImgFailed(item.id)}
         overlay={overlay}
       />
-      <div style={{ padding: `${space[3]}px ${space[4]}px` }}>
+      <div className="px-4 py-3">
         {topContent}
-        <div style={{
-          fontSize: t.body.size, fontWeight: textWeight, color: colors.text.secondary,
-          overflow: "hidden", display: "-webkit-box",
-          WebkitLineClamp: textClamp, WebkitBoxOrient: "vertical" as const,
-          lineHeight: 1.4, marginBottom: space[2], wordBreak: "break-word" as const,
-        }}>
+        <div
+          className="text-body text-secondary-foreground overflow-hidden mb-2 break-words"
+          style={{
+            display: "-webkit-box",
+            WebkitLineClamp: textClamp,
+            WebkitBoxOrient: "vertical" as const,
+            lineHeight: 1.4,
+            fontWeight: textWeight,
+          }}
+        >
           {item.text.slice(0, textSlice)}
         </div>
-        <div style={{
-          fontSize: t.caption.size, color: colors.text.disabled,
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          marginBottom: space[3],
-        }}>
+        <div className="text-caption text-[var(--color-text-disabled)] overflow-hidden text-ellipsis whitespace-nowrap mb-3">
           {item.author} &middot; {showPlatform ? (item.platform || item.source) : item.source} &middot; {item.timestamp}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+        <div className="flex items-center gap-2">
           <ScorePill gr={gr} tag={tag} />
-          <div style={{ flex: 1 }} />
+          <div className="flex-1" />
           <button onClick={(e) => { e.stopPropagation(); onBookmark(item.id); }}
-            style={bookmarkSet.has(item.id) ? inlineBBtnActiveStyle : inlineBBtnStyle}>&#x1F516;</button>
+            className={cn(
+              "px-2 py-0.5 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
+              bookmarkSet.has(item.id)
+                ? "bg-amber-400/[0.09] border border-amber-400/[0.19] text-amber-400"
+                : "bg-transparent border border-border text-muted-foreground"
+            )}>&#x1F516;</button>
           <button onClick={(e) => { e.stopPropagation(); onValidate(item.id); }}
-            disabled={item.validated} style={{ ...inlineVBtnStyle, opacity: item.validated ? 0.5 : 1, cursor: item.validated ? "default" : "pointer" }}>&#x2713;</button>
+            disabled={item.validated}
+            className={cn(
+              "px-2 py-0.5 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
+              "bg-emerald-500/[0.08] border border-emerald-500/20 text-emerald-400",
+              item.validated && "opacity-50 cursor-default"
+            )}>&#x2713;</button>
           <button onClick={(e) => { e.stopPropagation(); onFlag(item.id); }}
-            disabled={item.flagged} style={{ ...inlineFBtnStyle, opacity: item.flagged ? 0.5 : 1, cursor: item.flagged ? "default" : "pointer" }}>&#x2717;</button>
+            disabled={item.flagged}
+            className={cn(
+              "px-2 py-0.5 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
+              "bg-red-500/[0.08] border border-red-500/20 text-red-400",
+              item.flagged && "opacity-50 cursor-default"
+            )}>&#x2717;</button>
         </div>
       </div>
     </div>
@@ -210,38 +187,34 @@ function AgentKnowledgePills({ agentContext, profile }: {
 }) {
   return (
     <>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: space[2] }}>
+      <div className="flex flex-wrap gap-2">
         {agentContext.highAffinityTopics.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
-            <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>Interests:</span>
+          <div className="flex flex-wrap gap-1 items-center">
+            <span className="text-caption text-[var(--color-text-disabled)]">Interests:</span>
             {agentContext.highAffinityTopics.slice(0, 6).map(topic => (
-              <span key={topic} style={{
-                fontSize: t.caption.size, padding: `1px ${space[2]}px`,
-                background: `${colors.cyan[400]}10`, border: `1px solid ${colors.cyan[400]}20`,
-                borderRadius: radii.pill, color: colors.cyan[400],
-              }}>{topic}</span>
+              <span key={topic} className="text-caption px-2 py-px bg-cyan-400/[0.06] border border-cyan-400/[0.12] rounded-full text-cyan-400">
+                {topic}
+              </span>
             ))}
           </div>
         )}
         {agentContext.trustedAuthors.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
-            <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>Trusted:</span>
+          <div className="flex flex-wrap gap-1 items-center">
+            <span className="text-caption text-[var(--color-text-disabled)]">Trusted:</span>
             {agentContext.trustedAuthors.slice(0, 4).map(author => (
-              <span key={author} style={{
-                fontSize: t.caption.size, padding: `1px ${space[2]}px`,
-                background: `${colors.green[400]}10`, border: `1px solid ${colors.green[400]}20`,
-                borderRadius: radii.pill, color: colors.green[400],
-              }}>{author}</span>
+              <span key={author} className="text-caption px-2 py-px bg-emerald-400/[0.06] border border-emerald-400/[0.12] rounded-full text-emerald-400">
+                {author}
+              </span>
             ))}
           </div>
         )}
         {agentContext.highAffinityTopics.length === 0 && agentContext.trustedAuthors.length === 0 && (
-          <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>
+          <span className="text-caption text-[var(--color-text-disabled)]">
             Validate or flag content to teach your agent.
           </span>
         )}
       </div>
-      <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2] }}>
+      <div className="text-tiny text-[var(--color-text-disabled)] mt-2">
         Threshold: {profile.calibration.qualityThreshold.toFixed(1)} &middot; Reviews: {profile.totalValidated + profile.totalFlagged}
       </div>
     </>
@@ -407,23 +380,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   const { filteredDiscoveries, unreviewedQueue, dashboardSaved } = useMemo(() => {
     if (homeMode !== "dashboard") return EMPTY_SECTIONS;
-    // 1. Top sections: Top3 + Spotlight
     const topIds = new Set(dashboardTop3.map(c => c.item.id));
     for (const group of dashboardTopicSpotlight) {
       for (const item of group.items) topIds.add(item.id);
     }
-
-    // 2. Discoveries
     const filtDisc = discoveries.filter(d => !topIds.has(d.item.id)).slice(0, 3);
     for (const d of filtDisc) topIds.add(d.item.id);
-
-    // 3. Unreviewed queue
     const queue = computeUnreviewedQueue(contentRef.current, topIds).slice(0, 3);
     for (const item of queue) topIds.add(item.id);
-
-    // 4. Saved/Bookmarked
     const saved = computeDashboardSaved(contentRef.current, profile.bookmarkedIds ?? [], topIds).slice(0, 3);
-
     return { filteredDiscoveries: filtDisc, unreviewedQueue: queue, dashboardSaved: saved };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardTop3, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds, homeMode, content.length]);
@@ -520,17 +485,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   ], [onTabChange, content]);
 
   return (
-    <div data-testid="aegis-dashboard" style={{ animation: "fadeIn .4s ease" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[2], flexWrap: "wrap", gap: space[2] }}>
-        <h1 style={{ fontSize: mobile ? t.h1.mobileSz : t.h1.size, fontWeight: t.h1.weight, color: colors.text.primary, margin: 0 }}>
+    <div data-testid="aegis-dashboard" className="animate-fade-in">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <h1 className={cn("text-foreground m-0", mobile ? "text-[20px] font-bold" : typography.h1)}>
           Home
         </h1>
-        <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
-          <div style={{
-            display: "flex", gap: space[1],
-            background: colors.bg.raised, borderRadius: radii.md,
-            padding: space[1], border: `1px solid ${colors.border.default}`,
-          }}>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 bg-navy-lighter rounded-md p-1 border border-border">
             {(["feed", "dashboard"] as const).map(mode => {
               const active = homeMode === mode;
               return (
@@ -538,19 +499,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   key={mode}
                   data-testid={`aegis-home-mode-${mode}`}
                   onClick={() => setHomeMode(mode)}
-                  style={{
-                    padding: `${space[2]}px ${space[3]}px`,
-                    background: active ? colors.bg.surface : "transparent",
-                    border: active ? `1px solid ${colors.border.emphasis}` : "1px solid transparent",
-                    borderRadius: radii.sm,
-                    color: active ? colors.text.primary : colors.text.muted,
-                    fontSize: t.bodySm.size,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    transition: transitions.fast,
-                    textTransform: "capitalize" as const,
-                  }}
+                  className={cn(
+                    "px-3 py-2 rounded-sm text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast capitalize",
+                    active
+                      ? "bg-card border border-[var(--color-border-emphasis)] text-foreground"
+                      : "bg-transparent border border-transparent text-muted-foreground"
+                  )}
                 >
                   {mode === "feed" ? "Feed" : "Dashboard"}
                 </button>
@@ -559,45 +513,29 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           </div>
           <button
             onClick={() => onTabChange?.("settings:feeds")}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: space[1],
-              padding: `${space[1]}px ${space[3]}px`,
-              borderRadius: radii.pill,
-              background: filterMode === "pro" ? "rgba(56,189,248,0.1)" : colors.bg.raised,
-              border: `1px solid ${filterMode === "pro" ? "rgba(56,189,248,0.2)" : colors.border.default}`,
-              color: filterMode === "pro" ? colors.sky[400] : colors.text.muted,
-              fontSize: t.caption.size, fontWeight: 700, cursor: "pointer",
-              fontFamily: "inherit", transition: transitions.fast,
-            }}
+            className={cn(
+              "inline-flex items-center gap-1 px-3 py-1 rounded-full text-caption font-bold cursor-pointer font-[inherit] transition-fast",
+              filterMode === "pro"
+                ? "bg-sky-400/10 border border-sky-400/20 text-sky-400"
+                : "bg-navy-lighter border border-border text-muted-foreground"
+            )}
             title="Change in Settings > Feeds"
           >
             {filterMode === "pro" ? "Pro" : "Lite"}
           </button>
           {wotLoading && (
-            <span style={{ fontSize: t.caption.size, color: colors.text.disabled, animation: "pulse 2s infinite" }}>
+            <span className="text-caption text-[var(--color-text-disabled)] animate-pulse">
               &#x1F310; WoT...
             </span>
           )}
         </div>
       </div>
 
-      {/* Signal feedback loop message — shown in both modes */}
+      {/* Signal feedback loop message */}
       {feedbackMsg && (
         <div
           key={feedbackMsg.key}
-          style={{
-            marginTop: space[2],
-            marginBottom: space[2],
-            padding: `${space[2]}px ${space[4]}px`,
-            background: "rgba(139,92,246,0.06)",
-            border: "1px solid rgba(139,92,246,0.15)",
-            borderRadius: radii.md,
-            fontSize: t.bodySm.size,
-            color: colors.purple[400],
-            fontWeight: 600,
-            textAlign: "center",
-            animation: "fadeIn .3s ease",
-          }}
+          className="my-2 px-4 py-2 bg-purple-500/[0.06] border border-purple-500/15 rounded-md text-body-sm text-purple-400 font-semibold text-center animate-fade-in"
         >
           &#x1F4E1; Agent learned: {feedbackMsg.text}
         </div>
@@ -605,43 +543,38 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
       {homeMode === "feed" && (
         <>
-          <div data-testid="aegis-metrics-bar" style={{
-            display: "flex", flexWrap: "wrap", alignItems: "center",
-            gap: mobile ? space[3] : space[4],
-            marginBottom: space[3],
-            padding: `${space[2]}px ${space[4]}px`,
-            background: colors.bg.surface,
-            border: `1px solid ${colors.border.default}`,
-            borderRadius: radii.md,
-          }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: space[3], flex: 1 }}>
+          <div data-testid="aegis-metrics-bar" className={cn(
+            "flex flex-wrap items-center mb-3 px-4 py-2 bg-card border border-border rounded-md",
+            mobile ? "gap-3" : "gap-4"
+          )}>
+            <div className="flex flex-wrap gap-3 flex-1">
               {[
-                { icon: "\u{1F6E1}", value: todayQual.length, label: "quality", color: colors.cyan[400] },
-                { icon: "\u{1F525}", value: todaySlop.length, label: "burned", color: colors.orange[400] },
-                { icon: "\u26A1", value: todayContent.length, label: "eval", color: colors.purple[400] },
-                { icon: "\u{1F4E1}", value: uniqueSources.size, label: "sources", color: colors.sky[400] },
+                { icon: "\u{1F6E1}", value: todayQual.length, label: "quality", colorClass: "text-cyan-400" },
+                { icon: "\u{1F525}", value: todaySlop.length, label: "burned", colorClass: "text-orange-400" },
+                { icon: "\u26A1", value: todayContent.length, label: "eval", colorClass: "text-purple-400" },
+                { icon: "\u{1F4E1}", value: uniqueSources.size, label: "sources", colorClass: "text-sky-400" },
               ].map(m => (
-                <span key={m.label} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: t.bodySm.size, color: colors.text.muted }}>
+                <span key={m.label} className="flex items-center gap-1 text-body-sm text-muted-foreground">
                   <span>{m.icon}</span>
-                  <span style={{ fontWeight: 700, color: m.color, fontFamily: fonts.mono }}>{m.value}</span>
+                  <span className={cn("font-bold font-mono", m.colorClass)}>{m.value}</span>
                   <span>{m.label}</span>
                 </span>
               ))}
             </div>
-            <div style={{ display: "flex", gap: space[3], alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <div style={{ width: 60 }}>
+            <div className="flex gap-3 items-center">
+              <div className="flex items-center gap-1">
+                <div className="w-[60px]">
                   <MiniChart data={dailyQuality} color={colors.cyan[400]} h={20} />
                 </div>
-                <span style={{ fontSize: t.tiny.size, color: colors.cyan[400], fontFamily: fonts.mono }}>
+                <span className="text-tiny text-cyan-400 font-mono">
                   {dailyQuality.length > 0 ? dailyQuality[dailyQuality.length - 1] : 0}%
                 </span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <div style={{ width: 60 }}>
+              <div className="flex items-center gap-1">
+                <div className="w-[60px]">
                   <MiniChart data={dailySlop} color={colors.orange[500]} h={20} />
                 </div>
-                <span style={{ fontSize: t.tiny.size, color: colors.orange[500], fontFamily: fonts.mono }}>
+                <span className="text-tiny text-orange-500 font-mono">
                   {dailySlop.length > 0 ? dailySlop[dailySlop.length - 1] : 0}
                 </span>
               </div>
@@ -649,91 +582,62 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           </div>
 
           {/* Content filters */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3], flexWrap: "wrap", gap: space[2] }}>
-            <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
-              Filtered Signal {hasActiveFilter && <span data-testid="aegis-filter-count" style={{ fontSize: t.bodySm.size, color: colors.text.disabled }}>({filteredContent.length})</span>}
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">
+              Filtered Signal {hasActiveFilter && <span data-testid="aegis-filter-count" className="text-body-sm text-[var(--color-text-disabled)]">({filteredContent.length})</span>}
             </div>
-            <div style={{ display: "flex", gap: space[1], flexWrap: "wrap", alignItems: "center" }}>
+            <div className="flex gap-1 flex-wrap items-center">
               {/* Primary filter buttons */}
               {([
-                { id: "quality" as const, label: "Quality", bg: colors.green.bg, border: colors.green.border, color: colors.green[400] },
-                { id: "bookmarked" as const, label: "\uD83D\uDD16 Saved", bg: `${colors.cyan[500]}08`, border: `${colors.cyan[500]}25`, color: colors.cyan[400] },
-                { id: "validated" as const, label: "\u2713 Validated", bg: "rgba(167,139,250,0.06)", border: "rgba(167,139,250,0.15)", color: colors.purple[400] },
-              ]).map(({ id: v, label, bg, border, color }) => (
+                { id: "quality" as const, label: "Quality", activeClass: "bg-emerald-500/[0.08] border-emerald-500/20 text-emerald-400" },
+                { id: "bookmarked" as const, label: "\uD83D\uDD16 Saved", activeClass: "bg-cyan-500/[0.05] border-cyan-500/[0.15] text-cyan-400" },
+                { id: "validated" as const, label: "\u2713 Validated", activeClass: "bg-purple-400/[0.06] border-purple-400/15 text-purple-400" },
+              ]).map(({ id: v, label, activeClass }) => (
                 <button
                   key={v}
                   data-testid={`aegis-filter-${v}`}
                   aria-pressed={verdictFilter === v}
                   onClick={() => { setVerdictFilter(v); setMoreFiltersOpen(false); }}
-                  style={{
-                    padding: `${space[1]}px ${space[3]}px`,
-                    background: verdictFilter === v ? bg : "transparent",
-                    border: `1px solid ${verdictFilter === v ? border : colors.border.default}`,
-                    borderRadius: radii.pill,
-                    color: verdictFilter === v ? color : colors.text.disabled,
-                    fontSize: t.caption.size,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    transition: transitions.fast,
-                  }}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
+                    verdictFilter === v
+                      ? `border ${activeClass}`
+                      : "bg-transparent border border-border text-[var(--color-text-disabled)]"
+                  )}
                 >
                   {label}
                 </button>
               ))}
 
               {/* "More filters" dropdown */}
-              <div ref={moreFiltersRef} style={{ position: "relative" }}>
+              <div ref={moreFiltersRef} className="relative">
                 <button
                   data-testid="aegis-filter-more"
                   aria-expanded={moreFiltersOpen}
                   aria-haspopup="true"
                   onClick={() => setMoreFiltersOpen(prev => !prev)}
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 4,
-                    padding: `${space[1]}px ${space[3]}px`,
-                    background: moreFiltersActive ? colors.bg.raised : "transparent",
-                    border: `1px solid ${moreFiltersActive ? colors.border.emphasis : colors.border.default}`,
-                    borderRadius: radii.pill,
-                    color: moreFiltersActive ? colors.text.secondary : colors.text.disabled,
-                    fontSize: t.caption.size,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    transition: transitions.fast,
-                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-3 py-1 rounded-full text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
+                    moreFiltersActive
+                      ? "bg-navy-lighter border border-[var(--color-border-emphasis)] text-secondary-foreground"
+                      : "bg-transparent border border-border text-[var(--color-text-disabled)]"
+                  )}
                 >
                   More filters
                   {moreFiltersActive && (
-                    <span style={{
-                      width: 6, height: 6, borderRadius: "50%",
-                      background: colors.cyan[400], flexShrink: 0,
-                    }} />
+                    <span className="size-1.5 rounded-full bg-cyan-400 shrink-0" />
                   )}
-                  <span style={{ fontSize: 10, lineHeight: 1 }}>{moreFiltersOpen ? "\u25B4" : "\u25BE"}</span>
+                  <span className="text-[10px] leading-none">{moreFiltersOpen ? "\u25B4" : "\u25BE"}</span>
                 </button>
 
                 {moreFiltersOpen && (
                   <div
                     data-testid="aegis-filter-more-panel"
                     role="menu"
-                    style={{
-                      position: "absolute", right: 0, top: "calc(100% + 4px)",
-                      minWidth: 160, zIndex: 50,
-                      background: colors.bg.surface,
-                      border: `1px solid ${colors.border.default}`,
-                      borderRadius: radii.md,
-                      padding: `${space[2]}px 0`,
-                      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-                    }}
+                    className="absolute right-0 top-[calc(100%+4px)] min-w-[160px] z-50 bg-card border border-border rounded-md py-2 shadow-lg"
                   >
                     {/* VERDICT section */}
-                    <div style={{
-                      padding: `${space[1]}px ${space[3]}px`,
-                      fontSize: t.tiny.size, fontWeight: 700,
-                      color: colors.text.disabled, textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                    }}>Verdict</div>
+                    <div className="px-3 py-1 text-tiny font-bold text-[var(--color-text-disabled)] uppercase tracking-wide">Verdict</div>
                     {([
                       { id: "all" as const, label: "All" },
                       { id: "slop" as const, label: "Slop" },
@@ -744,51 +648,31 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         data-testid={`aegis-filter-${v}`}
                         aria-pressed={verdictFilter === v}
                         onClick={() => { setVerdictFilter(v); setMoreFiltersOpen(false); }}
-                        style={{
-                          display: "block", width: "100%", textAlign: "left",
-                          padding: `${space[2]}px ${space[3]}px`,
-                          background: verdictFilter === v ? `${colors.cyan[400]}10` : "transparent",
-                          border: "none",
-                          color: verdictFilter === v ? colors.cyan[400] : colors.text.muted,
-                          fontSize: t.bodySm.size,
-                          fontWeight: verdictFilter === v ? 700 : 500,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                          transition: transitions.fast,
-                        }}
+                        className={cn(
+                          "block w-full text-left px-3 py-2 border-none text-body-sm cursor-pointer font-[inherit] transition-fast",
+                          verdictFilter === v
+                            ? "bg-cyan-400/[0.06] text-cyan-400 font-bold"
+                            : "bg-transparent text-muted-foreground font-medium"
+                        )}
                       >{label}</button>
                     ))}
 
                     {/* Separator */}
-                    <div style={{
-                      height: 1, background: colors.border.default,
-                      margin: `${space[2]}px 0`,
-                    }} />
+                    <div className="h-px bg-border my-2" />
 
                     {/* SOURCE section */}
-                    <div style={{
-                      padding: `${space[1]}px ${space[3]}px`,
-                      fontSize: t.tiny.size, fontWeight: 700,
-                      color: colors.text.disabled, textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                    }}>Source</div>
+                    <div className="px-3 py-1 text-tiny font-bold text-[var(--color-text-disabled)] uppercase tracking-wide">Source</div>
                     {["all", ...availableSources].map(s => (
                       <button
                         key={s}
                         role="menuitem"
                         onClick={() => { setSourceFilter(s); setMoreFiltersOpen(false); }}
-                        style={{
-                          display: "block", width: "100%", textAlign: "left",
-                          padding: `${space[2]}px ${space[3]}px`,
-                          background: sourceFilter === s ? `${colors.cyan[400]}10` : "transparent",
-                          border: "none",
-                          color: sourceFilter === s ? colors.cyan[400] : colors.text.muted,
-                          fontSize: t.bodySm.size,
-                          fontWeight: sourceFilter === s ? 700 : 500,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                          transition: transitions.fast,
-                        }}
+                        className={cn(
+                          "block w-full text-left px-3 py-2 border-none text-body-sm cursor-pointer font-[inherit] transition-fast",
+                          sourceFilter === s
+                            ? "bg-cyan-400/[0.06] text-cyan-400 font-bold"
+                            : "bg-transparent text-muted-foreground font-medium"
+                        )}
                       >{s === "all" ? "All sources" : s}</button>
                     ))}
                   </div>
@@ -799,28 +683,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
           {/* Content list */}
           {isLoading ? (
-            <div style={{
-              textAlign: "center", padding: space[10],
-              color: colors.text.muted, background: colors.bg.surface,
-              borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
-              marginBottom: space[4],
-            }}>
-              <div style={{ fontSize: 32, marginBottom: space[3], animation: "pulse 2s infinite" }}>&#x1F6E1;</div>
-              <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>Loading content...</div>
-              <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Syncing from Internet Computer</div>
+            <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
+              <div className="text-[32px] mb-3 animate-pulse">&#x1F6E1;</div>
+              <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">Loading content...</div>
+              <div className="text-body-sm mt-2">Syncing from Internet Computer</div>
             </div>
           ) : filteredContent.length === 0 ? (
             <>
               {hasActiveFilter ? (
-                <div style={{
-                  textAlign: "center", padding: space[10],
-                  color: colors.text.muted, background: colors.bg.surface,
-                  borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
-                  marginBottom: space[4],
-                }}>
-                  <div style={{ fontSize: 32, marginBottom: space[3] }}>&#x1F50D;</div>
-                  <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>No matching content</div>
-                  <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Try adjusting your filters</div>
+                <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
+                  <div className="text-[32px] mb-3">&#x1F50D;</div>
+                  <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">No matching content</div>
+                  <div className="text-body-sm mt-2">Try adjusting your filters</div>
                 </div>
               ) : !isDemoMode ? (
                 <OnboardingFlow
@@ -834,15 +708,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   onTabChange={onTabChange}
                 />
               ) : (
-                <div style={{
-                  textAlign: "center", padding: space[10],
-                  color: colors.text.muted, background: colors.bg.surface,
-                  borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
-                  marginBottom: space[4],
-                }}>
-                  <div style={{ fontSize: 32, marginBottom: space[3] }}>&#x1F50D;</div>
-                  <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>No content yet</div>
-                  <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Add sources to start filtering, or try the incinerator for manual evaluation</div>
+                <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
+                  <div className="text-[32px] mb-3">&#x1F50D;</div>
+                  <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">No content yet</div>
+                  <div className="text-body-sm mt-2">Add sources to start filtering, or try the incinerator for manual evaluation</div>
                 </div>
               )}
             </>
@@ -858,11 +727,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 return (
                   <div key={rep.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
                     {verdictFilter === "validated" && rep.validatedAt && (
-                      <div style={{
-                        fontSize: t.caption.size, color: colors.purple[400],
-                        marginBottom: space[1], marginLeft: space[1],
-                        fontFamily: fonts.mono, fontWeight: 600,
-                      }}>
+                      <div className="text-caption text-purple-400 mb-1 ml-1 font-mono font-semibold">
                         Validated {new Date(rep.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                         {" "}
                         {new Date(rep.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
@@ -888,23 +753,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           if (next.has(rep.id)) next.delete(rep.id); else next.add(rep.id);
                           return next;
                         })}
-                        style={{
-                          display: "flex", alignItems: "center", gap: space[1],
-                          padding: `${space[1]}px ${space[3]}px`,
-                          margin: `${space[1]}px 0 ${space[2]}px ${space[4]}px`,
-                          background: "none", border: `1px solid ${colors.border.subtle}`,
-                          borderRadius: radii.pill, color: colors.text.muted,
-                          fontSize: t.caption.size, fontWeight: 600, cursor: "pointer",
-                          fontFamily: "inherit", transition: transitions.fast,
-                        }}
+                        className="flex items-center gap-1 px-3 py-1 my-1 ml-4 mb-2 bg-transparent border border-[var(--color-border-subtle)] rounded-full text-muted-foreground text-caption font-semibold cursor-pointer font-[inherit] transition-fast"
                       >
-                        <span style={{ transform: clusterExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: transitions.fast, display: "inline-block" }}>&#x25BC;</span>
+                        <span className={cn("inline-block transition-fast", clusterExpanded && "rotate-180")}>&#x25BC;</span>
                         {clusterExpanded ? "Hide" : `+${cluster.members.length - 1} related`}
                         {cluster.sharedTopics.length > 0 && ` \u00B7 ${cluster.sharedTopics.slice(0, 2).join(", ")}`}
                       </button>
                     )}
                     {hasCluster && clusterExpanded && cluster.members.slice(1).map(m => (
-                      <div key={m.id} style={{ marginLeft: space[4], borderLeft: `2px solid ${colors.border.subtle}`, paddingLeft: space[3] }}>
+                      <div key={m.id} className="ml-4 border-l-2 border-[var(--color-border-subtle)] pl-3">
                         <ContentCard
                           item={m}
                           expanded={expanded === m.id}
@@ -925,20 +782,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               {clusteredContent.length > 5 && !showAllContent && (
                 <button
                   onClick={() => setShowAllContent(true)}
-                  style={{
-                    width: "100%",
-                    padding: `${space[3]}px ${space[4]}px`,
-                    background: colors.bg.surface,
-                    border: `1px solid ${colors.border.default}`,
-                    borderRadius: radii.md,
-                    color: colors.text.muted,
-                    fontSize: t.bodySm.size,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    transition: transitions.normal,
-                    marginTop: space[2],
-                  }}
+                  className="w-full px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer font-[inherit] transition-normal mt-2"
                 >
                   Show all ({filteredContent.length} items in {clusteredContent.length} groups)
                 </button>
@@ -946,18 +790,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </>
           )}
 
-          {/* Agent Knowledge — interest profile */}
+          {/* Agent Knowledge */}
           {agentContext && (
-            <div style={{
-              marginTop: space[4],
-              padding: `${space[3]}px ${space[4]}px`,
-              background: colors.bg.surface,
-              border: `1px solid ${agentKnowsHighlight ? "rgba(139,92,246,0.3)" : colors.border.default}`,
-              borderRadius: radii.md,
-              transition: "border-color 0.5s ease, box-shadow 0.5s ease",
-              boxShadow: agentKnowsHighlight ? "0 0 12px rgba(139,92,246,0.1)" : "none",
-            }}>
-              <div style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary, marginBottom: space[2] }}>
+            <div
+              className={cn(
+                "mt-4 px-4 py-3 bg-card rounded-md transition-all duration-500",
+                agentKnowsHighlight
+                  ? "border border-purple-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]"
+                  : "border border-border"
+              )}
+            >
+              <div className="text-body-sm font-semibold text-[var(--color-text-tertiary)] mb-2">
                 Your Agent Knows
               </div>
               <AgentKnowledgePills agentContext={agentContext} profile={profile} />
@@ -970,54 +813,37 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       )}
 
       {homeMode === "dashboard" && (
-        <div style={{ marginTop: space[3] }}>
-          {/* Today's Top 3 — full width */}
-          <div data-testid="aegis-top3-section" style={{ marginBottom: space[4] }}>
-            <div style={{
-              fontSize: t.h3.size, fontWeight: t.h3.weight,
-              color: colors.text.tertiary, marginBottom: space[3],
-              display: "flex", alignItems: "center", gap: space[2],
-            }}>
-              <span>⭐</span> Today&#39;s Top 3
-              <div style={{ flex: 1 }} />
+        <div className="mt-3">
+          {/* Today's Top 3 */}
+          <div data-testid="aegis-top3-section" className="mb-4">
+            <div className="text-h3 font-semibold text-[var(--color-text-tertiary)] mb-3 flex items-center gap-2">
+              <span>&#x2B50;</span> Today&#39;s Top 3
+              <div className="flex-1" />
               <button
                 onClick={() => { setHomeMode("feed"); setVerdictFilter("all"); }}
-                style={{
-                  fontSize: t.caption.size, fontWeight: 600,
-                  color: colors.cyan[400], background: "transparent",
-                  border: "none", cursor: "pointer", fontFamily: "inherit",
-                }}
+                className="text-caption font-semibold text-cyan-400 bg-transparent border-none cursor-pointer font-[inherit]"
               >
-                Review All →
+                Review All &rarr;
               </button>
             </div>
             {dashboardTop3.length === 0 ? (
-              <div style={{
-                fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center",
-                padding: space[4], background: colors.bg.surface,
-                border: `1px solid ${colors.border.default}`, borderRadius: radii.lg,
-              }}>
+              <div className="text-body-sm text-[var(--color-text-disabled)] text-center p-4 bg-card border border-border rounded-lg">
                 No quality items scored yet.
               </div>
             ) : (
-              <div style={cardGridStyle(mobile)}>
+              <div className={cn(mobile ? "flex flex-col gap-4" : "grid grid-cols-3 gap-4")}>
                 {dashboardTop3.map((bi, i) => (
                   <DashboardCard
                     key={bi.item.id} item={bi.item} {...cardProps}
                     gradeSize={48} textClamp={3} textSlice={200} textWeight={700} showPlatform
-                    style={{ animation: `slideUp .3s ease ${i * 0.08}s forwards` }}
+                    className={`animate-[slideUp_.3s_ease_${i * 0.08}s_forwards]`}
                     overlay={
-                      <div style={{
-                        position: "absolute", top: space[2], left: space[2],
-                        width: 28, height: 28, borderRadius: "50%",
-                        background: `linear-gradient(135deg, ${colors.blue[600]}, ${colors.purple[600]})`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: t.bodySm.size, fontWeight: 800, color: "#fff",
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-                      }}>{i + 1}</div>
+                      <div className="absolute top-2 left-2 size-7 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-body-sm font-[800] text-white shadow-md">
+                        {i + 1}
+                      </div>
                     }
                     topContent={bi.classification !== "mixed" ? (
-                      <div style={{ marginBottom: space[1] }}>
+                      <div className="mb-1">
                         <BriefingClassificationBadge classification={bi.classification} />
                       </div>
                     ) : undefined}
@@ -1028,83 +854,44 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
           </div>
 
             {/* Topic Spotlight */}
-            <div style={{ marginBottom: space[4] }}>
-              <div style={{
-                fontSize: t.h3.size, fontWeight: t.h3.weight,
-                color: colors.text.tertiary, marginBottom: space[3],
-                display: "flex", alignItems: "center", gap: space[2],
-              }}>
+            <div className="mb-4">
+              <div className="text-h3 font-semibold text-[var(--color-text-tertiary)] mb-3 flex items-center gap-2">
                 <span>&#x1F3AF;</span> Topic Spotlight
               </div>
               {dashboardTopicSpotlight.length === 0 ? (
-                <div style={{
-                  fontSize: t.bodySm.size, color: colors.text.disabled, textAlign: "center",
-                  padding: space[4], background: colors.bg.surface,
-                  border: `1px solid ${colors.border.default}`, borderRadius: radii.lg,
-                }}>
+                <div className="text-body-sm text-[var(--color-text-disabled)] text-center p-4 bg-card border border-border rounded-lg">
                   Validate more content to refine recommendations.
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
+                <div className="flex flex-col gap-3">
                   {dashboardTopicSpotlight.map(({ topic, items }) => {
                     const isExpanded = expandedTopics.has(topic);
                     return (
-                      <div key={topic} style={{
-                        background: "transparent",
-                        border: `1px solid ${colors.border.subtle}`,
-                        borderRadius: radii.lg,
-                        overflow: "hidden",
-                      }}>
+                      <div key={topic} className="bg-transparent border border-[var(--color-border-subtle)] rounded-lg overflow-hidden">
                         <button
                           onClick={() => toggleTopic(topic)}
-                          style={{
-                            width: "100%",
-                            padding: `${space[3]}px ${space[4]}px`,
-                            background: isExpanded ? colors.bg.surface : "transparent",
-                            border: "none",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: space[2],
-                            fontFamily: "inherit",
-                            transition: transitions.fast,
-                          }}
+                          className={cn(
+                            "w-full px-4 py-3 border-none cursor-pointer flex items-center gap-2 font-[inherit] transition-fast",
+                            isExpanded ? "bg-card" : "bg-transparent"
+                          )}
                         >
-                          <span style={{
-                            fontSize: t.bodySm.size, fontWeight: 700,
-                            padding: `2px ${space[2]}px`,
-                            background: "rgba(6,182,212,0.1)",
-                            borderRadius: radii.pill,
-                            color: colors.cyan[400],
-                          }}>
+                          <span className="text-body-sm font-bold px-2 py-0.5 bg-cyan-500/10 rounded-full text-cyan-400">
                             {topic}
                           </span>
-                          <span style={{
-                            fontSize: t.caption.size,
-                            color: colors.text.muted,
-                            background: colors.bg.raised,
-                            padding: "2px 8px",
-                            borderRadius: radii.sm,
-                          }}>
+                          <span className="text-caption text-muted-foreground bg-navy-lighter px-2 py-0.5 rounded-sm">
                             {items.length}
                           </span>
-                          <div style={{ flex: 1 }} />
-                          <span style={{
-                            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                            transition: transitions.fast,
-                            fontSize: 12,
-                            color: colors.text.muted,
-                          }}>
-                            ▼
+                          <div className="flex-1" />
+                          <span className={cn(
+                            "transition-fast text-xs text-muted-foreground",
+                            isExpanded && "rotate-180"
+                          )}>
+                            &#x25BC;
                           </span>
                         </button>
                         {isExpanded && (
-                          <div style={{
-                            padding: `${space[3]}px ${space[4]}px`,
-                            borderTop: `1px solid ${colors.border.subtle}`,
-                            animation: "slideDown .2s ease forwards",
-                          }}>
-                            <div style={cardGridStyle(mobile)}>
+                          <div className="px-4 py-3 border-t border-[var(--color-border-subtle)]" style={{ animation: "slideDown .2s ease forwards" }}>
+                            <div className={cn(mobile ? "flex flex-col gap-4" : "grid grid-cols-3 gap-4")}>
                               {items.map(item => (
                                 <DashboardCard key={item.id} item={item} {...cardProps} />
                               ))}
@@ -1118,43 +905,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               )}
             </div>
 
-          {/* Your Agent — merged personality card */}
-          <div style={{
-            padding: `${space[3]}px ${space[4]}px`,
-            background: colors.bg.surface,
-            border: `1px solid ${agentKnowsHighlight ? "rgba(139,92,246,0.3)" : colors.border.default}`,
-            borderRadius: radii.lg,
-            marginBottom: space[4],
-            transition: "border-color 0.5s ease, box-shadow 0.5s ease",
-            boxShadow: agentKnowsHighlight ? "0 0 12px rgba(139,92,246,0.1)" : "none",
-          }}>
-            <div style={{
-              display: "flex", alignItems: "center", gap: space[2], marginBottom: agentContext ? space[2] : 0,
-            }}>
+          {/* Your Agent */}
+          <div className={cn(
+            "px-4 py-3 bg-card rounded-lg mb-4 transition-all duration-500",
+            agentKnowsHighlight
+              ? "border border-purple-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]"
+              : "border border-border"
+          )}>
+            <div className={cn("flex items-center gap-2", agentContext && "mb-2")}>
               <span>&#x1F9E0;</span>
-              <span style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary }}>Your Agent</span>
-              <span style={{
-                fontSize: t.caption.size, color: colors.text.disabled, fontWeight: 400,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
-              }}>
+              <span className="text-body-sm font-semibold text-[var(--color-text-tertiary)]">Your Agent</span>
+              <span className="text-caption text-[var(--color-text-disabled)] font-normal overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
                 {Object.entries(profile.topicAffinities).filter(([, v]) => v >= 0.2).length} interests
                 &middot; {profile.totalValidated + profile.totalFlagged} reviews
                 &middot; threshold {profile.calibration.qualityThreshold.toFixed(1)}
               </span>
-              <div style={{ flex: 1 }} />
+              <div className="flex-1" />
               <button
                 onClick={() => onTabChange?.("settings:agent")}
-                style={{
-                  padding: `${space[1]}px ${space[3]}px`,
-                  background: `${colors.cyan[400]}10`,
-                  border: `1px solid ${colors.cyan[400]}25`,
-                  borderRadius: radii.md,
-                  color: colors.cyan[400],
-                  fontSize: t.caption.size, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit",
-                  transition: transitions.fast,
-                  whiteSpace: "nowrap", flexShrink: 0,
-                }}
+                className="px-3 py-1 bg-cyan-400/[0.06] border border-cyan-400/[0.15] rounded-md text-cyan-400 text-caption font-semibold cursor-pointer font-[inherit] transition-fast whitespace-nowrap shrink-0"
               >
                 Edit settings
               </button>
@@ -1167,17 +936,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             <CollapsibleSection
               id="discoveries"
               title="Discoveries"
-              icon="🔭"
+              icon="&#x1F52D;"
               isExpanded={expandedSections.has('discoveries')}
               onToggle={toggleSection}
               itemCount={filteredDiscoveries.length}
               mobile={mobile}
             >
-              <div style={cardGridStyle(mobile)}>
+              <div className={cn(mobile ? "flex flex-col gap-4" : "grid grid-cols-3 gap-4")}>
                 {filteredDiscoveries.map(d => (
                   <DashboardCard key={d.item.id} item={d.item} {...cardProps}
                     overlay={d.reason && (
-                      <div style={{ position: "absolute", bottom: space[2], left: space[2], right: space[2] }}>
+                      <div className="absolute bottom-2 left-2 right-2">
                         <SerendipityBadge discoveryType={d.discoveryType} />
                       </div>
                     )}
@@ -1189,17 +958,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
           {/* Needs Review - Collapsible */}
           {unreviewedQueue.length > 0 && (
-            <div style={{ marginTop: space[4], marginBottom: space[4] }}>
+            <div className="my-4">
             <CollapsibleSection
               id="review-queue"
               title="Needs Review"
-              icon="📋"
+              icon="&#x1F4CB;"
               isExpanded={expandedSections.has('review-queue')}
               onToggle={toggleSection}
               itemCount={unreviewedQueue.length}
               mobile={mobile}
             >
-              <div style={cardGridStyle(mobile)}>
+              <div className={cn(mobile ? "flex flex-col gap-4" : "grid grid-cols-3 gap-4")}>
                 {unreviewedQueue.map(item => (
                   <DashboardCard key={item.id} item={item} {...cardProps} />
                 ))}
@@ -1208,28 +977,20 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </div>
           )}
 
-          {/* Saved - Full width 3-card grid */}
+          {/* Saved */}
           {dashboardSaved.length > 0 && (
-            <div style={{ marginBottom: space[4] }}>
-              <div style={{
-                fontSize: t.h3.size, fontWeight: t.h3.weight,
-                color: colors.text.tertiary, marginBottom: space[3],
-                display: "flex", alignItems: "center", gap: space[2],
-              }}>
-                <span>🔖</span> Saved
-                <div style={{ flex: 1 }} />
+            <div className="mb-4">
+              <div className="text-h3 font-semibold text-[var(--color-text-tertiary)] mb-3 flex items-center gap-2">
+                <span>&#x1F516;</span> Saved
+                <div className="flex-1" />
                 <button
                   onClick={() => { setVerdictFilter("bookmarked"); setHomeMode("feed"); }}
-                  style={{
-                    background: "transparent", border: "none", cursor: "pointer",
-                    color: colors.cyan[400], fontSize: t.caption.size, fontWeight: 600,
-                    fontFamily: "inherit", padding: 0,
-                  }}
+                  className="bg-transparent border-none cursor-pointer text-cyan-400 text-caption font-semibold font-[inherit] p-0"
                 >
                   Review Saved &rarr;
                 </button>
               </div>
-              <div style={cardGridStyle(mobile)}>
+              <div className={cn(mobile ? "flex flex-col gap-4" : "grid grid-cols-3 gap-4")}>
                 {dashboardSaved.map(item => (
                   <DashboardCard key={item.id} item={item} {...cardProps} />
                 ))}
@@ -1240,13 +1001,31 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         </div>
       )}
 
-      {/* Keyboard shortcut hint — only in feed mode where keyboard nav is active */}
+      {/* Chrome Extension CTA */}
+      <a
+        href="https://chromewebstore.google.com/detail/aegis-score/pnnpkepiojfpkppjpoimolkamflhbjhh"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 mt-4 px-4 py-3 bg-gradient-to-br from-cyan-500/[0.03] to-blue-600/[0.02] border border-cyan-500/[0.12] rounded-lg no-underline transition-normal"
+      >
+        <span className="text-xl shrink-0">&#x1F9E9;</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-body-sm font-semibold text-cyan-400">
+            Aegis Score for Chrome
+          </div>
+          <div className="text-caption text-muted-foreground mt-0.5">
+            1-click V/C/L scores on any page &mdash; send articles to Aegis without leaving your browser
+          </div>
+        </div>
+        <span className="text-caption text-cyan-400 font-semibold whitespace-nowrap shrink-0">
+          Install &rarr;
+        </span>
+      </a>
+
+      {/* Keyboard shortcut hint */}
       {!mobile && homeMode === "feed" && (
-        <div style={{
-          textAlign: "center", marginTop: space[3],
-          fontSize: t.tiny.size, color: colors.text.disabled,
-        }}>
-          <span style={{ fontFamily: fonts.mono }}>J/K</span> navigate &middot; <span style={{ fontFamily: fonts.mono }}>V</span> validate &middot; <span style={{ fontFamily: fonts.mono }}>F</span> flag &middot; <span style={{ fontFamily: fonts.mono }}>{navigator?.platform?.includes("Mac") ? "\u2318" : "Ctrl"}+K</span> commands
+        <div className="text-center mt-3 text-tiny text-[var(--color-text-disabled)]">
+          <span className="font-mono">J/K</span> navigate &middot; <span className="font-mono">V</span> validate &middot; <span className="font-mono">F</span> flag &middot; <span className="font-mono">{navigator?.platform?.includes("Mac") ? "\u2318" : "Ctrl"}+K</span> commands
         </div>
       )}
 
@@ -1254,4 +1033,3 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     </div>
   );
 };
-

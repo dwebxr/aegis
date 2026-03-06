@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { fonts, colors } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 
 interface ScoreRingProps {
   value: number;
@@ -9,8 +9,21 @@ interface ScoreRingProps {
 }
 
 export const ScoreRing: React.FC<ScoreRingProps> = ({ value, size = 48, color }) => (
-  <div style={{ width: size, height: size, borderRadius: "50%", background: `conic-gradient(${color} ${value * 10}%, ${colors.bg.raised} ${value * 10}%)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-    <div style={{ width: size - 10, height: size - 10, borderRadius: "50%", background: colors.bg.surface, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size > 40 ? 14 : 12, fontWeight: 800, color, fontFamily: fonts.mono }}>
+  <div
+    className="flex items-center justify-center rounded-full shrink-0"
+    style={{
+      width: size,
+      height: size,
+      background: `conic-gradient(${color} ${value * 10}%, var(--color-bg-raised) ${value * 10}%)`,
+    }}
+  >
+    <div
+      className={cn(
+        "rounded-full bg-card flex items-center justify-center font-mono font-extrabold",
+        size > 40 ? "text-sm" : "text-xs"
+      )}
+      style={{ width: size - 10, height: size - 10, color }}
+    >
       {value.toFixed(1)}
     </div>
   </div>

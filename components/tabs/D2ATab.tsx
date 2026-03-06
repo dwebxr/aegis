@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { ContentCard } from "@/components/ui/ContentCard";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { AgentProfileEditModal } from "@/components/ui/AgentProfileEditModal";
@@ -28,7 +29,6 @@ import { Principal } from "@dfinity/principal";
 import { npubEncode } from "nostr-tools/nip19";
 import { maskNpub } from "@/lib/nostr/linkAccount";
 import { useAgent } from "@/contexts/AgentContext";
-import { colors, space, fonts, type as t, radii, transitions } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import type { AgentState, ActivityLogEntry } from "@/lib/agent/types";
 import type { D2AMatchRecord } from "@/lib/ic/declarations";
@@ -47,12 +47,10 @@ interface D2ATabProps {
   onTabChange?: (tab: string) => void;
 }
 
-const surfaceCard = (m?: boolean): React.CSSProperties => ({
-  background: colors.bg.surface,
-  border: `1px solid ${colors.border.default}`,
-  borderRadius: radii.lg,
-  padding: m ? space[4] : space[5],
-});
+const surfaceCardClass = (m?: boolean) => cn(
+  "bg-card border border-border rounded-lg",
+  m ? "p-4" : "p-5",
+);
 
 function formatTimestamp(nsOrMs: bigint | number): string {
   const ms = typeof nsOrMs === "bigint" ? Number(nsOrMs) / 1_000_000 : nsOrMs;
@@ -74,18 +72,18 @@ function relativeTime(ts: number): string {
   return `${Math.floor(diff / 86400_000)}d ago`;
 }
 
-const LOG_ICONS: Record<string, { icon: string; color: string }> = {
-  presence: { icon: "\uD83D\uDCE1", color: colors.text.muted },
-  discovery: { icon: "\uD83D\uDD0D", color: colors.sky[400] },
-  offer_sent: { icon: "\uD83E\uDD1D", color: colors.purple[400] },
-  offer_received: { icon: "\uD83E\uDD1D", color: colors.purple[400] },
-  accept: { icon: "\u2713", color: colors.green[400] },
-  deliver: { icon: "\u2713", color: colors.green[400] },
-  received: { icon: "\u2713", color: colors.green[400] },
-  reject: { icon: "\u2717", color: colors.amber[400] },
-  error: { icon: "\u26A0", color: colors.red[400] },
-  comment_sent: { icon: "\uD83D\uDCAC", color: colors.amber[400] },
-  comment_received: { icon: "\uD83D\uDCAC", color: colors.amber[400] },
+const LOG_ICONS: Record<string, { icon: string; colorClass: string }> = {
+  presence: { icon: "\uD83D\uDCE1", colorClass: "text-muted-foreground" },
+  discovery: { icon: "\uD83D\uDD0D", colorClass: "text-sky-400" },
+  offer_sent: { icon: "\uD83E\uDD1D", colorClass: "text-purple-400" },
+  offer_received: { icon: "\uD83E\uDD1D", colorClass: "text-purple-400" },
+  accept: { icon: "\u2713", colorClass: "text-green-400" },
+  deliver: { icon: "\u2713", colorClass: "text-green-400" },
+  received: { icon: "\u2713", colorClass: "text-green-400" },
+  reject: { icon: "\u2717", colorClass: "text-amber-400" },
+  error: { icon: "\u26A0", colorClass: "text-red-400" },
+  comment_sent: { icon: "\uD83D\uDCAC", colorClass: "text-amber-400" },
+  comment_received: { icon: "\uD83D\uDCAC", colorClass: "text-amber-400" },
 };
 
 export const D2ATab: React.FC<D2ATabProps> = ({
@@ -179,20 +177,16 @@ export const D2ATab: React.FC<D2ATabProps> = ({
   ];
 
   return (
-    <div style={{ animation: "fadeIn .4s ease" }}>
+    <div className="animate-fade-in">
       {/* Header */}
-      <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
-        <h1 data-testid="aegis-d2a-heading" style={{
-          fontSize: mobile ? t.display.mobileSz : t.display.size,
-          fontWeight: t.display.weight,
-          lineHeight: t.display.lineHeight,
-          letterSpacing: t.display.letterSpacing,
-          color: colors.text.primary,
-          margin: 0,
-        }}>
+      <div className={cn("mb-8", !mobile && "mb-12")}>
+        <h1 data-testid="aegis-d2a-heading" className={cn(
+          "font-bold leading-tight tracking-tight text-foreground m-0",
+          mobile ? "text-[22px]" : "text-display"
+        )}>
           D2A Activity
         </h1>
-        <p data-testid="aegis-d2a-status" style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
+        <p data-testid="aegis-d2a-status" className={cn("text-muted-foreground mt-2", mobile ? "text-body-sm" : "text-body")}>
           {agentState?.isActive
             ? `Agent active \u2014 ${agentState.peers.length} peers, ${agentState.sentItems}\u2191 ${agentState.receivedItems}\u2193`
             : "Enable D2A Agent in Settings to exchange content with peers"}
@@ -206,61 +200,38 @@ export const D2ATab: React.FC<D2ATabProps> = ({
         const profileName = agentProfile?.display_name || agentProfile?.name || (principalText ? `Aegis Agent for ${principalText.slice(0, 5)}...${principalText.slice(-3)}` : "Aegis Agent");
         return (
           <>
-            <div style={{
-              ...surfaceCard(mobile),
-              marginBottom: space[4],
-              display: "flex",
-              gap: space[3],
-              flexWrap: "wrap",
-              alignItems: "flex-start",
-            }}>
+            <div className={cn(surfaceCardClass(mobile), "mb-4 flex gap-3 flex-wrap items-start")}>
               {/* Avatar */}
-              <div style={{
-                width: avatarSize, height: avatarSize,
-                borderRadius: "50%",
-                border: `2px solid ${colors.green[400]}`,
-                overflow: "hidden",
-                flexShrink: 0,
-                background: colors.bg.surface,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
+              <div
+                className="rounded-full border-2 border-green-400 overflow-hidden shrink-0 bg-card flex items-center justify-center"
+                style={{ width: avatarSize, height: avatarSize }}
+              >
                 {profilePicture && !avatarError ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={profilePicture}
                     alt="Agent"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    className="w-full h-full object-cover"
                     onError={() => setAvatarError(true)}
                   />
                 ) : (
-                  <span style={{ fontSize: avatarSize * 0.5, opacity: 0.4 }}>{"\uD83E\uDD16"}</span>
+                  <span style={{ fontSize: avatarSize * 0.5 }} className="opacity-40">{"\uD83E\uDD16"}</span>
                 )}
               </div>
 
               {/* Center: name + npub + about + website */}
-              <div style={{ flex: 1, minWidth: 120 }}>
+              <div className="flex-1 min-w-[120px]">
                 {/* Name row */}
-                <div style={{
-                  fontSize: mobile ? t.h3.mobileSz : t.h3.size,
-                  fontWeight: 700,
-                  color: colors.text.primary,
-                  marginBottom: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: space[2],
-                }}>
+                <div className={cn("font-bold text-foreground mb-0.5 flex items-center gap-2", mobile ? "text-body" : "text-h3")}>
                   {profileName}
                   {agentProfileLoading && (
-                    <span style={{ fontSize: t.caption.size, color: colors.text.disabled, fontWeight: 400 }}>...</span>
+                    <span className="text-caption text-[var(--color-text-disabled)] font-normal">...</span>
                   )}
                 </div>
 
                 {/* npub + copy */}
-                <div style={{ display: "flex", alignItems: "center", gap: space[2], position: "relative", marginBottom: space[1] }}>
-                  <code style={{
-                    fontFamily: fonts.mono, fontSize: t.caption.size,
-                    color: colors.purple[400], letterSpacing: "0.02em",
-                  }}>
+                <div className="flex items-center gap-2 relative mb-1">
+                  <code className="font-mono text-caption text-purple-400 tracking-wide">
                     {(() => { try { return maskNpub(npubEncode(agentState.myPubkey!)); } catch { return agentState.myPubkey?.slice(0, 12) + "\u2026"; } })()}
                   </code>
                   <button
@@ -279,25 +250,17 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                         setTimeout(() => setNpubCopyState("idle"), 2000);
                       }
                     }}
-                    style={{
-                      background: "none", border: `1px solid ${colors.border.default}`,
-                      borderRadius: radii.sm, padding: "1px 6px",
-                      fontSize: 10, color: npubCopyState === "copied" ? colors.green[400] : npubCopyState === "failed" ? colors.red[400] : colors.text.muted,
-                      cursor: "pointer", transition: transitions.fast,
-                      fontFamily: fonts.sans, lineHeight: 1.4,
-                    }}
+                    className={cn(
+                      "bg-transparent border border-border rounded-sm px-1.5 py-px text-[10px] cursor-pointer transition-fast font-sans leading-snug",
+                      npubCopyState === "copied" ? "text-green-400"
+                        : npubCopyState === "failed" ? "text-red-400"
+                        : "text-muted-foreground"
+                    )}
                   >
                     {npubCopyState === "copied" ? "Copied!" : npubCopyState === "failed" ? "Failed" : "Copy npub"}
                   </button>
                   {npubCopyState === "copied" && (
-                    <div style={{
-                      position: "absolute", top: "100%", left: 0, marginTop: 4,
-                      background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-                      borderRadius: radii.sm, padding: "4px 8px",
-                      fontFamily: fonts.mono, fontSize: 10, color: colors.purple[400],
-                      whiteSpace: "nowrap", zIndex: 10,
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-                    }}>
+                    <div className="absolute top-full left-0 mt-1 bg-navy-lighter border border-border rounded-sm px-2 py-1 font-mono text-[10px] text-purple-400 whitespace-nowrap z-10 shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
                       {(() => { try { return npubEncode(agentState.myPubkey!); } catch { return ""; } })()}
                     </div>
                   )}
@@ -305,12 +268,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
 
                 {/* About (optional) */}
                 {agentProfile?.about && (
-                  <p style={{
-                    fontSize: t.bodySm.size, color: colors.text.tertiary,
-                    lineHeight: 1.5, margin: 0, marginBottom: space[1],
-                    overflow: "hidden", textOverflow: "ellipsis",
-                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                  }}>
+                  <p className="text-body-sm text-[var(--color-text-tertiary)] leading-normal m-0 mb-1 overflow-hidden text-ellipsis [-webkit-line-clamp:2] [-webkit-box-orient:vertical] [display:-webkit-box]">
                     {agentProfile.about}
                   </p>
                 )}
@@ -321,11 +279,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                     href={agentProfile.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{
-                      fontSize: t.caption.size, color: colors.cyan[400],
-                      textDecoration: "none", display: "inline-flex",
-                      alignItems: "center", gap: 4,
-                    }}
+                    className="text-caption text-cyan-400 no-underline inline-flex items-center gap-1"
                   >
                     {"\uD83D\uDD17"} {agentProfile.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
                   </a>
@@ -333,28 +287,17 @@ export const D2ATab: React.FC<D2ATabProps> = ({
               </div>
 
               {/* Right: status + edit */}
-              <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", gap: space[2], alignItems: "flex-end" }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: "2px 8px",
-                  borderRadius: radii.pill, textTransform: "uppercase",
-                  background: "rgba(52,211,153,0.12)", color: colors.green[400],
-                }}>
+              <div className="text-right shrink-0 flex flex-col gap-2 items-end">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-emerald-400/[0.12] text-green-400">
                   Active
                 </span>
-                <div style={{ fontSize: t.caption.size, color: colors.text.muted }}>
+                <div className="text-caption text-muted-foreground">
                   {agentState.peers.length} peers {"\u00B7"} {agentState.sentItems}{"\u2191"} {agentState.receivedItems}{"\u2193"}
                 </div>
                 {nostrKeys && principalText && (
                   <button
                     onClick={() => setShowProfileEdit(true)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 4,
-                      background: "none", border: `1px solid ${colors.border.default}`,
-                      borderRadius: radii.sm, padding: "2px 8px",
-                      fontSize: t.caption.size, color: colors.text.muted,
-                      cursor: "pointer", transition: transitions.fast,
-                      fontFamily: fonts.sans,
-                    }}
+                    className="flex items-center gap-1 bg-transparent border border-border rounded-sm px-2 py-0.5 text-caption text-muted-foreground cursor-pointer transition-fast font-sans"
                   >
                     <PencilIcon s={10} /> Edit Profile
                   </button>
@@ -364,39 +307,29 @@ export const D2ATab: React.FC<D2ATabProps> = ({
 
             {/* Explanatory text block */}
             {showProfileInfo && (
-              <div style={{
-                ...surfaceCard(mobile),
-                marginBottom: space[4],
-                borderLeft: `3px solid ${colors.purple[400]}`,
-                padding: mobile ? space[3] : space[4],
-              }}>
-                <div style={{ fontSize: t.bodySm.size, color: colors.text.muted, lineHeight: 1.7 }}>
-                  <p style={{ margin: 0, marginBottom: space[2] }}>
+              <div className={cn(surfaceCardClass(mobile), "mb-4 border-l-[3px] border-l-purple-400", mobile ? "p-3" : "p-4")}>
+                <div className="text-body-sm text-muted-foreground leading-relaxed">
+                  <p className="m-0 mb-2">
                     This account was auto-generated from your Internet Identity as your Aegis agent{"'"}s Nostr account.
                   </p>
-                  <p style={{ margin: 0, marginBottom: space[2] }}>
+                  <p className="m-0 mb-2">
                     Your {onTabChange ? (
                       <a
                         href="#"
                         onClick={(e) => { e.preventDefault(); onTabChange("settings:account"); }}
-                        style={{ color: colors.purple[400], textDecoration: "underline", cursor: "pointer" }}
+                        className="text-purple-400 underline cursor-pointer"
                       >linked main Nostr account (npub)</a>
                     ) : (
                       "linked main Nostr account (npub)"
                     )} is used only for the follow graph (WoT). All posts come from this agent account.
                   </p>
-                  <p style={{ margin: 0 }}>
+                  <p className="m-0">
                     The icon, name, and about set here are published as a Nostr Kind 0 profile, visible from other Nostr clients.
                   </p>
                 </div>
                 <button
                   onClick={() => setShowProfileInfo(false)}
-                  style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    color: colors.purple[400], fontSize: t.caption.size,
-                    fontWeight: 600, fontFamily: "inherit",
-                    marginTop: space[2], padding: 0,
-                  }}
+                  className="bg-transparent border-none cursor-pointer text-purple-400 text-caption font-semibold font-[inherit] mt-2 p-0"
                 >
                   Hide
                 </button>
@@ -405,11 +338,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
             {!showProfileInfo && (
               <button
                 onClick={() => setShowProfileInfo(true)}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  color: colors.text.disabled, fontSize: t.caption.size,
-                  fontFamily: "inherit", marginBottom: space[4], padding: 0,
-                }}
+                className="bg-transparent border-none cursor-pointer text-[var(--color-text-disabled)] text-caption font-[inherit] mb-4 p-0"
               >
                 Learn more about this agent account
               </button>
@@ -419,7 +348,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
         );
       })()}
 
-      {/* Profile edit modal — outside agent-active guard so it survives deactivation */}
+      {/* Profile edit modal */}
       {showProfileEdit && nostrKeys && principalText && (
         <AgentProfileEditModal
           currentProfile={agentProfile}
@@ -436,37 +365,24 @@ export const D2ATab: React.FC<D2ATabProps> = ({
 
       {/* Activity Log */}
       {agentState?.isActive && agentState.activityLog.length > 0 && (
-        <div style={{
-          ...surfaceCard(mobile),
-          marginBottom: space[4],
-          padding: mobile ? space[3] : space[4],
-        }}>
-          <div style={{
-            fontSize: t.caption.size, fontWeight: 600, color: colors.text.muted,
-            textTransform: "uppercase", letterSpacing: "0.05em",
-            marginBottom: space[2],
-          }}>
+        <div className={cn(surfaceCardClass(mobile), "mb-4", mobile ? "p-3" : "p-4")}>
+          <div className="text-caption font-semibold text-muted-foreground uppercase tracking-wide mb-2">
             Activity Log
           </div>
           {(showAllLogs ? agentState.activityLog.slice(0, 20) : agentState.activityLog.slice(0, 5)).map((entry: ActivityLogEntry) => {
-            const meta = LOG_ICONS[entry.type] || { icon: "\u2022", color: colors.text.muted };
+            const meta = LOG_ICONS[entry.type] || { icon: "\u2022", colorClass: "text-muted-foreground" };
             return (
-              <div key={entry.id} style={{
-                display: "flex", alignItems: "center", gap: space[2],
-                padding: `${space[1]}px 0`,
-                fontSize: t.caption.size,
-                borderBottom: `1px solid ${colors.border.default}`,
-              }}>
-                <span style={{ color: meta.color, flexShrink: 0, width: 18, textAlign: "center" }}>{meta.icon}</span>
-                <span style={{ color: colors.text.secondary, flex: 1 }}>
+              <div key={entry.id} className="flex items-center gap-2 py-1 text-caption border-b border-border">
+                <span className={cn("shrink-0 w-[18px] text-center", meta.colorClass)}>{meta.icon}</span>
+                <span className="text-secondary-foreground flex-1">
                   {entry.message}
                   {entry.peerId && (
-                    <span style={{ color: colors.text.disabled, fontFamily: fonts.mono, marginLeft: space[1] }}>
+                    <span className="text-[var(--color-text-disabled)] font-mono ml-1">
                       {entry.peerId.slice(0, 8)}...
                     </span>
                   )}
                 </span>
-                <span style={{ color: colors.text.disabled, flexShrink: 0, fontSize: 10 }}>
+                <span className="text-[var(--color-text-disabled)] shrink-0 text-[10px]">
                   {relativeTime(entry.timestamp)}
                 </span>
               </div>
@@ -475,12 +391,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
           {agentState.activityLog.length > 5 && (
             <button
               onClick={() => setShowAllLogs(!showAllLogs)}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: colors.purple[400], fontSize: t.caption.size,
-                fontWeight: 600, fontFamily: "inherit",
-                marginTop: space[2], padding: 0,
-              }}
+              className="bg-transparent border-none cursor-pointer text-purple-400 text-caption font-semibold font-[inherit] mt-2 p-0"
             >
               {showAllLogs ? "Show less" : `Show more (${agentState.activityLog.length})`}
             </button>
@@ -489,36 +400,29 @@ export const D2ATab: React.FC<D2ATabProps> = ({
       )}
 
       {/* Sub-tab selector */}
-      <div style={{
-        display: "flex", gap: mobile ? 2 : space[1], marginBottom: space[4],
-        background: colors.bg.surface, borderRadius: radii.md,
-        border: `1px solid ${colors.border.default}`, padding: space[1],
-      }}>
+      <div className={cn(
+        "flex mb-4 bg-card rounded-md border border-border p-1",
+        mobile ? "gap-0.5" : "gap-1"
+      )}>
         {subTabs.map(st => (
           <button
             key={st.id}
             data-testid={`d2a-tab-${st.id}`}
             onClick={() => setSubTab(st.id)}
             title={mobile ? st.label : undefined}
-            style={{
-              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: mobile ? 2 : space[1],
-              padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
-              borderRadius: radii.sm, border: "none", cursor: "pointer",
-              fontFamily: "inherit", fontSize: t.bodySm.size, fontWeight: 600,
-              background: subTab === st.id ? colors.bg.raised : "transparent",
-              color: subTab === st.id ? colors.purple[400] : colors.text.muted,
-              transition: transitions.fast,
-            }}
+            className={cn(
+              "flex-1 flex items-center justify-center border-none cursor-pointer font-[inherit] text-body-sm font-semibold rounded-sm transition-fast",
+              mobile ? "gap-0.5 px-2 py-2" : "gap-1 px-3 py-2",
+              subTab === st.id ? "bg-navy-lighter text-purple-400" : "bg-transparent text-muted-foreground"
+            )}
           >
             <span>{st.emoji}</span>
             {!mobile && st.label}
             {counts[st.id] > 0 && (
-              <span style={{
-                fontSize: 10, fontWeight: 700, padding: "1px 6px",
-                borderRadius: radii.pill,
-                background: subTab === st.id ? "rgba(167,139,250,0.15)" : colors.bg.raised,
-                color: subTab === st.id ? colors.purple[400] : colors.text.disabled,
-              }}>
+              <span className={cn(
+                "text-[10px] font-bold px-1.5 py-px rounded-full",
+                subTab === st.id ? "bg-purple-400/15 text-purple-400" : "bg-navy-lighter text-[var(--color-text-disabled)]"
+              )}>
                 {counts[st.id]}
               </span>
             )}
@@ -545,22 +449,14 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                     mobile={mobile}
                   />
                   {expanded === item.id && peerPk && (
-                    <div style={{
-                      padding: `0 ${mobile ? space[4] : space[5]}px ${space[3]}px`,
-                      marginTop: -space[2],
-                      marginBottom: space[2],
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[1] }}>
+                    <div className={cn("pb-3 -mt-2 mb-2", mobile ? "px-4" : "px-5")}>
+                      <div className="flex items-center gap-2 mb-1">
                         <button
                           onClick={() => setCommentOpen(commentOpen === item.id ? null : item.id)}
-                          style={{
-                            background: "none", border: `1px solid ${colors.border.default}`,
-                            borderRadius: radii.sm, padding: `1px ${space[2]}px`,
-                            fontSize: t.caption.size, fontWeight: 600,
-                            color: commentOpen === item.id ? colors.amber[400] : colors.text.muted,
-                            cursor: "pointer", fontFamily: "inherit",
-                            transition: transitions.fast,
-                          }}
+                          className={cn(
+                            "bg-transparent border border-border rounded-sm px-2 py-px text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
+                            commentOpen === item.id ? "text-amber-400" : "text-muted-foreground"
+                          )}
                         >
                           Comment{itemComments.length > 0 ? ` (${itemComments.length})` : ""}
                         </button>
@@ -611,44 +507,32 @@ export const D2ATab: React.FC<D2ATabProps> = ({
       {/* Published section */}
       {subTab === "published" && (
         <div>
-          <p style={{ fontSize: t.bodySm.size, color: colors.text.muted, marginTop: 0, marginBottom: space[4] }}>
+          <p className="text-body-sm text-muted-foreground mt-0 mb-4">
             Content you{"'"}ve validated as quality. These signals demonstrate your curation taste and are shared with D2A peers during exchanges.
           </p>
           {published.length > 0 ? (
             published.map((item, i) => (
               <div key={item.id} style={{ animation: `slideUp .3s ease ${i * 0.06}s both` }}>
-                <div style={{
-                  ...surfaceCard(mobile),
-                  marginBottom: space[2],
-                  display: "flex",
-                  gap: space[3],
-                  alignItems: "flex-start",
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[1], flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, color: colors.text.secondary, fontFamily: fonts.mono, fontSize: t.bodySm.size }}>{item.author}</span>
-                      <span style={{ fontSize: t.caption.size, color: colors.text.muted, background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm }}>{item.platform || item.source}</span>
-                      <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.timestamp}</span>
+                <div className={cn(surfaceCardClass(mobile), "mb-2 flex gap-3 items-start")}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="font-bold text-secondary-foreground font-mono text-body-sm">{item.author}</span>
+                      <span className="text-caption text-muted-foreground bg-navy-lighter px-2 py-0.5 rounded-sm">{item.platform || item.source}</span>
+                      <span className="text-caption text-[var(--color-text-disabled)]">{item.timestamp}</span>
                     </div>
-                    <p style={{
-                      color: colors.text.secondary, fontSize: mobile ? t.body.mobileSz : t.body.size,
-                      lineHeight: t.body.lineHeight, margin: 0,
-                      overflow: "hidden", textOverflow: "ellipsis",
-                      display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
-                    }}>
+                    <p className={cn(
+                      "text-secondary-foreground leading-normal m-0 overflow-hidden text-ellipsis [-webkit-line-clamp:3] [-webkit-box-orient:vertical] [display:-webkit-box]",
+                      mobile ? "text-body-sm" : "text-body"
+                    )}>
                       {item.text}
                     </p>
                   </div>
                   {item.scores && (
-                    <div style={{
-                      textAlign: "center", flexShrink: 0,
-                      padding: `${space[1]}px ${space[2]}px`,
-                      background: colors.bg.raised, borderRadius: radii.sm,
-                    }}>
-                      <div style={{ fontSize: t.h3.size, fontWeight: 700, color: colors.green[400], fontFamily: fonts.mono }}>
+                    <div className="text-center shrink-0 px-2 py-1 bg-navy-lighter rounded-sm">
+                      <div className="text-h3 font-bold text-green-400 font-mono">
                         {item.scores.composite.toFixed(1)}
                       </div>
-                      <div style={{ fontSize: 9, color: colors.text.muted, textTransform: "uppercase" }}>Score</div>
+                      <div className="text-[9px] text-muted-foreground uppercase">Score</div>
                     </div>
                   )}
                 </div>
@@ -684,14 +568,14 @@ export const D2ATab: React.FC<D2ATabProps> = ({
               actionLabel="Retry"
             />
           ) : matchLoading && matches.length === 0 ? (
-            <div style={{ ...surfaceCard(mobile), textAlign: "center", padding: space[10] }}>
-              <div style={{ fontSize: 32, marginBottom: space[3], animation: "pulse 2s infinite" }}>{"\u26A1"}</div>
-              <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>Loading match records...</div>
+            <div className={cn(surfaceCardClass(mobile), "text-center p-10")}>
+              <div className="text-[32px] mb-3 animate-pulse">{"\u26A1"}</div>
+              <div className="text-h3 font-semibold text-secondary-foreground">Loading match records...</div>
             </div>
           ) : matches.length > 0 ? (
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[3] }}>
-                <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.purple[400] }}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-h3 font-semibold text-purple-400">
                   Fee-Paid Matches
                 </span>
                 <InfoTooltip text="On-chain records of D2A content exchanges with fee payments. 80% goes to the content provider, 20% to the protocol." mobile={mobile} />
@@ -699,40 +583,34 @@ export const D2ATab: React.FC<D2ATabProps> = ({
               {matches.map((m, i) => {
                 const isSender = principalText && m.senderPrincipal.toText() === principalText;
                 return (
-                  <div key={m.id} style={{
-                    ...surfaceCard(mobile),
-                    marginBottom: space[2],
-                    animation: `slideUp .3s ease ${i * 0.04}s both`,
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: space[2] }}>
+                  <div key={m.id} className={cn(surfaceCardClass(mobile), "mb-2")} style={{ animation: `slideUp .3s ease ${i * 0.04}s both` }}>
+                    <div className="flex justify-between items-center flex-wrap gap-2">
                       <div>
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, padding: "2px 8px",
-                          borderRadius: radii.pill, textTransform: "uppercase",
-                          background: isSender ? "rgba(52,211,153,0.12)" : "rgba(56,189,248,0.12)",
-                          color: isSender ? colors.green[400] : colors.sky[400],
-                        }}>
+                        <span className={cn(
+                          "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase",
+                          isSender ? "bg-emerald-400/[0.12] text-green-400" : "bg-sky-400/[0.12] text-sky-400"
+                        )}>
                           {isSender ? "Sent" : "Received"}
                         </span>
-                        <span style={{ fontSize: t.caption.size, color: colors.text.muted, marginLeft: space[2] }}>
+                        <span className="text-caption text-muted-foreground ml-2">
                           {isSender ? truncPrincipal(m.receiverPrincipal) : truncPrincipal(m.senderPrincipal)}
                         </span>
                       </div>
-                      <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>
+                      <span className="text-caption text-[var(--color-text-disabled)]">
                         {formatTimestamp(m.createdAt)}
                       </span>
                     </div>
-                    <div style={{ display: "flex", gap: space[4], marginTop: space[2], flexWrap: "wrap" }}>
+                    <div className="flex gap-4 mt-2 flex-wrap">
                       <div>
-                        <span style={{ fontSize: 10, color: colors.text.muted, textTransform: "uppercase" }}>Fee </span>
-                        <span style={{ fontFamily: fonts.mono, fontWeight: 600, color: colors.amber[400], fontSize: t.bodySm.size }}>
+                        <span className="text-[10px] text-muted-foreground uppercase">Fee </span>
+                        <span className="font-mono font-semibold text-amber-400 text-body-sm">
                           {formatICP(m.feeAmount)} ICP
                         </span>
                       </div>
                       {isSender && (
                         <div>
-                          <span style={{ fontSize: 10, color: colors.text.muted, textTransform: "uppercase" }}>Earned </span>
-                          <span style={{ fontFamily: fonts.mono, fontWeight: 600, color: colors.green[400], fontSize: t.bodySm.size }}>
+                          <span className="text-[10px] text-muted-foreground uppercase">Earned </span>
+                          <span className="font-mono font-semibold text-green-400 text-body-sm">
                             {formatICP(m.senderPayout)} ICP
                           </span>
                         </div>
@@ -745,14 +623,10 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                 <button
                   onClick={() => loadMatches(matchOffset)}
                   disabled={matchLoading}
-                  style={{
-                    width: "100%", padding: `${space[3]}px`, marginTop: space[2],
-                    background: colors.bg.surface, border: `1px solid ${colors.border.default}`,
-                    borderRadius: radii.md, color: colors.purple[400],
-                    fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
-                    fontFamily: "inherit", transition: transitions.fast,
-                    opacity: matchLoading ? 0.5 : 1,
-                  }}
+                  className={cn(
+                    "w-full p-3 mt-2 bg-card border border-border rounded-md text-purple-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast",
+                    matchLoading && "opacity-50"
+                  )}
                 >
                   {matchLoading ? "Loading..." : "Load More"}
                 </button>
@@ -773,19 +647,14 @@ export const D2ATab: React.FC<D2ATabProps> = ({
         <div>
           {peerStats.length > 0 ? (
             <>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3] }}>
-                <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.secondary }}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-h3 font-semibold text-secondary-foreground">
                   D2A Peers ({peerStats.length})
                 </span>
                 <select
                   value={peerSortKey}
                   onChange={e => setPeerSortKey(e.target.value as PeerSortKey)}
-                  style={{
-                    background: colors.bg.surface, border: `1px solid ${colors.border.default}`,
-                    borderRadius: radii.sm, padding: `${space[1]}px ${space[2]}px`,
-                    color: colors.text.secondary, fontSize: t.caption.size,
-                    fontFamily: "inherit", cursor: "pointer",
-                  }}
+                  className="bg-card border border-border rounded-sm px-2 py-1 text-secondary-foreground text-caption font-[inherit] cursor-pointer"
                 >
                   <option value="effectiveTrust">Trust</option>
                   <option value="itemsReceived">Items</option>
@@ -794,90 +663,73 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                 </select>
               </div>
               {peerStats.map((peer, i) => (
-                <div key={peer.pubkey} style={{
-                  ...surfaceCard(mobile),
-                  marginBottom: space[2],
-                  animation: `slideUp .3s ease ${i * 0.04}s both`,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: space[3] }}>
+                <div key={peer.pubkey} className={cn(surfaceCardClass(mobile), "mb-2")} style={{ animation: `slideUp .3s ease ${i * 0.04}s both` }}>
+                  <div className="flex items-center gap-3">
                     {/* Avatar placeholder */}
-                    <div style={{
-                      width: 36, height: 36, borderRadius: "50%",
-                      background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0, fontSize: 16,
-                    }}>
+                    <div className="size-9 rounded-full bg-navy-lighter border border-border flex items-center justify-center shrink-0 text-[16px]">
                       {"\uD83D\uDC64"}
                     </div>
 
                     {/* Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: space[2], flexWrap: "wrap" }}>
-                        <span style={{
-                          fontFamily: fonts.mono, fontSize: t.bodySm.size,
-                          fontWeight: 600, color: colors.text.secondary,
-                        }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-body-sm font-semibold text-secondary-foreground">
                           {peer.displayName}
                         </span>
                         <TrustTierBadge tier={peer.trustTier} />
                       </div>
-                      <div style={{ display: "flex", gap: space[3], marginTop: space[1], flexWrap: "wrap" }}>
-                        <span style={{ fontSize: t.caption.size, color: colors.text.muted }}>
+                      <div className="flex gap-3 mt-1 flex-wrap">
+                        <span className="text-caption text-muted-foreground">
                           {peer.itemsReceived} received
                         </span>
-                        <span style={{ fontSize: t.caption.size, color: colors.green[400] }}>
+                        <span className="text-caption text-green-400">
                           {peer.validated} validated
                         </span>
-                        <span style={{ fontSize: t.caption.size, color: colors.red[400] }}>
+                        <span className="text-caption text-red-400">
                           {peer.flagged} flagged
                         </span>
                       </div>
                     </div>
 
                     {/* Quality bar + score */}
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{
-                        fontSize: t.h3.size, fontWeight: 700, fontFamily: fonts.mono,
-                        color: peer.qualityRate >= 0.7 ? colors.green[400] : peer.qualityRate >= 0.4 ? colors.amber[400] : colors.red[400],
-                      }}>
+                    <div className="text-right shrink-0">
+                      <div className={cn(
+                        "text-h3 font-bold font-mono",
+                        peer.qualityRate >= 0.7 ? "text-green-400" : peer.qualityRate >= 0.4 ? "text-amber-400" : "text-red-400"
+                      )}>
                         {(peer.qualityRate * 100).toFixed(0)}%
                       </div>
-                      <div style={{ fontSize: 9, color: colors.text.muted, textTransform: "uppercase" }}>Quality</div>
+                      <div className="text-[9px] text-muted-foreground uppercase">Quality</div>
                       {/* Mini quality bar */}
-                      <div style={{
-                        width: 48, height: 3, background: colors.bg.raised,
-                        borderRadius: 2, marginTop: 2, overflow: "hidden",
-                      }}>
-                        <div style={{
-                          width: `${peer.qualityRate * 100}%`, height: "100%",
-                          background: peer.qualityRate >= 0.7 ? colors.green[400] : peer.qualityRate >= 0.4 ? colors.amber[400] : colors.red[400],
-                          borderRadius: 2,
-                        }} />
+                      <div className="w-12 h-[3px] bg-navy-lighter rounded-sm mt-0.5 overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-sm",
+                            peer.qualityRate >= 0.7 ? "bg-green-400" : peer.qualityRate >= 0.4 ? "bg-amber-400" : "bg-red-400"
+                          )}
+                          style={{ width: `${peer.qualityRate * 100}%` }}
+                        />
                       </div>
                     </div>
                   </div>
 
                   {/* Bottom row: trust details */}
-                  <div style={{
-                    display: "flex", gap: space[4], marginTop: space[2],
-                    paddingTop: space[2], borderTop: `1px solid ${colors.border.default}`,
-                    flexWrap: "wrap",
-                  }}>
+                  <div className="flex gap-4 mt-2 pt-2 border-t border-border flex-wrap">
                     <div>
-                      <span style={{ fontSize: 10, color: colors.text.muted, textTransform: "uppercase" }}>WoT </span>
-                      <span style={{ fontFamily: fonts.mono, fontWeight: 600, fontSize: t.bodySm.size, color: colors.purple[400] }}>
+                      <span className="text-[10px] text-muted-foreground uppercase">WoT </span>
+                      <span className="font-mono font-semibold text-body-sm text-purple-400">
                         {(peer.wotScore * 100).toFixed(0)}%
                       </span>
                     </div>
                     <div>
-                      <span style={{ fontSize: 10, color: colors.text.muted, textTransform: "uppercase" }}>Rep </span>
-                      <span style={{ fontFamily: fonts.mono, fontWeight: 600, fontSize: t.bodySm.size, color: peer.reputation.score >= 0 ? colors.green[400] : colors.red[400] }}>
+                      <span className="text-[10px] text-muted-foreground uppercase">Rep </span>
+                      <span className={cn("font-mono font-semibold text-body-sm", peer.reputation.score >= 0 ? "text-green-400" : "text-red-400")}>
                         {peer.reputation.score > 0 ? "+" : ""}{peer.reputation.score}
                       </span>
                     </div>
                     <div>
-                      <span style={{ fontSize: 10, color: colors.text.muted, textTransform: "uppercase" }}>Trust </span>
-                      <span style={{ fontFamily: fonts.mono, fontWeight: 600, fontSize: t.bodySm.size, color: colors.cyan[400] }}>
+                      <span className="text-[10px] text-muted-foreground uppercase">Trust </span>
+                      <span className="font-mono font-semibold text-body-sm text-cyan-400">
                         {(peer.effectiveTrust * 100).toFixed(0)}%
                       </span>
                     </div>
@@ -900,22 +752,14 @@ export const D2ATab: React.FC<D2ATabProps> = ({
       {/* Groups section */}
       {subTab === "groups" && (
         <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3] }}>
-            <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.secondary }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-h3 font-semibold text-secondary-foreground">
               Curation Groups
             </span>
             {nostrKeys && (
               <button
                 onClick={() => setShowCreateGroup(true)}
-                style={{
-                  padding: `${space[1]}px ${space[3]}px`,
-                  background: `${colors.purple[400]}12`,
-                  border: `1px solid ${colors.purple[400]}33`,
-                  borderRadius: radii.sm, color: colors.purple[400],
-                  fontSize: t.bodySm.size, fontWeight: 700,
-                  cursor: "pointer", fontFamily: "inherit",
-                  transition: transitions.fast,
-                }}
+                className="px-3 py-1 bg-purple-400/[0.07] border border-purple-400/20 rounded-sm text-purple-400 text-body-sm font-bold cursor-pointer font-[inherit] transition-fast"
               >
                 + Create Group
               </button>
@@ -1016,36 +860,26 @@ function EmptyState({ emoji, title, subtitle, action, actionLabel, checklist }: 
   checklist?: Array<{ done: boolean; text: string }>;
 }) {
   return (
-    <div style={{
-      textAlign: "center", padding: space[10],
-      color: colors.text.muted, background: colors.bg.surface,
-      borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
-    }}>
-      <div style={{ fontSize: 32, marginBottom: space[3] }}>{emoji}</div>
-      <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>{title}</div>
-      <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>{subtitle}</div>
+    <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border">
+      <div className="text-[32px] mb-3">{emoji}</div>
+      <div className="text-h3 font-semibold text-secondary-foreground">{title}</div>
+      <div className="text-body-sm mt-2">{subtitle}</div>
       {checklist && (
-        <div style={{ textAlign: "left", display: "inline-block", marginTop: space[3] }}>
+        <div className="text-left inline-block mt-3">
           {checklist.map((item) => (
-            <div key={item.text} style={{
-              display: "flex", gap: space[2], alignItems: "center",
-              fontSize: t.bodySm.size, padding: `${space[1]}px 0`,
-              color: item.done ? colors.green[400] : colors.text.disabled,
-            }}>
-              <span style={{ flexShrink: 0 }}>{item.done ? "\u2713" : "\u25CC"}</span>
+            <div key={item.text} className={cn(
+              "flex gap-2 items-center text-body-sm py-1",
+              item.done ? "text-green-400" : "text-[var(--color-text-disabled)]"
+            )}>
+              <span className="shrink-0">{item.done ? "\u2713" : "\u25CC"}</span>
               <span>{item.text}</span>
             </div>
           ))}
         </div>
       )}
       {action && actionLabel && (
-        <div style={{ marginTop: space[4] }}>
-          <button onClick={action} style={{
-            padding: `${space[2]}px ${space[4]}px`, background: colors.bg.raised,
-            border: `1px solid ${colors.border.emphasis}`, borderRadius: radii.md,
-            color: colors.purple[400], fontSize: t.bodySm.size, fontWeight: 600,
-            cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
-          }}>
+        <div className="mt-4">
+          <button onClick={action} className="px-4 py-2 bg-navy-lighter border border-[var(--color-border-emphasis)] rounded-md text-purple-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast">
             {actionLabel} &rarr;
           </button>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { colors, space, type as t, radii, transitions, shadows, fonts } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 import { CameraIcon } from "@/components/icons";
 import { publishAgentProfile, setCachedAgentProfile } from "@/lib/nostr/profile";
 import { createNIP98AuthHeader } from "@/lib/nostr/nip98";
@@ -18,28 +18,8 @@ interface AgentProfileEditModalProps {
 
 type Phase = "edit" | "uploading" | "publishing" | "success" | "error";
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: colors.bg.root,
-  border: `1px solid ${colors.border.default}`,
-  borderRadius: radii.sm,
-  padding: `${space[2]}px ${space[3]}px`,
-  color: colors.text.secondary,
-  fontSize: t.body.size,
-  fontFamily: fonts.sans,
-  outline: "none",
-  boxSizing: "border-box" as const,
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: t.caption.size,
-  fontWeight: 600,
-  color: colors.text.muted,
-  textTransform: "uppercase" as const,
-  letterSpacing: 1,
-  marginBottom: 6,
-  display: "block",
-};
+const inputClass = "w-full bg-[var(--color-bg-root)] border border-border rounded-sm px-3 py-2 text-secondary-foreground text-body font-sans outline-none box-border";
+const labelClass = "text-caption font-semibold text-muted-foreground uppercase tracking-[1px] mb-1.5 block";
 
 export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
   currentProfile,
@@ -134,84 +114,46 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
     }
   };
 
+  const cancelBtnClass = "px-4 py-2 bg-transparent border border-border rounded-md text-[var(--color-text-tertiary)] text-body cursor-pointer font-[inherit] transition-fast";
+  const primaryBtnClass = "px-5 py-2 bg-gradient-to-br from-purple-600 to-blue-600 border-none rounded-md text-white text-body font-semibold cursor-pointer font-[inherit] transition-fast";
+
   return (
     <div
       onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: colors.bg.overlay,
-        backdropFilter: "blur(8px)",
-        animation: "fadeIn .2s ease",
-      }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: mobile ? "92vw" : 480,
-          maxWidth: 480,
-          maxHeight: "90vh",
-          overflowY: "auto",
-          background: colors.bg.raised,
-          border: `1px solid ${colors.border.emphasis}`,
-          borderRadius: radii.lg,
-          boxShadow: shadows.lg,
-          padding: mobile ? space[5] : space[6],
-        }}
+        className={cn(
+          "max-w-[480px] max-h-[90vh] overflow-y-auto bg-navy-lighter border border-[var(--color-border-emphasis)] rounded-lg shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
+          mobile ? "w-[92vw] p-5" : "w-[480px] p-6"
+        )}
       >
         {phase === "edit" && (
           <>
-            <h2 style={{
-              fontSize: t.h2.size, fontWeight: t.h2.weight,
-              color: colors.text.primary, margin: 0, marginBottom: space[5],
-            }}>
+            <h2 className="text-h2 font-bold text-foreground m-0 mb-5">
               Edit Agent Profile
             </h2>
 
             {/* Avatar */}
-            <div style={{ display: "flex", alignItems: "center", gap: space[4], marginBottom: space[5] }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: "50%",
-                background: colors.bg.surface,
-                border: `2px solid ${colors.border.default}`,
-                overflow: "hidden",
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}>
+            <div className="flex items-center gap-4 mb-5">
+              <div className="size-16 rounded-full bg-card border-2 border-border overflow-hidden shrink-0 flex items-center justify-center">
                 {picture && !imgError ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={picture}
                     alt="Agent avatar"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    className="w-full h-full object-cover"
                     onError={() => setImgError(true)}
                   />
                 ) : (
-                  <span style={{ fontSize: 28, opacity: 0.4 }}>{"\uD83E\uDD16"}</span>
+                  <span className="text-[28px] opacity-40">{"\uD83E\uDD16"}</span>
                 )}
               </div>
               <div>
                 <button
                   onClick={() => fileRef.current?.click()}
-                  style={{
-                    display: "flex", alignItems: "center", gap: space[1],
-                    padding: `${space[1]}px ${space[3]}px`,
-                    background: colors.bg.surface,
-                    border: `1px solid ${colors.border.default}`,
-                    borderRadius: radii.sm,
-                    color: colors.text.tertiary,
-                    fontSize: t.bodySm.size,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    fontFamily: fonts.sans,
-                    transition: transitions.fast,
-                  }}
+                  className="flex items-center gap-1 px-3 py-1 bg-card border border-border rounded-sm text-[var(--color-text-tertiary)] text-body-sm font-semibold cursor-pointer font-sans transition-fast"
                 >
                   <CameraIcon s={14} /> Upload Image
                 </button>
@@ -219,7 +161,7 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
                   ref={fileRef}
                   type="file"
                   accept="image/jpeg,image/png,image/gif,image/webp"
-                  style={{ display: "none" }}
+                  className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) void handleImageUpload(file);
@@ -227,11 +169,7 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
                   }}
                 />
                 {picture && (
-                  <div style={{
-                    fontSize: t.caption.size, color: colors.text.muted,
-                    marginTop: space[1], maxWidth: 200,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>
+                  <div className="text-caption text-muted-foreground mt-1 max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">
                     {picture}
                   </div>
                 )}
@@ -239,124 +177,58 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
             </div>
 
             {/* Display Name */}
-            <div style={{ marginBottom: space[4] }}>
-              <label style={labelStyle}>Display Name</label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Aegis Agent"
-                maxLength={100}
-                style={inputStyle}
-              />
+            <div className="mb-4">
+              <label className={labelClass}>Display Name</label>
+              <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Aegis Agent" maxLength={100} className={inputClass} />
             </div>
 
             {/* About */}
-            <div style={{ marginBottom: space[4] }}>
-              <label style={labelStyle}>About</label>
-              <textarea
-                value={about}
-                onChange={(e) => setAbout(e.target.value)}
-                placeholder="A brief description of your agent..."
-                rows={3}
-                maxLength={500}
-                style={{ ...inputStyle, resize: "vertical" as const, lineHeight: 1.6 }}
-              />
+            <div className="mb-4">
+              <label className={labelClass}>About</label>
+              <textarea value={about} onChange={(e) => setAbout(e.target.value)} placeholder="A brief description of your agent..." rows={3} maxLength={500} className={cn(inputClass, "resize-y leading-relaxed")} />
             </div>
 
             {/* Website */}
-            <div style={{ marginBottom: space[4] }}>
-              <label style={labelStyle}>Website</label>
-              <input
-                type="url"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                placeholder="https://..."
-                style={inputStyle}
-              />
+            <div className="mb-4">
+              <label className={labelClass}>Website</label>
+              <input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." className={inputClass} />
             </div>
 
             {/* Banner */}
-            <div style={{ marginBottom: space[5] }}>
-              <label style={labelStyle}>Banner Image URL <span style={{ fontWeight: 400, textTransform: "none" }}>(optional)</span></label>
-              <input
-                type="url"
-                value={banner}
-                onChange={(e) => setBanner(e.target.value)}
-                placeholder="https://..."
-                style={inputStyle}
-              />
+            <div className="mb-5">
+              <label className={labelClass}>Banner Image URL <span className="font-normal normal-case">(optional)</span></label>
+              <input type="url" value={banner} onChange={(e) => setBanner(e.target.value)} placeholder="https://..." className={inputClass} />
             </div>
 
             {/* Actions */}
-            <div style={{ display: "flex", gap: space[3], justifyContent: "flex-end" }}>
-              <button
-                onClick={onClose}
-                style={{
-                  padding: `${space[2]}px ${space[4]}px`,
-                  background: "transparent",
-                  border: `1px solid ${colors.border.default}`,
-                  borderRadius: radii.md,
-                  color: colors.text.tertiary,
-                  fontSize: t.body.size,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  transition: transitions.fast,
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                style={{
-                  padding: `${space[2]}px ${space[5]}px`,
-                  background: `linear-gradient(135deg, ${colors.purple[600]}, ${colors.blue[600]})`,
-                  border: "none",
-                  borderRadius: radii.md,
-                  color: "#fff",
-                  fontSize: t.body.size,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  transition: transitions.fast,
-                }}
-              >
-                Save &amp; Publish
-              </button>
+            <div className="flex gap-3 justify-end">
+              <button onClick={onClose} className={cancelBtnClass}>Cancel</button>
+              <button onClick={handleSave} className={primaryBtnClass}>Save &amp; Publish</button>
             </div>
           </>
         )}
 
         {(phase === "uploading" || phase === "publishing") && (
-          <div style={{ textAlign: "center", padding: space[6] }}>
-            <div style={{
-              width: 40, height: 40,
-              border: `3px solid ${colors.border.default}`,
-              borderTopColor: colors.purple[400],
-              borderRadius: "50%",
-              animation: "spin 0.8s linear infinite",
-              margin: "0 auto",
-              marginBottom: space[4],
-            }} />
-            <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.primary }}>
+          <div className="text-center p-6">
+            <div className="size-10 border-[3px] border-border border-t-purple-400 rounded-full animate-spin mx-auto mb-4" />
+            <div className="text-h3 font-semibold text-foreground">
               {phase === "uploading" ? "Uploading image..." : "Publishing profile..."}
             </div>
             {phase === "publishing" && (
-              <div style={{ fontSize: t.bodySm.size, color: colors.text.muted, marginTop: space[2] }}>
+              <div className="text-body-sm text-muted-foreground mt-2">
                 Signing &amp; broadcasting Kind 0 to relays
               </div>
             )}
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
           </div>
         )}
 
         {phase === "success" && (
-          <div style={{ textAlign: "center", padding: space[6] }}>
-            <div style={{ fontSize: 36, marginBottom: space[2] }}>&#x2705;</div>
-            <h2 style={{ fontSize: t.h2.size, fontWeight: t.h2.weight, color: colors.text.primary, margin: 0, marginBottom: space[4] }}>
+          <div className="text-center p-6">
+            <div className="text-[36px] mb-2">&#x2705;</div>
+            <h2 className="text-h2 font-bold text-foreground m-0 mb-4">
               Profile Published!
             </h2>
-            <p style={{ fontSize: t.bodySm.size, color: colors.text.tertiary, marginBottom: space[5] }}>
+            <p className="text-body-sm text-[var(--color-text-tertiary)] mb-5">
               Your agent profile is now visible on Nostr relays.
             </p>
             <button
@@ -364,18 +236,7 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
                 if (savedProfile) onSaved(savedProfile);
                 onClose();
               }}
-              style={{
-                padding: `${space[2]}px ${space[5]}px`,
-                background: `linear-gradient(135deg, ${colors.green[500]}, ${colors.green[400]})`,
-                border: "none",
-                borderRadius: radii.md,
-                color: "#fff",
-                fontSize: t.body.size,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                transition: transitions.fast,
-              }}
+              className="px-5 py-2 bg-gradient-to-br from-green-500 to-green-400 border-none rounded-md text-white text-body font-semibold cursor-pointer font-[inherit] transition-fast"
             >
               Done
             </button>
@@ -384,60 +245,20 @@ export const AgentProfileEditModal: React.FC<AgentProfileEditModalProps> = ({
 
         {phase === "error" && (
           <>
-            <div style={{ textAlign: "center", marginBottom: space[4] }}>
-              <div style={{ fontSize: 36, marginBottom: space[2] }}>&#x26A0;&#xFE0F;</div>
-              <h2 style={{ fontSize: t.h2.size, fontWeight: t.h2.weight, color: colors.red[400], margin: 0 }}>
+            <div className="text-center mb-4">
+              <div className="text-[36px] mb-2">&#x26A0;&#xFE0F;</div>
+              <h2 className="text-h2 font-bold text-red-400 m-0">
                 {errorMsg.includes("Upload") || errorMsg.includes("Image") ? "Upload Failed" : "Publish Failed"}
               </h2>
             </div>
 
-            <div style={{
-              background: colors.red.bg,
-              border: `1px solid ${colors.red.border}`,
-              borderRadius: radii.md,
-              padding: space[4],
-              marginBottom: space[5],
-              fontSize: t.bodySm.size,
-              color: colors.red[400],
-              wordBreak: "break-word",
-            }}>
+            <div className="bg-red-400/[0.06] border border-red-400/15 rounded-md p-4 mb-5 text-body-sm text-red-400 break-words">
               {errorMsg}
             </div>
 
-            <div style={{ display: "flex", gap: space[3], justifyContent: "flex-end" }}>
-              <button
-                onClick={onClose}
-                style={{
-                  padding: `${space[2]}px ${space[4]}px`,
-                  background: "transparent",
-                  border: `1px solid ${colors.border.default}`,
-                  borderRadius: radii.md,
-                  color: colors.text.tertiary,
-                  fontSize: t.body.size,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  transition: transitions.fast,
-                }}
-              >
-                Close
-              </button>
-              <button
-                onClick={() => { setPhase("edit"); setErrorMsg(""); }}
-                style={{
-                  padding: `${space[2]}px ${space[5]}px`,
-                  background: `linear-gradient(135deg, ${colors.purple[600]}, ${colors.blue[600]})`,
-                  border: "none",
-                  borderRadius: radii.md,
-                  color: "#fff",
-                  fontSize: t.body.size,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  transition: transitions.fast,
-                }}
-              >
-                Try Again
-              </button>
+            <div className="flex gap-3 justify-end">
+              <button onClick={onClose} className={cancelBtnClass}>Close</button>
+              <button onClick={() => { setPhase("edit"); setErrorMsg(""); }} className={primaryBtnClass}>Try Again</button>
             </div>
           </>
         )}

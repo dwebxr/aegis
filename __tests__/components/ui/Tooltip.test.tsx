@@ -1,6 +1,6 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Tooltip } from "@/components/ui/Tooltip";
+import { Tooltip } from "@/components/ui/LegacyTooltip";
 
 describe("Tooltip", () => {
   it("renders children content", () => {
@@ -17,18 +17,18 @@ describe("Tooltip", () => {
     expect(html).toContain("Explanation here");
   });
 
-  it("tooltip has opacity 0 by default", () => {
+  it("tooltip has opacity 0 by default (Tailwind class)", () => {
     const html = renderToStaticMarkup(
       <Tooltip text="Tip"><span>X</span></Tooltip>
     );
-    expect(html).toContain("opacity:0");
+    expect(html).toContain("opacity-0");
   });
 
-  it("wraps children in a span with position relative", () => {
+  it("wraps children in a span with relative positioning (Tailwind class)", () => {
     const html = renderToStaticMarkup(
       <Tooltip text="Tip"><span>X</span></Tooltip>
     );
-    expect(html).toContain("position:relative");
+    expect(html).toContain("relative");
   });
 
   it("renders CSS class names for hover transition (style in globals.css)", () => {
@@ -43,14 +43,14 @@ describe("Tooltip", () => {
     const html = renderToStaticMarkup(
       <Tooltip text="Tip"><span>X</span></Tooltip>
     );
-    // position=top means tooltip appears above, so CSS "bottom" is set
-    expect(html).toContain("bottom:calc(100% + 6px)");
+    // position=top means tooltip appears above, so Tailwind bottom class is set
+    expect(html).toContain("bottom-[calc(100%+6px)]");
   });
 
   it("uses top positioning for position=bottom", () => {
     const html = renderToStaticMarkup(
       <Tooltip text="Tip" position="bottom"><span>X</span></Tooltip>
     );
-    expect(html).toContain("top:calc(100% + 6px)");
+    expect(html).toContain("top-[calc(100%+6px)]");
   });
 });

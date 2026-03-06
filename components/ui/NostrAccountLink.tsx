@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useCallback } from "react";
-import { colors, space, type as t, radii, transitions, fonts } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 import {
   getLinkedAccount,
   linkNostrAccount,
@@ -15,6 +15,8 @@ interface NostrAccountLinkProps {
   account?: LinkedNostrAccount | null;
   onLinkChange: (account: LinkedNostrAccount | null) => void;
 }
+
+const smallBtn = "px-2 py-1 rounded-sm text-tiny font-semibold cursor-pointer font-[inherit]";
 
 export const NostrAccountLink: React.FC<NostrAccountLinkProps> = ({ mobile, account: externalAccount, onLinkChange }) => {
   const [internalAccount, setInternalAccount] = useState<LinkedNostrAccount | null>(() => getLinkedAccount());
@@ -57,16 +59,15 @@ export const NostrAccountLink: React.FC<NostrAccountLinkProps> = ({ mobile, acco
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[3] }}>
-        <div style={{
-          width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-          background: isLinked ? colors.green[400] : colors.text.disabled,
-        }} />
-        <span style={{
-          fontSize: t.caption.size,
-          fontWeight: 600,
-          color: isLinked ? colors.green[400] : colors.text.disabled,
-        }}>
+      <div className="flex items-center gap-2 mb-3">
+        <div className={cn(
+          "size-[7px] rounded-full shrink-0",
+          isLinked ? "bg-green-400" : "bg-[var(--color-text-disabled)]"
+        )} />
+        <span className={cn(
+          "text-caption font-semibold",
+          isLinked ? "text-green-400" : "text-[var(--color-text-disabled)]"
+        )}>
           {isLinked
             ? `${account.displayName || maskNpub(account.npub)} · ${account.followCount} follows`
             : "Not linked"}
@@ -74,96 +75,70 @@ export const NostrAccountLink: React.FC<NostrAccountLinkProps> = ({ mobile, acco
       </div>
 
       {isLinked ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
-          <div style={{ display: "flex", alignItems: "center", gap: space[2], flexWrap: "wrap" }}>
-            <code style={{
-              fontSize: t.tiny.size, fontFamily: fonts.mono, color: colors.text.secondary,
-              background: colors.bg.overlay, padding: `2px ${space[2]}px`, borderRadius: radii.sm,
-            }}>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <code className="text-tiny font-mono text-secondary-foreground bg-[var(--color-bg-overlay)] px-2 py-px rounded-sm">
               {maskNpub(account.npub)}
             </code>
-            <span style={{ fontSize: t.caption.size, color: colors.text.muted }}>
+            <span className="text-caption text-muted-foreground">
               {account.followCount} follows
             </span>
             {confirmUnlink ? (
-              <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
-                <span style={{ fontSize: t.caption.size, color: colors.amber[400], fontWeight: 600 }}>
+              <div className="flex items-center gap-2">
+                <span className="text-caption text-amber-400 font-semibold">
                   Unlink account?
                 </span>
-                <button onClick={handleUnlink} style={{
-                  padding: `${space[1]}px ${space[2]}px`, borderRadius: radii.sm,
-                  fontSize: t.tiny.size, fontWeight: 600, cursor: "pointer",
-                  background: `${colors.red[500]}18`, color: colors.red[400],
-                  border: `1px solid ${colors.red[500]}33`, fontFamily: "inherit",
-                }}>
+                <button onClick={handleUnlink} className={cn(smallBtn, "bg-red-500/[0.09] text-red-400 border border-red-500/20")}>
                   Confirm
                 </button>
-                <button onClick={() => setConfirmUnlink(false)} style={{
-                  padding: `${space[1]}px ${space[2]}px`, borderRadius: radii.sm,
-                  fontSize: t.tiny.size, fontWeight: 600, cursor: "pointer",
-                  background: "transparent", color: colors.text.muted,
-                  border: `1px solid ${colors.border.subtle}`, fontFamily: "inherit",
-                }}>
+                <button onClick={() => setConfirmUnlink(false)} className={cn(smallBtn, "bg-transparent text-muted-foreground border border-[var(--color-border-subtle)]")}>
                   Cancel
                 </button>
               </div>
             ) : (
-              <button onClick={handleUnlink} style={{
-                padding: `${space[1]}px ${space[2]}px`, borderRadius: radii.sm,
-                fontSize: t.tiny.size, fontWeight: 600, cursor: "pointer",
-                background: "transparent", color: colors.text.muted,
-                border: `1px solid ${colors.border.subtle}`, fontFamily: "inherit",
-                transition: transitions.fast,
-              }}>
+              <button onClick={handleUnlink} className={cn(smallBtn, "bg-transparent text-muted-foreground border border-[var(--color-border-subtle)] transition-fast")}>
                 Unlink
               </button>
             )}
           </div>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
-          <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2 flex-wrap">
             <input
               type="text"
               value={input}
               onChange={e => { setInput(e.target.value); setError(""); }}
-              placeholder="npub1… or hex pubkey"
+              placeholder="npub1... or hex pubkey"
               disabled={linking}
-              style={{
-                flex: 1, minWidth: mobile ? 140 : 180, padding: `${space[1]}px ${space[3]}px`,
-                background: colors.bg.overlay, border: `1px solid ${colors.border.subtle}`,
-                borderRadius: radii.sm, color: colors.text.primary, fontSize: t.caption.size,
-                fontFamily: fonts.mono, outline: "none",
-              }}
+              className={cn(
+                "flex-1 px-3 py-1 bg-[var(--color-bg-overlay)] border border-[var(--color-border-subtle)] rounded-sm text-foreground text-caption font-mono outline-none",
+                mobile ? "min-w-[140px]" : "min-w-[180px]"
+              )}
             />
             <button
               onClick={handleLink}
               disabled={linking || !input.trim()}
-              style={{
-                padding: `${space[1]}px ${space[3]}px`, borderRadius: radii.sm,
-                fontSize: t.caption.size, fontWeight: 700, cursor: linking ? "wait" : "pointer",
-                fontFamily: "inherit", transition: transitions.fast,
-                background: linking ? colors.bg.overlay : `${colors.cyan[500]}18`,
-                color: linking ? colors.text.disabled : colors.cyan[400],
-                border: `1px solid ${linking ? colors.border.subtle : `${colors.cyan[500]}33`}`,
-              }}
+              className={cn(
+                "px-3 py-1 rounded-sm text-caption font-bold font-[inherit] transition-fast",
+                linking
+                  ? "bg-[var(--color-bg-overlay)] text-[var(--color-text-disabled)] border border-[var(--color-border-subtle)] cursor-wait"
+                  : "bg-cyan-500/[0.09] text-cyan-400 border border-cyan-500/20 cursor-pointer"
+              )}
             >
-              {linking ? "Linking…" : "Link"}
+              {linking ? "Linking..." : "Link"}
             </button>
           </div>
 
           {linking && progress && (
-            <div style={{ fontSize: t.tiny.size, color: colors.cyan[400] }}>{progress}</div>
+            <div className="text-tiny text-cyan-400">{progress}</div>
           )}
 
           {error && (
-            <div style={{ fontSize: t.tiny.size, color: colors.red[400] }}>{error}</div>
+            <div className="text-tiny text-red-400">{error}</div>
           )}
 
-          <div style={{
-            fontSize: t.tiny.size, color: colors.text.disabled,
-            marginTop: space[1], lineHeight: 1.5,
-          }}>
+          <div className="text-tiny text-[var(--color-text-disabled)] mt-1 leading-[1.5]">
             Link your existing Nostr account to power Web of Trust filtering
           </div>
         </div>

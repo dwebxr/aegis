@@ -1,5 +1,5 @@
 import React from "react";
-import { colors, space, radii, transitions, type as t } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 
 interface CollapsibleSectionProps {
   id: string;
@@ -30,92 +30,47 @@ export function CollapsibleSection({
   return (
     <div
       data-testid={`aegis-section-${id}`}
-      style={{
-        background: "transparent",
-        border: `1px solid ${colors.border.subtle}`,
-        borderRadius: radii.lg,
-        overflow: "hidden",
-        transition: transitions.fast,
-      }}
+      className="border border-[var(--color-border-subtle)] rounded-lg overflow-hidden transition-all duration-150"
     >
       <button
         onClick={() => onToggle(id)}
-        style={{
-          width: "100%",
-          padding: `${space[3]}px ${space[4]}px`,
-          background: isExpanded ? colors.bg.surface : "transparent",
-          border: "none",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: space[2],
-          fontFamily: "inherit",
-          transition: transitions.fast,
-        }}
+        className={cn(
+          "w-full px-4 py-3 border-none cursor-pointer flex items-center gap-2 font-[inherit] transition-all duration-150",
+          isExpanded ? "bg-card" : "bg-transparent"
+        )}
       >
-        <span style={{ fontSize: mobile ? 16 : 14 }}>{icon}</span>
-        <span
-          style={{
-            fontSize: t.bodySm.size,
-            fontWeight: 600,
-            color: colors.text.tertiary,
-          }}
-        >
+        <span className={mobile ? "text-base" : "text-sm"}>{icon}</span>
+        <span className="text-body-sm font-semibold text-[var(--color-text-tertiary)]">
           {title}
         </span>
         {itemCount !== undefined && itemCount > 0 && (
-          <span
-            style={{
-              fontSize: t.caption.size,
-              color: colors.text.muted,
-              background: colors.bg.raised,
-              padding: "2px 8px",
-              borderRadius: radii.sm,
-            }}
-          >
+          <span className="text-caption text-muted-foreground bg-navy-lighter px-2 py-0.5 rounded-sm">
             {itemCount}
           </span>
         )}
-        <div style={{ flex: 1 }} />
+        <div className="flex-1" />
         {actionButton && isExpanded && (
           <button
             onClick={(e) => {
               e.stopPropagation();
               actionButton.onClick();
             }}
-            style={{
-              fontSize: t.caption.size,
-              fontWeight: 600,
-              color: colors.cyan[400],
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              padding: `2px ${space[2]}px`,
-            }}
+            className="text-caption font-semibold text-cyan-400 bg-transparent border-none cursor-pointer font-[inherit] px-2 py-0.5"
           >
             {actionButton.label}
           </button>
         )}
         <span
-          style={{
-            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-            transition: transitions.fast,
-            fontSize: 12,
-            color: colors.text.muted,
-          }}
+          className={cn(
+            "text-xs text-muted-foreground transition-transform duration-150",
+            isExpanded && "rotate-180"
+          )}
         >
-          ▼
+          &#x25BC;
         </span>
       </button>
       {isExpanded && (
-        <div
-          style={{
-            padding: `${space[3]}px ${space[4]}px`,
-            borderTop: `1px solid ${colors.border.subtle}`,
-            animation: "slideDown .2s ease forwards",
-          }}
-        >
+        <div className="px-4 py-3 border-t border-[var(--color-border-subtle)] animate-slide-up">
           {children}
         </div>
       )}
@@ -125,24 +80,12 @@ export function CollapsibleSection({
 
 export function SectionSkeleton({ mobile = false }: { mobile?: boolean }) {
   return (
-    <div
-      style={{
-        padding: space[4],
-        display: "flex",
-        flexDirection: "column",
-        gap: space[2],
-        animation: "pulse 2s infinite",
-      }}
-    >
+    <div className="p-4 flex flex-col gap-2 animate-pulse">
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          style={{
-            height: mobile ? 80 : 60,
-            background: colors.bg.raised,
-            borderRadius: radii.md,
-            opacity: 0.5 - i * 0.1,
-          }}
+          className={cn("bg-navy-lighter rounded-md", mobile ? "h-20" : "h-15")}
+          style={{ opacity: 0.5 - i * 0.1 }}
         />
       ))}
     </div>

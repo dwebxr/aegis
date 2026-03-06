@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { colors, space, radii, type as t, transitions, fonts } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 import type { CurationGroup } from "@/lib/d2a/curationGroup";
 
 interface CreateGroupModalProps {
@@ -10,6 +10,8 @@ interface CreateGroupModalProps {
   onCreate: (group: CurationGroup) => void;
   mobile?: boolean;
 }
+
+const inputClass = "w-full p-2 bg-navy-lighter border border-border rounded-sm text-secondary-foreground text-body font-sans box-border";
 
 export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   ownerPk, onClose, onCreate, mobile,
@@ -47,47 +49,25 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   };
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 1000,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      background: "rgba(0,0,0,0.6)",
-    }} onClick={onClose}>
-      <div style={{
-        background: colors.bg.surface,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: radii.lg,
-        padding: mobile ? space[4] : space[6],
-        width: "min(420px, 90vw)",
-        maxHeight: "80vh",
-        overflow: "auto",
-      }} onClick={e => e.stopPropagation()}>
-        <h3 style={{
-          fontSize: t.h2.size, fontWeight: t.h2.weight,
-          color: colors.text.primary, margin: 0, marginBottom: space[4],
-        }}>
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div className={cn("bg-card border border-border rounded-lg w-[min(420px,90vw)] max-h-[80vh] overflow-auto", mobile ? "p-4" : "p-6")} onClick={e => e.stopPropagation()}>
+        <h3 className="text-h2 font-bold text-foreground m-0 mb-4">
           Create Curation Group
         </h3>
 
         {/* Name */}
-        <label style={{ fontSize: t.caption.size, color: colors.text.muted, fontWeight: 600, textTransform: "uppercase" }}>
+        <label className="text-caption text-muted-foreground font-semibold uppercase">
           Group Name *
         </label>
         <input
           value={name}
           onChange={e => setName(e.target.value.slice(0, 50))}
           placeholder="e.g. AI Research"
-          style={{
-            width: "100%", padding: space[2],
-            background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-            borderRadius: radii.sm, color: colors.text.secondary,
-            fontSize: t.body.size, fontFamily: fonts.sans,
-            marginTop: space[1], marginBottom: space[3],
-            boxSizing: "border-box",
-          }}
+          className={cn(inputClass, "mt-1 mb-3")}
         />
 
         {/* Description */}
-        <label style={{ fontSize: t.caption.size, color: colors.text.muted, fontWeight: 600, textTransform: "uppercase" }}>
+        <label className="text-caption text-muted-foreground font-semibold uppercase">
           Description
         </label>
         <textarea
@@ -95,87 +75,50 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           onChange={e => setDescription(e.target.value.slice(0, 200))}
           placeholder="What is this group about?"
           rows={2}
-          style={{
-            width: "100%", padding: space[2],
-            background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-            borderRadius: radii.sm, color: colors.text.secondary,
-            fontSize: t.body.size, fontFamily: fonts.sans,
-            marginTop: space[1], marginBottom: space[3],
-            resize: "vertical", boxSizing: "border-box",
-          }}
+          className={cn(inputClass, "mt-1 mb-3 resize-y")}
         />
 
         {/* Topics */}
-        <label style={{ fontSize: t.caption.size, color: colors.text.muted, fontWeight: 600, textTransform: "uppercase" }}>
+        <label className="text-caption text-muted-foreground font-semibold uppercase">
           Topics
         </label>
-        <div style={{ display: "flex", gap: space[1], marginTop: space[1], marginBottom: space[1], flexWrap: "wrap" }}>
+        <div className="flex gap-1 mt-1 mb-1 flex-wrap">
           {topics.map(tp => (
-            <span key={tp} style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: `1px ${space[2]}px`,
-              background: `${colors.cyan[400]}12`,
-              border: `1px solid ${colors.cyan[400]}25`,
-              borderRadius: radii.pill,
-              fontSize: t.caption.size, color: colors.cyan[400],
-            }}>
+            <span key={tp} className="inline-flex items-center gap-1 px-2 py-px bg-cyan-400/[0.07] border border-cyan-400/15 rounded-full text-caption text-cyan-400">
               {tp}
               <button
                 onClick={() => setTopics(topics.filter(x => x !== tp))}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  color: colors.text.disabled, fontSize: 12, padding: 0,
-                  lineHeight: 1, fontFamily: "inherit",
-                }}
+                className="bg-transparent border-none cursor-pointer text-[var(--color-text-disabled)] text-[12px] p-0 leading-none font-[inherit]"
               >
                 &times;
               </button>
             </span>
           ))}
         </div>
-        <div style={{ display: "flex", gap: space[1], marginBottom: space[4] }}>
+        <div className="flex gap-1 mb-4">
           <input
             value={topicInput}
             onChange={e => setTopicInput(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addTopic(); } }}
             placeholder="Add topic..."
-            style={{
-              flex: 1, padding: `${space[1]}px ${space[2]}px`,
-              background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-              borderRadius: radii.sm, color: colors.text.secondary,
-              fontSize: t.bodySm.size, fontFamily: fonts.sans,
-            }}
+            className="flex-1 px-2 py-1 bg-navy-lighter border border-border rounded-sm text-secondary-foreground text-body-sm font-sans"
           />
-          <button onClick={addTopic} style={{
-            padding: `${space[1]}px ${space[2]}px`,
-            background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-            borderRadius: radii.sm, color: colors.text.muted,
-            fontSize: t.bodySm.size, cursor: "pointer", fontFamily: "inherit",
-          }}>
+          <button onClick={addTopic} className="px-2 py-1 bg-navy-lighter border border-border rounded-sm text-muted-foreground text-body-sm cursor-pointer font-[inherit]">
             +
           </button>
         </div>
 
         {/* Actions */}
-        <div style={{ display: "flex", gap: space[2], justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{
-            padding: `${space[2]}px ${space[4]}px`,
-            background: "transparent", border: `1px solid ${colors.border.default}`,
-            borderRadius: radii.sm, color: colors.text.muted,
-            fontSize: t.bodySm.size, fontWeight: 600, cursor: "pointer",
-            fontFamily: "inherit", transition: transitions.fast,
-          }}>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 bg-transparent border border-border rounded-sm text-muted-foreground text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast">
             Cancel
           </button>
-          <button onClick={handleCreate} disabled={!canCreate} style={{
-            padding: `${space[2]}px ${space[4]}px`,
-            background: canCreate ? `${colors.purple[400]}18` : "transparent",
-            border: `1px solid ${canCreate ? `${colors.purple[400]}33` : colors.border.default}`,
-            borderRadius: radii.sm,
-            color: canCreate ? colors.purple[400] : colors.text.disabled,
-            fontSize: t.bodySm.size, fontWeight: 700, cursor: canCreate ? "pointer" : "default",
-            fontFamily: "inherit", transition: transitions.fast,
-          }}>
+          <button onClick={handleCreate} disabled={!canCreate} className={cn(
+            "px-4 py-2 rounded-sm text-body-sm font-bold font-[inherit] transition-fast border",
+            canCreate
+              ? "bg-purple-400/[0.09] border-purple-400/20 text-purple-400 cursor-pointer"
+              : "bg-transparent border-border text-[var(--color-text-disabled)] cursor-default"
+          )}>
             Create Group
           </button>
         </div>

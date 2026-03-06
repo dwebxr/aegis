@@ -32,8 +32,8 @@ describe("NewItemsBar", () => {
     expect(html).toContain("100 new articles");
   });
 
-  it("applies animation style", () => {
+  it("applies animation class", () => {
     const html = renderToStaticMarkup(<NewItemsBar count={2} onFlush={jest.fn()} />);
-    expect(html).toContain("slideDown");
+    expect(html).toContain("animate-slide-up");
   });
 });

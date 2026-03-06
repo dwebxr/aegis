@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotify } from "@/contexts/NotificationContext";
-import { colors, space, radii, shadows, transitions } from "@/styles/theme";
 import { ShieldIcon } from "@/components/icons";
 import { errMsg } from "@/lib/utils/errors";
 
@@ -31,8 +31,8 @@ export const LoginButton: React.FC<LoginButtonProps> = ({ compact }) => {
 
   if (isLoading) {
     return (
-      <div style={{ padding: compact ? `6px ${space[3]}px` : `${space[3]}px 18px`, fontSize: 12, color: colors.text.muted }}>
-        <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>&#x27F3;</span>
+      <div className={cn("text-body-sm text-muted-foreground", compact ? "px-3 py-1.5" : "px-[18px] py-3")}>
+        <span className="inline-block animate-spin">&#x27F3;</span>
       </div>
     );
   }
@@ -41,18 +41,10 @@ export const LoginButton: React.FC<LoginButtonProps> = ({ compact }) => {
     return (
       <button
         onClick={handleLogout}
-        style={{
-          padding: compact ? `6px ${space[3]}px` : `${space[2]}px ${space[4]}px`,
-          background: colors.red.bg,
-          border: `1px solid ${colors.red.border}`,
-          borderRadius: radii.sm,
-          color: colors.red[400],
-          fontSize: compact ? 11 : 12,
-          fontWeight: 600,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          transition: transitions.fast,
-        }}
+        className={cn(
+          "bg-red-400/[0.06] border border-red-400/[0.15] rounded-sm text-red-400 font-semibold cursor-pointer font-[inherit] transition-fast",
+          compact ? "px-3 py-1.5 text-[11px]" : "px-4 py-2 text-body-sm"
+        )}
       >
         Logout
       </button>
@@ -64,22 +56,13 @@ export const LoginButton: React.FC<LoginButtonProps> = ({ compact }) => {
       onClick={handleLogin}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className={cn(
+        "bg-gradient-to-br from-blue-600 to-cyan-500 border-none rounded-md text-white font-bold cursor-pointer font-[inherit] flex items-center gap-1.5 transition-fast",
+        compact ? "px-3 py-1.5 text-[11px]" : "px-[18px] py-3 text-[13px]"
+      )}
       style={{
-        padding: compact ? `6px ${space[3]}px` : `${space[3]}px 18px`,
-        background: `linear-gradient(135deg, ${colors.blue[600]}, ${colors.cyan[500]})`,
-        border: "none",
-        borderRadius: radii.md,
-        color: "#fff",
-        fontSize: compact ? 11 : 13,
-        fontWeight: 700,
-        cursor: "pointer",
-        fontFamily: "inherit",
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        boxShadow: hovered ? shadows.glow.cyan : "none",
+        boxShadow: hovered ? "0 0 20px rgba(6,182,212,0.4)" : "none",
         transform: hovered ? "scale(1.02)" : "scale(1)",
-        transition: transitions.fast,
       }}
     >
       <ShieldIcon s={compact ? 13 : 16} />

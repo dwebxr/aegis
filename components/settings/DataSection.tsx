@@ -1,12 +1,12 @@
 "use client";
 import React, { useState } from "react";
-import { colors, space, type as t } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotify } from "@/contexts/NotificationContext";
 import type { ContentItem } from "@/lib/types/content";
 import { exportContentCSV, exportContentJSON } from "@/lib/utils/export";
 import type { ExportPeriod, ExportType } from "@/lib/utils/export";
-import { cardStyle, sectionTitle, actionBtnStyle, confirmBtnStyle, cancelBtnStyle, pillBtn } from "./styles";
+import { cardClass, sectionTitleClass, actionBtnClass, confirmBtnClass, cancelBtnClass, pillBtnClass } from "./styles";
 
 interface DataSectionProps {
   mobile?: boolean;
@@ -60,99 +60,94 @@ export const DataSection: React.FC<DataSectionProps> = ({ mobile, content }) => 
 
   return (
     <>
-      <div style={cardStyle(mobile)}>
-        <div style={sectionTitle}>Export</div>
+      <div className={cardClass(mobile)}>
+        <div className={sectionTitleClass}>Export</div>
 
         {content.length > 0 ? (
           <>
-            <div style={{ marginBottom: space[3] }}>
-              <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginBottom: space[1] }}>Period</div>
-              <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
+            <div className="mb-3">
+              <div className="text-tiny text-[var(--color-text-disabled)] mb-1">Period</div>
+              <div className="flex gap-1 flex-wrap">
                 {PERIOD_OPTIONS.map(opt => (
-                  <button key={opt.value} onClick={() => setExportPeriod(opt.value)} style={pillBtn(exportPeriod === opt.value)}>
+                  <button key={opt.value} onClick={() => setExportPeriod(opt.value)} className={pillBtnClass(exportPeriod === opt.value)}>
                     {opt.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div style={{ marginBottom: space[3] }}>
-              <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginBottom: space[1] }}>Content</div>
-              <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
+            <div className="mb-3">
+              <div className="text-tiny text-[var(--color-text-disabled)] mb-1">Content</div>
+              <div className="flex gap-1 flex-wrap">
                 {TYPE_OPTIONS.map(opt => (
-                  <button key={opt.value} onClick={() => setExportType(opt.value)} style={pillBtn(exportType === opt.value)}>
+                  <button key={opt.value} onClick={() => setExportType(opt.value)} className={pillBtnClass(exportType === opt.value)}>
                     {opt.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
+            <div className="flex gap-2 flex-wrap">
               <button
                 data-testid="aegis-settings-export-csv"
                 onClick={() => exportContentCSV(content, scope)}
-                style={{
-                  ...actionBtnStyle,
-                  background: `${colors.cyan[500]}18`,
-                  color: colors.cyan[400],
-                  border: `1px solid ${colors.cyan[500]}33`,
-                }}
+                className="px-3 py-1 bg-cyan-500/[0.09] border border-cyan-500/20 rounded-sm text-cyan-400 text-caption font-semibold cursor-pointer font-[inherit] transition-fast"
               >
                 Export CSV
               </button>
               <button
                 data-testid="aegis-settings-export-json"
                 onClick={() => exportContentJSON(content, scope)}
-                style={{
-                  ...actionBtnStyle,
-                  background: `${colors.cyan[500]}18`,
-                  color: colors.cyan[400],
-                  border: `1px solid ${colors.cyan[500]}33`,
-                }}
+                className="px-3 py-1 bg-cyan-500/[0.09] border border-cyan-500/20 rounded-sm text-cyan-400 text-caption font-semibold cursor-pointer font-[inherit] transition-fast"
               >
                 Export JSON
               </button>
             </div>
           </>
         ) : (
-          <div style={{ fontSize: t.caption.size, color: colors.text.disabled }}>
+          <div className="text-caption text-[var(--color-text-disabled)]">
             No content to export yet. Evaluate some content first.
           </div>
         )}
 
-        <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
+        <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-tight">
           Download your evaluations as CSV or JSON. Choose a time period and content type to filter.
         </div>
       </div>
 
-      <div style={cardStyle(mobile)}>
-        <div style={sectionTitle}>Data Management</div>
-        <div style={{ display: "flex", gap: space[2], flexWrap: "wrap", alignItems: "center" }}>
+      <div className={cardClass(mobile)}>
+        <div className={sectionTitleClass}>Data Management</div>
+        <div className="flex gap-2 flex-wrap items-center">
           {confirmAction === "clearCache" ? (
-            <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
-              <span style={{ fontSize: t.caption.size, color: colors.amber[400], fontWeight: 600 }}>Clear cache?</span>
-              <button onClick={handleClearCache} style={confirmBtnStyle}>Confirm</button>
-              <button onClick={() => setConfirmAction(null)} style={cancelBtnStyle}>Cancel</button>
+            <div className="flex items-center gap-2">
+              <span className="text-caption text-amber-400 font-semibold">Clear cache?</span>
+              <button onClick={handleClearCache} className={confirmBtnClass}>Confirm</button>
+              <button onClick={() => setConfirmAction(null)} className={cancelBtnClass}>Cancel</button>
             </div>
           ) : (
-            <button data-testid="aegis-settings-clear-cache" onClick={handleClearCache} style={actionBtnStyle}>
+            <button data-testid="aegis-settings-clear-cache" onClick={handleClearCache} className={actionBtnClass}>
               Clear Content Cache
             </button>
           )}
 
           {confirmAction === "resetPrefs" ? (
-            <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
-              <span style={{ fontSize: t.caption.size, color: colors.red[400], fontWeight: 600 }}>Reset preferences?</span>
-              <button onClick={handleResetPrefs} style={{ ...confirmBtnStyle, color: colors.red[400], borderColor: `${colors.red[400]}33` }}>Confirm</button>
-              <button onClick={() => setConfirmAction(null)} style={cancelBtnStyle}>Cancel</button>
+            <div className="flex items-center gap-2">
+              <span className="text-caption text-red-400 font-semibold">Reset preferences?</span>
+              <button onClick={handleResetPrefs} className={cn(confirmBtnClass, "text-red-400 border-red-400/20")}>Confirm</button>
+              <button onClick={() => setConfirmAction(null)} className={cancelBtnClass}>Cancel</button>
             </div>
           ) : (
-            <button data-testid="aegis-settings-reset-prefs" onClick={handleResetPrefs} disabled={!isAuthenticated} style={{ ...actionBtnStyle, opacity: isAuthenticated ? 1 : 0.4, cursor: isAuthenticated ? "pointer" : "not-allowed" }}>
+            <button
+              data-testid="aegis-settings-reset-prefs"
+              onClick={handleResetPrefs}
+              disabled={!isAuthenticated}
+              className={cn(actionBtnClass, !isAuthenticated && "opacity-40 cursor-not-allowed")}
+            >
               Reset Preferences
             </button>
           )}
         </div>
-        <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
+        <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-tight">
           Cache stores dedup hashes &amp; source state. Preferences include your topic weights &amp; author quality data.
         </div>
       </div>

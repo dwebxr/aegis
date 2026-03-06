@@ -38,24 +38,22 @@ describe("WoTPromptBanner", () => {
     const html = renderToStaticMarkup(
       <WoTPromptBanner onGoToSettings={noop} onDismiss={noop} />
     );
-    expect(html).toContain("linear-gradient(135deg");
-    expect(html).toContain("rgba(34,197,94,");
-    expect(html).toContain("rgba(6,182,212,");
+    expect(html).toContain("from-emerald-500");
+    expect(html).toContain("to-cyan-500");
   });
 
   it("renders Link Account button with gradient fill", () => {
     const html = renderToStaticMarkup(
       <WoTPromptBanner onGoToSettings={noop} onDismiss={noop} />
     );
-    // Button uses gradient from green[500] to cyan[500]
-    expect(html).toContain("linear-gradient(135deg");
+    expect(html).toContain("bg-gradient-to-br");
   });
 
   it("renders a green border", () => {
     const html = renderToStaticMarkup(
       <WoTPromptBanner onGoToSettings={noop} onDismiss={noop} />
     );
-    expect(html).toContain("1px solid rgba(34,197,94,0.2)");
+    expect(html).toContain("border-emerald-500/20");
   });
 
   it("renders two buttons (Link Account + dismiss)", () => {

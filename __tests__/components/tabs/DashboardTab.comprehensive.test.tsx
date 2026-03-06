@@ -201,11 +201,11 @@ describe("DashboardCard — rendered via dashboard sections", () => {
     const buttons = Array.from(container.querySelectorAll("button"));
     const validateBtns = buttons.filter(b => b.textContent === "\u2713");
     expect(validateBtns.length).toBeGreaterThan(0);
-    // Validated items have disabled buttons with opacity 0.5
+    // Validated items have disabled buttons with opacity-50 class
     const disabledBtns = validateBtns.filter(b => b.disabled);
     expect(disabledBtns.length).toBeGreaterThan(0);
     disabledBtns.forEach(btn => {
-      expect(btn.style.opacity).toBe("0.5");
+      expect(btn.className).toContain("opacity-50");
     });
   });
 

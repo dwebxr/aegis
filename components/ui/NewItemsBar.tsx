@@ -1,6 +1,5 @@
 "use client";
 import React from "react";
-import { colors, space, radii, type as t, transitions, fonts } from "@/styles/theme";
 
 interface NewItemsBarProps {
   count: number;
@@ -14,23 +13,7 @@ export const NewItemsBar: React.FC<NewItemsBarProps> = ({ count, onFlush }) => {
     <button
       data-testid="new-items-bar"
       onClick={onFlush}
-      style={{
-        display: "block",
-        width: "100%",
-        padding: `${space[2]}px ${space[3]}px`,
-        marginBottom: space[2],
-        background: `${colors.amber[400]}12`,
-        border: `1px solid ${colors.amber[400]}33`,
-        borderRadius: radii.md,
-        color: colors.amber[400],
-        fontSize: t.bodySm.size,
-        fontWeight: 600,
-        fontFamily: fonts.sans,
-        cursor: "pointer",
-        textAlign: "center",
-        transition: transitions.fast,
-        animation: "slideDown .3s ease both",
-      }}
+      className="block w-full px-3 py-2 mb-2 bg-amber-400/[0.07] border border-amber-400/20 rounded-md text-amber-400 text-body-sm font-semibold font-sans cursor-pointer text-center transition-fast animate-slide-up"
     >
       {count} new article{count !== 1 ? "s" : ""} — tap to show
     </button>

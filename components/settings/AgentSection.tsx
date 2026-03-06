@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { colors, space, type as t, radii, fonts } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 import { useAgent } from "@/contexts/AgentContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { AgentStatusBadge } from "@/components/ui/AgentStatusBadge";
@@ -11,20 +11,25 @@ import {
   D2A_FEE_UNKNOWN,
   D2A_APPROVE_AMOUNT,
 } from "@/lib/agent/protocol";
-import { cardStyle, sectionTitle } from "./styles";
+import { cardClass, sectionTitleClass } from "./styles";
 
 interface AgentSectionProps {
   mobile?: boolean;
 }
 
-const subsectionLabel: React.CSSProperties = {
-  fontSize: t.caption.size,
-  color: colors.text.disabled,
-  marginBottom: space[2],
-  fontWeight: 600,
-  textTransform: "uppercase" as const,
-  letterSpacing: 0.5,
-};
+const subsectionLabel = "text-caption text-[var(--color-text-disabled)] mb-2 font-semibold uppercase tracking-[0.5px]";
+
+const pillChip = (colorClass: string) => cn(
+  "inline-flex items-center gap-1 text-caption px-2 py-px rounded-full",
+  colorClass
+);
+
+const pillRemoveBtn = (textColor: string) => cn(
+  "bg-transparent border-none cursor-pointer p-0 text-sm leading-none inline-flex items-center",
+  textColor
+);
+
+const tagInput = "w-[120px] px-2 py-px bg-transparent border border-border rounded-full text-secondary-foreground text-caption font-[inherit] outline-none";
 
 export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
   const { isEnabled: agentEnabled } = useAgent();
@@ -43,41 +48,34 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
   const authorRules = (profile.customFilterRules ?? []).filter(r => r.field === "author");
   const titleRules = (profile.customFilterRules ?? []).filter(r => r.field === "title");
 
+  const AGENT_PARAMS = [
+    { label: "Interests", value: String(interests.length), colorClass: "text-cyan-400" },
+    { label: "Threshold", value: profile.calibration.qualityThreshold.toFixed(1), colorClass: "text-cyan-400" },
+    { label: "Reviews", value: String(profile.totalValidated + profile.totalFlagged), colorClass: "text-secondary-foreground" },
+  ];
+
   return (
     <>
-      <div style={cardStyle(mobile)}>
-        <div style={sectionTitle}>Agent Preferences</div>
-        <div style={{ display: "flex", gap: space[4], marginBottom: space[4], flexWrap: "wrap" }}>
-          {[
-            { label: "Interests", value: String(interests.length), color: colors.cyan[400] },
-            { label: "Threshold", value: profile.calibration.qualityThreshold.toFixed(1), color: colors.cyan[400] },
-            { label: "Reviews", value: String(profile.totalValidated + profile.totalFlagged), color: colors.text.secondary },
-          ].map(s => (
+      <div className={cardClass(mobile)}>
+        <div className={sectionTitleClass}>Agent Preferences</div>
+        <div className="flex gap-4 mb-4 flex-wrap">
+          {AGENT_PARAMS.map(s => (
             <div key={s.label}>
-              <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginBottom: 2 }}>{s.label}</div>
-              <div style={{ fontSize: t.caption.size, fontWeight: 700, fontFamily: fonts.mono, color: s.color }}>{s.value}</div>
+              <div className="text-tiny text-[var(--color-text-disabled)] mb-0.5">{s.label}</div>
+              <div className={cn("text-caption font-bold font-mono", s.colorClass)}>{s.value}</div>
             </div>
           ))}
         </div>
 
-        <div style={{ marginBottom: space[4] }}>
-          <div style={subsectionLabel}>Interests</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: space[2], alignItems: "center" }}>
+        <div className="mb-4">
+          <div className={subsectionLabel}>Interests</div>
+          <div className="flex flex-wrap gap-2 items-center">
             {interests.map(([topic]) => (
-              <span key={topic} style={{
-                display: "inline-flex", alignItems: "center", gap: 4,
-                fontSize: t.caption.size, padding: `2px ${space[2]}px`,
-                background: `${colors.cyan[400]}10`, border: `1px solid ${colors.cyan[400]}20`,
-                borderRadius: radii.pill, color: colors.cyan[400],
-              }}>
+              <span key={topic} className={pillChip("bg-cyan-400/[0.06] border border-cyan-400/[0.12] text-cyan-400")}>
                 {topic}
                 <button
                   onClick={() => removeTopicAffinity(topic)}
-                  style={{
-                    background: "transparent", border: "none", cursor: "pointer",
-                    color: colors.cyan[400], padding: 0, fontSize: 14, lineHeight: 1,
-                    display: "inline-flex", alignItems: "center",
-                  }}
+                  className={pillRemoveBtn("text-cyan-400")}
                 >&times;</button>
               </span>
             ))}
@@ -95,38 +93,20 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
                 }
               }}
               placeholder="+ Add topic"
-              style={{
-                width: 100, padding: `2px ${space[2]}px`,
-                background: "transparent",
-                border: `1px solid ${colors.border.default}`,
-                borderRadius: radii.pill,
-                color: colors.text.secondary,
-                fontSize: t.caption.size,
-                fontFamily: "inherit",
-                outline: "none",
-              }}
+              className={cn(tagInput, "w-[100px]")}
             />
           </div>
         </div>
 
-        <div style={{ marginBottom: space[4] }}>
-          <div style={subsectionLabel}>Blocked Authors</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: space[2], alignItems: "center" }}>
+        <div className="mb-4">
+          <div className={subsectionLabel}>Blocked Authors</div>
+          <div className="flex flex-wrap gap-2 items-center">
             {authorRules.map(rule => (
-              <span key={rule.id} style={{
-                display: "inline-flex", alignItems: "center", gap: 4,
-                fontSize: t.caption.size, padding: `2px ${space[2]}px`,
-                background: `${colors.red[400]}10`, border: `1px solid ${colors.red[400]}20`,
-                borderRadius: radii.pill, color: colors.red[400],
-              }}>
+              <span key={rule.id} className={pillChip("bg-red-400/[0.06] border border-red-400/[0.12] text-red-400")}>
                 {rule.pattern}
                 <button
                   onClick={() => removeFilterRule(rule.id)}
-                  style={{
-                    background: "transparent", border: "none", cursor: "pointer",
-                    color: colors.red[400], padding: 0, fontSize: 14, lineHeight: 1,
-                    display: "inline-flex", alignItems: "center",
-                  }}
+                  className={pillRemoveBtn("text-red-400")}
                 >&times;</button>
               </span>
             ))}
@@ -141,38 +121,20 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
                 }
               }}
               placeholder="+ Block author"
-              style={{
-                width: 120, padding: `2px ${space[2]}px`,
-                background: "transparent",
-                border: `1px solid ${colors.border.default}`,
-                borderRadius: radii.pill,
-                color: colors.text.secondary,
-                fontSize: t.caption.size,
-                fontFamily: "inherit",
-                outline: "none",
-              }}
+              className={tagInput}
             />
           </div>
         </div>
 
-        <div style={{ marginBottom: space[4] }}>
-          <div style={subsectionLabel}>Burn Patterns</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: space[2], alignItems: "center" }}>
+        <div className="mb-4">
+          <div className={subsectionLabel}>Burn Patterns</div>
+          <div className="flex flex-wrap gap-2 items-center">
             {titleRules.map(rule => (
-              <span key={rule.id} style={{
-                display: "inline-flex", alignItems: "center", gap: 4,
-                fontSize: t.caption.size, padding: `2px ${space[2]}px`,
-                background: `${colors.orange[400]}10`, border: `1px solid ${colors.orange[400]}20`,
-                borderRadius: radii.pill, color: colors.orange[400],
-              }}>
+              <span key={rule.id} className={pillChip("bg-orange-400/[0.06] border border-orange-400/[0.12] text-orange-400")}>
                 &ldquo;{rule.pattern}&rdquo;
                 <button
                   onClick={() => removeFilterRule(rule.id)}
-                  style={{
-                    background: "transparent", border: "none", cursor: "pointer",
-                    color: colors.orange[400], padding: 0, fontSize: 14, lineHeight: 1,
-                    display: "inline-flex", alignItems: "center",
-                  }}
+                  className={pillRemoveBtn("text-orange-400")}
                 >&times;</button>
               </span>
             ))}
@@ -187,23 +149,14 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
                 }
               }}
               placeholder="+ Add keyword"
-              style={{
-                width: 120, padding: `2px ${space[2]}px`,
-                background: "transparent",
-                border: `1px solid ${colors.border.default}`,
-                borderRadius: radii.pill,
-                color: colors.text.secondary,
-                fontSize: t.caption.size,
-                fontFamily: "inherit",
-                outline: "none",
-              }}
+              className={tagInput}
             />
           </div>
         </div>
 
         <div>
-          <div style={subsectionLabel}>
-            Quality Threshold: <span style={{ color: colors.cyan[400], fontFamily: fonts.mono }}>{profile.calibration.qualityThreshold.toFixed(1)}</span>
+          <div className={subsectionLabel}>
+            Quality Threshold: <span className="text-cyan-400 font-mono">{profile.calibration.qualityThreshold.toFixed(1)}</span>
           </div>
           <input
             data-testid="aegis-settings-quality-threshold"
@@ -211,33 +164,34 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
             min={1} max={9} step={0.5}
             value={profile.calibration.qualityThreshold}
             onChange={(e) => { const v = parseFloat(e.target.value); if (!Number.isNaN(v)) setQualityThreshold(v); }}
-            style={{ width: "100%", accentColor: colors.cyan[400], cursor: "pointer" }}
+            className="w-full cursor-pointer"
+            style={{ accentColor: "var(--color-cyan-400, #22d3ee)" }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[1] }}>
+          <div className="flex justify-between text-tiny text-[var(--color-text-disabled)] mt-1">
             <span>More content</span>
             <span>Stricter filtering</span>
           </div>
         </div>
 
-        <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[3], lineHeight: t.tiny.lineHeight }}>
+        <div className="text-tiny text-[var(--color-text-disabled)] mt-3 leading-normal">
           Changes apply in real time. Add topics to boost, block authors to suppress, set threshold to filter.
         </div>
       </div>
 
-      <div style={cardStyle(mobile)}>
-        <div style={sectionTitle}>D2A Social Agent</div>
+      <div className={cardClass(mobile)}>
+        <div className={sectionTitleClass}>D2A Social Agent</div>
         <AgentStatusBadge />
         {agentEnabled && (
-          <div style={{ marginTop: space[3], display: "flex", flexWrap: "wrap", gap: mobile ? space[3] : space[4] }}>
+          <div className={cn("mt-3 flex flex-wrap", mobile ? "gap-3" : "gap-4")}>
             {[
-              { label: "Min Score", value: MIN_OFFER_SCORE.toFixed(1), color: colors.purple[400] },
-              { label: "Resonance", value: RESONANCE_THRESHOLD.toFixed(1), color: colors.sky[400] },
-              { label: "Fee Range", value: `${(D2A_FEE_TRUSTED / 1e8).toFixed(4)}\u2013${(D2A_FEE_UNKNOWN / 1e8).toFixed(3)} ICP`, color: colors.amber[400] },
-              { label: "Approval", value: `${(D2A_APPROVE_AMOUNT / 1e8).toFixed(1)} ICP`, color: colors.text.muted },
+              { label: "Min Score", value: MIN_OFFER_SCORE.toFixed(1), colorClass: "text-purple-400" },
+              { label: "Resonance", value: RESONANCE_THRESHOLD.toFixed(1), colorClass: "text-sky-400" },
+              { label: "Fee Range", value: `${(D2A_FEE_TRUSTED / 1e8).toFixed(4)}\u2013${(D2A_FEE_UNKNOWN / 1e8).toFixed(3)} ICP`, colorClass: "text-amber-400" },
+              { label: "Approval", value: `${(D2A_APPROVE_AMOUNT / 1e8).toFixed(1)} ICP`, colorClass: "text-muted-foreground" },
             ].map(p => (
-              <div key={p.label} style={{ minWidth: 70 }}>
-                <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginBottom: 2 }}>{p.label}</div>
-                <div style={{ fontSize: t.caption.size, fontWeight: 700, fontFamily: fonts.mono, color: p.color }}>{p.value}</div>
+              <div key={p.label} className="min-w-[70px]">
+                <div className="text-tiny text-[var(--color-text-disabled)] mb-0.5">{p.label}</div>
+                <div className={cn("text-caption font-bold font-mono", p.colorClass)}>{p.value}</div>
               </div>
             ))}
           </div>

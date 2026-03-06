@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { SearchIcon } from "@/components/icons";
-import { colors, space, type as t, radii, transitions, fonts } from "@/styles/theme";
 
 export interface PaletteCommand {
   label: string;
@@ -29,7 +29,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, c
     if (open) {
       setQuery("");
       setSelectedIndex(0);
-      // Focus input on next frame to ensure mount
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
@@ -68,34 +67,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, c
 
   return (
     <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,0.5)",
-        backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "flex-start", justifyContent: "center",
-        paddingTop: mobile ? 40 : 120,
-        animation: "fadeIn .15s ease",
-      }}
+      className="fixed inset-0 z-[1000] bg-black/50 backdrop-blur-sm flex items-start justify-center animate-fade-in"
+      style={{ paddingTop: mobile ? 40 : 120 }}
       onClick={onClose}
     >
       <div
-        style={{
-          width: mobile ? "calc(100% - 32px)" : 520,
-          maxHeight: 400,
-          background: colors.bg.surface,
-          border: `1px solid ${colors.border.emphasis}`,
-          borderRadius: radii.xl,
-          overflow: "hidden",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-        }}
+        className={cn(
+          "max-h-[400px] bg-card border border-[var(--color-border-emphasis)] rounded-xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
+          mobile ? "w-[calc(100%-32px)]" : "w-[520px]"
+        )}
         onClick={e => e.stopPropagation()}
       >
         {/* Search input */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: space[3],
-          padding: `${space[3]}px ${space[4]}px`,
-          borderBottom: `1px solid ${colors.border.default}`,
-        }}>
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <SearchIcon s={18} />
           <input
             ref={inputRef}
@@ -103,27 +87,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, c
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a command..."
-            style={{
-              flex: 1, background: "transparent", border: "none", outline: "none",
-              color: colors.text.primary, fontSize: t.body.size,
-              fontFamily: fonts.sans,
-            }}
+            className="flex-1 bg-transparent border-none outline-none text-foreground text-body font-sans"
           />
-          <span style={{
-            fontSize: t.tiny.size, color: colors.text.disabled,
-            padding: "2px 6px", border: `1px solid ${colors.border.default}`,
-            borderRadius: radii.sm, fontFamily: fonts.mono,
-          }}>ESC</span>
+          <span className="text-tiny text-[var(--color-text-disabled)] px-1.5 py-0.5 border border-border rounded-sm font-mono">ESC</span>
         </div>
 
         {/* Command list */}
-        <div style={{ maxHeight: 320, overflowY: "auto", padding: `${space[2]}px 0` }}>
+        <div className="max-h-[320px] overflow-y-auto py-2">
           {filtered.length === 0 ? (
-            <div style={{
-              padding: `${space[4]}px ${space[4]}px`,
-              textAlign: "center", color: colors.text.disabled,
-              fontSize: t.bodySm.size,
-            }}>
+            <div className="p-4 text-center text-[var(--color-text-disabled)] text-body-sm">
               No matching commands
             </div>
           ) : (
@@ -132,17 +104,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, c
                 key={cmd.label}
                 onClick={() => execute(cmd)}
                 onMouseEnter={() => setSelectedIndex(i)}
-                style={{
-                  display: "flex", alignItems: "center", width: "100%",
-                  padding: `${space[2]}px ${space[4]}px`,
-                  background: i === selectedIndex ? `${colors.cyan[400]}10` : "transparent",
-                  border: "none", cursor: "pointer",
-                  color: i === selectedIndex ? colors.cyan[400] : colors.text.secondary,
-                  fontSize: t.bodySm.size, fontWeight: 500,
-                  fontFamily: fonts.sans,
-                  transition: transitions.fast,
-                  textAlign: "left",
-                }}
+                className={cn(
+                  "flex items-center w-full px-4 py-2 border-none cursor-pointer text-body-sm font-medium font-sans transition-fast text-left",
+                  i === selectedIndex
+                    ? "bg-cyan-400/[0.06] text-cyan-400"
+                    : "bg-transparent text-secondary-foreground"
+                )}
               >
                 {cmd.label}
               </button>

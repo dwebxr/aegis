@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { fonts, colors, space, type as t, radii, transitions, kpiLabelStyle } from "@/styles/theme";
+import { colors } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 import { RSSIcon, GlobeIcon, LinkIcon, GitHubIcon, CheckIcon } from "@/components/icons";
 import { POPULAR_SOURCES, CATALOG_CATEGORIES, type CatalogCategory } from "@/lib/sources/catalog";
 import type { AnalyzeResponse } from "@/lib/types/api";
@@ -26,25 +27,54 @@ interface SourcesTabProps {
 type QuickAddId = "youtube" | "topic" | "github" | "bluesky" | "reddit" | "mastodon" | "farcaster";
 
 const QUICK_ADD_PRESETS: ReadonlyArray<{
-  id: QuickAddId; icon: string; label: string; color: string;
+  id: QuickAddId; icon: string; label: string;
+  activeClass: string; badgeClass: string;
   formLabel: string; placeholder: string; hint: string;
 }> = [
-  { id: "youtube", icon: "\u25B6", label: "YouTube", color: colors.red[400], formLabel: "YouTube Channel URL", placeholder: "https://youtube.com/@channelname", hint: "Paste a channel URL \u2014 we\u2019ll find the RSS feed automatically" },
-  { id: "topic", icon: "\uD83D\uDCF0", label: "Topic", color: colors.amber[400], formLabel: "Search Keywords", placeholder: "AI safety, machine learning", hint: "Creates a Google News RSS feed for these keywords" },
-  { id: "github", icon: "", label: "GitHub", color: colors.text.secondary, formLabel: "GitHub Repository", placeholder: "owner/repo or https://github.com/owner/repo", hint: "Subscribes to release notifications for this repository" },
-  { id: "bluesky", icon: "\uD83E\uDD8B", label: "Bluesky", color: colors.sky[400], formLabel: "Bluesky Handle", placeholder: "@handle.bsky.social", hint: "Subscribes to this account\u2019s posts via Bluesky native RSS" },
-  { id: "reddit", icon: "\uD83D\uDCAC", label: "Reddit", color: colors.orange[400], formLabel: "Subreddit Name", placeholder: "r/programming or subreddit name", hint: "Subscribes to subreddit posts via Reddit native RSS" },
-  { id: "mastodon", icon: "\uD83D\uDC18", label: "Mastodon", color: colors.purple[400], formLabel: "Mastodon Account", placeholder: "@user@mastodon.social or profile URL", hint: "Subscribes to posts via Mastodon native RSS (works with any instance)" },
-  { id: "farcaster", icon: "\uD83D\uDFE3", label: "Farcaster", color: colors.purple[600], formLabel: "Farcaster Username", placeholder: "@username or https://warpcast.com/username", hint: "Subscribes to casts via Farcaster Hub API (free, no API key needed)" },
+  { id: "youtube", icon: "\u25B6", label: "YouTube", activeClass: "bg-red-400/[0.09] border-red-400/25 text-red-400", badgeClass: "text-red-400", formLabel: "YouTube Channel URL", placeholder: "https://youtube.com/@channelname", hint: "Paste a channel URL \u2014 we\u2019ll find the RSS feed automatically" },
+  { id: "topic", icon: "\uD83D\uDCF0", label: "Topic", activeClass: "bg-amber-400/[0.09] border-amber-400/25 text-amber-400", badgeClass: "text-amber-400", formLabel: "Search Keywords", placeholder: "AI safety, machine learning", hint: "Creates a Google News RSS feed for these keywords" },
+  { id: "github", icon: "", label: "GitHub", activeClass: "bg-slate-400/[0.09] border-slate-400/25 text-secondary-foreground", badgeClass: "text-secondary-foreground", formLabel: "GitHub Repository", placeholder: "owner/repo or https://github.com/owner/repo", hint: "Subscribes to release notifications for this repository" },
+  { id: "bluesky", icon: "\uD83E\uDD8B", label: "Bluesky", activeClass: "bg-sky-400/[0.09] border-sky-400/25 text-sky-400", badgeClass: "text-sky-400", formLabel: "Bluesky Handle", placeholder: "@handle.bsky.social", hint: "Subscribes to this account\u2019s posts via Bluesky native RSS" },
+  { id: "reddit", icon: "\uD83D\uDCAC", label: "Reddit", activeClass: "bg-orange-400/[0.09] border-orange-400/25 text-orange-400", badgeClass: "text-orange-400", formLabel: "Subreddit Name", placeholder: "r/programming or subreddit name", hint: "Subscribes to subreddit posts via Reddit native RSS" },
+  { id: "mastodon", icon: "\uD83D\uDC18", label: "Mastodon", activeClass: "bg-purple-400/[0.09] border-purple-400/25 text-purple-400", badgeClass: "text-purple-400", formLabel: "Mastodon Account", placeholder: "@user@mastodon.social or profile URL", hint: "Subscribes to posts via Mastodon native RSS (works with any instance)" },
+  { id: "farcaster", icon: "\uD83D\uDFE3", label: "Farcaster", activeClass: "bg-purple-600/[0.09] border-purple-600/25 text-purple-600", badgeClass: "text-purple-600", formLabel: "Farcaster Username", placeholder: "@username or https://warpcast.com/username", hint: "Subscribes to casts via Farcaster Hub API (free, no API key needed)" },
 ];
 
-const HEALTH_COLORS: Record<string, string> = {
-  healthy: colors.green[400],
-  degraded: colors.amber[400],
-  error: colors.red[400],
-  disabled: colors.text.disabled,
-  rate_limited: colors.sky[400],
+const HEALTH_BG: Record<string, string> = {
+  healthy: "bg-green-400",
+  degraded: "bg-amber-400",
+  error: "bg-red-400",
+  disabled: "bg-[var(--color-text-disabled)]",
+  rate_limited: "bg-sky-400",
 };
+
+const inputClass = "w-full bg-navy-lighter border border-border rounded-md px-4 py-3 text-secondary-foreground text-body-sm font-[inherit] outline-none box-border";
+
+const btnClass = (disabled: boolean, loading: boolean) => cn(
+  "px-5 py-3 rounded-md text-white text-body-sm font-bold whitespace-nowrap transition-fast border-none",
+  loading ? "bg-sky-400/10" : "bg-gradient-to-br from-blue-600 to-blue-700",
+  disabled ? "opacity-50 cursor-default" : "cursor-pointer",
+);
+
+const saveBtnClass = "px-4 py-2 bg-gradient-to-br from-green-500 to-green-400 border-none rounded-md text-white text-body-sm font-bold cursor-pointer transition-fast font-[inherit]";
+
+const kpiLabel = "text-tiny font-bold uppercase tracking-[0.5px] text-[var(--color-text-disabled)]";
+
+function platformBadgeClass(platform?: string, type?: string): string {
+  const key = platform || type;
+  switch (key) {
+    case "youtube": return "text-red-400";
+    case "topic": return "text-amber-400";
+    case "github": return "text-secondary-foreground";
+    case "bluesky": return "text-sky-400";
+    case "reddit": return "text-orange-400";
+    case "mastodon": return "text-purple-400";
+    case "farcaster": return "text-purple-600";
+    case "rss": return "text-amber-400";
+    case "nostr": return "text-purple-400";
+    default: return "text-amber-400";
+  }
+}
 
 function formatRetryCountdown(until: number): string {
   const diffSec = Math.max(0, Math.ceil((until - Date.now()) / 1000));
@@ -423,130 +453,84 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     return getSourceKey(s.type, config);
   };
 
-  const sourceTabs: Array<{ id: "url" | "rss" | "twitter" | "nostr"; label: string; icon: React.ReactNode; color: string }> = [
-    { id: "url", label: "URL", icon: <LinkIcon s={14} />, color: colors.sky[400] },
-    { id: "rss", label: "RSS", icon: <RSSIcon s={14} />, color: colors.amber[400] },
-    { id: "twitter", label: "X (Twitter)", icon: <span style={{ fontSize: 14 }}>{"\u{1D54F}"}</span>, color: colors.text.secondary },
-    { id: "nostr", label: "Nostr", icon: <GlobeIcon s={14} />, color: colors.purple[400] },
+  const sourceTabs: Array<{ id: "url" | "rss" | "twitter" | "nostr"; label: string; icon: React.ReactNode; activeClass: string }> = [
+    { id: "url", label: "URL", icon: <LinkIcon s={14} />, activeClass: "bg-sky-400/[0.09] border-sky-400/25 text-sky-400" },
+    { id: "rss", label: "RSS", icon: <RSSIcon s={14} />, activeClass: "bg-amber-400/[0.09] border-amber-400/25 text-amber-400" },
+    { id: "twitter", label: "X (Twitter)", icon: <span className="text-[14px]">{"\u{1D54F}"}</span>, activeClass: "bg-slate-400/[0.09] border-slate-400/25 text-secondary-foreground" },
+    { id: "nostr", label: "Nostr", icon: <GlobeIcon s={14} />, activeClass: "bg-purple-400/[0.09] border-purple-400/25 text-purple-400" },
   ];
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%", background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-    borderRadius: radii.md, padding: `${space[3]}px ${space[4]}px`, color: colors.text.secondary, fontSize: t.body.mobileSz,
-    fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-  };
-
-  const btnStyle = (disabled: boolean, loading: boolean): React.CSSProperties => ({
-    padding: `${space[3]}px ${space[5]}px`,
-    background: loading ? "rgba(56,189,248,0.1)" : `linear-gradient(135deg,${colors.blue[600]},${colors.blue[700]})`,
-    border: "none", borderRadius: radii.md, color: "#fff", fontSize: t.body.mobileSz, fontWeight: 700,
-    cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.5 : 1, whiteSpace: "nowrap",
-    transition: transitions.fast,
-  });
-
-  const saveBtnStyle: React.CSSProperties = {
-    padding: `${space[2]}px ${space[4]}px`,
-    background: `linear-gradient(135deg,${colors.green[500]},${colors.green[400]})`,
-    border: "none", borderRadius: radii.md, color: "#fff", fontSize: t.bodySm.size, fontWeight: 700,
-    cursor: "pointer", transition: transitions.fast, fontFamily: "inherit",
-  };
-
-  const errorStyle: React.CSSProperties = { fontSize: t.bodySm.size, color: colors.red[400], marginTop: space[2] };
-  const labelStyle: React.CSSProperties = { ...kpiLabelStyle, display: "block", marginBottom: space[1] };
-
   return (
-    <div style={{ animation: "fadeIn .4s ease" }}>
-      <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
-        <h1 data-testid="aegis-sources-heading" style={{
-          fontSize: mobile ? t.display.mobileSz : t.display.size,
-          fontWeight: t.display.weight,
-          lineHeight: t.display.lineHeight,
-          letterSpacing: t.display.letterSpacing,
-          color: colors.text.primary,
-          margin: 0,
-        }}>
+    <div className="animate-fade-in">
+      <div className={cn("mb-8", !mobile && "mb-12")}>
+        <h1 data-testid="aegis-sources-heading" className={cn(
+          "font-bold leading-tight tracking-tight text-foreground m-0",
+          mobile ? "text-[22px]" : "text-display"
+        )}>
           Content Sources
         </h1>
-        <p style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[1] }}>
+        <p className={cn("text-muted-foreground mt-1", mobile ? "text-body-sm" : "text-body")}>
           Configure where to find content for evaluation
         </p>
       </div>
 
       {isDemoMode && (
-        <div style={{
-          background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.15)",
-          borderRadius: radii.lg, padding: `${space[3]}px ${space[5]}px`, marginBottom: space[3],
-          fontSize: t.bodySm.size, color: colors.blue[400], fontWeight: 600,
-        }}>
+        <div className="bg-blue-600/[0.04] border border-blue-600/15 rounded-lg px-5 py-3 mb-3 text-body-sm text-blue-400 font-semibold">
           Demo sources are read-only. Login to add your own feeds.
         </div>
       )}
 
       {!isAuthenticated && !isDemoMode && sources.length === 0 && (
-        <div style={{
-          background: colors.bg.surface, border: `1px solid ${colors.border.default}`,
-          borderRadius: radii.lg, padding: space[5], marginBottom: space[5],
-          textAlign: "center", color: colors.text.muted, fontSize: t.bodySm.size,
-        }}>
+        <div className="bg-card border border-border rounded-lg p-5 mb-5 text-center text-muted-foreground text-body-sm">
           Log in to save sources for automatic fetching
         </div>
       )}
 
-      <div style={{ display: "flex", gap: space[1], marginBottom: space[5], flexWrap: "wrap" }}>
+      <div className="flex gap-1 mb-5 flex-wrap">
         {sourceTabs.map(s => (
-          <button key={s.id} data-testid={`aegis-sources-tab-${s.id}`} onClick={() => setActiveSource(s.id)} style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: `${space[2]}px ${space[4]}px`, borderRadius: radii.sm, fontSize: t.bodySm.size, fontWeight: 600,
-            cursor: "pointer", transition: transitions.fast,
-            background: activeSource === s.id ? `${s.color}18` : colors.border.subtle,
-            border: activeSource === s.id ? `1px solid ${s.color}40` : `1px solid ${colors.border.subtle}`,
-            color: activeSource === s.id ? s.color : colors.text.muted,
-            fontFamily: "inherit",
-          }}>
+          <button key={s.id} data-testid={`aegis-sources-tab-${s.id}`} onClick={() => setActiveSource(s.id)} className={cn(
+            "flex items-center gap-1.5 px-4 py-2 rounded-sm text-body-sm font-semibold cursor-pointer transition-fast font-[inherit] border",
+            activeSource === s.id ? s.activeClass : "bg-[var(--color-border-subtle)] border-[var(--color-border-subtle)] text-muted-foreground"
+          )}>
             {s.icon} {s.label}
           </button>
         ))}
       </div>
 
-      <div style={{
-        background: colors.bg.surface,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: radii.xl,
-        padding: mobile ? space[5] : space[8],
-      }}>
+      <div className={cn("bg-card border border-border rounded-xl", mobile ? "p-5" : "p-8")}>
         {activeSource === "url" && (
           <div>
-            <label style={labelStyle}>Article URL</label>
-            <div style={{ display: "flex", gap: space[2] }}>
-              <input data-testid="aegis-sources-url-input" value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="https://example.com/article" style={{ ...inputStyle, flex: 1 }} />
-              <button data-testid="aegis-sources-extract-btn" onClick={() => fetchUrl()} disabled={urlLoading || !urlInput.trim()} style={btnStyle(!urlInput.trim(), urlLoading)}>
+            <label className={cn(kpiLabel, "block mb-1")}>Article URL</label>
+            <div className="flex gap-2">
+              <input data-testid="aegis-sources-url-input" value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="https://example.com/article" className={cn(inputClass, "flex-1")} />
+              <button data-testid="aegis-sources-extract-btn" onClick={() => fetchUrl()} disabled={urlLoading || !urlInput.trim()} className={btnClass(!urlInput.trim(), urlLoading)}>
                 {urlLoading ? "Extracting..." : "Extract"}
               </button>
             </div>
-            {urlError && <div data-testid="aegis-sources-url-error" style={errorStyle}>{urlError}</div>}
+            {urlError && <div data-testid="aegis-sources-url-error" className="text-body-sm text-red-400 mt-2">{urlError}</div>}
             {urlResult && (
-              <div data-testid="aegis-sources-url-result" style={{ marginTop: space[4], background: colors.bg.raised, borderRadius: radii.md, padding: space[4] }}>
-                <div style={{ display: "flex", gap: space[3], marginBottom: space[3] }}>
+              <div data-testid="aegis-sources-url-result" className="mt-4 bg-navy-lighter rounded-md p-4">
+                <div className="flex gap-3 mb-3">
                   {urlResult.imageUrl && (
                     /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
                     <img
                       src={urlResult.imageUrl}
                       alt=""
                       loading="lazy"
-                      style={{ width: 100, height: 100, objectFit: "cover", borderRadius: radii.sm, border: `1px solid ${colors.border.default}`, flexShrink: 0 }}
+                      className="w-[100px] h-[100px] object-cover rounded-sm border border-border shrink-0"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
                   )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: t.body.size, fontWeight: 700, color: colors.text.secondary, marginBottom: space[1] }}>{urlResult.title}</div>
-                    <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginBottom: space[2] }}>by {urlResult.author} &middot; {urlResult.source}</div>
-                    <a href={urlInput} target="_blank" rel="noopener noreferrer" style={{ fontSize: t.caption.size, color: colors.blue[400], textDecoration: "none", fontWeight: 600 }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-body font-bold text-secondary-foreground mb-1">{urlResult.title}</div>
+                    <div className="text-caption text-muted-foreground mb-2">by {urlResult.author} &middot; {urlResult.source}</div>
+                    <a href={urlInput} target="_blank" rel="noopener noreferrer" className="text-caption text-blue-400 no-underline font-semibold">
                       Open original &rarr;
                     </a>
                   </div>
                 </div>
-                <div style={{ fontSize: t.body.mobileSz, color: colors.text.tertiary, lineHeight: 1.6, maxHeight: 200, overflow: "auto", marginBottom: space[3] }}>{urlResult.content.slice(0, 1000)}{urlResult.content.length > 1000 ? "..." : ""}</div>
-                <button onClick={() => handleAnalyzeOnce(urlResult.content, { sourceUrl: urlInput, imageUrl: urlResult.imageUrl })} disabled={isAnalyzing || analyzedUrls.has(urlInput)} style={btnStyle(isAnalyzing || analyzedUrls.has(urlInput), isAnalyzing)}>
+                <div className="text-body-sm text-[var(--color-text-tertiary)] leading-relaxed max-h-[200px] overflow-auto mb-3">{urlResult.content.slice(0, 1000)}{urlResult.content.length > 1000 ? "..." : ""}</div>
+                <button onClick={() => handleAnalyzeOnce(urlResult.content, { sourceUrl: urlInput, imageUrl: urlResult.imageUrl })} disabled={isAnalyzing || analyzedUrls.has(urlInput)} className={btnClass(isAnalyzing || analyzedUrls.has(urlInput), isAnalyzing)}>
                   {analyzedUrls.has(urlInput) ? "Already Analyzed" : isAnalyzing ? "Analyzing..." : "Analyze This Content"}
                 </button>
               </div>
@@ -556,8 +540,8 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
 
         {activeSource === "rss" && (
           <div>
-            <label style={labelStyle}>RSS Feed URL</label>
-            <div style={{ display: "flex", gap: space[2] }}>
+            <label className={cn(kpiLabel, "block mb-1")}>RSS Feed URL</label>
+            <div className="flex gap-2">
               <input
                 data-testid="aegis-sources-rss-input"
                 value={rssInput}
@@ -567,47 +551,36 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   setResolvedPlatform(null);
                 }}
                 placeholder="https://example.com/feed.xml \u2014 blogs, podcasts, any RSS/Atom feed"
-                style={{ ...inputStyle, flex: 1 }}
+                className={cn(inputClass, "flex-1")}
               />
-              <button onClick={fetchRss} disabled={rssLoading || !rssInput.trim()} style={btnStyle(!rssInput.trim(), rssLoading)}>
+              <button onClick={fetchRss} disabled={rssLoading || !rssInput.trim()} className={btnClass(!rssInput.trim(), rssLoading)}>
                 {rssLoading ? "Fetching..." : "Fetch Feed"}
               </button>
             </div>
 
             {/* Feed auto-discovery */}
             {rssInput.trim() && !rssResult && !rssLoading && (
-              <div style={{ marginTop: space[2] }}>
+              <div className="mt-2">
                 <button
                   onClick={() => discoverFeed(rssInput)}
                   disabled={discoverLoading}
-                  style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    fontSize: t.caption.size, color: colors.blue[400], fontWeight: 600,
-                    fontFamily: "inherit", padding: 0, opacity: discoverLoading ? 0.5 : 1,
-                  }}
+                  className={cn(
+                    "bg-transparent border-none cursor-pointer text-caption text-blue-400 font-semibold font-[inherit] p-0",
+                    discoverLoading && "opacity-50"
+                  )}
                 >
                   {discoverLoading ? "Discovering feeds..." : "Not a feed URL? Auto-discover feeds"}
                 </button>
                 {discoveredFeeds.length > 0 && (
-                  <div style={{ marginTop: space[2], display: "flex", gap: space[2], flexWrap: "wrap" }}>
+                  <div className="mt-2 flex gap-2 flex-wrap">
                     {discoveredFeeds.map((f) => (
                       <button
                         key={f.url}
                         onClick={() => { setRssInput(f.url); setDiscoveredFeeds([]); setResolvedPlatform(null); }}
-                        style={{
-                          padding: `${space[1]}px ${space[3]}px`,
-                          background: `${colors.amber[400]}15`,
-                          border: `1px solid ${colors.amber[400]}40`,
-                          borderRadius: radii.sm,
-                          fontSize: t.caption.size,
-                          color: colors.amber[400],
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                          fontWeight: 600,
-                        }}
+                        className="px-3 py-1 bg-amber-400/[0.08] border border-amber-400/25 rounded-sm text-caption text-amber-400 cursor-pointer font-[inherit] font-semibold"
                       >
                         {f.title || f.url}
-                        {f.type && <span style={{ opacity: 0.6, marginLeft: 4 }}>({f.type})</span>}
+                        {f.type && <span className="opacity-60 ml-1">({f.type})</span>}
                       </button>
                     ))}
                   </div>
@@ -619,22 +592,17 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             {!rssResult && (() => {
               const activePreset = QUICK_ADD_PRESETS.find(p => p.id === quickAddMode);
               return (
-                <div style={{ marginTop: space[3] }}>
-                  <div style={{ ...kpiLabelStyle, marginBottom: space[2] }}>Quick Add</div>
-                  <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
+                <div className="mt-3">
+                  <div className={cn(kpiLabel, "mb-2")}>Quick Add</div>
+                  <div className="flex gap-2 flex-wrap">
                     {QUICK_ADD_PRESETS.map(p => (
                       <button
                         key={p.id}
                         onClick={() => { setQuickAddMode(quickAddMode === p.id ? "" : p.id); setQuickAddInput(""); setQuickAddError(""); setRssError(""); setResolvedFarcaster(null); setResolvedPlatform(null); }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 4,
-                          padding: `${space[1]}px ${space[3]}px`, borderRadius: radii.sm,
-                          fontSize: t.caption.size, fontWeight: 600, cursor: "pointer",
-                          background: quickAddMode === p.id ? `${p.color}18` : colors.border.subtle,
-                          border: quickAddMode === p.id ? `1px solid ${p.color}40` : `1px solid ${colors.border.subtle}`,
-                          color: quickAddMode === p.id ? p.color : colors.text.muted,
-                          fontFamily: "inherit", transition: transitions.fast,
-                        }}
+                        className={cn(
+                          "flex items-center gap-1 px-3 py-1 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast border",
+                          quickAddMode === p.id ? p.activeClass : "bg-[var(--color-border-subtle)] border-[var(--color-border-subtle)] text-muted-foreground"
+                        )}
                       >
                         {p.id === "github" ? <GitHubIcon s={12} /> : <span>{p.icon}</span>} {p.label}
                       </button>
@@ -642,64 +610,64 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   </div>
 
                   {activePreset && (
-                    <div style={{ marginTop: space[3], background: colors.bg.raised, borderRadius: radii.md, padding: space[4] }}>
-                      <label style={{ ...kpiLabelStyle, display: "block", marginBottom: space[1] }}>{activePreset.formLabel}</label>
-                      <div style={{ display: "flex", gap: space[2] }}>
+                    <div className="mt-3 bg-navy-lighter rounded-md p-4">
+                      <label className={cn(kpiLabel, "block mb-1")}>{activePreset.formLabel}</label>
+                      <div className="flex gap-2">
                         <input
                           value={quickAddInput}
                           onChange={e => { setQuickAddInput(e.target.value); setQuickAddError(""); }}
                           onKeyDown={e => { if (e.key === "Enter" && quickAddInput.trim()) handleQuickAdd(); }}
                           placeholder={activePreset.placeholder}
-                          style={{ ...inputStyle, flex: 1 }}
+                          className={cn(inputClass, "flex-1")}
                         />
                         <button
                           onClick={handleQuickAdd}
                           disabled={quickAddLoading || !quickAddInput.trim()}
-                          style={btnStyle(!quickAddInput.trim(), quickAddLoading)}
+                          className={btnClass(!quickAddInput.trim(), quickAddLoading)}
                         >
                           {quickAddLoading ? "Adding..." : "Add Feed"}
                         </button>
                       </div>
-                      <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: space[1] }}>{activePreset.hint}</div>
-                      {quickAddError && <div style={errorStyle}>{quickAddError}</div>}
+                      <div className="text-caption text-muted-foreground mt-1">{activePreset.hint}</div>
+                      {quickAddError && <div className="text-body-sm text-red-400 mt-2">{quickAddError}</div>}
                     </div>
                   )}
                 </div>
               );
             })()}
 
-            {rssError && <div style={errorStyle}>{rssError}</div>}
+            {rssError && <div className="text-body-sm text-red-400 mt-2">{rssError}</div>}
             {rssResult && (
-              <div style={{ marginTop: space[4] }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: space[3] }}>
-                  <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>{rssResult.feedTitle} ({rssResult.items.length} items)</div>
+              <div className="mt-4">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="text-h3 font-semibold text-secondary-foreground">{rssResult.feedTitle} ({rssResult.items.length} items)</div>
                   {isAuthenticated && (
-                    <button onClick={handleSaveRss} style={saveBtnStyle}>
+                    <button onClick={handleSaveRss} className={saveBtnClass}>
                       Save as Source
                     </button>
                   )}
                 </div>
                 {rssResult.items.map((item, i) => (
-                  <div key={item.link ? `${item.link}-${i}` : `${item.title}-${i}`} style={{ background: colors.bg.raised, borderRadius: radii.md, padding: space[3], marginBottom: space[1], display: "flex", alignItems: "center", gap: space[3] }}>
+                  <div key={item.link ? `${item.link}-${i}` : `${item.title}-${i}`} className="bg-navy-lighter rounded-md p-3 mb-1 flex items-center gap-3">
                     {item.imageUrl && (
                       /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
                       <img
                         src={item.imageUrl}
                         alt=""
                         loading="lazy"
-                        style={{ width: 48, height: 48, objectFit: "cover", borderRadius: radii.sm, border: `1px solid ${colors.border.default}`, flexShrink: 0 }}
+                        className="size-12 object-cover rounded-sm border border-border shrink-0"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                       />
                     )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="flex-1 min-w-0">
                       {item.link ? (
-                        <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: t.body.mobileSz, color: colors.text.secondary, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", textDecoration: "none" }}>{item.title}</a>
+                        <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-body-sm text-secondary-foreground font-semibold overflow-hidden text-ellipsis whitespace-nowrap block no-underline">{item.title}</a>
                       ) : (
-                        <div style={{ fontSize: t.body.mobileSz, color: colors.text.secondary, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</div>
+                        <div className="text-body-sm text-secondary-foreground font-semibold overflow-hidden text-ellipsis whitespace-nowrap">{item.title}</div>
                       )}
-                      <div style={{ fontSize: t.caption.size, color: colors.text.muted }}>{item.author} &middot; {item.publishedDate}</div>
+                      <div className="text-caption text-muted-foreground">{item.author} &middot; {item.publishedDate}</div>
                     </div>
-                    <button onClick={() => handleAnalyzeOnce(item.content || item.title, { sourceUrl: item.link || undefined, imageUrl: item.imageUrl })} disabled={isAnalyzing || !!(item.link && analyzedUrls.has(item.link))} style={{ ...btnStyle(isAnalyzing || !!(item.link && analyzedUrls.has(item.link)), false), padding: `6px ${space[3]}px`, fontSize: t.caption.size, flexShrink: 0 }}>
+                    <button onClick={() => handleAnalyzeOnce(item.content || item.title, { sourceUrl: item.link || undefined, imageUrl: item.imageUrl })} disabled={isAnalyzing || !!(item.link && analyzedUrls.has(item.link))} className={cn(btnClass(isAnalyzing || !!(item.link && analyzedUrls.has(item.link)), false), "!px-3 !py-1.5 !text-caption shrink-0")}>
                       {item.link && analyzedUrls.has(item.link) ? "Done" : "Analyze"}
                     </button>
                   </div>
@@ -711,29 +679,29 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
 
         {activeSource === "twitter" && (
           <div>
-            <label style={labelStyle}>X API Bearer Token</label>
-            <input type="password" value={twitterToken} onChange={e => setTwitterToken(e.target.value)} placeholder="Your X API Bearer Token" style={{ ...inputStyle, marginBottom: space[3] }} />
-            <label style={labelStyle}>Search Query</label>
-            <div style={{ display: "flex", gap: space[2] }}>
-              <input value={twitterQuery} onChange={e => setTwitterQuery(e.target.value)} placeholder="AI research -is:retweet lang:en" style={{ ...inputStyle, flex: 1 }} />
-              <button onClick={fetchTwitter} disabled={twitterLoading || !twitterToken.trim() || !twitterQuery.trim()} style={btnStyle(!twitterToken.trim() || !twitterQuery.trim(), twitterLoading)}>
+            <label className={cn(kpiLabel, "block mb-1")}>X API Bearer Token</label>
+            <input type="password" value={twitterToken} onChange={e => setTwitterToken(e.target.value)} placeholder="Your X API Bearer Token" className={cn(inputClass, "mb-3")} />
+            <label className={cn(kpiLabel, "block mb-1")}>Search Query</label>
+            <div className="flex gap-2">
+              <input value={twitterQuery} onChange={e => setTwitterQuery(e.target.value)} placeholder="AI research -is:retweet lang:en" className={cn(inputClass, "flex-1")} />
+              <button onClick={fetchTwitter} disabled={twitterLoading || !twitterToken.trim() || !twitterQuery.trim()} className={btnClass(!twitterToken.trim() || !twitterQuery.trim(), twitterLoading)}>
                 {twitterLoading ? "Searching..." : "Search"}
               </button>
             </div>
-            <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: space[1] }}>Your token is sent per-request only and never stored on our servers.</div>
-            {twitterError && <div style={errorStyle}>{twitterError}</div>}
+            <div className="text-caption text-muted-foreground mt-1">Your token is sent per-request only and never stored on our servers.</div>
+            {twitterError && <div className="text-body-sm text-red-400 mt-2">{twitterError}</div>}
             {twitterResult && (
-              <div style={{ marginTop: space[4] }}>
-                <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[3] }}>{twitterResult.tweets.length} tweets found</div>
+              <div className="mt-4">
+                <div className="text-h3 font-semibold text-secondary-foreground mb-3">{twitterResult.tweets.length} tweets found</div>
                 {twitterResult.tweets.map(tweet => (
-                  <div key={tweet.id} style={{ background: colors.bg.raised, borderRadius: radii.md, padding: space[3], marginBottom: space[1] }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: space[3] }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, fontWeight: 600, fontFamily: fonts.mono }}>{tweet.authorHandle}</div>
-                        <div style={{ fontSize: t.body.mobileSz, color: colors.text.tertiary, lineHeight: 1.5, marginTop: space[1] }}>{tweet.text}</div>
-                        <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: space[1] }}>{tweet.createdAt}</div>
+                  <div key={tweet.id} className="bg-navy-lighter rounded-md p-3 mb-1">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1">
+                        <div className="text-body-sm text-secondary-foreground font-semibold font-mono">{tweet.authorHandle}</div>
+                        <div className="text-body-sm text-[var(--color-text-tertiary)] leading-normal mt-1">{tweet.text}</div>
+                        <div className="text-caption text-muted-foreground mt-1">{tweet.createdAt}</div>
                       </div>
-                      <button onClick={() => handleAnalyzeOnce(tweet.text)} disabled={isAnalyzing || analyzedUrls.has(tweet.text.slice(0, 200))} style={{ ...btnStyle(isAnalyzing || analyzedUrls.has(tweet.text.slice(0, 200)), false), padding: `6px ${space[3]}px`, fontSize: t.caption.size }}>
+                      <button onClick={() => handleAnalyzeOnce(tweet.text)} disabled={isAnalyzing || analyzedUrls.has(tweet.text.slice(0, 200))} className={cn(btnClass(isAnalyzing || analyzedUrls.has(tweet.text.slice(0, 200)), false), "!px-3 !py-1.5 !text-caption")}>
                         {analyzedUrls.has(tweet.text.slice(0, 200)) ? "Done" : "Analyze"}
                       </button>
                     </div>
@@ -746,33 +714,33 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
 
         {activeSource === "nostr" && (
           <div>
-            <label style={labelStyle}>Relay URLs (one per line, max 20)</label>
-            <textarea value={nostrRelays} onChange={e => setNostrRelays(e.target.value)} placeholder={"wss://relay.damus.io\nwss://nos.lol"} style={{ ...inputStyle, height: 70, resize: "vertical", marginBottom: space[3] }} />
-            <label style={labelStyle}>Public Keys to follow (optional, one per line)</label>
-            <textarea value={nostrPubkeys} onChange={e => setNostrPubkeys(e.target.value)} placeholder="npub or hex pubkey..." style={{ ...inputStyle, height: 50, resize: "vertical", marginBottom: space[3] }} />
-            <div style={{ display: "flex", gap: space[2] }}>
-              <button onClick={fetchNostr} disabled={nostrLoading} style={btnStyle(nostrLoading, nostrLoading)}>
+            <label className={cn(kpiLabel, "block mb-1")}>Relay URLs (one per line, max 20)</label>
+            <textarea value={nostrRelays} onChange={e => setNostrRelays(e.target.value)} placeholder={"wss://relay.damus.io\nwss://nos.lol"} className={cn(inputClass, "h-[70px] resize-y mb-3")} />
+            <label className={cn(kpiLabel, "block mb-1")}>Public Keys to follow (optional, one per line)</label>
+            <textarea value={nostrPubkeys} onChange={e => setNostrPubkeys(e.target.value)} placeholder="npub or hex pubkey..." className={cn(inputClass, "h-[50px] resize-y mb-3")} />
+            <div className="flex gap-2">
+              <button onClick={fetchNostr} disabled={nostrLoading} className={btnClass(nostrLoading, nostrLoading)}>
                 {nostrLoading ? "Fetching..." : "Fetch Latest"}
               </button>
               {isAuthenticated && (
-                <button onClick={handleSaveNostr} style={saveBtnStyle}>
+                <button onClick={handleSaveNostr} className={saveBtnClass}>
                   Save Relay Config
                 </button>
               )}
             </div>
-            {nostrError && <div style={errorStyle}>{nostrError}</div>}
+            {nostrError && <div className="text-body-sm text-red-400 mt-2">{nostrError}</div>}
             {nostrResult && (
-              <div style={{ marginTop: space[4] }}>
-                <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[3] }}>{nostrResult.events.length} events found</div>
+              <div className="mt-4">
+                <div className="text-h3 font-semibold text-secondary-foreground mb-3">{nostrResult.events.length} events found</div>
                 {nostrResult.events.map(event => (
-                  <div key={event.id} style={{ background: colors.bg.raised, borderRadius: radii.md, padding: space[3], marginBottom: space[1] }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: space[3] }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: t.caption.size, color: colors.purple[400], fontFamily: fonts.mono }}>{event.pubkey.slice(0, 12)}...{event.pubkey.slice(-8)}</div>
-                        <div style={{ fontSize: t.body.mobileSz, color: colors.text.tertiary, lineHeight: 1.5, marginTop: space[1] }}>{event.content}</div>
-                        <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: space[1] }}>{new Date(event.createdAt * 1000).toLocaleString()}</div>
+                  <div key={event.id} className="bg-navy-lighter rounded-md p-3 mb-1">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1">
+                        <div className="text-caption text-purple-400 font-mono">{event.pubkey.slice(0, 12)}...{event.pubkey.slice(-8)}</div>
+                        <div className="text-body-sm text-[var(--color-text-tertiary)] leading-normal mt-1">{event.content}</div>
+                        <div className="text-caption text-muted-foreground mt-1">{new Date(event.createdAt * 1000).toLocaleString()}</div>
                       </div>
-                      <button onClick={() => handleAnalyzeOnce(event.content)} disabled={isAnalyzing || analyzedUrls.has(event.content.slice(0, 200))} style={{ ...btnStyle(isAnalyzing || analyzedUrls.has(event.content.slice(0, 200)), false), padding: `6px ${space[3]}px`, fontSize: t.caption.size }}>
+                      <button onClick={() => handleAnalyzeOnce(event.content)} disabled={isAnalyzing || analyzedUrls.has(event.content.slice(0, 200))} className={cn(btnClass(isAnalyzing || analyzedUrls.has(event.content.slice(0, 200)), false), "!px-3 !py-1.5 !text-caption")}>
                         {analyzedUrls.has(event.content.slice(0, 200)) ? "Done" : "Analyze"}
                       </button>
                     </div>
@@ -785,28 +753,16 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
       </div>
 
       {/* Popular Sources Catalog */}
-      <div data-testid="aegis-sources-catalog" style={{
-        background: colors.bg.surface,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: radii.lg,
-        padding: mobile ? space[4] : space[5],
-        marginTop: space[5],
-        marginBottom: space[5],
-      }}>
-        <div style={{
-          fontSize: t.h3.size, fontWeight: t.h3.weight,
-          color: colors.text.tertiary, marginBottom: space[1],
-        }}>
+      <div data-testid="aegis-sources-catalog" className={cn("bg-card border border-border rounded-lg mt-5 mb-5", mobile ? "p-4" : "p-5")}>
+        <div className="text-h3 font-semibold text-secondary-foreground mb-1">
           Popular Sources
         </div>
-        <div style={{
-          fontSize: t.caption.size, color: colors.text.muted, marginBottom: space[3],
-        }}>
+        <div className="text-caption text-muted-foreground mb-3">
           Add trusted feeds with a single tap
         </div>
 
         {/* Category filter chips */}
-        <div style={{ display: "flex", gap: space[1], marginBottom: space[3], flexWrap: "wrap" }}>
+        <div className="flex gap-1 mb-3 flex-wrap">
           {([{ id: "all" as const, label: "All", emoji: "" }, ...CATALOG_CATEGORIES] as const).map(cat => {
             const isAll = cat.id === "all";
             const active = catalogFilter === cat.id;
@@ -815,17 +771,11 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
               <button
                 key={cat.id}
                 onClick={() => setCatalogFilter(cat.id)}
+                className="flex items-center gap-1 px-3 py-1 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast border"
                 style={{
-                  display: "flex", alignItems: "center", gap: 4,
-                  padding: `${space[1]}px ${space[3]}px`,
-                  borderRadius: radii.sm,
-                  fontSize: t.caption.size, fontWeight: 600,
-                  cursor: "pointer",
-                  background: active ? `${chipColor}18` : colors.border.subtle,
-                  border: active ? `1px solid ${chipColor}40` : `1px solid ${colors.border.subtle}`,
-                  color: active ? chipColor : colors.text.muted,
-                  fontFamily: "inherit",
-                  transition: transitions.fast,
+                  background: active ? `${chipColor}18` : undefined,
+                  borderColor: active ? `${chipColor}40` : undefined,
+                  color: active ? chipColor : undefined,
                 }}
               >
                 {cat.emoji ? `${cat.emoji} ` : ""}{cat.label}
@@ -835,11 +785,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         </div>
 
         {/* Source grid */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: mobile ? "1fr 1fr" : "1fr 1fr 1fr",
-          gap: space[2],
-        }}>
+        <div className={cn("grid gap-2", mobile ? "grid-cols-2" : "grid-cols-3")}>
           {POPULAR_SOURCES
             .filter(s => catalogFilter === "all" || s.category === catalogFilter)
             .map(source => {
@@ -850,32 +796,25 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                   key={source.id}
                   onClick={() => handleCatalogAdd(source)}
                   disabled={isAdded || isDemoMode}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-md font-[inherit] transition-fast text-left w-full border",
+                    (isAdded || isDemoMode) ? "cursor-default" : "cursor-pointer",
+                    isAdded && "opacity-60",
+                  )}
                   style={{
-                    display: "flex", alignItems: "center", gap: space[2],
-                    padding: `${space[2]}px ${space[3]}px`,
-                    borderRadius: radii.md,
-                    border: isAdded
-                      ? `1px solid ${colors.green[400]}30`
-                      : `1px solid ${source.color}30`,
+                    borderColor: isAdded ? `${colors.green[400]}30` : `${source.color}30`,
                     background: isAdded
                       ? `${colors.green[400]}08`
                       : justAdded ? `${colors.green[400]}15` : `${source.color}08`,
-                    cursor: isAdded || isDemoMode ? "default" : "pointer",
-                    opacity: isAdded ? 0.6 : 1,
-                    fontFamily: "inherit",
-                    transition: transitions.fast,
-                    textAlign: "left" as const,
-                    width: "100%",
                   }}
                 >
-                  <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1 }}>
+                  <span className="text-[16px] shrink-0 leading-none">
                     {isAdded ? <CheckIcon /> : source.emoji}
                   </span>
-                  <span style={{
-                    fontSize: t.bodySm.size, fontWeight: 600,
-                    color: isAdded ? colors.green[400] : colors.text.secondary,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>
+                  <span className={cn(
+                    "text-body-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap",
+                    isAdded ? "text-green-400" : "text-secondary-foreground"
+                  )}>
                     {source.label}
                   </span>
                 </button>
@@ -886,27 +825,17 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
 
       {/* Source auto-suggestions */}
       {feedSuggestions.length > 0 && (
-          <div style={{
-            background: "rgba(59,130,246,0.06)",
-            border: `1px solid rgba(59,130,246,0.15)`,
-            borderRadius: radii.lg,
-            padding: mobile ? space[4] : space[5],
-            marginBottom: space[4],
-          }}>
-            <div style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.blue[400], marginBottom: space[3] }}>
+          <div className={cn("bg-blue-500/[0.06] border border-blue-500/15 rounded-lg mb-4", mobile ? "p-4" : "p-5")}>
+            <div className="text-body-sm font-semibold text-blue-400 mb-3">
               &#x1F4A1; Suggested Sources
             </div>
             {feedSuggestions.map(s => (
-              <div key={s.domain} style={{
-                display: "flex", alignItems: "center", gap: space[3],
-                padding: `${space[2]}px 0`,
-                borderTop: `1px solid ${colors.border.subtle}`,
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, fontWeight: 600 }}>
+              <div key={s.domain} className="flex items-center gap-3 py-2 border-t border-[var(--color-border-subtle)]">
+                <div className="flex-1">
+                  <div className="text-body-sm text-secondary-foreground font-semibold">
                     {s.domain}
                   </div>
-                  <div style={{ fontSize: t.caption.size, color: colors.text.disabled }}>
+                  <div className="text-caption text-[var(--color-text-disabled)]">
                     {s.count} validated items from this domain
                   </div>
                 </div>
@@ -916,30 +845,19 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                       addSource({ type: "rss", label: s.domain, feedUrl: s.discoveredFeedUrl!, enabled: true });
                       setFeedSuggestions(prev => prev.filter(p => p.domain !== s.domain));
                     }}
-                    style={{
-                      padding: `${space[1]}px ${space[3]}px`,
-                      background: colors.blue[400],
-                      border: "none", borderRadius: radii.sm,
-                      color: "#fff", fontSize: t.caption.size, fontWeight: 600,
-                      cursor: "pointer", fontFamily: "inherit",
-                      whiteSpace: "nowrap",
-                    }}
+                    className="px-3 py-1 bg-blue-400 border-none rounded-sm text-white text-caption font-semibold cursor-pointer font-[inherit] whitespace-nowrap"
                   >
                     Add Feed
                   </button>
                 ) : (
-                  <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>No feed found</span>
+                  <span className="text-caption text-[var(--color-text-disabled)]">No feed found</span>
                 )}
                 <button
                   onClick={() => {
                     dismissSuggestion(s.domain);
                     setFeedSuggestions(prev => prev.filter(p => p.domain !== s.domain));
                   }}
-                  style={{
-                    background: "none", border: "none",
-                    color: colors.text.disabled, fontSize: t.caption.size,
-                    cursor: "pointer", fontFamily: "inherit",
-                  }}
+                  className="bg-transparent border-none text-[var(--color-text-disabled)] text-caption cursor-pointer font-[inherit]"
                 >
                   Dismiss
                 </button>
@@ -950,57 +868,49 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
 
       {/* Saved Sources List */}
       {sources.length > 0 && (
-        <div style={{
-          background: colors.bg.surface,
-          border: `1px solid ${colors.border.default}`,
-          borderRadius: radii.lg,
-          padding: mobile ? space[4] : space[5],
-          marginBottom: space[5],
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: space[3], fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary, marginBottom: space[3] }}>
+        <div className={cn("bg-card border border-border rounded-lg mb-5", mobile ? "p-4" : "p-5")}>
+          <div className="flex items-center gap-3 text-h3 font-semibold text-secondary-foreground mb-3">
             <span>Saved Sources ({sources.length})</span>
-            {syncStatus === "syncing" && <span style={{ fontSize: t.caption.size, color: colors.sky[400], fontWeight: 600 }}>syncing...</span>}
-            {syncStatus === "synced" && <span style={{ fontSize: t.caption.size, color: colors.green[400], fontWeight: 600 }}>synced</span>}
-            {syncStatus === "error" && <span style={{ fontSize: t.caption.size, color: colors.red[400], fontWeight: 600 }}>sync error{syncError ? `: ${syncError}` : ""}</span>}
+            {syncStatus === "syncing" && <span className="text-caption text-sky-400 font-semibold">syncing...</span>}
+            {syncStatus === "synced" && <span className="text-caption text-green-400 font-semibold">synced</span>}
+            {syncStatus === "error" && <span className="text-caption text-red-400 font-semibold">sync error{syncError ? `: ${syncError}` : ""}</span>}
           </div>
           {sources.map(s => {
             const stateKey = getStateKey(s);
             const state = sourceStates[stateKey];
             const health = state ? getSourceHealth(state) : "healthy";
-            const healthColor = HEALTH_COLORS[health];
 
             return (
-              <div key={s.id} style={{ marginBottom: space[1] }}>
-                <div style={{
-                  display: "flex", alignItems: "center", gap: space[3],
-                  padding: `${space[2]}px ${space[3]}px`,
-                  background: s.enabled ? `${s.type === "rss" ? colors.amber[400] : colors.purple[400]}08` : "transparent",
-                  borderRadius: editingId === s.id ? `${radii.sm} ${radii.sm} 0 0` : radii.sm,
-                }}>
+              <div key={s.id} className="mb-1">
+                <div className={cn(
+                  "flex items-center gap-3 px-3 py-2",
+                  editingId === s.id ? "rounded-t-sm" : "rounded-sm",
+                  s.enabled
+                    ? (s.type === "rss" ? "bg-amber-400/[0.03]" : "bg-purple-400/[0.03]")
+                    : "bg-transparent"
+                )}>
                   {/* Health-aware toggle */}
                   <button
                     onClick={() => toggleSource(s.id)}
-                    style={{
-                      width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "pointer",
-                      background: s.enabled ? healthColor : colors.border.default,
-                      flexShrink: 0, padding: 0,
-                    }}
+                    className={cn(
+                      "size-[18px] rounded-full border-none cursor-pointer shrink-0 p-0",
+                      s.enabled ? (HEALTH_BG[health] || "bg-border") : "bg-border"
+                    )}
                     title={s.enabled ? (health === "rate_limited" ? "Rate limited — retrying soon" : `${health} — click to disable`) : "Enable"}
                   />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: t.body.mobileSz, fontWeight: 600,
-                      color: s.enabled ? colors.text.secondary : colors.text.disabled,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }}>
+                  <div className="flex-1 min-w-0">
+                    <div className={cn(
+                      "text-body-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap",
+                      s.enabled ? "text-secondary-foreground" : "text-[var(--color-text-disabled)]"
+                    )}>
                       {s.label}
                     </div>
-                    <div style={{ fontSize: t.tiny.size, color: colors.text.muted }}>
+                    <div className="text-tiny text-muted-foreground">
                       {s.type === "rss" ? s.feedUrl : `${(s.relays || []).length} relays · ${(s.pubkeys || []).length} keys`}
                     </div>
                     {/* Runtime stats */}
                     {state && (
-                      <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: 2 }}>
+                      <div className="text-tiny text-[var(--color-text-disabled)] mt-0.5">
                         {state.lastFetchedAt > 0 && (
                           <span>Last fetch: {relativeTime(state.lastFetchedAt)}</span>
                         )}
@@ -1012,15 +922,15 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                         )}
                       </div>
                     )}
-                    {/* Rate limit notice — friendly, non-alarming */}
+                    {/* Rate limit notice */}
                     {state && health === "rate_limited" && (
-                      <div style={{ fontSize: t.tiny.size, color: colors.sky[400], marginTop: 2 }}>
+                      <div className="text-tiny text-sky-400 mt-0.5">
                         Rate limited — retries automatically in {formatRetryCountdown(state.rateLimitedUntil)}
                       </div>
                     )}
-                    {/* Error message (only when NOT rate-limited) */}
+                    {/* Error message */}
                     {state && state.errorCount > 0 && health !== "rate_limited" && (
-                      <div style={{ fontSize: t.tiny.size, color: colors.red[400], marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                      <div className="text-tiny text-red-400 mt-0.5 flex items-center gap-1.5">
                         <span>
                           {state.errorCount >= 5 ? "Auto-disabled: " : `Error (${state.errorCount}x): `}
                           {state.lastError}
@@ -1028,11 +938,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                         {state.errorCount >= 5 && !isDemoMode && (
                           <button
                             onClick={() => { resetSourceErrors(stateKey); setSourceStates(loadSourceStates()); }}
-                            style={{
-                              background: "none", border: `1px solid ${colors.amber[400]}`, borderRadius: radii.sm,
-                              color: colors.amber[400], fontSize: t.tiny.size, fontWeight: 600,
-                              padding: "1px 6px", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
-                            }}
+                            className="bg-transparent border border-amber-400 rounded-sm text-amber-400 text-tiny font-semibold px-1.5 py-px cursor-pointer font-[inherit] whitespace-nowrap"
                           >
                             Retry
                           </button>
@@ -1040,32 +946,25 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                       </div>
                     )}
                   </div>
-                  <span style={{
-                    fontSize: t.tiny.size, fontWeight: 700,
-                    color: QUICK_ADD_PRESETS.find(p => p.id === (s.platform || s.type))?.color
-                      || (s.type === "rss" ? colors.amber[400] : colors.purple[400]),
-                    textTransform: "uppercase", letterSpacing: 1,
-                  }}>
+                  <span className={cn(
+                    "text-tiny font-bold uppercase tracking-[1px]",
+                    platformBadgeClass(s.platform, s.type)
+                  )}>
                     {s.platform || s.type}
                   </span>
                   {!isDemoMode && <button
                     onClick={() => editingId === s.id ? cancelEdit() : startEdit(s)}
-                    style={{
-                      background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
-                      fontSize: t.caption.size, color: editingId === s.id ? colors.blue[400] : colors.text.disabled,
-                      fontFamily: "inherit", transition: transitions.fast,
-                    }}
+                    className={cn(
+                      "bg-transparent border-none cursor-pointer px-1.5 py-0.5 text-caption font-[inherit] transition-fast",
+                      editingId === s.id ? "text-blue-400" : "text-[var(--color-text-disabled)]"
+                    )}
                     title="Edit source"
                   >
                     &#x270E;
                   </button>}
                   {!isDemoMode && <button
                     onClick={() => removeSource(s.id)}
-                    style={{
-                      background: "none", border: "none", cursor: "pointer", padding: `2px 6px`,
-                      fontSize: t.caption.size, color: colors.text.disabled, fontFamily: "inherit",
-                      transition: transitions.fast,
-                    }}
+                    className="bg-transparent border-none cursor-pointer px-1.5 py-0.5 text-caption text-[var(--color-text-disabled)] font-[inherit] transition-fast"
                     title="Remove source"
                   >
                     &#x2715;
@@ -1074,37 +973,33 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
 
                 {/* Inline Editor */}
                 {editingId === s.id && (
-                  <div style={{
-                    background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-                    borderTop: "none", borderRadius: `0 0 ${radii.sm} ${radii.sm}`,
-                    padding: `${space[3]}px ${space[4]}px`,
-                  }}>
-                    <div style={{ marginBottom: space[3] }}>
-                      <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Label</label>
-                      <input value={editLabel} onChange={e => setEditLabel(e.target.value)} style={{ ...inputStyle, padding: `${space[2]}px ${space[3]}px` }} />
+                  <div className="bg-navy-lighter border border-border border-t-0 rounded-b-sm px-4 py-3">
+                    <div className="mb-3">
+                      <label className={cn(kpiLabel, "block mb-1")}>Label</label>
+                      <input value={editLabel} onChange={e => setEditLabel(e.target.value)} className={cn(inputClass, "px-3 py-2")} />
                     </div>
 
                     {s.type === "rss" && (
-                      <div style={{ marginBottom: space[3] }}>
-                        <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Feed URL</label>
-                        <input value={editFeedUrl} onChange={e => setEditFeedUrl(e.target.value)} style={{ ...inputStyle, padding: `${space[2]}px ${space[3]}px` }} />
+                      <div className="mb-3">
+                        <label className={cn(kpiLabel, "block mb-1")}>Feed URL</label>
+                        <input value={editFeedUrl} onChange={e => setEditFeedUrl(e.target.value)} className={cn(inputClass, "px-3 py-2")} />
                       </div>
                     )}
 
                     {s.type === "nostr" && (
                       <>
-                        <div style={{ marginBottom: space[3] }}>
-                          <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Relays ({editRelays.length})</label>
+                        <div className="mb-3">
+                          <label className={cn(kpiLabel, "block mb-1")}>Relays ({editRelays.length})</label>
                           {editRelays.map((relay, i) => (
-                            <div key={relay} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
-                              <span style={{ flex: 1, fontSize: t.bodySm.size, color: colors.text.tertiary, fontFamily: fonts.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{relay}</span>
+                            <div key={relay} className="flex items-center gap-2 mb-0.5">
+                              <span className="flex-1 text-body-sm text-[var(--color-text-tertiary)] font-mono overflow-hidden text-ellipsis whitespace-nowrap">{relay}</span>
                               <button
                                 onClick={() => setEditRelays(prev => prev.filter((_, idx) => idx !== i))}
-                                style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", fontSize: t.caption.size, color: colors.red[400], fontFamily: "inherit" }}
+                                className="bg-transparent border-none cursor-pointer px-1 py-px text-caption text-red-400 font-[inherit]"
                               >&#x2715;</button>
                             </div>
                           ))}
-                          <div style={{ display: "flex", gap: space[2], marginTop: space[1] }}>
+                          <div className="flex gap-2 mt-1">
                             <input
                               value={editNewRelay}
                               onChange={e => setEditNewRelay(e.target.value)}
@@ -1115,7 +1010,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                                 }
                               }}
                               placeholder="wss://relay.example.com"
-                              style={{ ...inputStyle, flex: 1, padding: `${space[1]}px ${space[3]}px`, fontSize: t.bodySm.size }}
+                              className={cn(inputClass, "flex-1 px-3 py-1 text-body-sm")}
                             />
                             <button
                               onClick={() => {
@@ -1124,27 +1019,23 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                                   setEditNewRelay("");
                                 }
                               }}
-                              style={{
-                                background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
-                                cursor: "pointer", padding: `${space[1]}px ${space[3]}px`,
-                                fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
-                              }}
+                              className="bg-transparent border border-border rounded-sm cursor-pointer px-3 py-1 text-body-sm text-muted-foreground font-[inherit]"
                             >+ Add</button>
                           </div>
                         </div>
 
-                        <div style={{ marginBottom: space[3] }}>
-                          <label style={{ ...kpiLabelStyle, display: "block", marginBottom: 4 }}>Public Keys ({editPubkeys.length})</label>
+                        <div className="mb-3">
+                          <label className={cn(kpiLabel, "block mb-1")}>Public Keys ({editPubkeys.length})</label>
                           {editPubkeys.map((pk, i) => (
-                            <div key={pk} style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: 3 }}>
-                              <span style={{ flex: 1, fontSize: t.bodySm.size, color: colors.text.tertiary, fontFamily: fonts.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pk}</span>
+                            <div key={pk} className="flex items-center gap-2 mb-0.5">
+                              <span className="flex-1 text-body-sm text-[var(--color-text-tertiary)] font-mono overflow-hidden text-ellipsis whitespace-nowrap">{pk}</span>
                               <button
                                 onClick={() => setEditPubkeys(prev => prev.filter((_, idx) => idx !== i))}
-                                style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", fontSize: t.caption.size, color: colors.red[400], fontFamily: "inherit" }}
+                                className="bg-transparent border-none cursor-pointer px-1 py-px text-caption text-red-400 font-[inherit]"
                               >&#x2715;</button>
                             </div>
                           ))}
-                          <div style={{ display: "flex", gap: space[2], marginTop: space[1] }}>
+                          <div className="flex gap-2 mt-1">
                             <input
                               value={editNewPubkey}
                               onChange={e => setEditNewPubkey(e.target.value)}
@@ -1155,7 +1046,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                                 }
                               }}
                               placeholder="npub or hex pubkey"
-                              style={{ ...inputStyle, flex: 1, padding: `${space[1]}px ${space[3]}px`, fontSize: t.bodySm.size }}
+                              className={cn(inputClass, "flex-1 px-3 py-1 text-body-sm")}
                             />
                             <button
                               onClick={() => {
@@ -1164,24 +1055,16 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                                   setEditNewPubkey("");
                                 }
                               }}
-                              style={{
-                                background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
-                                cursor: "pointer", padding: `${space[1]}px ${space[3]}px`,
-                                fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
-                              }}
+                              className="bg-transparent border border-border rounded-sm cursor-pointer px-3 py-1 text-body-sm text-muted-foreground font-[inherit]"
                             >+ Add</button>
                           </div>
                         </div>
                       </>
                     )}
 
-                    <div style={{ display: "flex", gap: space[2], justifyContent: "flex-end" }}>
-                      <button onClick={cancelEdit} style={{
-                        background: "none", border: `1px solid ${colors.border.default}`, borderRadius: radii.sm,
-                        cursor: "pointer", padding: `${space[2]}px ${space[4]}px`,
-                        fontSize: t.bodySm.size, color: colors.text.muted, fontFamily: "inherit",
-                      }}>Cancel</button>
-                      <button onClick={saveEdit} style={saveBtnStyle}>Save</button>
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={cancelEdit} className="bg-transparent border border-border rounded-sm cursor-pointer px-4 py-2 text-body-sm text-muted-foreground font-[inherit]">Cancel</button>
+                      <button onClick={saveEdit} className={saveBtnClass}>Save</button>
                     </div>
                   </div>
                 )}

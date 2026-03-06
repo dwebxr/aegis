@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
-import { colors, space, type as t, radii, transitions } from "@/styles/theme";
+import { cn } from "@/lib/utils";
+import { colors } from "@/styles/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePushNotification } from "@/hooks/usePushNotification";
 
@@ -45,17 +46,14 @@ export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact 
         onClick={handleToggle}
         disabled={denied || isLoading}
         title={error ? `Error: ${error}` : isSubscribed ? "Push notifications on" : denied ? "Notifications blocked" : "Enable push notifications"}
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          width: 28, height: 28,
-          background: isSubscribed ? `${colors.cyan[500]}18` : "transparent",
-          border: `1px solid ${isSubscribed ? `${colors.cyan[500]}33` : colors.border.subtle}`,
-          borderRadius: radii.sm,
-          cursor: denied || isLoading ? "not-allowed" : "pointer",
-          opacity: denied || isLoading ? 0.4 : 1,
-          transition: transitions.fast,
-          padding: 0, flexShrink: 0,
-        }}
+        className={cn(
+          "flex items-center justify-center size-7 rounded-sm p-0 shrink-0 transition-fast",
+          isSubscribed
+            ? "bg-cyan-500/[0.09] border border-cyan-500/20"
+            : "bg-transparent border border-[var(--color-border-subtle)]",
+          (denied || isLoading) && "opacity-40 cursor-not-allowed",
+          !(denied || isLoading) && "cursor-pointer"
+        )}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={bellColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -67,31 +65,17 @@ export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact 
   }
 
   return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: `${space[2]}px ${space[3]}px`,
-      background: isSubscribed ? `${colors.cyan[500]}0A` : colors.bg.surface,
-      border: `1px solid ${isSubscribed ? `${colors.cyan[500]}33` : colors.border.subtle}`,
-      borderRadius: radii.md,
-      transition: transitions.fast,
-    }}>
-      <div style={{ minWidth: 0 }}>
-        <div style={{
-          fontSize: t.caption.size,
-          fontWeight: 600,
-          color: isSubscribed ? colors.cyan[400] : colors.text.muted,
-          letterSpacing: 0.3,
-        }}>
+    <div className={cn(
+      "flex items-center justify-between px-3 py-2 rounded-md transition-fast",
+      isSubscribed
+        ? "bg-cyan-500/[0.04] border border-cyan-500/20"
+        : "bg-card border border-[var(--color-border-subtle)]"
+    )}>
+      <div className="min-w-0">
+        <div className={cn("text-caption font-semibold tracking-[0.3px]", isSubscribed ? "text-cyan-400" : "text-muted-foreground")}>
           Push Notifications
         </div>
-        <div style={{
-          fontSize: t.tiny.size,
-          color: error ? colors.red[400] : colors.text.disabled,
-          marginTop: 1,
-          lineHeight: t.tiny.lineHeight,
-        }}>
+        <div className={cn("text-tiny mt-px leading-tight", error ? "text-red-400" : "text-[var(--color-text-disabled)]")}>
           {error
             ? error
             : isSubscribed
@@ -104,20 +88,14 @@ export const NotificationToggle: React.FC<NotificationToggleProps> = ({ compact 
       <button
         onClick={handleToggle}
         disabled={denied || isLoading}
-        style={{
-          padding: `${space[1]}px ${space[3]}px`,
-          borderRadius: radii.sm,
-          fontSize: t.caption.size,
-          fontWeight: 600,
-          fontFamily: "inherit",
-          cursor: denied || isLoading ? "not-allowed" : "pointer",
-          opacity: denied || isLoading ? 0.4 : 1,
-          background: isSubscribed ? "transparent" : `${colors.cyan[500]}18`,
-          color: isSubscribed ? colors.text.muted : colors.cyan[400],
-          border: `1px solid ${isSubscribed ? colors.border.subtle : `${colors.cyan[500]}33`}`,
-          transition: transitions.fast,
-          flexShrink: 0,
-        }}
+        className={cn(
+          "px-3 py-1 rounded-sm text-caption font-semibold font-[inherit] transition-fast shrink-0",
+          (denied || isLoading) && "opacity-40 cursor-not-allowed",
+          !(denied || isLoading) && "cursor-pointer",
+          isSubscribed
+            ? "bg-transparent text-muted-foreground border border-[var(--color-border-subtle)]"
+            : "bg-cyan-500/[0.09] text-cyan-400 border border-cyan-500/20"
+        )}
       >
         {isLoading ? "..." : isSubscribed ? "Off" : "On"}
       </button>

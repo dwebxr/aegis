@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { colors, fonts } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 import { ScoreRing } from "./ScoreRing";
 import { scoreColor } from "@/lib/utils/scores";
 import { formatICP, MIN_STAKE, MAX_STAKE } from "@/lib/ic/icpLedger";
@@ -145,24 +145,23 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
     handleRemoveImage();
   };
 
+  const canEval = text.trim() && !isAnalyzing && !isUploading;
+  const canPublish = !isPublishing && !isGateBlocked && !(stakingEnabled && !hasBalance);
+
   if (publishResult) {
     return (
-      <div style={{ textAlign: "center", padding: 24 }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>&#x1F4E1;</div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: colors.green[400], marginBottom: 8 }}>Signal Published</div>
+      <div className="text-center p-6">
+        <div className="text-[40px] mb-3">&#x1F4E1;</div>
+        <div className="text-lg font-bold text-green-400 mb-2">Signal Published</div>
         {publishResult.eventId && (
-          <div style={{ fontSize: 11, color: colors.text.muted, fontFamily: fonts.mono, marginBottom: 12 }}>
+          <div className="text-[11px] text-muted-foreground font-mono mb-3">
             Event: {publishResult.eventId.slice(0, 16)}...
           </div>
         )}
-        <div style={{ fontSize: 12, color: colors.text.tertiary, marginBottom: 16 }}>
+        <div className="text-body-sm text-[var(--color-text-tertiary)] mb-4">
           Published to {publishResult.relaysPublished.length} relay{publishResult.relaysPublished.length !== 1 ? "s" : ""}
         </div>
-        <button onClick={handleReset} style={{
-          padding: "10px 24px", background: "rgba(37,99,235,0.15)",
-          border: "1px solid rgba(37,99,235,0.3)", borderRadius: 10,
-          color: colors.blue[400], fontSize: 13, fontWeight: 600, cursor: "pointer",
-        }}>
+        <button onClick={handleReset} className="px-6 py-2.5 bg-blue-600/15 border border-blue-600/30 rounded-[10px] text-blue-400 text-[13px] font-semibold cursor-pointer">
           Compose Another
         </button>
       </div>
@@ -172,7 +171,7 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
   return (
     <div>
       {nostrPubkey && (
-        <div style={{ fontSize: 10, color: colors.text.muted, marginBottom: 10, fontFamily: fonts.mono }}>
+        <div className="text-[10px] text-muted-foreground mb-2.5 font-mono">
           Nostr: {nostrPubkey.slice(0, 12)}...{nostrPubkey.slice(-8)}
         </div>
       )}
@@ -181,48 +180,26 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
         value={text}
         onChange={e => { setText(e.target.value); setSelfScore(null); setEvalError(null); }}
         placeholder="Share your signal — analysis, findings, insights..."
-        style={{
-          width: "100%",
-          minHeight: 120,
-          background: "rgba(0,0,0,0.3)",
-          border: `1px solid ${colors.border.default}`,
-          borderRadius: 12,
-          padding: 14,
-          color: colors.text.secondary,
-          fontSize: 14,
-          lineHeight: 1.6,
-          fontFamily: "inherit",
-          resize: "vertical",
-          outline: "none",
-          boxSizing: "border-box",
-        }}
+        className="w-full min-h-[120px] bg-black/30 border border-border rounded-xl px-3.5 py-3.5 text-secondary-foreground text-sm leading-[1.6] font-[inherit] resize-y outline-none box-border"
       />
 
       {/* Image preview */}
       {imagePreview && (
-        <div style={{ position: "relative", display: "inline-block", marginTop: 8 }}>
+        <div className="relative inline-block mt-2">
           {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview URL */}
           <img
             src={imagePreview}
             alt="Attached"
-            style={{ maxHeight: 120, maxWidth: "100%", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)" }}
+            className="max-h-[120px] max-w-full rounded-lg border border-white/10"
           />
           {isUploading && (
-            <div style={{
-              position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-              background: "rgba(0,0,0,0.6)", borderRadius: 8, fontSize: 11, color: colors.text.tertiary, fontWeight: 600,
-            }}>
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg text-[11px] text-[var(--color-text-tertiary)] font-semibold">
               Uploading...
             </div>
           )}
           <button
             onClick={handleRemoveImage}
-            style={{
-              position: "absolute", top: 4, right: 4, width: 20, height: 20,
-              background: "rgba(0,0,0,0.7)", border: "none", borderRadius: "50%",
-              color: colors.red[400], fontSize: 12, cursor: "pointer", display: "flex",
-              alignItems: "center", justifyContent: "center", lineHeight: 1,
-            }}
+            className="absolute top-1 right-1 size-5 bg-black/70 border-none rounded-full text-red-400 text-xs cursor-pointer flex items-center justify-center leading-none"
           >
             &#x2715;
           </button>
@@ -230,12 +207,12 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
       )}
 
       {imageError && (
-        <div style={{ fontSize: 10, color: colors.red[400], marginTop: 4, fontWeight: 600 }}>{imageError}</div>
+        <div className="text-[10px] text-red-400 mt-1 font-semibold">{imageError}</div>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, gap: 10, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 10, color: colors.text.muted }}>
+      <div className="flex items-center justify-between mt-3 gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2.5">
+          <div className="text-[10px] text-muted-foreground">
             {text.length}/5000 characters
           </div>
           <input
@@ -243,123 +220,106 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
             type="file"
             accept="image/jpeg,image/png,image/gif,image/webp"
             onChange={handleImageSelect}
-            style={{ display: "none" }}
+            className="hidden"
           />
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
             title="Attach image"
-            style={{
-              background: "none", border: `1px solid ${colors.border.emphasis}`, borderRadius: 6,
-              padding: "3px 8px", cursor: isUploading ? "not-allowed" : "pointer", color: colors.text.muted,
-              fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center", gap: 4,
-            }}
+            className={cn(
+              "bg-transparent border border-[var(--color-border-emphasis)] rounded-md px-2 py-[3px] text-muted-foreground text-sm leading-none flex items-center gap-1",
+              isUploading ? "cursor-not-allowed" : "cursor-pointer"
+            )}
           >
             &#x1F4F7;
-            {imageUrl && <span style={{ fontSize: 9, color: colors.green[400] }}>&#x2713;</span>}
+            {imageUrl && <span className="text-[9px] text-green-400">&#x2713;</span>}
           </button>
         </div>
 
         {!selfScore ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+          <div className="flex flex-col items-end gap-1">
             <button
               onClick={handleSelfEvaluate}
-              disabled={!text.trim() || isAnalyzing || isUploading}
-              style={{
-                padding: mobile ? "10px 20px" : "10px 28px",
-                background: text.trim() && !isAnalyzing && !isUploading
-                  ? "linear-gradient(135deg, #7c3aed, #2563eb)"
-                  : "rgba(255,255,255,0.05)",
-                border: "none",
-                borderRadius: 10,
-                color: text.trim() && !isAnalyzing && !isUploading ? "#fff" : colors.text.muted,
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: text.trim() && !isAnalyzing && !isUploading ? "pointer" : "not-allowed",
-              }}
+              disabled={!canEval}
+              className={cn(
+                "border-none rounded-[10px] text-[13px] font-bold",
+                mobile ? "px-5 py-2.5" : "px-7 py-2.5",
+                canEval
+                  ? "bg-gradient-to-br from-violet-600 to-blue-600 text-white cursor-pointer"
+                  : "bg-white/5 text-muted-foreground cursor-not-allowed"
+              )}
             >
               {isAnalyzing ? "Evaluating..." : "Self-Evaluate"}
             </button>
             {evalError && (
-              <div style={{ fontSize: 10, color: colors.red[400], fontWeight: 600 }}>
+              <div className="text-[10px] text-red-400 font-semibold">
                 {evalError}
               </div>
             )}
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="flex flex-col gap-2.5 flex-1">
+            <div className="flex items-center gap-3">
               <ScoreRing value={selfScore.composite} size={40} color={scoreColor(selfScore.composite)} />
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: selfScore.verdict === "quality" ? colors.green[400] : colors.red[400], textTransform: "uppercase" }}>
+                <div className={cn(
+                  "text-[11px] font-bold uppercase",
+                  selfScore.verdict === "quality" ? "text-green-400" : "text-red-400"
+                )}>
                   {selfScore.verdict}
                 </div>
                 {selfScore.topics && selfScore.topics.length > 0 && (
-                  <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
+                  <div className="flex gap-1 mt-[3px]">
                     {selfScore.topics.map(t => (
-                      <span key={t} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(139,92,246,0.12)", color: "#a78bfa", fontWeight: 600 }}>{t}</span>
+                      <span key={t} className="text-[9px] px-1.5 py-px rounded-lg bg-violet-500/[0.12] text-purple-400 font-semibold">{t}</span>
                     ))}
                   </div>
                 )}
               </div>
               <button
                 onClick={handlePublish}
-                disabled={isPublishing || isGateBlocked || (stakingEnabled && !hasBalance)}
-                style={{
-                  padding: mobile ? "10px 16px" : "10px 24px",
-                  background: isPublishing || isGateBlocked || (stakingEnabled && !hasBalance)
-                    ? "rgba(255,255,255,0.05)"
+                disabled={!canPublish}
+                className={cn(
+                  "border-none rounded-[10px] text-[13px] font-bold text-white ml-auto",
+                  mobile ? "px-4 py-2.5" : "px-6 py-2.5",
+                  !canPublish
+                    ? "bg-white/5 cursor-not-allowed"
                     : stakingEnabled
-                      ? "linear-gradient(135deg, #f59e0b, #ef4444)"
-                      : "linear-gradient(135deg, #34d399, #2563eb)",
-                  border: "none",
-                  borderRadius: 10,
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: isPublishing || isGateBlocked || (stakingEnabled && !hasBalance) ? "not-allowed" : "pointer",
-                  marginLeft: "auto",
-                }}
+                      ? "bg-gradient-to-br from-amber-500 to-red-500 cursor-pointer"
+                      : "bg-gradient-to-br from-emerald-400 to-blue-600 cursor-pointer"
+                )}
               >
                 {isPublishing ? "Publishing..." : isGateBlocked ? "Publishing Suspended" : stakingEnabled ? `Deposit & Publish` : "Publish Signal"}
               </button>
             </div>
 
             {isGateBlocked && (
-              <div style={{
-                fontSize: 11, color: colors.red[400], marginTop: 4, padding: "8px 12px",
-                background: colors.red.bg, borderRadius: 8, fontWeight: 600, lineHeight: 1.5,
-              }}>
+              <div className="text-[11px] text-red-400 mt-1 px-3 py-2 bg-red-400/[0.06] rounded-lg font-semibold leading-[1.5]">
                 Publishing is suspended. Your published signals have been repeatedly flagged. Reputation recovers +1 per week of inactivity.
               </div>
             )}
 
             {publishGate && !publishGate.requiresDeposit && publishGate.canPublish && publishGate.reason && (
-              <div style={{ fontSize: 10, color: colors.text.muted, marginTop: 4, fontStyle: "italic" }}>
+              <div className="text-[10px] text-muted-foreground mt-1 italic">
                 {publishGate.reason}
               </div>
             )}
 
             {stakingEnabled && (
-              <div style={{
-                background: "rgba(245,158,11,0.06)",
-                border: "1px solid rgba(245,158,11,0.15)",
-                borderRadius: 10,
-                padding: "10px 14px",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600 }}>
+              <div className="bg-amber-500/[0.06] border border-amber-500/15 rounded-[10px] px-3.5 py-2.5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-body-sm text-amber-500 font-semibold">
                     Quality Assurance Deposit
                   </span>
                   {icpBalance != null && (
-                    <span style={{ fontSize: 10, color: colors.text.muted, fontFamily: fonts.mono }}>
+                    <span className="text-[10px] text-muted-foreground font-mono">
                       Balance: {formatICP(icpBalance)} ICP
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div className="flex items-center gap-2.5">
                     <input
                       type="range"
                       min={Number(MIN_STAKE)}
@@ -367,20 +327,21 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
                       step={100_000}
                       value={stakeE8s}
                       onChange={e => setStakeE8s(Number(e.target.value))}
-                      style={{ flex: 1, accentColor: "#f59e0b" }}
+                      className="flex-1"
+                      style={{ accentColor: "#f59e0b" }}
                     />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b", fontFamily: fonts.mono, minWidth: 80, textAlign: "right" }}>
+                    <span className="text-[13px] font-bold text-amber-500 font-mono min-w-[80px] text-right">
                       {formatICP(BigInt(stakeE8s))} ICP
                     </span>
                   </div>
-                  <div style={{ fontSize: 10, color: colors.text.tertiary, marginTop: 4 }}>
+                  <div className="text-[10px] text-[var(--color-text-tertiary)] mt-1">
                     Deposit ICP as a quality assurance bond. Validated by community = deposit returned. Flagged = deposit forfeited as quality assurance cost. No verdict within 30 days = deposit auto-returned.
                   </div>
-                  <div style={{ fontSize: 10, color: "#fbbf24", marginTop: 6, padding: "6px 8px", background: "rgba(251,191,36,0.08)", borderRadius: 6, lineHeight: 1.5 }}>
+                  <div className="text-[10px] text-[#fbbf24] mt-1.5 px-2 py-1.5 bg-[rgba(251,191,36,0.08)] rounded-md leading-[1.5]">
                     &#x26A0;&#xFE0F; Alpha &mdash; Currently in test operation. Bugs or data resets may occur. Please deposit only amounts you are comfortable treating as a tip. Refunds cannot be guaranteed if issues arise.
                   </div>
                   {!hasBalance && (
-                    <div style={{ fontSize: 10, color: colors.red[400], marginTop: 4, fontWeight: 600 }}>
+                    <div className="text-[10px] text-red-400 mt-1 font-semibold">
                       Insufficient ICP balance. Min: {formatICP(MIN_STAKE)} ICP
                     </div>
                   )}

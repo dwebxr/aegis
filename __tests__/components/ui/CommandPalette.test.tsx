@@ -61,7 +61,7 @@ describe("CommandPalette — static rendering", () => {
     const html = renderToStaticMarkup(
       <CommandPalette open={true} onClose={jest.fn()} commands={commands} mobile />
     );
-    expect(html).toContain("calc(100% - 32px)");
+    expect(html).toContain("calc(100%-32px)");
   });
 });
 

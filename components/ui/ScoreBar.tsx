@@ -1,6 +1,5 @@
 "use client";
 import React from "react";
-import { colors, type as t, transitions } from "@/styles/theme";
 
 interface ScoreBarProps {
   label: string;
@@ -9,13 +8,16 @@ interface ScoreBarProps {
 }
 
 export const ScoreBar: React.FC<ScoreBarProps> = ({ label, score, color }) => (
-  <div style={{ marginBottom: 6 }}>
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: t.caption.size, color: colors.text.muted, marginBottom: 3 }}>
+  <div className="mb-1.5">
+    <div className="flex justify-between text-caption text-muted-foreground mb-0.5">
       <span>{label}</span>
-      <span style={{ color, fontWeight: 700 }}>{score}/10</span>
+      <span className="font-bold" style={{ color }}>{score}/10</span>
     </div>
-    <div style={{ height: 4, background: colors.bg.raised, borderRadius: 2, overflow: "hidden" }}>
-      <div style={{ height: "100%", width: `${score * 10}%`, background: color, borderRadius: 2, transition: transitions.slow }} />
+    <div className="h-1 bg-navy-lighter rounded-sm overflow-hidden">
+      <div
+        className="h-full rounded-sm transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        style={{ width: `${score * 10}%`, background: color }}
+      />
     </div>
   </div>
 );

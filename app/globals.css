@@ -1,13 +1,226 @@
+@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
+/* Aegis uses data-theme attribute instead of .dark class */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+/* ── Tailwind v4 Theme — Aegis Design System ───────────────── */
+@theme {
+
+  /* ─── Color Palette ──────────────────────────────────────── */
+
+  /* Navy — Primary background family */
+  --color-navy: #0A1428;
+  --color-navy-light: #0f1729;
+  --color-navy-lighter: #131c33;
+  --color-navy-surface: #1a2340;
+  --color-navy-hover: #1e2a4a;
+
+  /* Teal — Primary accent (brand) */
+  --color-teal: #00E5C0;
+  --color-teal-400: #00D4B1;
+  --color-teal-dim: rgba(0, 229, 192, 0.15);
+  --color-teal-border: rgba(0, 229, 192, 0.25);
+  --color-teal-glow: rgba(0, 229, 192, 0.08);
+
+  /* Emerald — Success */
+  --color-emerald: #10B981;
+  --color-emerald-400: #34d399;
+  --color-emerald-dim: rgba(16, 185, 129, 0.08);
+  --color-emerald-border: rgba(52, 211, 153, 0.15);
+
+  /* Amber — Warning */
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-dim: rgba(251, 191, 36, 0.08);
+
+  /* Orange — Burn / low quality */
+  --color-orange-400: #fb923c;
+  --color-orange-500: #f97316;
+  --color-orange-dim: rgba(249, 115, 22, 0.06);
+  --color-orange-border: rgba(249, 115, 22, 0.15);
+
+  /* Red — Danger / destructive */
+  --color-red-400: #f87171;
+  --color-red-500: #ef4444;
+  --color-red-dim: rgba(248, 113, 113, 0.06);
+  --color-red-border: rgba(248, 113, 113, 0.15);
+
+  /* Cyan — V-Signal */
+  --color-cyan-50: #ecfeff;
+  --color-cyan-400: #22d3ee;
+  --color-cyan-500: #06b6d4;
+
+  /* Blue — Info */
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+
+  /* Purple — D2A / Agent */
+  --color-purple-300: #d8b4fe;
+  --color-purple-400: #a78bfa;
+  --color-purple-500: #8b5cf6;
+  --color-purple-600: #7c3aed;
+
+  /* Sky */
+  --color-sky-400: #38bdf8;
+
+  /* ─── Typography ─────────────────────────────────────────── */
+
+  --font-sans: 'Outfit', 'Noto Sans JP', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Custom font sizes — maps to theme.ts type scale */
+  --text-display: 2rem;       /* 32px */
+  --text-h1: 1.5rem;          /* 24px */
+  --text-h2: 1.125rem;        /* 18px */
+  --text-h3: 0.9375rem;       /* 15px */
+  --text-body-lg: 0.9375rem;  /* 15px */
+  --text-body: 0.875rem;      /* 14px */
+  --text-body-sm: 0.75rem;    /* 12px */
+  --text-caption: 0.625rem;   /* 10px */
+  --text-tiny: 0.5625rem;     /* 9px */
+  --text-kpi: 1.75rem;        /* 28px */
+  --text-kpi-sub: 0.6875rem;  /* 11px */
+  --text-kpi-label: 0.625rem; /* 10px */
+
+  --leading-display: 1.1;
+  --leading-h1: 1.2;
+  --leading-h2: 1.3;
+  --leading-h3: 1.4;
+  --leading-body: 1.6;
+  --leading-body-lg: 1.7;
+  --leading-body-sm: 1.5;
+
+  --tracking-tight: -0.5px;
+  --tracking-snug: -0.3px;
+  --tracking-wide: 0.5px;
+  --tracking-wider: 1.5px;
+
+  /* ─── Shadows ────────────────────────────────────────────── */
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glow-teal: 0 0 20px rgba(0, 229, 192, 0.15);
+  --shadow-glow-green: 0 0 20px rgba(52, 211, 153, 0.15);
+  --shadow-glow-orange: 0 0 20px rgba(249, 115, 22, 0.2);
+  --shadow-glow-purple: 0 0 20px rgba(124, 58, 237, 0.15);
+  --shadow-glow-cyan: 0 0 20px rgba(6, 182, 212, 0.15);
+
+  /* ─── Breakpoints ────────────────────────────────────────── */
+
+  --breakpoint-mobile: 680px;
+  --breakpoint-tablet: 960px;
+
+  /* ─── Animations ─────────────────────────────────────────── */
+
+  --animate-fade-in: fade-in 0.3s ease-out;
+  --animate-slide-up: slide-up 0.3s ease-out;
+  --animate-glow-pulse: glow-pulse 2s ease-in-out infinite;
+  --animate-subtle-bounce: subtle-bounce 2s ease-in-out infinite;
+  --animate-teal-pulse: teal-pulse 2s ease-in-out infinite;
+
+  /* ─── Transitions ────────────────────────────────────────── */
+
+  --transition-fast: all 0.15s ease;
+  --transition-normal: all 0.25s ease;
+  --transition-slow: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── shadcn theme inline (radius mappings) ──────────────── */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-pill: 9999px;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ── Aegis Dark Theme (default) ──────────────────────────── */
 :root, [data-theme="dark"] {
-  --color-bg-root: #0a0f1e;
+  --radius: 0.75rem;
+
+  /* shadcn semantic → Aegis navy palette */
+  --background: #0A1428;
+  --foreground: #f1f5f9;
+  --card: #0f1729;
+  --card-foreground: #f1f5f9;
+  --popover: #131c33;
+  --popover-foreground: #f1f5f9;
+  --primary: #00E5C0;
+  --primary-foreground: #0A1428;
+  --secondary: #1a2340;
+  --secondary-foreground: #e2e8f0;
+  --muted: #131c33;
+  --muted-foreground: #64748b;
+  --accent: #1a2340;
+  --accent-foreground: #e2e8f0;
+  --destructive: #ef4444;
+  --border: rgba(255, 255, 255, 0.07);
+  --input: rgba(255, 255, 255, 0.07);
+  --ring: #00E5C0;
+
+  /* Chart colors */
+  --chart-1: #00E5C0;
+  --chart-2: #8b5cf6;
+  --chart-3: #f59e0b;
+  --chart-4: #3b82f6;
+  --chart-5: #ef4444;
+
+  /* Sidebar */
+  --sidebar: #0A1428;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #00E5C0;
+  --sidebar-primary-foreground: #0A1428;
+  --sidebar-accent: #131c33;
+  --sidebar-accent-foreground: #e2e8f0;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-ring: #00E5C0;
+
+  /* Aegis legacy variables (backward compat during migration) */
+  --color-bg-root: #0A1428;
   --color-bg-surface: #0f1729;
   --color-bg-raised: #131c33;
-  --color-bg-overlay: rgba(15,23,42,0.85);
-  --color-border-subtle: rgba(255,255,255,0.04);
-  --color-border-default: rgba(255,255,255,0.07);
-  --color-border-emphasis: rgba(255,255,255,0.12);
+  --color-bg-overlay: rgba(15, 23, 42, 0.85);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-default: rgba(255, 255, 255, 0.07);
+  --color-border-emphasis: rgba(255, 255, 255, 0.12);
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #e2e8f0;
   --color-text-tertiary: #94a3b8;
@@ -16,14 +229,49 @@
   --color-scrollbar: #1e293b;
 }
 
+/* ── Aegis Light Theme ───────────────────────────────────── */
 [data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #00B899;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #1e293b;
+  --destructive: #ef4444;
+  --border: rgba(0, 0, 0, 0.08);
+  --input: rgba(0, 0, 0, 0.08);
+  --ring: #00B899;
+
+  --chart-1: #00B899;
+  --chart-2: #7c3aed;
+  --chart-3: #f59e0b;
+  --chart-4: #2563eb;
+  --chart-5: #ef4444;
+
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #1e293b;
+  --sidebar-primary: #00B899;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1f5f9;
+  --sidebar-accent-foreground: #1e293b;
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+  --sidebar-ring: #00B899;
+
   --color-bg-root: #f8fafc;
   --color-bg-surface: #ffffff;
   --color-bg-raised: #f1f5f9;
-  --color-bg-overlay: rgba(241,245,249,0.92);
-  --color-border-subtle: rgba(0,0,0,0.04);
-  --color-border-default: rgba(0,0,0,0.08);
-  --color-border-emphasis: rgba(0,0,0,0.14);
+  --color-bg-overlay: rgba(241, 245, 249, 0.92);
+  --color-border-subtle: rgba(0, 0, 0, 0.04);
+  --color-border-default: rgba(0, 0, 0, 0.08);
+  --color-border-emphasis: rgba(0, 0, 0, 0.14);
   --color-text-primary: #0f172a;
   --color-text-secondary: #1e293b;
   --color-text-tertiary: #475569;
@@ -32,10 +280,8 @@
   --color-scrollbar: #cbd5e1;
 }
 
+/* ── Base Styles ─────────────────────────────────────────── */
 * {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -46,9 +292,9 @@ html, body {
 }
 
 body {
-  color: var(--color-text-secondary);
-  background: var(--color-bg-root);
-  font-family: 'Outfit', 'Noto Sans JP', -apple-system, sans-serif;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -58,6 +304,7 @@ a {
   text-decoration: none;
 }
 
+/* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 5px;
 }
@@ -71,36 +318,48 @@ a {
   border-radius: 3px;
 }
 
-@keyframes fadeIn {
+/* ── Keyframes ───────────────────────────────────────────── */
+@keyframes fade-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@keyframes slideUp {
+@keyframes slide-up {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(249,115,22,0.2); }
-  50% { box-shadow: 0 0 20px rgba(249,115,22,0.4); }
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(249, 115, 22, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(249, 115, 22, 0.4); }
 }
 
-@keyframes subtleBounce {
+@keyframes subtle-bounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
 }
 
+@keyframes teal-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 229, 192, 0.15); }
+  50% { box-shadow: 0 0 24px rgba(0, 229, 192, 0.3); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Utility ─────────────────────────────────────────────── */
 .aegis-tooltip-wrap:hover .aegis-tooltip-content {
   opacity: 1 !important;
+}
+
+/* ── shadcn/ui Base ──────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

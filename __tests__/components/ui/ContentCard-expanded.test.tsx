@@ -135,8 +135,8 @@ describe("ContentCard — mobile rendering", () => {
     expect(html).not.toContain("Flag Slop");
     // Verify icon-only mode: ↗ for Read more, SVG icons for validate/flag
     expect(html).toContain("\u2197"); // ↗
-    // Validate button uses flex:none on mobile (not flex:1)
-    expect(html).toContain("flex:none");
+    // Validate button does not use flex-1 on mobile
+    expect(html).not.toMatch(/aegis-card-validate[^"]*flex-1/);
   });
 
   it("shows icon-only Save button on mobile", () => {
@@ -251,7 +251,7 @@ describe("ContentCard — serendipity variant", () => {
         variant="serendipity"
       />
     );
-    expect(html).toContain("124,58,237"); // purple RGB from serendipity theme
+    expect(html).toContain("purple-600"); // purple from serendipity Tailwind class
   });
 });
 

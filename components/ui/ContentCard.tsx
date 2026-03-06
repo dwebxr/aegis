@@ -1,8 +1,9 @@
 "use client";
 import React, { useState } from "react";
-import { fonts, colors, space, type as t, shadows, radii, transitions, scoreGrade } from "@/styles/theme";
+import { cn } from "@/lib/utils";
+import { colors, scoreGrade } from "@/styles/theme";
 import { ScoreBar } from "./ScoreBar";
-import { Tooltip } from "./Tooltip";
+import { Tooltip } from "./LegacyTooltip";
 import { GLOSSARY } from "@/lib/glossary";
 import { CheckIcon, XCloseIcon } from "@/components/icons";
 import { D2ABadge } from "@/components/ui/D2ABadge";
@@ -35,22 +36,23 @@ interface ContentCardProps {
 function GradeBadge({ composite }: { composite: number }) {
   const { grade, color, bg } = scoreGrade(composite);
   return (
-    <div style={{
-      width: 44, height: 54, borderRadius: radii.sm,
-      background: bg, border: `2px solid ${color}40`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      flexDirection: "column", gap: 1, flexShrink: 0,
-      boxShadow: `0 0 12px ${color}30`,
-    }}>
-      <span style={{ fontSize: 18, fontWeight: 800, color, fontFamily: fonts.mono, lineHeight: 1 }}>{grade}</span>
-      <span style={{ fontSize: 10, fontWeight: 600, color, fontFamily: fonts.mono, lineHeight: 1, opacity: 0.85 }}>{composite.toFixed(1)}</span>
+    <div
+      className="w-11 h-[54px] rounded-sm flex items-center justify-center flex-col gap-px shrink-0"
+      style={{
+        background: bg,
+        border: `2px solid ${color}40`,
+        boxShadow: `0 0 12px ${color}30`,
+      }}
+    >
+      <span className="text-lg font-extrabold font-mono leading-none" style={{ color }}>{grade}</span>
+      <span className="text-[10px] font-semibold font-mono leading-none opacity-85" style={{ color }}>{composite.toFixed(1)}</span>
     </div>
   );
 }
 
 export function ScoreGrid({ item }: { item: ContentItem }) {
   return (
-    <div data-testid="aegis-card-score-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: space[3], marginBottom: space[4] }}>
+    <div data-testid="aegis-card-score-grid" className="grid grid-cols-3 gap-3 mb-4">
       {hasVCL(item) ? (
         <>
           <Tooltip text={GLOSSARY["V-Signal"]} position="bottom"><ScoreBar label="V Signal" score={item.vSignal!} color={colors.purple[400]} /></Tooltip>
@@ -73,18 +75,19 @@ export function TopicTags({ topics, max = 3 }: { topics: string[]; max?: number 
   const visible = topics.slice(0, max);
   const overflow = topics.length - max;
   return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: space[2] }}>
+    <div className="flex gap-1.5 flex-wrap mt-2">
       {visible.map(tp => (
-        <span key={tp} style={{
-          fontSize: t.caption.size, padding: "3px 10px", borderRadius: radii.pill,
-          background: `${colors.purple[400]}15`, color: colors.purple[400], fontWeight: 600,
-        }}>{tp}</span>
+        <span
+          key={tp}
+          className="text-caption px-2.5 py-[3px] rounded-full bg-purple-400/[0.08] text-purple-400 font-semibold"
+        >
+          {tp}
+        </span>
       ))}
       {overflow > 0 && (
-        <span style={{
-          fontSize: t.caption.size, padding: "3px 10px", borderRadius: radii.pill,
-          background: "rgba(100,116,139,0.06)", color: colors.text.disabled, fontWeight: 600,
-        }}>+{overflow}</span>
+        <span className="text-caption px-2.5 py-[3px] rounded-full bg-[rgba(100,116,139,0.06)] text-[var(--color-text-disabled)] font-semibold">
+          +{overflow}
+        </span>
       )}
     </div>
   );
@@ -113,20 +116,26 @@ function ScoreTags({ item }: { item: ContentItem }) {
   const tags = deriveScoreTags(item);
   if (tags.length === 0) return null;
   return (
-    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: space[2] }}>
+    <div className="flex gap-1 flex-wrap mt-2">
       {tags.map(tag => (
-        <span key={tag.label} style={{
-          fontSize: t.tiny.size, fontWeight: t.tiny.weight, letterSpacing: t.tiny.letterSpacing,
-          padding: "2px 8px", borderRadius: radii.pill,
-          background: `${tag.color}12`, color: tag.color,
-          border: `1px solid ${tag.color}20`, textTransform: "uppercase",
-        }}>
+        <span
+          key={tag.label}
+          className="text-tiny font-semibold tracking-wide px-2 py-[2px] rounded-full uppercase"
+          style={{
+            background: `${tag.color}12`,
+            color: tag.color,
+            border: `1px solid ${tag.color}20`,
+          }}
+        >
           {tag.label}
         </span>
       ))}
     </div>
   );
 }
+
+/* ── Action Button Base ──────────────────────────────────── */
+const actionBtnBase = "flex items-center justify-center gap-[5px] rounded-md text-body-sm font-semibold cursor-pointer transition-all duration-150 font-[inherit] min-w-8";
 
 const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, isBookmarked, mobile, variant = "default", rank, focused, clusterCount }) => {
   const [hovered, setHovered] = useState(false);
@@ -135,23 +144,9 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
   const gr = scoreGrade(item.scores.composite);
 
   const isLarge = variant === "priority" || variant === "serendipity";
-  const pad = isLarge ? (mobile ? `${space[4]}px ${space[4]}px` : `${space[5]}px ${space[6]}px`) : (mobile ? `${space[4]}px ${space[4]}px` : `${space[4]}px ${space[5]}px`);
-
-  const bg = variant === "serendipity"
-    ? `linear-gradient(135deg, rgba(124,58,237,0.06), rgba(37,99,235,0.04))`
-    : variant === "priority"
-      ? `rgba(37,99,235,0.04)`
-      : isSlop ? colors.red.bg : colors.green.bg;
-
-  const border = variant === "serendipity"
-    ? `1px solid rgba(124,58,237,0.2)`
-    : variant === "priority"
-      ? `1px solid rgba(37,99,235,0.12)`
-      : `1px solid ${isSlop ? colors.red.border : colors.green.border}`;
-
-  const borderLeft = variant === "serendipity" ? undefined : `${isLarge ? 4 : 3}px solid ${gr.color}`;
-
-  const hoverShadow = isSlop ? shadows.glow.orange : shadows.md;
+  const padCls = isLarge
+    ? (mobile ? "p-4" : "px-6 py-5")
+    : (mobile ? "p-4" : "px-5 py-4");
 
   return (
     <div
@@ -165,129 +160,113 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item.id); } }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className={cn(
+        padCls,
+        "cursor-pointer transition-all duration-250 ease-out",
+        isLarge ? "rounded-lg mb-3" : "rounded-md mb-2",
+        variant !== "default" && "relative",
+        variant === "serendipity" && "overflow-hidden",
+        focused && "outline-2 outline-cyan-400 outline-offset-1",
+        /* Variant backgrounds */
+        variant === "serendipity" && "bg-gradient-to-br from-purple-600/[0.06] to-blue-600/[0.04] border border-purple-600/20",
+        variant === "priority" && "bg-blue-600/[0.04] border border-blue-600/[0.12]",
+        variant === "default" && (isSlop ? "bg-red-dim border border-red-border" : "bg-emerald-dim border border-emerald-border"),
+      )}
       style={{
-        background: bg, border,
-        borderRadius: isLarge ? radii.lg : radii.md, padding: pad,
-        cursor: "pointer",
-        transition: transitions.normal,
-        marginBottom: isLarge ? space[3] : space[2],
-        borderLeft,
-        position: variant !== "default" ? "relative" : undefined,
-        overflow: variant === "serendipity" ? "hidden" : undefined,
+        borderLeft: variant !== "serendipity" ? `${isLarge ? 4 : 3}px solid ${gr.color}` : undefined,
         transform: hovered ? "scale(1.008)" : "scale(1)",
-        boxShadow: hovered ? hoverShadow : "none",
-        outline: focused ? `2px solid ${colors.cyan[400]}` : "none",
-        outlineOffset: focused ? 1 : undefined,
+        boxShadow: hovered ? (isSlop ? "0 0 20px rgba(249,115,22,0.2)" : "0 4px 12px rgba(0,0,0,0.4)") : "none",
       }}
     >
+      {/* Priority rank badge */}
       {variant === "priority" && rank !== undefined && (
-        <div style={{
-          position: "absolute", top: mobile ? space[3] : space[4], right: mobile ? space[3] : space[4],
-          width: 28, height: 28, borderRadius: "50%",
-          background: `linear-gradient(135deg, ${colors.blue[600]}, ${colors.purple[600]})`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: t.bodySm.size, fontWeight: 800, color: "#fff",
-        }}>
+        <div className={cn(
+          "absolute size-7 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-body-sm font-extrabold text-white",
+          mobile ? "top-3 right-3" : "top-4 right-4"
+        )}>
           {rank}
         </div>
       )}
 
+      {/* Serendipity ribbon */}
       {variant === "serendipity" && (
         <Tooltip text={GLOSSARY["Serendipity"]} position="bottom">
-          <div style={{
-            position: "absolute", top: 0, right: 0,
-            background: `linear-gradient(135deg, ${colors.purple[600]}, ${colors.blue[600]})`,
-            padding: `${space[1]}px ${space[4]}px ${space[1]}px 18px`, borderBottomLeftRadius: radii.md,
-            fontSize: t.caption.size, fontWeight: 700, color: "#fff", letterSpacing: 0.5,
-          }}>
+          <div className="absolute top-0 right-0 bg-gradient-to-br from-purple-600 to-blue-600 py-1 pl-[18px] pr-4 rounded-bl-md text-caption font-bold text-white tracking-wide">
             SERENDIPITY
           </div>
         </Tooltip>
       )}
 
-      <div style={{
-        display: "flex", alignItems: "center", gap: space[2], flexWrap: "wrap",
-        paddingBottom: space[2],
-        borderBottom: `1px solid ${colors.border.subtle}`,
-        marginBottom: space[2],
-        ...(variant === "serendipity" ? { marginTop: space[1] } : {}),
-      }}>
+      {/* Header row */}
+      <div className={cn(
+        "flex items-center gap-2 flex-wrap pb-2 border-b border-[var(--color-border-subtle)] mb-2",
+        variant === "serendipity" && "mt-1"
+      )}>
         {item.avatar?.startsWith("http") ? (
           /* eslint-disable-next-line @next/next/no-img-element -- Nostr profile avatar */
           <img
             src={item.avatar}
             alt=""
-            style={{
-              width: isLarge ? 22 : 20, height: isLarge ? 22 : 20,
-              borderRadius: "50%", objectFit: "cover", flexShrink: 0,
-              border: `1px solid ${colors.border.default}`,
-            }}
+            className={cn(
+              "rounded-full object-cover shrink-0 border border-border",
+              isLarge ? "size-[22px]" : "size-5"
+            )}
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
         ) : (
-          <span style={{ fontSize: isLarge ? 16 : 18 }}>{item.avatar}</span>
+          <span className={isLarge ? "text-base" : "text-lg"}>{item.avatar}</span>
         )}
-        <span style={{ fontWeight: 700, color: colors.text.secondary, fontSize: isLarge ? t.body.size : t.body.mobileSz, fontFamily: fonts.mono }}>{item.author}</span>
-        <span style={{
-          fontSize: t.caption.size, color: colors.text.muted,
-          background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
-        }}>{item.platform || item.source}</span>
+        <span className={cn("font-bold text-secondary-foreground font-mono", isLarge ? "text-body" : "text-[13px]")}>{item.author}</span>
+        <span className="text-caption text-muted-foreground bg-navy-lighter px-2 py-0.5 rounded-sm">{item.platform || item.source}</span>
         {isD2AContent(item) && <D2ABadge mobile={mobile} />}
-        {variant !== "serendipity" && <span style={{ fontSize: t.caption.size, color: colors.text.disabled }}>{item.timestamp}</span>}
-        {variant === "priority" && <div style={{ flex: 1 }} />}
+        {variant !== "serendipity" && <span className="text-caption text-[var(--color-text-disabled)]">{item.timestamp}</span>}
+        {variant === "priority" && <div className="flex-1" />}
       </div>
 
-      <div style={{ display: "flex", gap: mobile ? space[3] : space[4], alignItems: "flex-start" }}>
+      {/* Body + grade */}
+      <div className={cn("flex gap-4 items-start", mobile && "gap-3")}>
         {item.imageUrl && (
           /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
           <img
             src={item.imageUrl}
             alt=""
-            style={{
-              width: isLarge ? 80 : 60,
-              height: isLarge ? 80 : 60,
-              objectFit: "cover",
-              borderRadius: radii.sm,
-              flexShrink: 0,
-              border: `1px solid ${colors.border.default}`,
-            }}
+            className={cn(
+              "object-cover rounded-sm shrink-0 border border-border",
+              isLarge ? "size-20" : "size-15"
+            )}
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
         )}
-        <div style={{ flex: 1, minWidth: 0, paddingRight: variant === "serendipity" ? 90 : (variant === "priority" ? 36 : 0) }}>
-          <p style={{
-            color: isSlop ? colors.text.tertiary : (variant === "serendipity" ? "#d8b4fe" : colors.text.tertiary),
-            fontSize: mobile ? t.body.mobileSz : (isLarge ? t.bodyLg.size : t.body.size),
-            lineHeight: isLarge ? t.bodyLg.lineHeight : t.body.lineHeight,
-            margin: 0,
-            textDecoration: isSlop && !isLarge ? "line-through" : "none",
-            opacity: isSlop && !isLarge ? 0.5 : 1,
-            wordBreak: "break-word",
-          }}>
+        <div className="flex-1 min-w-0" style={{ paddingRight: variant === "serendipity" ? 90 : (variant === "priority" ? 36 : 0) }}>
+          <p className={cn(
+            "m-0 break-words",
+            isSlop && !isLarge && "line-through opacity-50",
+            variant === "serendipity" ? "text-purple-300" : "text-[var(--color-text-tertiary)]",
+            mobile ? "text-[13px]" : (isLarge ? "text-body-lg leading-body-lg" : "text-body leading-body"),
+          )}>
             {item.text}
           </p>
           {variant === "serendipity" && (
-            <div style={{ marginTop: space[2], fontSize: t.caption.size, color: colors.purple[400], fontStyle: "italic" }}>
+            <div className="mt-2 text-caption text-purple-400 italic">
               Outside your usual topics — expanding your perspective
             </div>
           )}
         </div>
 
         {!isLarge && (
-          <div style={{ textAlign: "center", flexShrink: 0 }}>
+          <div className="text-center shrink-0">
             <GradeBadge composite={item.scores.composite} />
-            <div style={{
-              marginTop: space[1], fontSize: t.tiny.size, fontWeight: 700,
-              textTransform: "uppercase", letterSpacing: 1,
-              color: isSlop ? colors.red[400] : colors.green[400],
-            }}>
+            <div className={cn(
+              "mt-1 text-tiny font-bold uppercase tracking-[1px]",
+              isSlop ? "text-red-400" : "text-emerald-400"
+            )}>
               {item.verdict}
             </div>
           </div>
         )}
 
         {isLarge && (
-          <div style={{ flexShrink: 0, marginTop: space[1] }}>
+          <div className="shrink-0 mt-1">
             <GradeBadge composite={item.scores.composite} />
           </div>
         )}
@@ -299,49 +278,37 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         <TopicTags topics={item.topics} />
       )}
 
+      {/* Cluster count */}
       {clusterCount !== undefined && clusterCount > 0 && !expanded && (
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: 4,
-          marginTop: space[2], padding: "2px 10px", borderRadius: radii.pill,
-          background: `${colors.blue[400]}12`, color: colors.blue[400],
-          fontSize: t.caption.size, fontWeight: 600, border: `1px solid ${colors.blue[400]}20`,
-        }}>
+        <div className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full bg-blue-400/[0.07] text-blue-400 text-caption font-semibold border border-blue-400/[0.12]">
           +{clusterCount} related
         </div>
       )}
 
+      {/* Expanded detail */}
       {expanded && (
-        <div style={{
-          marginTop: space[4],
-          paddingTop: space[4],
-          borderTop: `1px solid ${variant === "serendipity" ? "rgba(124,58,237,0.15)" : colors.border.default}`,
-        }}>
+        <div className={cn(
+          "mt-4 pt-4 border-t",
+          variant === "serendipity" ? "border-purple-600/15" : "border-border"
+        )}>
           <ScoreGrid item={item} />
           {item.reason && (
-            <div data-testid="aegis-card-reason" style={{
-              fontSize: t.bodySm.size, color: colors.text.tertiary, lineHeight: 1.5, fontStyle: "italic",
-              background: colors.bg.raised, padding: `${space[3]}px ${space[4]}px`, borderRadius: radii.md, marginBottom: space[3],
-            }}>
+            <div data-testid="aegis-card-reason" className="text-body-sm text-[var(--color-text-tertiary)] leading-[1.5] italic bg-navy-lighter px-4 py-3 rounded-md mb-3">
               {item.reason}
             </div>
           )}
-          <div style={{ display: "flex", gap: space[2], flexWrap: "wrap" }}>
+          <div className="flex gap-2 flex-wrap">
             {item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) && (
               <a
                 href={item.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
-                  background: `${colors.blue[400]}10`,
-                  border: `1px solid ${colors.blue[400]}30`,
-                  borderRadius: radii.md,
-                  color: colors.blue[400], fontSize: t.bodySm.size, fontWeight: 600,
-                  textDecoration: "none", whiteSpace: "nowrap",
-                  transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
-                }}
+                className={cn(
+                  actionBtnBase,
+                  "bg-blue-400/[0.06] border border-blue-400/[0.19] text-blue-400 no-underline whitespace-nowrap",
+                  mobile ? "p-2" : "px-3 py-2"
+                )}
               >
                 {mobile ? "\u2197" : <>Read more &rarr;</>}
               </a>
@@ -350,81 +317,70 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
               <button
                 aria-label={isBookmarked ? "Remove bookmark" : "Bookmark for later"}
                 onClick={e => { e.stopPropagation(); onBookmark(item.id); }}
-                style={{
-                  padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
-                  background: isBookmarked ? `${colors.amber[400]}18` : "transparent",
-                  border: `1px solid ${isBookmarked ? `${colors.amber[400]}30` : colors.border.default}`,
-                  borderRadius: radii.md,
-                  color: isBookmarked ? colors.amber[400] : colors.text.muted,
-                  fontSize: t.bodySm.size, fontWeight: 600,
-                  cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
-                }}
+                className={cn(
+                  actionBtnBase,
+                  isBookmarked
+                    ? "bg-amber-400/[0.09] border border-amber-400/[0.19] text-amber-400"
+                    : "bg-transparent border border-border text-muted-foreground",
+                  mobile ? "p-2" : "px-3 py-2"
+                )}
               >
                 {mobile ? "\uD83D\uDD16" : (isBookmarked ? "\uD83D\uDD16 Saved" : "\uD83D\uDD16 Save")}
               </button>
             )}
-            <button data-testid="aegis-card-validate" disabled={item.validated} aria-label="Validate content" onClick={e => { e.stopPropagation(); onValidate(item.id); }} style={{
-              flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
-              background: item.validated ? `${colors.green[400]}18` : colors.green.bg,
-              border: `1px solid ${colors.green.border}`, borderRadius: radii.md,
-              color: colors.green[400], fontSize: t.bodySm.size, fontWeight: 600,
-              cursor: item.validated ? "default" : "pointer", opacity: item.validated ? 0.6 : 1,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-              transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
-            }}>
+            <button
+              data-testid="aegis-card-validate"
+              disabled={item.validated}
+              aria-label="Validate content"
+              onClick={e => { e.stopPropagation(); onValidate(item.id); }}
+              className={cn(
+                actionBtnBase,
+                "bg-emerald-dim border border-emerald-border text-emerald-400",
+                item.validated && "opacity-60 cursor-default",
+                !mobile && "flex-1",
+                mobile ? "p-2" : "px-3 py-2"
+              )}
+            >
               <CheckIcon />{!mobile && (item.validated ? " Validated" : isSlop && !isLarge ? " Not Slop" : " Validate")}
             </button>
             {(!isSlop || isLarge) && (
-              <button data-testid="aegis-card-flag" disabled={item.flagged} aria-label="Flag as slop" onClick={e => { e.stopPropagation(); onFlag(item.id); }} style={{
-                flex: mobile ? "none" : 1, padding: mobile ? `${space[2]}px ${space[2]}px` : `${space[2]}px ${space[3]}px`,
-                background: item.flagged ? `${colors.red[400]}18` : colors.red.bg,
-                border: `1px solid ${colors.red.border}`, borderRadius: radii.md,
-                color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600,
-                cursor: item.flagged ? "default" : "pointer", opacity: item.flagged ? 0.6 : 1,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                transition: transitions.fast, fontFamily: "inherit", minWidth: 32,
-              }}>
+              <button
+                data-testid="aegis-card-flag"
+                disabled={item.flagged}
+                aria-label="Flag as slop"
+                onClick={e => { e.stopPropagation(); onFlag(item.id); }}
+                className={cn(
+                  actionBtnBase,
+                  "bg-red-dim border border-red-border text-red-400",
+                  item.flagged && "opacity-60 cursor-default",
+                  !mobile && "flex-1",
+                  mobile ? "p-2" : "px-3 py-2"
+                )}
+              >
                 <XCloseIcon />{!mobile && (item.flagged ? " Flagged" : " Flag Slop")}
               </button>
             )}
             {onAddFilterRule && (
-              <div style={{ position: "relative" }}>
+              <div className="relative">
                 <button
                   aria-label="More actions"
                   onClick={e => { e.stopPropagation(); setMenuOpen(prev => !prev); }}
-                  style={{
-                    padding: `${space[2]}px ${space[2]}px`,
-                    background: menuOpen ? `${colors.text.muted}12` : "transparent",
-                    border: `1px solid ${colors.border.default}`, borderRadius: radii.md,
-                    color: colors.text.muted, fontSize: t.body.size, fontWeight: 700,
-                    cursor: "pointer", transition: transitions.fast, fontFamily: "inherit",
-                    lineHeight: 1, minWidth: 32, display: "flex", alignItems: "center", justifyContent: "center",
-                  }}
+                  className={cn(
+                    "p-2 border border-border rounded-md text-muted-foreground text-body font-bold cursor-pointer transition-all duration-150 font-[inherit] leading-none min-w-8 flex items-center justify-center",
+                    menuOpen && "bg-[var(--color-text-muted)]/[0.07]"
+                  )}
                 >
-                  ⋮
+                  &#x22EE;
                 </button>
                 {menuOpen && (
-                  <div style={{
-                    position: "absolute", bottom: "100%", right: 0, marginBottom: 4,
-                    background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-                    borderRadius: radii.md, boxShadow: shadows.md, zIndex: 10,
-                    minWidth: 160, overflow: "hidden",
-                  }}>
+                  <div className="absolute bottom-full right-0 mb-1 bg-navy-lighter border border-border rounded-md shadow-md z-10 min-w-[160px] overflow-hidden">
                     <button
                       onClick={e => {
                         e.stopPropagation();
                         onAddFilterRule({ field: "author", pattern: item.author });
                         setMenuOpen(false);
                       }}
-                      style={{
-                        width: "100%", padding: `${space[2]}px ${space[3]}px`,
-                        background: "transparent", border: "none", borderRadius: 0,
-                        color: colors.red[400], fontSize: t.bodySm.size, fontWeight: 600,
-                        cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                        transition: transitions.fast,
-                      }}
+                      className="w-full px-3 py-2 bg-transparent border-none rounded-none text-red-400 text-body-sm font-semibold cursor-pointer text-left font-[inherit] transition-all duration-150 hover:bg-red-dim"
                     >
                       Block {item.author}
                     </button>

@@ -1,43 +1,23 @@
 "use client";
 import React from "react";
-import { colors, radii, type as t } from "@/styles/theme";
 import type { BriefingClassification } from "@/lib/briefing/types";
 
-interface BriefingClassificationBadgeProps {
-  classification: BriefingClassification;
-}
-
-const BADGE_CONFIG: Record<Exclude<BriefingClassification, "mixed">, { label: string; color: string; bg: string; border: string }> = {
+const BADGE_CONFIG: Record<Exclude<BriefingClassification, "mixed">, { label: string; cls: string }> = {
   familiar: {
     label: "YOUR EXPERTISE",
-    color: colors.blue[400],
-    bg: "rgba(59,130,246,0.08)",
-    border: "rgba(59,130,246,0.2)",
+    cls: "text-blue-400 bg-blue-500/[0.08] border-blue-500/20",
   },
   novel: {
     label: "NEW HORIZON",
-    color: colors.purple[400],
-    bg: "rgba(139,92,246,0.08)",
-    border: "rgba(139,92,246,0.2)",
+    cls: "text-purple-400 bg-purple-500/[0.08] border-purple-500/20",
   },
 };
 
-export const BriefingClassificationBadge: React.FC<BriefingClassificationBadgeProps> = ({ classification }) => {
+export const BriefingClassificationBadge: React.FC<{ classification: BriefingClassification }> = ({ classification }) => {
   if (classification === "mixed") return null;
   const cfg = BADGE_CONFIG[classification];
   return (
-    <span style={{
-      fontSize: t.tiny.size,
-      fontWeight: t.tiny.weight,
-      letterSpacing: t.tiny.letterSpacing,
-      color: cfg.color,
-      background: cfg.bg,
-      border: `1px solid ${cfg.border}`,
-      borderRadius: radii.sm,
-      padding: "1px 6px",
-      lineHeight: 1.4,
-      whiteSpace: "nowrap",
-    }}>
+    <span className={`text-tiny font-semibold tracking-wide leading-[1.4] whitespace-nowrap rounded-sm px-1.5 py-px border ${cfg.cls}`}>
       {cfg.label}
     </span>
   );

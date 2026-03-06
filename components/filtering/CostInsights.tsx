@@ -1,6 +1,7 @@
 "use client";
 import React, { useMemo } from "react";
-import { colors, space, type as t, radii, fonts, kpiLabelStyle } from "@/styles/theme";
+import { cn } from "@/lib/utils";
+import { colors } from "@/styles/theme";
 import type { FilterPipelineStats } from "@/lib/filtering/types";
 import { getMonthlyCost } from "@/lib/filtering/costTracker";
 
@@ -9,6 +10,8 @@ interface CostInsightsProps {
   mobile?: boolean;
   expanded?: boolean;
 }
+
+const kpiLabel = "text-tiny font-bold uppercase tracking-[0.5px] text-[var(--color-text-disabled)]";
 
 export const CostInsights: React.FC<CostInsightsProps> = ({ stats, mobile, expanded = false }) => {
   const costSaved = stats.mode === "lite" && stats.totalInput > 0
@@ -23,69 +26,28 @@ export const CostInsights: React.FC<CostInsightsProps> = ({ stats, mobile, expan
   ];
 
   return (
-    <div style={{
-      background: colors.bg.surface,
-      border: `1px solid ${colors.border.default}`,
-      borderRadius: radii.lg,
-      padding: mobile ? space[4] : space[5],
-    }}>
-      <div style={{
-        fontSize: t.h3.size,
-        fontWeight: t.h3.weight,
-        color: colors.cyan[400],
-        marginBottom: space[4],
-      }}>
+    <div className={cn("bg-card border border-border rounded-lg", mobile ? "p-4" : "p-5")}>
+      <div className="text-h3 font-semibold text-cyan-400 mb-4">
         Filter Pipeline
       </div>
 
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)",
-        gap: mobile ? space[2] : space[3],
-      }}>
+      <div className={cn("grid gap-2", mobile ? "grid-cols-2 gap-2" : "grid-cols-4 gap-3")}>
         {kpis.map(([label, value, color]) => (
-          <div key={label} style={{
-            textAlign: "center",
-            padding: `${space[3]}px ${space[2]}px`,
-            background: colors.bg.raised,
-            borderRadius: radii.sm,
-          }}>
-            <div style={{ ...kpiLabelStyle, marginBottom: space[1] }}>{label}</div>
-            <div style={{
-              fontSize: mobile ? t.bodySm.size : t.body.size,
-              fontWeight: t.kpiValue.weight,
-              color,
-              fontFamily: fonts.mono,
-            }}>{value}</div>
+          <div key={label} className="text-center px-2 py-3 bg-navy-lighter rounded-sm">
+            <div className={cn(kpiLabel, "mb-1")}>{label}</div>
+            <div className={cn("font-bold font-mono", mobile ? "text-body-sm" : "text-body")} style={{ color }}>{value}</div>
           </div>
         ))}
       </div>
 
       {stats.mode === "lite" && costSaved > 0 && (
-        <div style={{
-          marginTop: space[3],
-          textAlign: "center",
-          padding: `${space[2]}px`,
-          background: colors.green.bg,
-          borderRadius: radii.sm,
-          fontSize: t.bodySm.size,
-          color: colors.green[400],
-          fontWeight: 600,
-        }}>
+        <div className="mt-3 text-center p-2 bg-green-400/[0.06] rounded-sm text-body-sm text-green-400 font-semibold">
           Estimated API savings: ~${costSaved.toFixed(3)} by using Lite mode (heuristic scoring)
         </div>
       )}
 
       {stats.serendipityCount > 0 && (
-        <div style={{
-          marginTop: space[2],
-          textAlign: "center",
-          padding: `${space[2]}px`,
-          background: "rgba(167,139,250,0.06)",
-          borderRadius: radii.sm,
-          fontSize: t.bodySm.size,
-          color: colors.purple[400],
-        }}>
+        <div className="mt-2 text-center p-2 bg-purple-400/[0.06] rounded-sm text-body-sm text-purple-400">
           {stats.serendipityCount} serendipity item{stats.serendipityCount > 1 ? "s" : ""} discovered via WoT
         </div>
       )}
@@ -106,15 +68,7 @@ function MonthlyUsage({ mobile }: { mobile?: boolean }) {
 
   if (monthly.totalDays === 0) {
     return (
-      <div style={{
-        marginTop: space[4],
-        padding: space[3],
-        background: colors.bg.raised,
-        borderRadius: radii.md,
-        textAlign: "center",
-        fontSize: t.bodySm.size,
-        color: colors.text.muted,
-      }}>
+      <div className="mt-4 p-3 bg-navy-lighter rounded-md text-center text-body-sm text-muted-foreground">
         No usage data this month yet. Keep filtering!
       </div>
     );
@@ -134,34 +88,15 @@ function MonthlyUsage({ mobile }: { mobile?: boolean }) {
   ];
 
   return (
-    <div style={{ marginTop: space[4] }}>
-      <div style={{
-        fontSize: t.h3.size,
-        fontWeight: t.h3.weight,
-        color: colors.amber[400],
-        marginBottom: space[3],
-      }}>
+    <div className="mt-4">
+      <div className="text-h3 font-semibold text-amber-400 mb-3">
         Your Usage (This Month)
       </div>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(3,1fr)",
-        gap: space[2],
-      }}>
+      <div className={cn("grid gap-2", mobile ? "grid-cols-2" : "grid-cols-3")}>
         {monthlyKpis.map(([label, value, color]) => (
-          <div key={label} style={{
-            textAlign: "center",
-            padding: `${space[3]}px ${space[2]}px`,
-            background: colors.bg.raised,
-            borderRadius: radii.sm,
-          }}>
-            <div style={{ ...kpiLabelStyle, marginBottom: space[1] }}>{label}</div>
-            <div style={{
-              fontSize: mobile ? t.bodySm.size : t.body.size,
-              fontWeight: t.kpiValue.weight,
-              color,
-              fontFamily: fonts.mono,
-            }}>{value}</div>
+          <div key={label} className="text-center px-2 py-3 bg-navy-lighter rounded-sm">
+            <div className={cn(kpiLabel, "mb-1")}>{label}</div>
+            <div className={cn("font-bold font-mono", mobile ? "text-body-sm" : "text-body")} style={{ color }}>{value}</div>
           </div>
         ))}
       </div>
@@ -180,40 +115,24 @@ function LiteVsProTable() {
   ];
 
   return (
-    <div style={{ marginTop: space[4] }}>
-      <div style={{
-        fontSize: t.h3.size,
-        fontWeight: t.h3.weight,
-        color: colors.cyan[400],
-        marginBottom: space[3],
-      }}>
+    <div className="mt-4">
+      <div className="text-h3 font-semibold text-cyan-400 mb-3">
         Lite vs Pro
       </div>
-      <div style={{
-        background: colors.bg.raised,
-        borderRadius: radii.md,
-        overflow: "hidden",
-      }}>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "2fr 1fr 1fr",
-          padding: `${space[2]}px ${space[3]}px`,
-          borderBottom: `1px solid ${colors.border.default}`,
-        }}>
-          <div style={{ ...kpiLabelStyle }}>Feature</div>
-          <div style={{ ...kpiLabelStyle, textAlign: "center", color: colors.green[400] }}>Lite</div>
-          <div style={{ ...kpiLabelStyle, textAlign: "center", color: colors.purple[400] }}>Pro</div>
+      <div className="bg-navy-lighter rounded-md overflow-hidden">
+        <div className="grid grid-cols-[2fr_1fr_1fr] px-3 py-2 border-b border-border">
+          <div className={kpiLabel}>Feature</div>
+          <div className={cn(kpiLabel, "text-center !text-green-400")}>Lite</div>
+          <div className={cn(kpiLabel, "text-center !text-purple-400")}>Pro</div>
         </div>
         {rows.map((row, i) => (
-          <div key={row.feature} style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr 1fr",
-            padding: `${space[2]}px ${space[3]}px`,
-            borderBottom: i < rows.length - 1 ? `1px solid ${colors.border.subtle}` : "none",
-          }}>
-            <div style={{ fontSize: t.bodySm.size, color: colors.text.tertiary }}>{row.feature}</div>
-            <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, textAlign: "center" }}>{row.lite}</div>
-            <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, textAlign: "center" }}>{row.pro}</div>
+          <div key={row.feature} className={cn(
+            "grid grid-cols-[2fr_1fr_1fr] px-3 py-2",
+            i < rows.length - 1 && "border-b border-[var(--color-border-subtle)]"
+          )}>
+            <div className="text-body-sm text-[var(--color-text-tertiary)]">{row.feature}</div>
+            <div className="text-body-sm text-secondary-foreground text-center">{row.lite}</div>
+            <div className="text-body-sm text-secondary-foreground text-center">{row.pro}</div>
           </div>
         ))}
       </div>
@@ -227,91 +146,62 @@ function CompetitorComparison({ mobile }: { mobile?: boolean }) {
     name: string;
     costUSD: string;
     sub: string;
-    color: string;
+    colorClass: string;
     highlight?: boolean;
   }> = [
     {
       name: "Aegis (Your Usage)",
       costUSD: `$${monthly.totalAiCostUSD.toFixed(2)}/mo`,
       sub: "Estimated AI API cost + WoT filtering",
-      color: colors.green[400],
+      colorClass: "text-green-400",
       highlight: true,
     },
     {
       name: "X Premium (est.)",
       costUSD: "~$8/mo",
       sub: "Algorithmic feed, no quality filter",
-      color: colors.sky[400],
+      colorClass: "text-sky-400",
     },
     {
       name: "News Sub (est.)",
       costUSD: "~$10/mo",
       sub: "Single source, curated editorially",
-      color: colors.orange[400],
+      colorClass: "text-orange-400",
     },
     {
       name: "Manual Curation",
       costUSD: "$0",
       sub: "~2h/day estimated time cost",
-      color: colors.red[400],
+      colorClass: "text-red-400",
     },
   ];
 
   return (
-    <div style={{ marginTop: space[4] }}>
-      <div style={{
-        fontSize: t.h3.size,
-        fontWeight: t.h3.weight,
-        color: colors.green[400],
-        marginBottom: space[3],
-      }}>
+    <div className="mt-4">
+      <div className="text-h3 font-semibold text-green-400 mb-3">
         vs Other Services (Estimates)
       </div>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: mobile ? "1fr" : "1fr 1fr",
-        gap: space[2],
-      }}>
+      <div className={cn("grid gap-2", mobile ? "grid-cols-1" : "grid-cols-2")}>
         {competitors.map(c => (
-          <div key={c.name} style={{
-            padding: `${space[3]}px ${space[4]}px`,
-            background: c.highlight ? "rgba(52,211,153,0.06)" : colors.bg.raised,
-            border: c.highlight ? `1px solid ${colors.green.border}` : `1px solid ${colors.border.subtle}`,
-            borderRadius: radii.md,
-          }}>
-            <div style={{
-              fontSize: t.bodySm.size,
-              fontWeight: 700,
-              color: c.color,
-              marginBottom: space[1],
-            }}>
+          <div key={c.name} className={cn(
+            "px-4 py-3 rounded-md border",
+            c.highlight
+              ? "bg-emerald-400/[0.06] border-green-400/15"
+              : "bg-navy-lighter border-[var(--color-border-subtle)]"
+          )}>
+            <div className={cn("text-body-sm font-bold mb-1", c.colorClass)}>
               {c.name}
             </div>
-            <div style={{
-              fontSize: t.h2.size,
-              fontWeight: t.kpiValue.weight,
-              color: colors.text.primary,
-              fontFamily: fonts.mono,
-            }}>
+            <div className="text-h2 font-bold text-foreground font-mono">
               {c.costUSD}
             </div>
-            <div style={{
-              fontSize: t.caption.size,
-              color: colors.text.muted,
-              marginTop: space[1],
-            }}>
+            <div className="text-caption text-muted-foreground mt-1">
               {c.sub}
             </div>
           </div>
         ))}
       </div>
-      <div style={{
-        marginTop: space[2],
-        fontSize: t.caption.size,
-        color: colors.text.muted,
-        textAlign: "center",
-        fontStyle: "italic",
-      }}>
+      <div className="mt-2 text-caption text-muted-foreground text-center italic">
         Competitor prices are approximate public rates. Aegis cost is your actual API usage.
       </div>
     </div>

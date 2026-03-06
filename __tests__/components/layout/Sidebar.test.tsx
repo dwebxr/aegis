@@ -128,8 +128,8 @@ describe("Sidebar", () => {
     const html = renderToStaticMarkup(
       <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
     );
-    // Active item has blue color and bold weight
-    expect(html).toContain("rgba(37,99,235,0.12)");
+    // Active item has blue color class and bold weight
+    expect(html).toContain("bg-blue-600/[0.12]");
   });
 
   it("renders description for nav items that have one", () => {

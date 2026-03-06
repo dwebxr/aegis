@@ -1,11 +1,11 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import { colors, space, type as t, radii, transitions, fonts } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
 import { usePushNotification } from "@/hooks/usePushNotification";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { NotificationToggle } from "@/components/ui/NotificationToggle";
-import { cardStyle, sectionTitle, actionBtnStyle, pillBtn } from "./styles";
+import { cardClass, sectionTitleClass, actionBtnClass, pillBtnClass } from "./styles";
 
 const LS_PUSH_FREQ_KEY = "aegis-push-frequency";
 
@@ -21,6 +21,16 @@ type PushFrequency = typeof PUSH_FREQ_OPTIONS[number]["value"];
 interface GeneralSectionProps {
   mobile?: boolean;
 }
+
+const toggleTrack = (on: boolean) => cn(
+  "relative w-10 h-[22px] rounded-[11px] border-none cursor-pointer shrink-0 transition-fast",
+  on ? "bg-cyan-500" : "bg-[var(--color-bg-raised)]"
+);
+
+const toggleThumb = (on: boolean) => cn(
+  "absolute top-[2px] w-[18px] h-[18px] rounded-full transition-fast",
+  on ? "left-5 bg-white" : "left-[2px] bg-[var(--color-text-disabled)]"
+);
 
 export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
   const { theme, setTheme } = useTheme();
@@ -64,92 +74,77 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
     });
   }, [profile.notificationPrefs, setNotificationPrefs]);
 
+  const isLight = theme === "light";
+  const d2aOn = profile.notificationPrefs?.d2aAlerts ?? false;
+
   return (
     <>
-      <div style={cardStyle(mobile)}>
-        <div style={sectionTitle}>Appearance</div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className={cardClass(mobile)}>
+        <div className={sectionTitleClass}>Appearance</div>
+        <div className="flex items-center justify-between">
           <div>
-            <div style={{ fontSize: t.body.size, fontWeight: 600, color: colors.text.secondary }}>Theme</div>
-            <div style={{ fontSize: t.caption.size, color: colors.text.muted, marginTop: 2 }}>
-              {theme === "dark" ? "Dark" : "Light"} mode
+            <div className="text-body font-semibold text-secondary-foreground">Theme</div>
+            <div className="text-caption text-muted-foreground mt-0.5">
+              {isLight ? "Light" : "Dark"} mode
             </div>
           </div>
           <button
             data-testid="aegis-settings-theme-toggle"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-            style={{
-              position: "relative",
-              width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
-              background: theme === "light" ? colors.cyan[500] : colors.bg.raised,
-              transition: transitions.fast, flexShrink: 0,
-            }}
+            onClick={() => setTheme(isLight ? "dark" : "light")}
+            aria-label={`Switch to ${isLight ? "dark" : "light"} mode`}
+            className={toggleTrack(isLight)}
           >
-            <div style={{
-              position: "absolute", top: 2, left: theme === "light" ? 20 : 2,
-              width: 18, height: 18, borderRadius: "50%",
-              background: theme === "light" ? "#fff" : colors.text.disabled,
-              transition: transitions.fast,
-            }} />
+            <div className={toggleThumb(isLight)} />
           </button>
         </div>
       </div>
 
-      <div style={cardStyle(mobile)}>
-        <div style={sectionTitle}>Push Notifications</div>
+      <div className={cardClass(mobile)}>
+        <div className={sectionTitleClass}>Push Notifications</div>
         <NotificationToggle />
         {isSubscribed && (
-          <div style={{ marginTop: space[3] }}>
-            <div style={{ fontSize: t.caption.size, fontWeight: 600, color: colors.text.muted, marginBottom: space[2] }}>
+          <div className="mt-3">
+            <div className="text-caption font-semibold text-muted-foreground mb-2">
               Frequency
             </div>
-            <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
+            <div className="flex gap-1 flex-wrap">
               {PUSH_FREQ_OPTIONS.map(opt => (
                 <button
                   key={opt.value}
                   onClick={() => handleFreqChange(opt.value)}
-                  style={pillBtn(pushFreq === opt.value)}
+                  className={pillBtnClass(pushFreq === opt.value)}
                 >
                   {opt.label}
                 </button>
               ))}
             </div>
-            <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
+            <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-normal">
               Controls how often briefing alerts are sent. &quot;Off&quot; mutes without unsubscribing.
             </div>
           </div>
         )}
         {isSubscribed && (
-          <div style={{ marginTop: space[4], borderTop: `1px solid ${colors.border.subtle}`, paddingTop: space[3] }}>
-            <div style={{ fontSize: t.caption.size, fontWeight: 600, color: colors.text.muted, marginBottom: space[2] }}>
+          <div className="mt-4 border-t border-[var(--color-border-subtle)] pt-3">
+            <div className="text-caption font-semibold text-muted-foreground mb-2">
               Notification Rules
             </div>
 
-            <div style={{ marginBottom: space[3] }}>
-              <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginBottom: space[1] }}>Alert Topics</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: space[2] }}>
+            <div className="mb-3">
+              <div className="text-tiny text-[var(--color-text-disabled)] mb-1">Alert Topics</div>
+              <div className="flex flex-wrap gap-1 mb-2">
                 {(profile.notificationPrefs?.topicAlerts ?? []).map(topic => (
-                  <span key={topic} style={{
-                    display: "inline-flex", alignItems: "center", gap: 4,
-                    fontSize: t.caption.size, padding: `1px ${space[2]}px`,
-                    background: `${colors.cyan[400]}10`, border: `1px solid ${colors.cyan[400]}20`,
-                    borderRadius: radii.pill, color: colors.cyan[400],
-                  }}>
+                  <span key={topic} className="inline-flex items-center gap-1 text-caption px-2 py-px bg-cyan-400/[0.06] border border-cyan-400/[0.12] rounded-full text-cyan-400">
                     {topic}
                     <button
                       onClick={() => handleRemoveAlertTopic(topic)}
-                      style={{
-                        background: "none", border: "none", color: colors.cyan[400],
-                        cursor: "pointer", padding: 0, fontSize: t.caption.size, lineHeight: 1,
-                      }}
+                      className="bg-transparent border-none text-cyan-400 cursor-pointer p-0 text-caption leading-none"
                     >
                       &times;
                     </button>
                   </span>
                 ))}
               </div>
-              <div style={{ display: "flex", gap: space[2] }}>
+              <div className="flex gap-2">
                 <input
                   data-testid="aegis-settings-alert-topic-input"
                   type="text"
@@ -157,27 +152,23 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
                   onChange={e => setAlertTopicInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") handleAddAlertTopic(); }}
                   placeholder="Add topic..."
-                  style={{
-                    flex: 1, minWidth: 100, padding: `${space[1]}px ${space[3]}px`,
-                    background: colors.bg.overlay, border: `1px solid ${colors.border.subtle}`,
-                    borderRadius: radii.sm, color: colors.text.primary, fontSize: t.caption.size,
-                    fontFamily: "inherit", outline: "none",
-                  }}
+                  className="flex-1 min-w-[100px] px-3 py-1 bg-[var(--color-bg-overlay)] border border-[var(--color-border-subtle)] rounded-sm text-foreground text-caption font-[inherit] outline-none"
                 />
-                <button data-testid="aegis-settings-alert-topic-add" onClick={handleAddAlertTopic} disabled={!alertTopicInput.trim()} style={{
-                  ...actionBtnStyle,
-                  opacity: alertTopicInput.trim() ? 1 : 0.4,
-                  cursor: alertTopicInput.trim() ? "pointer" : "not-allowed",
-                }}>
+                <button
+                  data-testid="aegis-settings-alert-topic-add"
+                  onClick={handleAddAlertTopic}
+                  disabled={!alertTopicInput.trim()}
+                  className={cn(actionBtnClass, !alertTopicInput.trim() && "opacity-40 cursor-not-allowed")}
+                >
                   Add
                 </button>
               </div>
             </div>
 
-            <div style={{ marginBottom: space[3] }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: t.tiny.size, color: colors.text.disabled }}>Min Score Alert</div>
-                <div style={{ fontSize: t.caption.size, fontWeight: 700, fontFamily: fonts.mono, color: colors.text.secondary }}>
+            <div className="mb-3">
+              <div className="flex justify-between items-center">
+                <div className="text-tiny text-[var(--color-text-disabled)]">Min Score Alert</div>
+                <div className="text-caption font-bold font-mono text-secondary-foreground">
                   {profile.notificationPrefs?.minScoreAlert ?? 5}/10
                 </div>
               </div>
@@ -191,38 +182,29 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
                   ...profile.notificationPrefs,
                   minScoreAlert: parseInt(e.target.value, 10),
                 })}
-                style={{ width: "100%", accentColor: colors.cyan[500], marginTop: space[1] }}
+                className="w-full mt-1"
+                style={{ accentColor: "var(--color-cyan-500, #06b6d4)" }}
               />
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="flex items-center justify-between">
               <div>
-                <div style={{ fontSize: t.tiny.size, color: colors.text.disabled }}>D2A Content Alerts</div>
-                <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: 2 }}>
+                <div className="text-tiny text-[var(--color-text-disabled)]">D2A Content Alerts</div>
+                <div className="text-tiny text-[var(--color-text-disabled)] mt-0.5">
                   Always notify for D2A agent content
                 </div>
               </div>
               <button
                 onClick={() => setNotificationPrefs({
                   ...profile.notificationPrefs,
-                  d2aAlerts: !(profile.notificationPrefs?.d2aAlerts ?? false),
+                  d2aAlerts: !d2aOn,
                 })}
-                style={{
-                  position: "relative",
-                  width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
-                  background: (profile.notificationPrefs?.d2aAlerts ?? false) ? colors.cyan[500] : colors.bg.overlay,
-                  transition: transitions.fast, flexShrink: 0,
-                }}
+                className={toggleTrack(d2aOn)}
               >
-                <div style={{
-                  position: "absolute", top: 2, left: (profile.notificationPrefs?.d2aAlerts ?? false) ? 20 : 2,
-                  width: 18, height: 18, borderRadius: "50%",
-                  background: (profile.notificationPrefs?.d2aAlerts ?? false) ? "#fff" : colors.text.disabled,
-                  transition: transitions.fast,
-                }} />
+                <div className={toggleThumb(d2aOn)} />
               </button>
             </div>
-            <div style={{ fontSize: t.tiny.size, color: colors.text.disabled, marginTop: space[2], lineHeight: t.tiny.lineHeight }}>
+            <div className="text-tiny text-[var(--color-text-disabled)] mt-2 leading-normal">
               Only send notifications for items matching these rules. Leave topics empty to match all.
             </div>
           </div>

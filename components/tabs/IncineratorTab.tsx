@@ -1,9 +1,10 @@
 "use client";
 import React from "react";
+import { cn } from "@/lib/utils";
+import { typography } from "@/lib/design";
 import { IncineratorViz } from "@/components/ui/IncineratorViz";
 import { ManualInput } from "@/components/sources/ManualInput";
 import { SignalComposer } from "@/components/ui/SignalComposer";
-import { colors, space, type as t, radii, kpiLabelStyle } from "@/styles/theme";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { PublishGateDecision } from "@/lib/reputation/publishGate";
 
@@ -20,44 +21,38 @@ interface IncineratorTabProps {
 }
 
 const STAGES = [
-  { id: "S1", name: "Heuristic Filter", activatable: true, color: colors.purple[400] },
-  { id: "S2", name: "Structural", activatable: true, color: colors.sky[400] },
-  { id: "S3", name: "LLM Score", activatable: true, color: colors.amber[400] },
-  { id: "S4", name: "Cross-Valid", activatable: false, color: colors.text.tertiary },
+  { id: "S1", name: "Heuristic Filter", activatable: true, colorClass: "text-purple-400" },
+  { id: "S2", name: "Structural", activatable: true, colorClass: "text-sky-400" },
+  { id: "S3", name: "LLM Score", activatable: true, colorClass: "text-amber-400" },
+  { id: "S4", name: "Cross-Valid", activatable: false, colorClass: "text-[var(--color-text-tertiary)]" },
 ] as const;
 
 export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, onUploadImage, nostrPubkey, icpBalance, stakingEnabled, publishGate, mobile }) => {
   return (
-    <div style={{ animation: "fadeIn .4s ease" }}>
-      <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
-        <h1 data-testid="aegis-incinerator-heading" style={{
-          fontSize: mobile ? t.display.mobileSz : t.display.size,
-          fontWeight: t.display.weight,
-          lineHeight: t.display.lineHeight,
-          letterSpacing: t.display.letterSpacing,
-          color: colors.text.primary,
-          margin: 0,
-        }}>
+    <div className="animate-fade-in">
+      <div className={mobile ? "mb-8" : "mb-12"}>
+        <h1 data-testid="aegis-incinerator-heading" className={cn(
+          typography.display,
+          "text-foreground m-0",
+          mobile && "text-[24px]"
+        )}>
           Slop Incinerator + Signal
         </h1>
-        <p style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
-          Evaluate content quality & publish your insights
+        <p className={cn("text-muted-foreground mt-2", mobile ? "text-[13px]" : "text-body")}>
+          Evaluate content quality &amp; publish your insights
         </p>
       </div>
 
       {onPublishSignal && (
-        <div style={{
-          background: `linear-gradient(135deg, rgba(124,58,237,0.04), rgba(37,99,235,0.04))`,
-          border: `1px solid rgba(124,58,237,0.15)`,
-          borderRadius: radii.xl,
-          padding: mobile ? space[5] : space[8],
-          marginBottom: mobile ? space[8] : space[12],
-        }}>
-          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.purple[400], marginBottom: space[1] }}>
+        <div className={cn(
+          "bg-gradient-to-br from-purple-600/[0.04] to-blue-600/[0.04] border border-purple-600/15 rounded-xl",
+          mobile ? "p-5 mb-8" : "p-8 mb-12"
+        )}>
+          <div className="text-h3 font-semibold text-purple-400 mb-1">
             Publish Signal
           </div>
-          <div style={{ fontSize: t.bodySm.size, color: colors.text.muted, marginBottom: space[4] }}>
-            Share your thoughts with self-evaluation. Published to Nostr relays & IC canister.
+          <div className="text-body-sm text-muted-foreground mb-4">
+            Share your thoughts with self-evaluation. Published to Nostr relays &amp; IC canister.
           </div>
           <SignalComposer
             onPublish={onPublishSignal}
@@ -74,34 +69,29 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onA
       )}
 
       {!onPublishSignal && (
-        <div style={{
-          background: colors.bg.surface,
-          border: `1px solid ${colors.border.default}`,
-          borderRadius: radii.xl,
-          padding: mobile ? space[5] : space[8],
-          marginBottom: mobile ? space[8] : space[12],
-        }}>
-          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.secondary, marginBottom: space[4] }}>Manual Analysis</div>
+        <div className={cn(
+          "bg-card border border-border rounded-xl",
+          mobile ? "p-5 mb-8" : "p-8 mb-12"
+        )}>
+          <div className="text-h3 font-semibold text-secondary-foreground mb-4">Manual Analysis</div>
           <ManualInput onAnalyze={onAnalyze} isAnalyzing={isAnalyzing} mobile={mobile} />
         </div>
       )}
 
-      <div style={{
-        background: colors.bg.surface,
-        border: `1px solid ${colors.border.default}`,
-        borderRadius: radii.xl,
-        padding: mobile ? space[5] : space[8],
-        animation: isAnalyzing ? "glowPulse 2s infinite" : "none",
-      }}>
+      <div className={cn(
+        "bg-card border border-border rounded-xl",
+        mobile ? "p-5" : "p-8",
+        isAnalyzing && "animate-glow-pulse"
+      )}>
         <IncineratorViz active={isAnalyzing} mobile={mobile} />
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4,1fr)", gap: space[2], marginTop: space[4] }}>
-          {STAGES.map(({ id, name, activatable, color }) => {
+        <div className={cn("grid gap-2 mt-4", mobile ? "grid-cols-2" : "grid-cols-4")}>
+          {STAGES.map(({ id, name, activatable, colorClass }) => {
             const active = activatable && isAnalyzing;
             return (
-              <div key={id} style={{ textAlign: "center", padding: `${space[3]}px ${space[2]}px`, background: colors.bg.raised, borderRadius: radii.sm }}>
-                <div style={{ ...kpiLabelStyle, letterSpacing: 1 }}>{id}</div>
-                <div style={{ fontSize: t.bodySm.size, color: colors.text.secondary, fontWeight: 600, marginTop: space[1] }}>{name}</div>
-                <div style={{ fontSize: t.tiny.size, fontWeight: 700, color, marginTop: space[1], textTransform: "uppercase", animation: active ? "pulse 1.5s infinite" : "none" }}>
+              <div key={id} className="text-center px-2 py-3 bg-navy-lighter rounded-sm">
+                <div className={typography.kpiLabel} style={{ letterSpacing: 1 }}>{id}</div>
+                <div className="text-body-sm text-secondary-foreground font-semibold mt-1">{name}</div>
+                <div className={cn("text-tiny font-bold mt-1 uppercase", colorClass, active && "animate-pulse")}>
                   &#x25CF; {active ? "ACTIVE" : "IDLE"}
                 </div>
               </div>

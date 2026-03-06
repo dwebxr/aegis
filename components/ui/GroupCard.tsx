@@ -1,6 +1,6 @@
 import React from "react";
+import { cn } from "@/lib/utils";
 import type { CurationGroup } from "@/lib/d2a/curationGroup";
-import { colors, space, radii, type as t, transitions, fonts } from "@/styles/theme";
 
 interface GroupCardProps {
   group: CurationGroup;
@@ -16,89 +16,53 @@ export const GroupCard: React.FC<GroupCardProps> = ({
   group, feedCount, isOwner, expanded, onToggle, onDelete, mobile,
 }) => {
   return (
-    <div style={{
-      background: colors.bg.surface,
-      border: `1px solid ${expanded ? colors.purple[400] + "33" : colors.border.default}`,
-      borderRadius: radii.lg,
-      padding: mobile ? space[3] : space[4],
-      marginBottom: space[2],
-      cursor: "pointer",
-      transition: transitions.fast,
-    }} onClick={onToggle}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div className={cn(
+      "bg-card border rounded-lg cursor-pointer transition-fast mb-2",
+      mobile ? "p-3" : "p-4",
+      expanded ? "border-purple-400/20" : "border-border"
+    )} onClick={onToggle}>
+      <div className="flex items-center justify-between">
         <div>
-          <div style={{
-            fontSize: mobile ? t.h3.mobileSz : t.h3.size,
-            fontWeight: t.h3.weight, color: colors.text.primary,
-          }}>
+          <div className={cn("font-semibold text-foreground", mobile ? "text-body" : "text-h3")}>
             {group.name}
           </div>
           {group.description && (
-            <div style={{
-              fontSize: t.bodySm.size, color: colors.text.muted,
-              marginTop: 2,
-              overflow: "hidden", textOverflow: "ellipsis",
-              whiteSpace: expanded ? "normal" : "nowrap",
-              maxWidth: expanded ? "none" : 300,
-            }}>
+            <div className={cn(
+              "text-body-sm text-muted-foreground mt-0.5 overflow-hidden text-ellipsis",
+              expanded ? "whitespace-normal" : "whitespace-nowrap max-w-[300px]"
+            )}>
               {group.description}
             </div>
           )}
         </div>
 
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{
-            fontSize: t.h3.size, fontWeight: 700,
-            fontFamily: fonts.mono, color: colors.purple[400],
-          }}>
+        <div className="text-right shrink-0">
+          <div className="text-h3 font-bold font-mono text-purple-400">
             {feedCount}
           </div>
-          <div style={{ fontSize: 9, color: colors.text.muted, textTransform: "uppercase" }}>Items</div>
+          <div className="text-[9px] text-muted-foreground uppercase">Items</div>
         </div>
       </div>
 
       {/* Tags and meta */}
-      <div style={{ display: "flex", gap: space[2], marginTop: space[2], flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{
-          fontSize: t.caption.size, color: colors.text.disabled,
-          background: colors.bg.raised, padding: `1px ${space[2]}px`,
-          borderRadius: radii.sm,
-        }}>
+      <div className="flex gap-2 mt-2 flex-wrap items-center">
+        <span className="text-caption text-[var(--color-text-disabled)] bg-navy-lighter px-2 py-px rounded-sm">
           {group.members.length} member{group.members.length !== 1 ? "s" : ""}
         </span>
         {group.topics.map(tp => (
-          <span key={tp} style={{
-            fontSize: t.caption.size,
-            padding: `1px ${space[2]}px`,
-            background: `${colors.cyan[400]}10`,
-            border: `1px solid ${colors.cyan[400]}20`,
-            borderRadius: radii.pill,
-            color: colors.cyan[400],
-          }}>
+          <span key={tp} className="text-caption px-2 py-px bg-cyan-400/[0.06] border border-cyan-400/[0.12] rounded-full text-cyan-400">
             {tp}
           </span>
         ))}
         {isOwner && (
-          <span style={{
-            fontSize: 9, fontWeight: 700,
-            padding: "1px 6px", borderRadius: radii.pill,
-            background: "rgba(167,139,250,0.12)",
-            color: colors.purple[400],
-            textTransform: "uppercase",
-          }}>
+          <span className="text-[9px] font-bold px-1.5 py-px rounded-full bg-purple-400/[0.12] text-purple-400 uppercase">
             Owner
           </span>
         )}
         {isOwner && onDelete && (
           <button
             onClick={e => { e.stopPropagation(); onDelete(); }}
-            style={{
-              background: "none", border: `1px solid ${colors.red[400]}33`,
-              borderRadius: radii.sm, padding: `1px ${space[2]}px`,
-              fontSize: t.caption.size, color: colors.red[400],
-              cursor: "pointer", fontFamily: "inherit",
-              transition: transitions.fast,
-            }}
+            className="bg-transparent border border-red-400/20 rounded-sm px-2 py-px text-caption text-red-400 cursor-pointer font-[inherit] transition-fast"
           >
             Delete
           </button>

@@ -99,7 +99,8 @@ describe("BriefingTab — Discovery source links", () => {
     );
 
     expect(html).not.toContain("javascript:");
-    expect(html).not.toContain("<a ");
+    // No article-level links (Chrome extension link is OK)
+    expect(html).not.toMatch(/<a [^>]*href="(?!https:\/\/chromewebstore\.google\.com)/);
   });
 
   it("does NOT render link for mixed-case JavaScript: protocol", () => {
@@ -122,7 +123,8 @@ describe("BriefingTab — Discovery source links", () => {
     );
 
     expect(html).not.toContain("JavaScript:");
-    expect(html).not.toContain("<a ");
+    // No article-level links (Chrome extension link is OK)
+    expect(html).not.toMatch(/<a [^>]*href="(?!https:\/\/chromewebstore\.google\.com)/);
   });
 
   it("does NOT render link for data: protocol", () => {
@@ -145,7 +147,8 @@ describe("BriefingTab — Discovery source links", () => {
     );
 
     expect(html).not.toContain("data:text");
-    expect(html).not.toContain("<a ");
+    // No article-level links (Chrome extension link is OK)
+    expect(html).not.toMatch(/<a [^>]*href="(?!https:\/\/chromewebstore\.google\.com)/);
   });
 
   it("renders link for http:// URL", () => {
@@ -190,8 +193,8 @@ describe("BriefingTab — Discovery source links", () => {
       />,
     );
 
-    // Should have the discovery reason but no <a> link
+    // Should have the discovery reason but no article-level <a> link
     expect(html).toContain("No URL");
-    expect(html).not.toMatch(/<a [^>]*href/);
+    expect(html).not.toMatch(/<a [^>]*href="(?!https:\/\/chromewebstore\.google\.com)/);
   });
 });

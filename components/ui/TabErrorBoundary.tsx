@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import * as Sentry from "@sentry/nextjs";
-import { colors, space, type as t, radii, fonts } from "@/styles/theme";
 
 interface Props {
   tabName: string;
@@ -27,34 +26,16 @@ export class TabErrorBoundary extends React.Component<Props, State> {
     if (!this.state.error) return this.props.children;
 
     return (
-      <div style={{
-        padding: space[6], textAlign: "center",
-        display: "flex", flexDirection: "column", alignItems: "center", gap: space[4],
-        minHeight: 200,
-      }}>
-        <div style={{
-          fontSize: t.h2.size, fontWeight: t.h2.weight, color: colors.red[400],
-        }}>
+      <div className="p-6 text-center flex flex-col items-center gap-4 min-h-[200px]">
+        <div className="text-h2 font-bold text-red-400">
           {this.props.tabName} encountered an error
         </div>
-        <pre style={{
-          background: colors.bg.raised, border: `1px solid ${colors.border.default}`,
-          borderRadius: radii.md, padding: space[4],
-          fontSize: t.caption.size, fontFamily: fonts.mono,
-          color: colors.text.muted, maxWidth: 480, overflow: "auto",
-          whiteSpace: "pre-wrap", wordBreak: "break-word",
-          textAlign: "left",
-        }}>
+        <pre className="bg-navy-lighter border border-border rounded-md p-4 text-caption font-mono text-muted-foreground max-w-[480px] overflow-auto whitespace-pre-wrap break-words text-left">
           {this.state.error.message}
         </pre>
         <button
           onClick={() => this.setState({ error: null })}
-          style={{
-            padding: `${space[2]}px ${space[5]}px`,
-            background: colors.blue[600], border: "none", borderRadius: radii.md,
-            color: "#fff", cursor: "pointer", fontSize: t.body.size, fontWeight: 600,
-            fontFamily: "inherit",
-          }}
+          className="px-5 py-2 bg-blue-600 border-none rounded-md text-white cursor-pointer text-body font-semibold font-[inherit]"
         >
           Retry
         </button>

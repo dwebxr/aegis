@@ -119,8 +119,8 @@ describe("MobileNav", () => {
     const html = renderToStaticMarkup(
       <MobileNav navItems={navItems} activeTab="briefing" onTabChange={jest.fn()} />,
     );
-    // Active tab has active color (hex in SSR output)
-    expect(html).toContain("#60a5fa");
+    // Active tab has Tailwind blue color class
+    expect(html).toContain("text-blue-400");
   });
 
   it("highlights active footer button (settings)", () => {
@@ -133,8 +133,8 @@ describe("MobileNav", () => {
     const html = renderToStaticMarkup(
       <MobileNav navItems={navItems} activeTab="settings" onTabChange={jest.fn()} />,
     );
-    // Settings button should have active background
-    expect(html).toContain("rgba(37,99,235,0.12)");
+    // Settings button should have active background class
+    expect(html).toContain("bg-blue-600/[0.12]");
   });
 
   it("renders with empty nav items", () => {

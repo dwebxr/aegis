@@ -242,7 +242,7 @@ describe("ContentCard — data-source-url attribute", () => {
     const html = renderToStaticMarkup(
       <ContentCard item={item} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} focused />
     );
-    expect(html).toContain("outline:");
+    expect(html).toContain("outline-2 outline-cyan-400");
   });
 
   it("has role=button and tabIndex=0 on card root", () => {

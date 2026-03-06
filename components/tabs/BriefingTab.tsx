@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
+import { typography } from "@/lib/design";
 import { ContentCard } from "@/components/ui/ContentCard";
 import { ShareBriefingModal } from "@/components/ui/ShareBriefingModal";
 import { ShareIcon } from "@/components/icons";
@@ -8,7 +10,7 @@ import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificationBadge";
 import { useContent } from "@/contexts/ContentContext";
-import { colors, space, fonts, type as t, radii, transitions } from "@/styles/theme";
+import { colors } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
@@ -41,14 +43,12 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
 
-  // Deduplicate discoveries against priority + serendipity items
   const dedupedDiscoveries = useMemo(() => {
     const briefingIds = new Set(briefing.priority.map(b => b.item.id));
     if (briefing.serendipity) briefingIds.add(briefing.serendipity.item.id);
     return discoveries.filter(d => !briefingIds.has(d.item.id));
   }, [discoveries, briefing.priority, briefing.serendipity]);
 
-  // Stable key: only changes when the actual briefing composition changes
   const briefingSyncKey = useMemo(
     () => briefing.priority.map(b => b.item.id).join(",") + "|" + (briefing.serendipity?.item.id ?? ""),
     [briefing.priority, briefing.serendipity],
@@ -107,44 +107,28 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const canShare = nostrKeys && briefing.priority.length > 0;
 
   return (
-    <div style={{ animation: "fadeIn .4s ease" }}>
-      <div style={{ marginBottom: mobile ? space[8] : space[12] }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h1 data-testid="aegis-briefing-heading" style={{
-            fontSize: mobile ? t.display.mobileSz : t.display.size,
-            fontWeight: t.display.weight,
-            lineHeight: t.display.lineHeight,
-            letterSpacing: t.display.letterSpacing,
-            color: colors.text.primary,
-            margin: 0,
-          }}>
+    <div className="animate-fade-in">
+      {/* Header */}
+      <div className={mobile ? "mb-8" : "mb-12"}>
+        <div className="flex items-center justify-between">
+          <h1 data-testid="aegis-briefing-heading" className={cn(
+            typography.display,
+            "text-foreground m-0",
+            mobile && "text-[24px]"
+          )}>
             Your Briefing
           </h1>
           {canShare && (
             <button
               onClick={() => setShowShareModal(true)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: space[2],
-                padding: `${space[2]}px ${space[4]}px`,
-                background: colors.bg.surface,
-                border: `1px solid ${colors.border.default}`,
-                borderRadius: radii.md,
-                color: colors.purple[400],
-                fontSize: t.bodySm.size,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                transition: transitions.fast,
-              }}
+              className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-md text-purple-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-all duration-150 hover:border-purple-400/25 hover:shadow-glow-purple"
             >
               <ShareIcon s={16} />
               Share
             </button>
           )}
         </div>
-        <p data-testid="aegis-briefing-insight-count" style={{ fontSize: mobile ? t.body.mobileSz : t.body.size, color: colors.text.muted, marginTop: space[2] }}>
+        <p data-testid="aegis-briefing-insight-count" className={cn("text-muted-foreground mt-2", mobile ? "text-[13px]" : "text-body")}>
           {insightCount} insights selected from {briefing.totalItems} items
         </p>
       </div>
@@ -159,23 +143,19 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         />
       )}
 
+      {/* Main content: Loading / Priority List / Empty */}
       {isLoading ? (
-        <div data-testid="aegis-briefing-loading" style={{
-          textAlign: "center", padding: space[10],
-          color: colors.text.muted, background: colors.bg.surface,
-          borderRadius: radii.lg, border: `1px solid ${colors.border.default}`,
-          marginBottom: space[4],
-        }}>
-          <div style={{ fontSize: 32, marginBottom: space[3], animation: "pulse 2s infinite" }}>&#x1F6E1;</div>
-          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>Loading briefing...</div>
-          <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Syncing from Internet Computer</div>
+        <div data-testid="aegis-briefing-loading" className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
+          <div className="text-[32px] mb-3 animate-pulse">&#x1F6E1;</div>
+          <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">Loading briefing...</div>
+          <div className="text-body-sm mt-2">Syncing from Internet Computer</div>
         </div>
       ) : briefing.priority.length > 0 ? (
         <div data-testid="aegis-briefing-priority-list">
           {briefing.priority.map((b, i) => (
             <div key={b.item.id} style={{ animation: `slideUp .3s ease ${i * 0.06}s both` }}>
               {b.classification !== "mixed" && (
-                <div style={{ marginBottom: space[1], display: "flex", alignItems: "center" }}>
+                <div className="mb-1 flex items-center">
                   <BriefingClassificationBadge classification={b.classification} />
                 </div>
               )}
@@ -193,26 +173,17 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           ))}
         </div>
       ) : (
-        <div data-testid="aegis-briefing-empty" style={{
-          textAlign: "center",
-          padding: space[10],
-          color: colors.text.muted,
-          background: colors.bg.surface,
-          borderRadius: radii.lg,
-          border: `1px solid ${colors.border.default}`,
-          marginBottom: space[4],
-        }}>
-          <div style={{ fontSize: 32, marginBottom: space[3] }}>&#x1F50D;</div>
-          <div style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>No priority items yet</div>
-          <div style={{ fontSize: t.bodySm.size, marginTop: space[2] }}>Evaluate content and validate quality items to build your personalized briefing</div>
+        <div data-testid="aegis-briefing-empty" className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
+          <div className="text-[32px] mb-3">&#x1F50D;</div>
+          <div className="text-h3 font-semibold text-[var(--color-text-tertiary)]">No priority items yet</div>
+          <div className="text-body-sm mt-2">Evaluate content and validate quality items to build your personalized briefing</div>
           {onTabChange && (
-            <div style={{ marginTop: space[4] }}>
-              <button data-testid="aegis-briefing-start-eval" onClick={() => onTabChange("incinerator")} style={{
-                padding: `${space[2]}px ${space[4]}px`, background: colors.bg.raised,
-                border: `1px solid ${colors.border.emphasis}`, borderRadius: radii.md,
-                color: colors.purple[400], fontSize: t.bodySm.size, fontWeight: 600,
-                cursor: "pointer", fontFamily: "inherit", transition: transitions.fast,
-              }}>
+            <div className="mt-4">
+              <button
+                data-testid="aegis-briefing-start-eval"
+                onClick={() => onTabChange("incinerator")}
+                className="px-4 py-2 bg-navy-lighter border border-[var(--color-border-emphasis)] rounded-md text-purple-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-all duration-150 hover:bg-navy-hover"
+              >
                 Start Evaluating &rarr;
               </button>
             </div>
@@ -220,49 +191,43 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         </div>
       )}
 
+      {/* AI Digest */}
       {briefing.priority.length > 0 && getUserApiKey() && (
-        <div style={{
-          marginTop: space[4], marginBottom: space[4],
-          padding: `${space[4]}px ${space[5]}px`,
-          background: colors.bg.surface,
-          border: `1px solid ${colors.border.default}`,
-          borderRadius: radii.lg,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: space[3] }}>
-            <span style={{ fontSize: t.h3.size, fontWeight: t.h3.weight, color: colors.text.tertiary }}>
+        <div className="my-4 px-5 py-4 bg-card border border-border rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-h3 font-semibold text-[var(--color-text-tertiary)]">
               Today&apos;s Digest
             </span>
             {!digest && (
-              <button onClick={generateDigest} disabled={digestLoading} style={{
-                padding: `${space[1]}px ${space[3]}px`,
-                background: digestLoading ? colors.bg.overlay : `${colors.cyan[500]}18`,
-                border: `1px solid ${digestLoading ? colors.border.subtle : `${colors.cyan[500]}33`}`,
-                borderRadius: radii.md,
-                color: digestLoading ? colors.text.disabled : colors.cyan[400],
-                fontSize: t.caption.size, fontWeight: 600,
-                cursor: digestLoading ? "not-allowed" : "pointer",
-                fontFamily: "inherit", transition: transitions.fast,
-              }}>
+              <button
+                onClick={generateDigest}
+                disabled={digestLoading}
+                className={cn(
+                  "px-3 py-1 rounded-md text-caption font-semibold cursor-pointer font-[inherit] transition-all duration-150",
+                  digestLoading
+                    ? "bg-[var(--color-bg-overlay)] border border-[var(--color-border-subtle)] text-[var(--color-text-disabled)] cursor-not-allowed"
+                    : "bg-cyan-500/[0.09] border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/[0.15]"
+                )}
+              >
                 {digestLoading ? "Generating..." : "Generate Digest"}
               </button>
             )}
           </div>
           {digest ? (
-            <p style={{ fontSize: t.body.size, color: colors.text.secondary, lineHeight: 1.6, margin: 0 }}>
-              {digest}
-            </p>
+            <p className="text-body text-secondary-foreground leading-body m-0">{digest}</p>
           ) : digestError ? (
-            <p style={{ fontSize: t.caption.size, color: colors.red[400], margin: 0 }}>{digestError}</p>
+            <p className="text-caption text-red-400 m-0">{digestError}</p>
           ) : (
-            <p style={{ fontSize: t.caption.size, color: colors.text.disabled, margin: 0 }}>
+            <p className="text-caption text-[var(--color-text-disabled)] m-0">
               AI-generated summary of your top priority articles.
             </p>
           )}
         </div>
       )}
 
+      {/* Serendipity */}
       {briefing.serendipity && (
-        <div style={{ marginTop: space[2], animation: `slideUp .3s ease ${briefing.priority.length * 0.06 + 0.1}s both` }}>
+        <div className="mt-2" style={{ animation: `slideUp .3s ease ${briefing.priority.length * 0.06 + 0.1}s both` }}>
           <ContentCard
             item={briefing.serendipity.item}
             variant="serendipity"
@@ -275,29 +240,13 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         </div>
       )}
 
+      {/* Discoveries */}
       {dedupedDiscoveries.length > 0 && (
-        <div style={{ marginTop: space[4] }}>
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: space[2],
-            marginBottom: space[3],
-          }}>
-            <span style={{ fontSize: 18 }}>&#x1F52D;</span>
-            <span style={{
-              fontSize: t.h3.size,
-              fontWeight: t.h3.weight,
-              color: colors.purple[400],
-            }}>
-              Discoveries
-            </span>
-            <span style={{
-              fontSize: t.caption.size,
-              color: colors.text.muted,
-              background: colors.bg.raised,
-              padding: "2px 8px",
-              borderRadius: radii.sm,
-            }}>
+        <div className="mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">&#x1F52D;</span>
+            <span className="text-h3 font-semibold text-purple-400">Discoveries</span>
+            <span className="text-caption text-muted-foreground bg-navy-lighter px-2 py-0.5 rounded-sm">
               {dedupedDiscoveries.length}
             </span>
             <InfoTooltip
@@ -307,90 +256,50 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           </div>
 
           {dedupedDiscoveries.map((d, i) => (
-            <div key={d.item.id} style={{
-              animation: `slideUp .3s ease ${(briefing.priority.length + 1 + i) * 0.06}s both`,
-              marginBottom: space[2],
-            }}>
-              <div style={{
-                background: "linear-gradient(135deg, rgba(124,58,237,0.06), rgba(37,99,235,0.04))",
-                border: "1px solid rgba(124,58,237,0.15)",
-                borderRadius: radii.lg,
-                padding: mobile ? `${space[4]}px` : `${space[4]}px ${space[5]}px`,
-                position: "relative",
-                overflow: "hidden",
-              }}>
-                <div style={{ position: "absolute", top: space[2], right: space[2] }}>
+            <div
+              key={d.item.id}
+              className="mb-2"
+              style={{ animation: `slideUp .3s ease ${(briefing.priority.length + 1 + i) * 0.06}s both` }}
+            >
+              <div className={cn(
+                "bg-gradient-to-br from-purple-600/[0.06] to-blue-600/[0.04] border border-purple-600/15 rounded-lg relative overflow-hidden",
+                mobile ? "p-4" : "px-5 py-4"
+              )}>
+                <div className="absolute top-2 right-2">
                   <SerendipityBadge discoveryType={d.discoveryType} mobile={mobile} />
                 </div>
 
-                <div style={{
-                  display: "flex", alignItems: "center", gap: space[2],
-                  paddingBottom: space[2],
-                  borderBottom: `1px solid ${colors.border.subtle}`,
-                  marginBottom: space[2],
-                  paddingRight: mobile ? 40 : 130,
-                }}>
+                <div
+                  className="flex items-center gap-2 pb-2 border-b border-[var(--color-border-subtle)] mb-2"
+                  style={{ paddingRight: mobile ? 40 : 130 }}
+                >
                   {d.item.avatar && d.item.avatar.startsWith("http") ? (
                     /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
-                    <img src={d.item.avatar} alt="" loading="lazy" style={{
-                      width: 20, height: 20, borderRadius: "50%", objectFit: "cover",
-                      border: `1px solid ${colors.border.default}`,
-                    }} />
+                    <img src={d.item.avatar} alt="" loading="lazy" className="size-5 rounded-full object-cover border border-border" />
                   ) : (
-                    <span style={{ fontSize: 16 }}>{d.item.avatar}</span>
+                    <span className="text-base">{d.item.avatar}</span>
                   )}
-                  <span style={{
-                    fontWeight: 700, color: colors.text.secondary,
-                    fontSize: t.body.size, fontFamily: fonts.mono,
-                  }}>
-                    {d.item.author}
-                  </span>
-                  <span style={{
-                    fontSize: t.caption.size, color: colors.text.muted,
-                    background: colors.bg.raised, padding: "2px 8px", borderRadius: radii.sm,
-                  }}>
+                  <span className="font-bold text-secondary-foreground text-body font-mono">{d.item.author}</span>
+                  <span className="text-caption text-muted-foreground bg-navy-lighter px-2 py-0.5 rounded-sm">
                     {d.item.platform || d.item.source}
                   </span>
                 </div>
 
-                <p style={{
-                  color: colors.purple[300],
-                  fontSize: mobile ? t.body.mobileSz : t.body.size,
-                  lineHeight: t.body.lineHeight,
-                  margin: 0,
-                  wordBreak: "break-word",
-                }}>
+                <p className={cn("text-purple-300 leading-body m-0 break-words", mobile ? "text-[13px]" : "text-body")}>
                   {d.item.text}
                 </p>
 
-                <div style={{
-                  marginTop: space[2],
-                  fontSize: t.caption.size,
-                  color: colors.purple[400],
-                  fontStyle: "italic",
-                }}>
-                  {d.reason}
-                </div>
+                <div className="mt-2 text-caption text-purple-400 italic">{d.reason}</div>
 
                 {d.item.sourceUrl && /^https?:\/\//i.test(d.item.sourceUrl) && (
                   <a
                     href={d.item.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      marginTop: space[2],
-                      fontSize: t.caption.size,
-                      color: colors.cyan[400],
-                      textDecoration: "none",
-                      fontWeight: 600,
-                      wordBreak: "break-all",
-                    }}
+                    className="inline-flex items-center gap-1 mt-2 text-caption text-cyan-400 no-underline font-semibold break-all hover:underline"
                   >
                     {(() => { try { return new URL(d.item.sourceUrl).hostname; } catch { return d.item.sourceUrl; } })()}
-                    <span style={{ fontSize: 10 }}>{"\u2197"}</span>
+                    <span className="text-[10px]">{"\u2197"}</span>
                   </a>
                 )}
               </div>
@@ -399,39 +308,23 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         </div>
       )}
 
+      {/* Filtered Out */}
       {briefing.filteredOut.length > 0 && (
-        <div style={{ marginTop: space[5] }}>
+        <div className="mt-5">
           <button
             data-testid="aegis-briefing-filtered-toggle"
             onClick={() => setShowFiltered(!showFiltered)}
             aria-expanded={showFiltered}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: space[2],
-              padding: `${space[3]}px ${space[4]}px`,
-              background: colors.bg.surface,
-              border: `1px solid ${colors.border.default}`,
-              borderRadius: radii.md,
-              color: colors.text.muted,
-              fontSize: t.bodySm.size,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: transitions.normal,
-              fontFamily: "inherit",
-            }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer transition-all duration-250 font-[inherit] hover:border-[var(--color-border-emphasis)]"
           >
-            <span style={{ transform: showFiltered ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .2s", display: "inline-block" }}>
+            <span className={cn("inline-block transition-transform duration-200", showFiltered && "rotate-180")}>
               &#x25BC;
             </span>
             Filtered Out ({briefing.filteredOut.length} items)
           </button>
 
-
           {showFiltered && (
-            <div style={{ marginTop: space[3] }}>
+            <div className="mt-3">
               {briefing.filteredOut.map((it, i) => (
                 <div key={it.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
                   <ContentCard
@@ -448,6 +341,22 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           )}
         </div>
       )}
+
+      {/* Chrome Extension CTA */}
+      <div className="mt-6 px-4 py-3 bg-card border border-border rounded-lg flex items-center gap-3">
+        <span className="text-lg shrink-0">&#x1F9E9;</span>
+        <span className="text-body-sm text-muted-foreground flex-1">
+          Send any page to Aegis directly from Chrome
+        </span>
+        <a
+          href="https://chromewebstore.google.com/detail/aegis-score/pnnpkepiojfpkppjpoimolkamflhbjhh"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-caption font-semibold text-cyan-400 no-underline whitespace-nowrap shrink-0 hover:underline"
+        >
+          Aegis Score &rarr;
+        </a>
+      </div>
     </div>
   );
 };

@@ -158,7 +158,7 @@ describe("NostrAccountLink", () => {
     const html = renderToStaticMarkup(
       <NostrAccountLink onLinkChange={noop} />
     );
-    expect(html).toContain("JetBrains Mono");
+    expect(html).toContain("font-mono");
   });
 
   it("renders green status dot when linked", () => {
@@ -172,8 +172,8 @@ describe("NostrAccountLink", () => {
     const html = renderToStaticMarkup(
       <NostrAccountLink onLinkChange={noop} />
     );
-    // Green status dot (colors.green[400] = #34d399)
-    expect(html).toContain("#34d399");
+    // Green status dot (Tailwind class bg-green-400)
+    expect(html).toContain("bg-green-400");
   });
 
   it("follow count appears twice in linked state (status + detail)", () => {

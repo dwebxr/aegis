@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { colors, space, type as t, radii, transitions } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 import type { ContentItem } from "@/lib/types/content";
 import { GeneralSection } from "@/components/settings/GeneralSection";
@@ -44,23 +44,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   return (
     <div>
-      <div style={{ marginBottom: mobile ? space[3] : space[4] }}>
-        <h1 data-testid="aegis-settings-heading" style={{ fontSize: mobile ? t.h2.size : t.h1.size, fontWeight: 800, color: colors.text.primary, margin: 0, letterSpacing: -0.5 }}>
+      <div className={mobile ? "mb-3" : "mb-4"}>
+        <h1 data-testid="aegis-settings-heading" className={cn(
+          "font-[800] text-foreground m-0 tracking-tight",
+          mobile ? "text-[18px]" : "text-h1"
+        )}>
           Settings
         </h1>
-        <p style={{ fontSize: t.body.mobileSz, color: colors.text.muted, margin: `${space[1]}px 0 0` }}>
-          Configure your agent, feeds & account
+        <p className="text-[13px] text-muted-foreground mt-1 mb-0">
+          Configure your agent, feeds &amp; account
         </p>
       </div>
 
-      <div style={{
-        display: "flex", gap: space[1],
-        background: colors.bg.raised, borderRadius: radii.md,
-        padding: space[1], border: `1px solid ${colors.border.default}`,
-        marginBottom: mobile ? space[3] : space[4],
-        overflowX: "auto",
-        WebkitOverflowScrolling: "touch",
-      }}>
+      <div className={cn(
+        "flex gap-1 bg-navy-lighter rounded-md p-1 border border-border overflow-x-auto",
+        mobile ? "mb-3" : "mb-4"
+      )} style={{ WebkitOverflowScrolling: "touch" }}>
         {SUB_TABS.map(tab => {
           const active = activeTab === tab.id;
           return (
@@ -68,20 +67,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               key={tab.id}
               data-testid={`settings-tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: `${space[2]}px ${space[3]}px`,
-                background: active ? colors.bg.surface : "transparent",
-                border: active ? `1px solid ${colors.border.emphasis}` : "1px solid transparent",
-                borderRadius: radii.sm,
-                color: active ? colors.text.primary : colors.text.muted,
-                fontSize: t.bodySm.size,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                transition: transitions.fast,
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}
+              className={cn(
+                "px-3 py-2 rounded-sm text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast whitespace-nowrap shrink-0",
+                active
+                  ? "bg-card border border-[var(--color-border-emphasis)] text-foreground"
+                  : "bg-transparent border border-transparent text-muted-foreground"
+              )}
             >
               {tab.label}
             </button>

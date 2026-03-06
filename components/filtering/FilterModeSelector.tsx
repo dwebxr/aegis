@@ -1,12 +1,12 @@
 "use client";
 import React, { useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { useFilterMode } from "@/contexts/FilterModeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { getUserApiKey } from "@/lib/apiKey/storage";
-import { colors, space, type as t, radii, transitions } from "@/styles/theme";
 
 interface FilterModeSelectorProps {
   mobile?: boolean;
@@ -32,14 +32,7 @@ export const FilterModeSelector: React.FC<FilterModeSelectorProps> = ({ mobile }
   }, [filterMode, isAuthenticated, hasAIScoring, setFilterMode]);
 
   return (
-    <div style={{
-      display: "flex",
-      gap: space[1],
-      background: colors.bg.raised,
-      borderRadius: radii.md,
-      padding: space[1],
-      border: `1px solid ${colors.border.default}`,
-    }}>
+    <div className="flex gap-1 bg-[var(--color-bg-raised)] rounded-md p-1 border border-border">
       {MODES.map(m => {
         const active = filterMode === m.key;
         const locked = m.key === "pro" && (!isAuthenticated || !hasAIScoring);
@@ -49,25 +42,18 @@ export const FilterModeSelector: React.FC<FilterModeSelectorProps> = ({ mobile }
             key={m.key}
             onClick={() => !locked && setFilterMode(m.key)}
             disabled={locked}
-            style={{
-              flex: 1,
-              padding: `${space[2]}px ${space[3]}px`,
-              background: active ? colors.bg.surface : "transparent",
-              border: active ? `1px solid ${colors.border.emphasis}` : "1px solid transparent",
-              borderRadius: radii.sm,
-              color: locked ? colors.text.disabled : active ? colors.text.primary : colors.text.muted,
-              fontSize: t.bodySm.size,
-              fontWeight: 600,
-              cursor: locked ? "not-allowed" : "pointer",
-              fontFamily: "inherit",
-              transition: transitions.fast,
-              textAlign: "center",
-              opacity: locked ? 0.5 : 1,
-            }}
+            className={cn(
+              "flex-1 px-3 py-2 rounded-sm text-body-sm font-semibold font-[inherit] transition-fast text-center",
+              active
+                ? "bg-card border border-[var(--color-border-emphasis)] text-foreground"
+                : "bg-transparent border border-transparent text-muted-foreground",
+              locked && "text-[var(--color-text-disabled)] cursor-not-allowed opacity-50",
+              !locked && "cursor-pointer"
+            )}
           >
             <span>{m.label}</span>
             {!mobile && (
-              <div style={{ fontSize: t.caption.size, color: colors.text.disabled, marginTop: 2 }}>
+              <div className="text-caption text-[var(--color-text-disabled)] mt-0.5">
                 {locked ? lockReason : m.sub}
               </div>
             )}

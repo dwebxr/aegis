@@ -1,6 +1,7 @@
 "use client";
-import React, { useState } from "react";
-import { fonts, colors, space, type as t, shadows, radii, transitions, kpiLabelStyle } from "@/styles/theme";
+import React from "react";
+import { cn } from "@/lib/utils";
+import { typography } from "@/lib/design";
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -12,54 +13,41 @@ interface StatCardProps {
 }
 
 export const StatCard: React.FC<StatCardProps> = ({ icon, label, value, sub, color, mobile }) => {
-  const [hovered, setHovered] = useState(false);
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: colors.bg.surface,
-        border: `1px solid ${colors.border.default}`,
-        borderLeft: `3px solid ${color}`,
-        borderRadius: radii.lg,
-        padding: mobile ? `${space[4]}px ${space[4]}px` : `${space[5]}px ${space[6]}px`,
-        position: "relative",
-        overflow: "hidden",
-        transform: hovered ? "translateY(-2px)" : "translateY(0)",
-        boxShadow: hovered ? shadows.md : "none",
-        transition: transitions.normal,
-      }}
+      className={cn(
+        "group relative overflow-hidden rounded-lg bg-card border border-border",
+        "transition-all duration-250 ease-out",
+        "hover:-translate-y-0.5 hover:shadow-md",
+        mobile ? "px-4 py-4" : "px-6 py-5"
+      )}
+      style={{ borderLeft: `3px solid ${color}` }}
     >
-      <div style={{
-        position: "absolute", top: -20, right: -20,
-        width: 80, height: 80, borderRadius: "50%",
-        background: `radial-gradient(circle, ${color}12, transparent 70%)`,
-      }} />
+      {/* Radial glow decoration */}
+      <div
+        className="absolute -top-5 -right-5 size-20 rounded-full"
+        style={{ background: `radial-gradient(circle, ${color}12, transparent 70%)` }}
+      />
 
-      <div style={{ display: "flex", alignItems: "center", gap: space[2], marginBottom: space[3] }}>
-        <div style={{
-          width: 28, height: 28, borderRadius: radii.sm,
-          background: `${color}15`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color,
-        }}>
+      <div className="flex items-center gap-2 mb-3">
+        <div
+          className="size-7 rounded-sm flex items-center justify-center"
+          style={{ background: `${color}15`, color }}
+        >
           {icon}
         </div>
-        <span style={kpiLabelStyle}>{label}</span>
+        <span className={typography.kpiLabel}>{label}</span>
       </div>
 
-      <div style={{
-        fontSize: mobile ? t.kpiValue.mobileSz : t.kpiValue.size,
-        fontWeight: t.kpiValue.weight,
-        lineHeight: t.kpiValue.lineHeight,
-        color: colors.text.primary,
-        fontFamily: fonts.mono,
-      }}>
+      <div className={cn(
+        "font-mono font-extrabold text-foreground leading-[1.1]",
+        mobile ? "text-[22px]" : "text-kpi"
+      )}>
         {value}
       </div>
 
       {sub && (
-        <div style={{ fontSize: t.caption.size, fontWeight: t.kpiSub.weight, color: colors.text.disabled, marginTop: space[1] }}>
+        <div className="text-caption font-medium text-[var(--color-text-disabled)] mt-1">
           {sub}
         </div>
       )}

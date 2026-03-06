@@ -1,29 +1,21 @@
 "use client";
 import React, { useRef, useState, useEffect } from "react";
-import { colors } from "@/styles/theme";
+import { cn } from "@/lib/utils";
 
-// ── Configuration ──────────────────────────────────────────────
-const THRESHOLD = 72;    // px of pull needed to trigger refresh
-const MAX_PULL = 128;    // max visual pull distance (damped)
-const DAMPING = 0.45;    // resistance factor for overscroll feel
-const LOCK_DIST = 10;    // px before locking swipe direction
-const RELOAD_DELAY = 400; // ms spinner shown before reload
+const THRESHOLD = 72;
+const MAX_PULL = 128;
+const DAMPING = 0.45;
+const LOCK_DIST = 10;
+const RELOAD_DELAY = 400;
 
 type Phase = "idle" | "pulling" | "ready" | "refreshing";
 
 interface PullToRefreshProps {
-  /** Ref to the scrollable container (e.g. <main>) */
   scrollRef: React.RefObject<HTMLElement | null>;
-  /** Enable only on mobile / PWA */
   enabled: boolean;
   children: React.ReactNode;
 }
 
-/**
- * Pull-to-refresh for PWA standalone mode.
- * Renders an expandable indicator above children; touch gestures are
- * bound to the scrollRef element. Only activates when scrollTop ≤ 0.
- */
 export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   scrollRef,
   enabled,
@@ -45,7 +37,6 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
     const el = scrollRef.current;
     if (!el || !enabled) return;
 
-    // Direct DOM update for smooth 60fps indicator resize
     const setHeight = (h: number, animate = false) => {
       const ind = indicatorRef.current;
       if (!ind) return;
@@ -61,7 +52,6 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
       setPhase(p);
     };
 
-    // ── Touch handlers ──────────────────────────────────────
     const onTouchStart = (e: TouchEvent) => {
       if (phaseRef.current === "refreshing") return;
       const t = e.touches[0];
@@ -82,7 +72,6 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
       const dy = t.clientY - g.startY;
       const dx = t.clientX - g.startX;
 
-      // Direction lock: wait until user moves past threshold
       if (!g.locked) {
         if (Math.abs(dy) > LOCK_DIST || Math.abs(dx) > LOCK_DIST) {
           g.locked = true;
@@ -91,7 +80,6 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         return;
       }
 
-      // Only handle vertical pull-down from scroll top
       if (!g.vertical || g.startScrollTop > 0 || dy <= 0) {
         if (g.active) {
           g.active = false;
@@ -101,9 +89,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         return;
       }
 
-      // Activate pull-to-refresh
       g.active = true;
-      e.preventDefault(); // block native scroll / rubber-band
+      e.preventDefault();
       const pullY = Math.min(MAX_PULL, dy * DAMPING);
       setHeight(pullY);
       updatePhase(pullY >= THRESHOLD ? "ready" : "pulling");
@@ -141,64 +128,32 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
   return (
     <>
-      {/* Pull indicator — height is controlled via direct DOM updates */}
-      <div
-        ref={indicatorRef}
-        style={{
-          height: 0,
-          overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 4,
-            padding: "12px 0",
-          }}
-        >
+      <div ref={indicatorRef} className="h-0 overflow-hidden flex items-center justify-center">
+        <div className="flex flex-col items-center gap-1 py-3">
           {phase === "refreshing" ? (
-            <div
-              style={{
-                width: 20,
-                height: 20,
-                border: `2px solid ${colors.border.default}`,
-                borderTopColor: colors.purple[400],
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-              }}
-            />
+            <div className="size-5 border-2 border-border border-t-purple-400 rounded-full animate-spin" />
           ) : (
             <svg
               width="20"
               height="20"
               viewBox="0 0 24 24"
               fill="none"
-              stroke={phase === "ready" ? colors.purple[400] : colors.text.muted}
+              stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={{
-                transition: "transform 0.2s ease",
-                transform: phase === "ready" ? "rotate(180deg)" : "rotate(0deg)",
-              }}
+              className={cn(
+                "transition-transform duration-200",
+                phase === "ready" ? "rotate-180 text-purple-400" : "text-muted-foreground"
+              )}
             >
               <polyline points="6 9 12 15 18 9" />
             </svg>
           )}
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 500,
-              color: phase === "ready" ? colors.purple[400] : colors.text.muted,
-              transition: "color 0.2s ease",
-              userSelect: "none",
-            }}
-          >
+          <span className={cn(
+            "text-[11px] font-medium select-none transition-colors duration-200",
+            phase === "ready" ? "text-purple-400" : "text-muted-foreground"
+          )}>
             {phase === "refreshing"
               ? "Refreshing..."
               : phase === "ready"

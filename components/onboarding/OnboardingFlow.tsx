@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { colors, space, type as t, radii, transitions } from "@/styles/theme";
+import { cn } from "@/lib/utils";
+import { colors } from "@/styles/theme";
 import {
   STEPS,
   computeCurrentStepIndex,
@@ -30,7 +31,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
   const currentIdx = computeCurrentStepIndex(context);
   const completedCount = computeCompletedCount(context);
 
-  // All steps complete or dismissed
   if (dismissed || currentIdx === -1) return null;
 
   const current = steps[currentIdx];
@@ -44,105 +44,64 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
   const ctaAction = () => { if (current.ctaTab && onTabChange) onTabChange(current.ctaTab); };
 
   return (
-    <div style={{
-      background: colors.bg.surface,
-      border: `1px solid ${colors.border.default}`,
-      borderRadius: radii.lg,
-      padding: mobile ? space[4] : space[6],
-      marginBottom: space[4],
-    }}>
+    <div className={cn("bg-card border border-border rounded-lg mb-4", mobile ? "p-4" : "p-6")}>
       {/* Progress dots */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: space[2],
-        marginBottom: space[4],
-      }}>
+      <div className="flex items-center gap-2 mb-4">
         {steps.map((s, i) => (
-          <div key={s.id} style={{ display: "flex", alignItems: "center", gap: space[1] }}>
-            <div style={{
-              width: 8, height: 8, borderRadius: "50%",
-              background: i < completedCount
-                ? colors.green[400]
-                : i === currentIdx
-                  ? colors.blue[400]
-                  : colors.border.emphasis,
-              transition: transitions.fast,
-              animation: i === currentIdx ? "pulse 2s infinite" : undefined,
-            }} />
+          <div key={s.id} className="flex items-center gap-1">
+            <div
+              className={cn(
+                "size-2 rounded-full transition-fast",
+                i < completedCount ? "bg-green-400"
+                  : i === currentIdx ? "bg-blue-400 animate-pulse"
+                  : "bg-[var(--color-border-emphasis)]"
+              )}
+            />
             {i < steps.length - 1 && (
-              <div style={{
-                width: mobile ? 12 : 24, height: 1,
-                background: i < completedCount ? colors.green[400] : colors.border.emphasis,
-              }} />
+              <div
+                className={cn("h-px", i < completedCount ? "bg-green-400" : "bg-[var(--color-border-emphasis)]")}
+                style={{ width: mobile ? 12 : 24 }}
+              />
             )}
           </div>
         ))}
-        <div style={{ flex: 1 }} />
-        <span style={{
-          fontSize: t.caption.size, color: colors.text.disabled,
-        }}>
+        <div className="flex-1" />
+        <span className="text-caption text-[var(--color-text-disabled)]">
           {completedCount}/{steps.length}
         </span>
       </div>
 
       {/* Current step */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: space[3] }}>
-        <span style={{ fontSize: 28 }}>{STEP_ICONS[currentIdx] ?? "\u2753"}</span>
-        <div style={{ flex: 1 }}>
-          <div style={{
-            fontSize: t.h3.size, fontWeight: t.h3.weight,
-            color: colors.text.secondary, marginBottom: space[1],
-          }}>
+      <div className="flex items-start gap-3">
+        <span className="text-[28px]">{STEP_ICONS[currentIdx] ?? "\u2753"}</span>
+        <div className="flex-1">
+          <div className="text-h3 font-semibold text-secondary-foreground mb-1">
             {current.label}
           </div>
-          <div style={{
-            fontSize: t.bodySm.size, color: colors.text.muted,
-            lineHeight: 1.5,
-          }}>
+          <div className="text-body-sm text-muted-foreground leading-normal">
             {current.description}
           </div>
 
           {current.id === "wait-content" && (
-            <div style={{
-              fontSize: t.caption.size, color: colors.text.disabled,
-              marginTop: space[2],
-            }}>
+            <div className="text-caption text-[var(--color-text-disabled)] mt-2">
               {context.contentCount > 0
                 ? `${context.contentCount} item${context.contentCount !== 1 ? "s" : ""} received so far...`
                 : "This usually takes a minute after adding sources."}
             </div>
           )}
 
-          <div style={{ display: "flex", gap: space[2], marginTop: space[3], flexWrap: "wrap" }}>
+          <div className="flex gap-2 mt-3 flex-wrap">
             {ctaLabel && onTabChange && (
               <button
                 onClick={ctaAction}
-                style={{
-                  padding: `${space[2]}px ${space[4]}px`,
-                  background: "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15))",
-                  border: `1px solid ${colors.blue[400]}`,
-                  borderRadius: radii.md,
-                  color: colors.blue[400],
-                  fontSize: t.bodySm.size,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  transition: transitions.fast,
-                }}
+                className="px-4 py-2 bg-gradient-to-br from-blue-500/15 to-purple-500/15 border border-blue-400 rounded-md text-blue-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast"
               >
                 {ctaLabel}
               </button>
             )}
             <button
               onClick={handleDismiss}
-              style={{
-                padding: `${space[2]}px ${space[3]}px`,
-                background: "none",
-                border: "none",
-                color: colors.text.disabled,
-                fontSize: t.caption.size,
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
+              className="px-3 py-2 bg-transparent border-none text-[var(--color-text-disabled)] text-caption cursor-pointer font-[inherit]"
             >
               Dismiss
             </button>

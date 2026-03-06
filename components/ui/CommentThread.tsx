@@ -1,6 +1,6 @@
 import React from "react";
+import { cn } from "@/lib/utils";
 import type { StoredComment } from "@/lib/d2a/comments";
-import { colors, space, radii, type as t } from "@/styles/theme";
 
 interface CommentThreadProps {
   comments: StoredComment[];
@@ -19,35 +19,24 @@ export const CommentThread: React.FC<CommentThreadProps> = ({ comments, currentU
   const sorted = [...comments].sort((a, b) => a.timestamp - b.timestamp);
 
   return (
-    <div style={{ marginTop: space[2], display: "flex", flexDirection: "column", gap: space[1] }}>
+    <div className="mt-2 flex flex-col gap-1">
       {sorted.map(c => {
         const isSent = c.direction === "sent" || (currentUserPk && c.senderPk === currentUserPk);
         return (
-          <div key={c.id} style={{
-            display: "flex",
-            justifyContent: isSent ? "flex-end" : "flex-start",
-          }}>
-            <div style={{
-              maxWidth: "80%",
-              padding: `${space[1]}px ${space[2]}px`,
-              borderRadius: radii.sm,
-              background: isSent ? `${colors.cyan[400]}12` : colors.bg.raised,
-              border: `1px solid ${isSent ? `${colors.cyan[400]}25` : colors.border.default}`,
-            }}>
-              <div style={{
-                fontSize: t.bodySm.size,
-                color: colors.text.secondary,
-                lineHeight: 1.5,
-                wordBreak: "break-word",
-              }}>
+          <div key={c.id} className={cn("flex", isSent ? "justify-end" : "justify-start")}>
+            <div className={cn(
+              "max-w-[80%] px-2 py-1 rounded-sm",
+              isSent
+                ? "bg-cyan-400/[0.07] border border-cyan-400/[0.14]"
+                : "bg-[var(--color-bg-raised)] border border-border"
+            )}>
+              <div className="text-body-sm text-secondary-foreground leading-[1.5] break-words">
                 {c.comment}
               </div>
-              <div style={{
-                fontSize: 9,
-                color: colors.text.disabled,
-                marginTop: 2,
-                textAlign: isSent ? "right" : "left",
-              }}>
+              <div className={cn(
+                "text-[9px] text-[var(--color-text-disabled)] mt-0.5",
+                isSent ? "text-right" : "text-left"
+              )}>
                 {isSent ? "You" : c.senderPk.slice(0, 8) + "..."} · {formatTime(c.timestamp)}
               </div>
             </div>

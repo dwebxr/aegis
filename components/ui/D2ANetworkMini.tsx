@@ -1,6 +1,7 @@
 "use client";
 import React, { useMemo } from "react";
-import { colors, space, type as t, radii, fonts } from "@/styles/theme";
+import { cn } from "@/lib/utils";
+import { colors } from "@/styles/theme";
 import { useAgent } from "@/contexts/AgentContext";
 import { getReputation, calculateEffectiveTrust, getTrustTier, type TrustTier } from "@/lib/d2a/reputation";
 import { calculateWoTScore } from "@/lib/wot/scorer";
@@ -56,37 +57,23 @@ export const D2ANetworkMini: React.FC<D2ANetworkMiniProps> = ({ mobile }) => {
   const overflow = agentState.peers.length - MAX_PEERS;
 
   return (
-    <div style={{
-      marginTop: space[3],
-      padding: `${space[3]}px ${space[4]}px`,
-      background: colors.bg.surface,
-      border: `1px solid ${colors.border.default}`,
-      borderRadius: radii.md,
-    }}>
+    <div className="mt-3 px-4 py-3 bg-card border border-border rounded-md">
       {/* Header */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginBottom: space[2],
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{
-            width: 6, height: 6, borderRadius: "50%",
-            background: colors.purple[400],
-            boxShadow: `0 0 6px ${colors.purple[400]}80`,
-            animation: "pulse 2s infinite",
-          }} />
-          <span style={{ fontSize: t.bodySm.size, fontWeight: 600, color: colors.text.tertiary }}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <div className="size-1.5 rounded-full bg-purple-400 shadow-[0_0_6px_rgba(167,139,250,0.5)] animate-pulse" />
+          <span className="text-body-sm font-semibold text-[var(--color-text-tertiary)]">
             D2A Network
           </span>
         </div>
-        <div style={{ display: "flex", gap: space[3], fontSize: t.caption.size, color: colors.text.muted }}>
+        <div className="flex gap-3 text-caption text-muted-foreground">
           <span>
-            <strong style={{ color: colors.purple[400], fontFamily: fonts.mono }}>{agentState.peers.length}</strong> peers
+            <strong className="text-purple-400 font-mono">{agentState.peers.length}</strong> peers
           </span>
           <span>
-            <strong style={{ color: colors.green[400], fontFamily: fonts.mono }}>{agentState.receivedItems}</strong>&#x2193;
+            <strong className="text-green-400 font-mono">{agentState.receivedItems}</strong>&#x2193;
             {" "}
-            <strong style={{ color: colors.amber[400], fontFamily: fonts.mono }}>{agentState.sentItems}</strong>&#x2191;
+            <strong className="text-amber-400 font-mono">{agentState.sentItems}</strong>&#x2191;
           </span>
         </div>
       </div>
@@ -96,7 +83,7 @@ export const D2ANetworkMini: React.FC<D2ANetworkMiniProps> = ({ mobile }) => {
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
         height={mobile ? 60 : 80}
-        style={{ display: "block" }}
+        className="block"
       >
         {/* Orbit guide */}
         <ellipse
@@ -125,7 +112,7 @@ export const D2ANetworkMini: React.FC<D2ANetworkMiniProps> = ({ mobile }) => {
             strokeWidth={1.5}
             strokeDasharray="4 3"
             strokeOpacity={0.8}
-            style={{ animation: "pulse 1.5s infinite" }}
+            className="animate-pulse"
           />
         ))}
 
@@ -150,7 +137,7 @@ export const D2ANetworkMini: React.FC<D2ANetworkMiniProps> = ({ mobile }) => {
             textAnchor="end"
             fill={colors.text.disabled}
             fontSize={8}
-            fontFamily={fonts.mono}
+            fontFamily="monospace"
           >
             +{overflow}
           </text>

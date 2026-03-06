@@ -1,5 +1,6 @@
 "use client";
 import React, { useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
@@ -7,7 +8,6 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { SyncStatusBanner } from "@/components/ui/SyncStatusBanner";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { ShieldIcon, SearchIcon, FireIcon, RSSIcon, D2AIcon } from "@/components/icons";
-import { colors, fonts, space, type as t, radii, transitions } from "@/styles/theme";
 import type { NavItem } from "./Sidebar";
 
 interface AppShellProps {
@@ -36,66 +36,41 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
   const showInstallBanner = canInstall && !installed && !installDismissed;
 
   return (
-    <div style={{
-      display: "flex", flexDirection: mobile ? "column" : "row",
-      height: "100vh", background: colors.bg.root,
-      fontFamily: fonts.sans, color: colors.text.secondary,
-      overflow: "hidden", position: "relative",
-    }}>
+    <div className={cn(
+      "flex h-screen bg-background font-sans text-secondary-foreground overflow-hidden relative",
+      mobile ? "flex-col" : "flex-row"
+    )}>
       {!mobile && (
         <Sidebar navItems={buildNavItems(20)} activeTab={activeTab} onTabChange={onTabChange} collapsed={tablet} />
       )}
 
-      <main ref={mainRef} data-testid="aegis-main-content" style={{
-        flex: 1, overflow: "auto",
-        overscrollBehaviorY: "contain", // prevent native pull-to-refresh
-        padding: mobile ? `${space[4]}px ${space[4]}px 100px` : tablet ? `${space[6]}px ${space[6]}px` : `${space[10]}px ${space[12]}px`,
-      }}>
+      <main
+        ref={mainRef}
+        data-testid="aegis-main-content"
+        className={cn(
+          "flex-1 overflow-auto overscroll-y-contain",
+          mobile ? "px-4 pt-4 pb-[100px]" : tablet ? "p-6" : "px-12 py-10"
+        )}
+      >
         <PullToRefresh scrollRef={mainRef} enabled={mobile}>
-          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          <div className="max-w-[1200px] mx-auto">
+            {/* Install PWA banner */}
             {showInstallBanner && (
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: `${space[2]}px ${space[4]}px`,
-                background: `${colors.cyan[500]}10`,
-                border: `1px solid ${colors.cyan[500]}25`,
-                borderRadius: radii.md,
-                marginBottom: space[3],
-              }}>
-                <span style={{ fontSize: t.caption.size, color: colors.text.secondary, fontWeight: 600 }}>
+              <div className="flex items-center justify-between px-4 py-2 bg-cyan-500/[0.06] border border-cyan-500/[0.15] rounded-md mb-3">
+                <span className="text-caption text-secondary-foreground font-semibold">
                   Install Aegis for faster access
                 </span>
-                <div style={{ display: "flex", gap: space[2], flexShrink: 0 }}>
+                <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => void promptInstall().catch(() => {/* user dismissed */})}
-                    style={{
-                      padding: `${space[1]}px ${space[3]}px`,
-                      background: `${colors.cyan[500]}18`,
-                      border: `1px solid ${colors.cyan[500]}33`,
-                      borderRadius: radii.sm,
-                      color: colors.cyan[400],
-                      fontSize: t.caption.size,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      transition: transitions.fast,
-                    }}
+                    className="px-3 py-1 bg-cyan-500/[0.09] border border-cyan-500/20 rounded-sm text-cyan-400 text-caption font-bold cursor-pointer font-[inherit] transition-all duration-150 hover:bg-cyan-500/[0.15]"
                   >
                     Install
                   </button>
                   <button
                     onClick={() => setInstallDismissed(true)}
                     aria-label="Dismiss install banner"
-                    style={{
-                      padding: `${space[1]}px ${space[2]}px`,
-                      background: "transparent",
-                      border: "none",
-                      color: colors.text.disabled,
-                      fontSize: t.body.size,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      lineHeight: 1,
-                    }}
+                    className="px-2 py-1 bg-transparent border-none text-[var(--color-text-disabled)] text-body cursor-pointer font-[inherit] leading-none hover:text-[var(--color-text-tertiary)]"
                   >
                     &times;
                   </button>
