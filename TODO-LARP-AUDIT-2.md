@@ -25,7 +25,7 @@ handling** and **weak validation guards** that reduce operational visibility.
 **Verdict:** These are acceptable integration-boundary tests. No action needed.
 
 ### 3. Silent Error Handling (Most Impactful)
-**Status: NEEDS FIX** — 5 patterns where failures are invisible to users.
+**Status: RESOLVED** — All patterns addressed.
 
 | # | File | Lines | Issue | Severity |
 |---|------|-------|-------|----------|
@@ -47,7 +47,7 @@ handling** and **weak validation guards** that reduce operational visibility.
 **Verdict:** These are all intentional fire-and-forget patterns with error handling attached. The `void` cast is deliberate to suppress ESLint floating-promise warnings. No fix needed.
 
 ### 5. Validation Guards Without Value Checks
-**Status: NEEDS FIX** — Type-checked but not value-checked.
+**Status: FIXED** — Value bounds added.
 
 | # | File | Lines | Issue | Severity |
 |---|------|-------|-------|----------|
