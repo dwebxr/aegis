@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { UserContext } from "@/lib/preferences/types";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
-import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
 import { buildScoringPrompt } from "@/lib/scoring/prompt";
@@ -10,7 +10,7 @@ import { parseScoreResponse } from "@/lib/scoring/parseResponse";
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 20, 60_000);
+  const limited = await distributedRateLimit(request, 20, 60);
   if (limited) return limited;
   const tooLarge = checkBodySize(request, 64_000);
   if (tooLarge) return tooLarge;

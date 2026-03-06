@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
 
@@ -13,7 +13,7 @@ interface DigestArticle {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 5, 60_000);
+  const limited = await distributedRateLimit(request, 5, 60);
   if (limited) return limited;
   const tooLarge = checkBodySize(request, 32_000);
   if (tooLarge) return tooLarge;

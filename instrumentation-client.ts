@@ -7,7 +7,7 @@ if (dsn) {
     dsn,
     tracesSampleRate: 0.1,
     replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 1.0,
+    replaysOnErrorSampleRate: 0.1,
     beforeSend(event) {
       // Strip sensitive data from breadcrumbs and request bodies
       if (event.breadcrumbs) {

@@ -1,5 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// ─── KV-backed distributed rate limiter ──────────────────────────────
+
+type KVStore = Awaited<typeof import("@vercel/kv")>["kv"];
+let _kv: KVStore | null | undefined;
+
+async function getKV(): Promise<KVStore | null> {
+  if (_kv !== undefined) return _kv;
+  if (!process.env.KV_REST_API_URL) {
+    _kv = null;
+    return null;
+  }
+  try {
+    const mod = await import("@vercel/kv");
+    _kv = mod.kv;
+    return _kv;
+  } catch {
+    _kv = null;
+    return null;
+  }
+}
+
+/**
+ * Distributed rate limiter using Vercel KV (Upstash Redis).
+ * Uses sliding window via atomic INCR + EXPIRE.
+ * Falls back to in-memory `rateLimit()` when KV is unavailable.
+ */
+export async function distributedRateLimit(
+  request: NextRequest,
+  limit = 20,
+  windowSec = 60,
+): Promise<NextResponse | null> {
+  const store = await getKV();
+  if (!store) return rateLimit(request, limit, windowSec * 1000);
+
+  const ip = getClientIP(request);
+  const windowKey = `aegis:rl:${ip}:${Math.floor(Date.now() / (windowSec * 1000))}`;
+
+  const count = await store.incr(windowKey);
+  if (count === 1) {
+    await store.expire(windowKey, windowSec);
+  }
+
+  if (count > limit) {
+    const ttl = await store.ttl(windowKey);
+    const retryAfter = ttl > 0 ? ttl : windowSec;
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Try again later." },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } },
+    );
+  }
+
+  return null;
+}
+
+/** Reset KV lazy cache for tests. */
+export function _resetKVCache(): void {
+  _kv = undefined;
+}
+
+// ─── In-memory rate limiter (per-instance) ───────────────────────────
+
 interface WindowEntry {
   count: number;
   resetAt: number;
