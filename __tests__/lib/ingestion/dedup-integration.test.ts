@@ -1,4 +1,5 @@
 import { ArticleDeduplicator } from "@/lib/ingestion/dedup";
+import { computeContentFingerprint } from "@/lib/utils/hashing";
 
 describe("ArticleDeduplicator — fingerprint accuracy", () => {
   let dedup: ArticleDeduplicator;
@@ -35,19 +36,19 @@ describe("ArticleDeduplicator — fingerprint accuracy", () => {
   });
 
   it("fingerprints are deterministic", () => {
-    const fp1 = dedup.computeFingerprint("test content");
-    const fp2 = dedup.computeFingerprint("test content");
+    const fp1 = computeContentFingerprint("test content");
+    const fp2 = computeContentFingerprint("test content");
     expect(fp1).toBe(fp2);
   });
 
   it("fingerprints differ for different content", () => {
-    const fp1 = dedup.computeFingerprint("article about AI");
-    const fp2 = dedup.computeFingerprint("article about cooking");
+    const fp1 = computeContentFingerprint("article about AI");
+    const fp2 = computeContentFingerprint("article about cooking");
     expect(fp1).not.toBe(fp2);
   });
 
   it("fingerprint is hex string of length 32 (16 bytes)", () => {
-    const fp = dedup.computeFingerprint("any text");
+    const fp = computeContentFingerprint("any text");
     expect(fp).toMatch(/^[0-9a-f]{32}$/);
   });
 
@@ -55,8 +56,8 @@ describe("ArticleDeduplicator — fingerprint accuracy", () => {
     const short = "a".repeat(500);
     const long = "a".repeat(1000);
     // Both should produce the same fingerprint since only first 500 chars are used
-    const fp1 = dedup.computeFingerprint(short);
-    const fp2 = dedup.computeFingerprint(long);
+    const fp1 = computeContentFingerprint(short);
+    const fp2 = computeContentFingerprint(long);
     expect(fp1).toBe(fp2);
   });
 });

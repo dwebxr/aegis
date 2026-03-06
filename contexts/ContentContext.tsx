@@ -90,9 +90,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, []);
 
   // ─── IC sync helper (fire-and-forget with offline queue) ───
-  function doSyncToIC(promise: Promise<unknown>, actionType: "saveEvaluation" | "updateEvaluation", payload: unknown) {
+  const doSyncToIC = useCallback((promise: Promise<unknown>, actionType: "saveEvaluation" | "updateEvaluation", payload: unknown) => {
     syncToIC(promise, actionType, payload, setSyncStatus, setPendingActions, addNotification);
-  }
+  }, [addNotification]);
 
   // ─── Actor creation & auto-sync on auth ───
   useEffect(() => {
@@ -123,6 +123,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     }
     return () => {
       stale = true;
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- timer ref, not a DOM node
       clearTimeout(syncRetryTimerRef.current);
       syncRetryRef.current = 0;
     };
@@ -244,7 +245,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
       return result;
     } finally { setIsAnalyzing(false); }
-  }, [scoreText, isAuthenticated, principal, addNotification]);
+  }, [scoreText, isAuthenticated, principal, addNotification, doSyncToIC]);
 
   // ─── Validate / Flag ───
   const validateItem = useCallback((id: string) => {
@@ -257,7 +258,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (actorRef.current && isAuthenticated) {
       doSyncToIC(actorRef.current.updateEvaluation(id, true, false), "updateEvaluation", { id, validated: true, flagged: false });
     }
-  }, [isAuthenticated, preferenceCallbacks, addNotification]);
+  }, [isAuthenticated, preferenceCallbacks, doSyncToIC]);
 
   const flagItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
@@ -269,7 +270,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (actorRef.current && isAuthenticated) {
       doSyncToIC(actorRef.current.updateEvaluation(id, false, true), "updateEvaluation", { id, validated: false, flagged: true });
     }
-  }, [isAuthenticated, preferenceCallbacks, addNotification]);
+  }, [isAuthenticated, preferenceCallbacks, doSyncToIC]);
 
   // ─── Add content ───
   const addContent = useCallback((item: ContentItem) => {
@@ -286,7 +287,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
       return truncatePreservingActioned([owned, ...prev]);
     });
-  }, [isAuthenticated, principal, addNotification]);
+  }, [isAuthenticated, principal, doSyncToIC]);
 
   const addContentBuffered = useCallback((item: ContentItem) => {
     const owned = (!item.owner && isAuthenticated && principal)
@@ -311,7 +312,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         return truncatePreservingActioned([...fresh, ...prev]);
       });
     }
-  }, [isAuthenticated, principal, addNotification]);
+  }, [isAuthenticated, principal, doSyncToIC]);
 
   const flushPendingItems = useCallback(() => {
     if (pendingItemsRef.current.length === 0) return;
@@ -324,7 +325,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     });
   }, []);
 
-  const clearDemoContent = () => setContent(prev => prev.filter(c => c.owner !== ""));
+  const clearDemoContent = useCallback(() => setContent(prev => prev.filter(c => c.owner !== "")), []);
 
   // ─── Image backfill ───
   const backfillImageUrls = useCallback((): (() => void) => {

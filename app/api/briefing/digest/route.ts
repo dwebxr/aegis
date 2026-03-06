@@ -74,6 +74,7 @@ Respond with ONLY the digest paragraph, no labels or formatting.`;
     });
 
     if (!res.ok) {
+      console.error(`[briefing/digest] Anthropic API returned ${res.status}`);
       return NextResponse.json({ error: "Request failed" }, { status: 502 });
     }
 

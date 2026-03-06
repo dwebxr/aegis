@@ -247,8 +247,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const moreFiltersRef = useRef<HTMLDivElement>(null);
   const [showAllContent, setShowAllContent] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-  const markImgFailed = (id: string) =>
-    setFailedImages(prev => { const next = new Set(prev); next.add(id); return next; });
+  const markImgFailed = useCallback((id: string) =>
+    setFailedImages(prev => { const next = new Set(prev); next.add(id); return next; }), []);
   // Clear stale failedImages when content items are added/removed (e.g., after backfill)
   const prevContentLenRef = useRef(content.length);
   useEffect(() => {
@@ -646,7 +646,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         key={v}
                         role="menuitem"
                         data-testid={`aegis-filter-${v}`}
-                        aria-pressed={verdictFilter === v}
+                        aria-current={verdictFilter === v ? "true" : undefined}
                         onClick={() => { setVerdictFilter(v); setMoreFiltersOpen(false); }}
                         className={cn(
                           "block w-full text-left px-3 py-2 border-none text-body-sm cursor-pointer font-[inherit] transition-fast",

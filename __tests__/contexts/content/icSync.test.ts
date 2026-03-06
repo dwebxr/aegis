@@ -379,7 +379,7 @@ describe("drainOfflineQueue", () => {
     await enqueueAction("updateEvaluation", { id: "fail-me", validated: true, flagged: false });
 
     const actor = makeMockActor();
-    (actor.updateEvaluation as jest.Mock).mockRejectedValue(new Error("IC error"));
+    (actor.updateEvaluation as unknown as jest.Mock).mockRejectedValue(new Error("IC error"));
     const contentRef = { current: [] as ContentItem[] };
     const setPendingActions = jest.fn();
     const setSyncStatus = jest.fn();

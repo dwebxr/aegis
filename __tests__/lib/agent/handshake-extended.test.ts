@@ -216,6 +216,8 @@ describe("isHandshakeExpired", () => {
     expect(isHandshakeExpired({
       peerId: "peer",
       phase: "offered",
+      offeredTopic: "test",
+      offeredScore: 5,
       startedAt: Date.now(),
     })).toBe(false);
   });
@@ -224,6 +226,8 @@ describe("isHandshakeExpired", () => {
     expect(isHandshakeExpired({
       peerId: "peer",
       phase: "offered",
+      offeredTopic: "test",
+      offeredScore: 5,
       startedAt: Date.now() - HANDSHAKE_TIMEOUT_MS - 1000,
     })).toBe(true);
   });
@@ -231,7 +235,7 @@ describe("isHandshakeExpired", () => {
   it("returns false at exact timeout boundary", () => {
     // At exactly the timeout, Date.now() - startedAt === HANDSHAKE_TIMEOUT_MS, which is NOT > so returns false
     const startedAt = Date.now() - HANDSHAKE_TIMEOUT_MS;
-    expect(isHandshakeExpired({ peerId: "peer", phase: "offered", startedAt })).toBe(false);
+    expect(isHandshakeExpired({ peerId: "peer", phase: "offered", offeredTopic: "test", offeredScore: 5, startedAt })).toBe(false);
   });
 });
 
@@ -292,7 +296,7 @@ describe("sendAccept / sendReject / deliverContent / sendComment", () => {
   it("deliverContent returns publish result", async () => {
     const result = await deliverContent(
       sk, "my-pk", "peer-pk",
-      { text: "Content", author: "Auth", verdict: "quality" as const, topics: ["ai"] },
+      { text: "Content", author: "Auth", scores: { originality: 7, insight: 6, credibility: 8, composite: 7 }, verdict: "quality" as const, topics: ["ai"] },
       ["wss://relay1.example.com"],
     );
     expect(result.published).toHaveLength(1);

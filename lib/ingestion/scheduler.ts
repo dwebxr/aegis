@@ -20,7 +20,7 @@ import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { errMsg } from "@/lib/utils/errors";
 import { scoreItemWithHeuristics } from "@/lib/filtering/pipeline";
-import { fetchRSS, fetchNostr, fetchURL, fetchFarcaster, type RawItem, type HttpCacheHeaders, type FetcherCallbacks } from "./fetchers";
+import { fetchRSS, fetchNostr, fetchURL, fetchFarcaster, type RawItem, type FetcherCallbacks } from "./fetchers";
 
 const MAX_ITEMS_PER_SOURCE = 5;
 const MAX_ENRICH_PER_CYCLE = 3;

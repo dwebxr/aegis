@@ -337,8 +337,6 @@ export function titleWordOverlap(a: string, b: string): number {
 
 const CLUSTER_TIME_WINDOW_MS = 48 * 60 * 60 * 1000;
 
-// Max items for pairwise clustering — prevents O(n²) blowup on large sets.
-// Items beyond this cap are returned as singleton clusters.
 const CLUSTER_CAP = 150;
 
 export function clusterByStory(items: ContentItem[]): StoryCluster[] {
@@ -352,7 +350,6 @@ export function clusterByStory(items: ContentItem[]): StoryCluster[] {
   const topicSets = sorted.map(it =>
     new Set((it.topics ?? []).map(t => t.toLowerCase()))
   );
-  // Pre-compute word sets for titleWordOverlap to avoid recomputing inside nested loop
   const wordSets = sorted.map(it => {
     const words = it.text.slice(0, 200).toLowerCase().split(/\s+/).filter(w => w.length > 2);
     return new Set(words);

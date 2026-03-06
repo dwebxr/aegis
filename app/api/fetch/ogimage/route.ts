@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!res.ok) {
+      console.debug(`[fetch/ogimage] upstream returned ${res.status} for ${url}`);
       return NextResponse.json({ imageUrl: null });
     }
 

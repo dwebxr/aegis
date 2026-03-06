@@ -12,8 +12,8 @@ let idbAvailable = false;
 
 jest.mock("@/lib/storage/idb", () => ({
   isIDBAvailable: () => idbAvailable,
-  idbGet: (...args: unknown[]) => mockIdbGet(...args),
-  idbPut: (...args: unknown[]) => mockIdbPut(...args),
+  idbGet: (store: string, key: string) => mockIdbGet(store, key),
+  idbPut: (store: string, key: string, data: unknown) => mockIdbPut(store, key, data),
   STORE_SCORE_CACHE: "score-cache",
 }));
 
@@ -165,7 +165,7 @@ describe("flushCacheAsync with IDB", () => {
     storeScoringCache("flush-test:h", "h", makeResult());
     jest.advanceTimersByTime(600);
     expect(mockIdbPut).toHaveBeenCalled();
-    const [, , data] = mockIdbPut.mock.calls[mockIdbPut.mock.calls.length - 1];
+    const [, , data] = mockIdbPut.mock.calls[mockIdbPut.mock.calls.length - 1] as [string, string, Record<string, unknown>];
     expect(data["flush-test:h"]).toBeDefined();
     jest.useRealTimers();
   });

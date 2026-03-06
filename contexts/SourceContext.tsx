@@ -63,7 +63,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     return actorRef.current;
   }
 
-  function saveToIC(source: SavedSource): void {
+  const saveToIC = useCallback((source: SavedSource): void => {
     const actor = getActor();
     const ident = identityRef.current;
     if (!actor || !ident) {
@@ -79,7 +79,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         setSyncError("Failed to save source to IC");
         addNotification("Source saved locally but IC sync failed", "error");
       });
-  }
+  }, [addNotification]);
 
   useEffect(() => {
     if (!isAuthenticated || !identity || !principalText) {
@@ -181,7 +181,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => { cancelled = true; };
-  }, [isAuthenticated, identity, principalText]);
+  }, [isAuthenticated, identity, principalText, addNotification]);
 
   useEffect(() => {
     if (isDemoMode) setSources(DEMO_SOURCES);
@@ -212,7 +212,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     });
     saveToIC(source);
     return true;
-  }, [persist, isDemoMode]);
+  }, [persist, isDemoMode, saveToIC]);
 
   const removeSource = useCallback((id: string) => {
     if (isDemoMode) return;
@@ -245,7 +245,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       pendingDeletesRef.current.add(id);
       addNotification("Source removed locally — IC sync pending", "info");
     }
-  }, [persist, isDemoMode]);
+  }, [persist, isDemoMode, addNotification]);
 
   const toggleSource = useCallback((id: string) => {
     if (isDemoMode) return;
@@ -271,7 +271,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         }
       }
     });
-  }, [persist, isDemoMode]);
+  }, [persist, isDemoMode, saveToIC]);
 
   const updateSource = useCallback((id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => {
     if (isDemoMode) return;
@@ -287,7 +287,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     queueMicrotask(() => { if (updated) saveToIC(updated); });
-  }, [persist, isDemoMode]);
+  }, [persist, isDemoMode, saveToIC]);
 
   const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform }> => {
     const result: Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform }> = [];

@@ -1,4 +1,5 @@
 import { ArticleDeduplicator } from "@/lib/ingestion/dedup";
+import { computeContentFingerprint } from "@/lib/utils/hashing";
 
 // localStorage mock
 const store: Record<string, string> = {};
@@ -46,8 +47,8 @@ describe("ArticleDeduplicator — fingerprint normalization", () => {
 
   it("produces different fingerprints for genuinely different texts", () => {
     const d = new ArticleDeduplicator();
-    const fp1 = d.computeFingerprint("Article about quantum computing");
-    const fp2 = d.computeFingerprint("Article about classical music");
+    const fp1 = computeContentFingerprint("Article about quantum computing");
+    const fp2 = computeContentFingerprint("Article about classical music");
     expect(fp1).not.toBe(fp2);
     expect(fp1).toHaveLength(32);
     expect(fp2).toHaveLength(32);
@@ -55,7 +56,7 @@ describe("ArticleDeduplicator — fingerprint normalization", () => {
 
   it("returns 32-char hex string", () => {
     const d = new ArticleDeduplicator();
-    const fp = d.computeFingerprint("test");
+    const fp = computeContentFingerprint("test");
     expect(fp).toMatch(/^[0-9a-f]{32}$/);
   });
 });

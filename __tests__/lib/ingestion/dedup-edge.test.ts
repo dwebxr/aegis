@@ -1,4 +1,5 @@
 import { ArticleDeduplicator } from "@/lib/ingestion/dedup";
+import { computeContentFingerprint } from "@/lib/utils/hashing";
 
 // Mock localStorage
 const store: Record<string, string> = {};
@@ -19,43 +20,43 @@ describe("ArticleDeduplicator — edge cases", () => {
   describe("fingerprint stability", () => {
     it("produces same fingerprint for equivalent text after normalization", () => {
       const dedup = new ArticleDeduplicator();
-      const fp1 = dedup.computeFingerprint("Hello, World! This is a test.");
-      const fp2 = dedup.computeFingerprint("HELLO, WORLD! THIS IS A TEST.");
+      const fp1 = computeContentFingerprint("Hello, World! This is a test.");
+      const fp2 = computeContentFingerprint("HELLO, WORLD! THIS IS A TEST.");
       expect(fp1).toBe(fp2);
     });
 
     it("produces same fingerprint ignoring punctuation differences", () => {
       const dedup = new ArticleDeduplicator();
-      const fp1 = dedup.computeFingerprint("Hello World");
-      const fp2 = dedup.computeFingerprint("Hello, World!");
+      const fp1 = computeContentFingerprint("Hello World");
+      const fp2 = computeContentFingerprint("Hello, World!");
       expect(fp1).toBe(fp2);
     });
 
     it("produces same fingerprint ignoring extra whitespace", () => {
       const dedup = new ArticleDeduplicator();
-      const fp1 = dedup.computeFingerprint("Hello  World");
-      const fp2 = dedup.computeFingerprint("Hello World");
+      const fp1 = computeContentFingerprint("Hello  World");
+      const fp2 = computeContentFingerprint("Hello World");
       expect(fp1).toBe(fp2);
     });
 
     it("produces different fingerprints for different content", () => {
       const dedup = new ArticleDeduplicator();
-      const fp1 = dedup.computeFingerprint("Article about AI research");
-      const fp2 = dedup.computeFingerprint("Article about quantum computing");
+      const fp1 = computeContentFingerprint("Article about AI research");
+      const fp2 = computeContentFingerprint("Article about quantum computing");
       expect(fp1).not.toBe(fp2);
     });
 
     it("uses only first 500 chars for fingerprint", () => {
       const dedup = new ArticleDeduplicator();
       const base = "a".repeat(500);
-      const fp1 = dedup.computeFingerprint(base + " extra content that should be ignored");
-      const fp2 = dedup.computeFingerprint(base + " completely different ending text");
+      const fp1 = computeContentFingerprint(base + " extra content that should be ignored");
+      const fp2 = computeContentFingerprint(base + " completely different ending text");
       expect(fp1).toBe(fp2);
     });
 
     it("fingerprint is 32 hex characters (16 bytes)", () => {
       const dedup = new ArticleDeduplicator();
-      const fp = dedup.computeFingerprint("Some test content");
+      const fp = computeContentFingerprint("Some test content");
       expect(fp).toMatch(/^[0-9a-f]{32}$/);
     });
   });

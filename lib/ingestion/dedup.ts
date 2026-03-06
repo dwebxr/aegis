@@ -55,12 +55,12 @@ export class ArticleDeduplicator {
 
   isDuplicate(url: string | undefined, text: string): boolean {
     if (url && this.urls.has(url)) return true;
-    const fp = this.computeFingerprint(text);
+    const fp = computeContentFingerprint(text);
     return this.fingerprints.has(fp);
   }
 
   markSeen(url: string | undefined, text: string): void {
-    const fp = this.computeFingerprint(text);
+    const fp = computeContentFingerprint(text);
     if (url) {
       this.urls.add(url);
       this.insertionOrder.push(`u:${url}`);
@@ -91,10 +91,6 @@ export class ArticleDeduplicator {
 
     this.saveToLocalStorage(data);
     this.dirty = false;
-  }
-
-  computeFingerprint(text: string): string {
-    return computeContentFingerprint(text);
   }
 
   async reset(): Promise<void> {

@@ -257,10 +257,10 @@ describe("AgentManager", () => {
       await manager.start();
 
       const state: AgentState = callbacks.onStateChange.mock.calls[callbacks.onStateChange.mock.calls.length - 1][0];
-      const ids = state.activityLog.map(e => e.id);
-      // IDs should be monotonically increasing
-      for (let i = 1; i < ids.length; i++) {
-        expect(ids[i]).toBeGreaterThan(ids[i - 1]);
+      const idNums = state.activityLog.map(e => parseInt(e.id.replace("log-", ""), 10));
+      // IDs should be monotonically decreasing (unshift adds newest first)
+      for (let i = 1; i < idNums.length; i++) {
+        expect(idNums[i]).toBeLessThan(idNums[i - 1]);
       }
 
       manager.stop();

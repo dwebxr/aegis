@@ -17,16 +17,19 @@
 - **@sentry/nextjs 10.42.0**: Updated for full Next.js 15 compatibility
 
 ### Production Readiness & Code Quality Audit
-- **4718 tests, 272 suites** — zero failures, zero skipped, zero tautologies
+- **4884 tests, 282 suites** — zero failures, zero skipped, zero ESLint warnings, zero TypeScript errors
 - **LARP audit**: Eliminated test tautologies (`expect(true).toBe(true)`), conditional assertions, and mock-self patterns; all tests now assert real behavior
 - **Fail-secure design**: `calculateDynamicFee("restricted")` returns `Infinity` (was `0` — fail-open); callers pre-filter restricted tier as defense-in-depth
 - **Verdict validation**: D2A deliver payloads validate verdict is exactly `"quality"` or `"slop"` via Set; `parseResponse` warns on unexpected LLM verdict values
 - **IC call timeout protection**: All IC canister calls wrapped with `withTimeout()` (15–20s) — prevents indefinite hangs on slow/unreachable canisters
 - **Honest error notifications**: IC sync failures surface to user ("Saved locally — will sync when online" / "Failed to save — changes may be lost"); briefing sync failures notify user
-- **Dead code removal**: Removed redundant comments (94.7% reduction), unused wrapper functions, over-engineered abstractions; preserved algorithm-intent comments (Jaccard, NIP-44, decay factor)
+- **Dead code removal**: Removed redundant comments, unused wrapper functions (`computeFingerprint` passthrough, `const steps = STEPS` alias), over-engineered abstractions; preserved algorithm-intent comments (Jaccard, NIP-44, decay factor)
 - **Tailwind CSS v4 + shadcn/ui migration**: 1341 inline styles reduced to 71 (94.7% reduction)
 - **Tab error boundaries**: All 7 tabs wrapped in `TabErrorBoundary` with Sentry capture + retry
-- **API error sanitization**: All 16 API routes return generic error messages — no internal details leaked
+- **API error sanitization**: All 16 API routes return generic error messages — no internal details leaked; all non-OK upstream responses logged
+- **CSP hardened**: Full Content-Security-Policy with `default-src 'self'`, explicit allowlists for Google Fonts, Vercel Analytics, and Sentry CDN
+- **React hooks correctness**: All `useCallback`/`useMemo` dependency arrays verified — zero stale closure warnings
+- **Accessibility**: `aria-pressed` on `menuitem` role corrected to `aria-current`
 - **Validate/flag mutual exclusivity**: Flagging a validated item clears validated (and vice versa)
 - **clusterByStory O(n²) cap**: Pairwise clustering capped at 150 items with pre-computed word sets
 - **Single-pass optimizations**: `peerStats`, `getContext`, `cleanupStaleHandshakes`/`cleanupStalePeers`

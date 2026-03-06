@@ -7,6 +7,7 @@ if (typeof globalThis.TextEncoder === "undefined") {
 }
 
 import { ArticleDeduplicator } from "@/lib/ingestion/dedup";
+import { computeContentFingerprint } from "@/lib/utils/hashing";
 
 // Mock IDB as unavailable to use localStorage path
 jest.mock("@/lib/storage/idb", () => ({
@@ -70,17 +71,17 @@ describe("ArticleDeduplicator — prune edge cases", () => {
   });
 
   it("computeFingerprint returns consistent hash", () => {
-    const fp1 = dedup.computeFingerprint("hello world");
-    const fp2 = dedup.computeFingerprint("hello world");
-    const fp3 = dedup.computeFingerprint("different text");
+    const fp1 = computeContentFingerprint("hello world");
+    const fp2 = computeContentFingerprint("hello world");
+    const fp3 = computeContentFingerprint("different text");
     expect(fp1).toBe(fp2);
     expect(fp1).not.toBe(fp3);
     expect(fp1.length).toBeGreaterThan(0);
   });
 
   it("fingerprint normalizes whitespace", () => {
-    const fp1 = dedup.computeFingerprint("hello  world  test");
-    const fp2 = dedup.computeFingerprint("hello world test");
+    const fp1 = computeContentFingerprint("hello  world  test");
+    const fp2 = computeContentFingerprint("hello world test");
     // computeContentFingerprint normalizes whitespace
     expect(fp1).toBe(fp2);
   });

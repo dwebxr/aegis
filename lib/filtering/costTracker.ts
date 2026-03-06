@@ -19,7 +19,6 @@ export interface MonthlyCostSummary {
   timeSavedFormatted: string;
 }
 
-// Estimated reading/evaluation time saved per filtered article (industry avg: 2-5 min per article)
 export const SCROLL_TIME_SAVED_PER_ITEM_MIN = 3;
 
 const STORAGE_KEY = "aegis-cost-tracker";

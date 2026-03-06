@@ -1,4 +1,5 @@
 import { ArticleDeduplicator } from "@/lib/ingestion/dedup";
+import { computeContentFingerprint } from "@/lib/utils/hashing";
 
 // Mock localStorage
 const store: Record<string, string> = {};
@@ -57,19 +58,19 @@ describe("ArticleDeduplicator", () => {
   describe("computeFingerprint", () => {
     it("returns a hex string", () => {
       const dedup = new ArticleDeduplicator();
-      const fp = dedup.computeFingerprint("hello world");
+      const fp = computeContentFingerprint("hello world");
       expect(fp).toMatch(/^[0-9a-f]+$/);
       expect(fp.length).toBe(32); // 16 bytes = 32 hex chars
     });
 
     it("is deterministic", () => {
       const dedup = new ArticleDeduplicator();
-      expect(dedup.computeFingerprint("test")).toBe(dedup.computeFingerprint("test"));
+      expect(computeContentFingerprint("test")).toBe(computeContentFingerprint("test"));
     });
 
     it("normalizes text before hashing", () => {
       const dedup = new ArticleDeduplicator();
-      expect(dedup.computeFingerprint("Hello, World!")).toBe(dedup.computeFingerprint("hello world"));
+      expect(computeContentFingerprint("Hello, World!")).toBe(computeContentFingerprint("hello world"));
     });
   });
 

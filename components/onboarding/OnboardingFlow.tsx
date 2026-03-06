@@ -26,13 +26,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
     setDismissed(state.dismissed);
   }, []);
 
-  const steps = STEPS;
   const currentIdx = computeCurrentStepIndex(context);
   const completedCount = computeCompletedCount(context);
 
   if (dismissed || currentIdx === -1) return null;
 
-  const current = steps[currentIdx];
+  const current = STEPS[currentIdx];
 
   const handleDismiss = () => {
     dismissOnboarding();
@@ -46,7 +45,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
     <div className={cn("bg-card border border-border rounded-lg mb-4", mobile ? "p-4" : "p-6")}>
       {/* Progress dots */}
       <div className="flex items-center gap-2 mb-4">
-        {steps.map((s, i) => (
+        {STEPS.map((s, i) => (
           <div key={s.id} className="flex items-center gap-1">
             <div
               className={cn(
@@ -56,7 +55,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
                   : "bg-[var(--color-border-emphasis)]"
               )}
             />
-            {i < steps.length - 1 && (
+            {i < STEPS.length - 1 && (
               <div
                 className={cn("h-px", i < completedCount ? "bg-green-400" : "bg-[var(--color-border-emphasis)]")}
                 style={{ width: mobile ? 12 : 24 }}
@@ -66,7 +65,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ context, mobile,
         ))}
         <div className="flex-1" />
         <span className="text-caption text-[var(--color-text-disabled)]">
-          {completedCount}/{steps.length}
+          {completedCount}/{STEPS.length}
         </span>
       </div>
 
