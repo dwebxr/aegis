@@ -40,12 +40,12 @@ const mockMergeProfiles = jest.fn(
 jest.mock("@/lib/preferences/storage", () => ({
   loadProfile: (...args: unknown[]) => mockLoadProfile(args[0] as string),
   saveProfile: (...args: unknown[]) => mockSaveProfile(...args),
-  syncPreferencesToIC: (...args: unknown[]) => mockSyncToIC(...args),
-  loadPreferencesFromIC: (...args: unknown[]) => mockLoadFromIC(...args),
-  mergeProfiles: (...args: unknown[]) => mockMergeProfiles(...args),
+  syncPreferencesToIC: (pid: string, p: unknown) => mockSyncToIC(pid, p),
+  loadPreferencesFromIC: (pid: string) => mockLoadFromIC(pid),
+  mergeProfiles: (a: unknown, b: unknown) => mockMergeProfiles(a as UserPreferenceProfile, b as UserPreferenceProfile),
 }));
 
-const mockLearn = jest.fn((profile: UserPreferenceProfile) => ({
+const mockLearn = jest.fn((profile: UserPreferenceProfile, _event: unknown) => ({
   ...profile,
   totalValidated: profile.totalValidated + 1,
   lastUpdated: Date.now(),
@@ -59,9 +59,9 @@ const mockGetContext = jest.fn().mockReturnValue({
 const mockHasEnoughData = jest.fn().mockReturnValue(false);
 
 jest.mock("@/lib/preferences/engine", () => ({
-  learn: (...args: unknown[]) => mockLearn(...args),
-  getContext: (...args: unknown[]) => mockGetContext(...args),
-  hasEnoughData: (...args: unknown[]) => mockHasEnoughData(...args),
+  learn: (p: unknown, event: unknown) => mockLearn(p as UserPreferenceProfile, event),
+  getContext: (p: unknown) => mockGetContext(p),
+  hasEnoughData: (p: unknown) => mockHasEnoughData(p),
 }));
 
 jest.mock("@/lib/sources/discovery", () => ({

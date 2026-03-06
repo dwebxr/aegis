@@ -17,8 +17,11 @@
 - **@sentry/nextjs 10.42.0**: Updated for full Next.js 15 compatibility
 
 ### Production Readiness & Code Quality Audit
-- **4884 tests, 282 suites** — zero failures, zero skipped, zero ESLint warnings, zero TypeScript errors
+- **5006 tests, 288 suites** — zero failures, zero skipped, zero ESLint warnings, zero TypeScript errors
 - **LARP audit**: Eliminated test tautologies (`expect(true).toBe(true)`), conditional assertions, and mock-self patterns; all tests now assert real behavior
+- **Distributed rate limiting**: Per-IP rate limiting via Vercel KV (Redis) shared across serverless instances, with in-memory fallback
+- **Sentry replay rate**: Reduced `replaysOnErrorSampleRate` from 1.0 to 0.1 (production-appropriate)
+- **Test coverage expansion**: SourcesTab (29%→48%), AccountSection (41%→96%), FeedSection (49%→91%), PreferenceContext (8%→92%), OnboardingFlow (25%→100%), CreateGroupModal (18%→94%), CommentThread (31%→100%)
 - **Fail-secure design**: `calculateDynamicFee("restricted")` returns `Infinity` (was `0` — fail-open); callers pre-filter restricted tier as defense-in-depth
 - **Verdict validation**: D2A deliver payloads validate verdict is exactly `"quality"` or `"slop"` via Set; `parseResponse` warns on unexpected LLM verdict values
 - **IC call timeout protection**: All IC canister calls wrapped with `withTimeout()` (15–20s) — prevents indefinite hangs on slow/unreachable canisters
@@ -829,7 +832,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (4718 unit/integration tests, 272 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
+| Test | Jest + ts-jest (5006 unit/integration tests, 288 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
 
 ## Project Structure
 
@@ -989,7 +992,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 4718 Jest tests across 272 suites
+├── __tests__/                           # 5006 Jest tests across 288 suites
 ├── e2e/                                 # Playwright E2E tests (299 tests, 12 specs)
 ├── canisters/
 │   └── aegis_backend/
@@ -1026,7 +1029,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Jest unit + integration tests (4718 tests)
+npm test              # Jest unit + integration tests (5006 tests)
 npm run test:watch    # Watch mode
 npx playwright test   # E2E tests — requires dev server (npm run dev)
 ```
