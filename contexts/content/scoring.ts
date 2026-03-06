@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import type { _SERVICE } from "@/lib/ic/declarations";
@@ -61,83 +62,98 @@ export async function runScoringCascade(
   actorRef: React.MutableRefObject<_SERVICE | null>,
   isAuthenticated: boolean,
 ): Promise<AnalyzeResponse> {
-  const profileHash = computeProfileHash(userContext);
-  const cacheKey = computeScoringCacheKey(text, userContext, profileHash);
-  const cached = lookupScoringCache(cacheKey, profileHash);
-  if (cached) return cached;
+  return Sentry.startSpan({ name: "scoring.cascade", op: "scoring" }, async () => {
+    const profileHash = computeProfileHash(userContext);
+    const cacheKey = computeScoringCacheKey(text, userContext, profileHash);
+    const cached = lookupScoringCache(cacheKey, profileHash);
+    if (cached) return cached;
 
-  let result: AnalyzeResponse | null = null;
-  const userApiKey = getUserApiKey();
-  const topics = userContext
-    ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
-    : [];
+    let result: AnalyzeResponse | null = null;
+    const userApiKey = getUserApiKey();
+    const topics = userContext
+      ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
+      : [];
 
-  // Tier 0-2: Run enabled local tiers in parallel (fastest wins)
-  const localTiers: Promise<AnalyzeResponse>[] = [];
-  const tierNames: string[] = [];
-  if (isOllamaEnabled()) { localTiers.push(tryOllama(text, topics)); tierNames.push("ollama"); }
-  if (isWebLLMEnabled()) { localTiers.push(tryWebLLM(text, topics)); tierNames.push("webllm"); }
-  if (userApiKey) { localTiers.push(tryBYOK(text, userContext, userApiKey)); tierNames.push("byok"); }
-
-  if (localTiers.length > 0) {
-    try {
-      result = await Promise.any(localTiers);
-    } catch (err) {
-      const reasons = err instanceof AggregateError
-        ? err.errors.map((e, i) => `${tierNames[i]}: ${errMsg(e)}`).join("; ")
-        : errMsg(err);
-      console.warn("[scoreText] All local tiers failed:", reasons);
+    // Tier 0-2: Run enabled local tiers in parallel (fastest wins)
+    const localTiers: Promise<AnalyzeResponse>[] = [];
+    const tierNames: string[] = [];
+    if (isOllamaEnabled()) {
+      localTiers.push(Sentry.startSpan({ name: "scoring.ollama", op: "scoring.tier" }, () => tryOllama(text, topics)));
+      tierNames.push("ollama");
     }
-  }
+    if (isWebLLMEnabled()) {
+      localTiers.push(Sentry.startSpan({ name: "scoring.webllm", op: "scoring.tier" }, () => tryWebLLM(text, topics)));
+      tierNames.push("webllm");
+    }
+    if (userApiKey) {
+      localTiers.push(Sentry.startSpan({ name: "scoring.byok", op: "scoring.tier" }, () => tryBYOK(text, userContext, userApiKey)));
+      tierNames.push("byok");
+    }
 
-  // Tier 3: IC LLM via canister (free, on-chain)
-  if (!result && actorRef.current && isAuthenticated) {
-    try {
-      const icResult = await withTimeout(
-        actorRef.current.analyzeOnChain(text.slice(0, 3000), topics),
-        10_000,
-        "IC LLM timeout (10s)",
-      );
-      if ("ok" in icResult) {
-        const a = icResult.ok;
-        result = {
-          originality: a.originality,
-          insight: a.insight,
-          credibility: a.credibility,
-          composite: a.compositeScore,
-          verdict: "quality" in a.verdict ? "quality" : "slop",
-          reason: a.reason,
-          topics: a.topics,
-          vSignal: a.vSignal.length > 0 ? a.vSignal[0] : undefined,
-          cContext: a.cContext.length > 0 ? a.cContext[0] : undefined,
-          lSlop: a.lSlop.length > 0 ? a.lSlop[0] : undefined,
-          scoringEngine: "claude-ic" as const,
-        };
-      } else if ("err" in icResult) {
-        console.warn("[scoreText] IC LLM error:", icResult.err);
+    if (localTiers.length > 0) {
+      try {
+        result = await Promise.any(localTiers);
+      } catch (err) {
+        const reasons = err instanceof AggregateError
+          ? err.errors.map((e, i) => `${tierNames[i]}: ${errMsg(e)}`).join("; ")
+          : errMsg(err);
+        console.warn("[scoreText] All local tiers failed:", reasons);
       }
-    } catch (err) {
-      console.warn("[scoreText] IC LLM failed:", errMsg(err));
     }
-  }
 
-  // Tier 3.5: Claude API with server key (fallback for all prior tiers)
-  if (!result) {
-    const data = await fetchAnalyze(text, userContext);
-    if (data) {
-      result = { ...data, scoringEngine: "claude-server" as const };
-    } else {
-      console.warn("[scoreText] Server Claude failed, falling back to heuristic");
+    // Tier 3: IC LLM via canister (free, on-chain)
+    if (!result && actorRef.current && isAuthenticated) {
+      try {
+        result = await Sentry.startSpan({ name: "scoring.ic-llm", op: "scoring.tier" }, async () => {
+          const icResult = await withTimeout(
+            actorRef.current!.analyzeOnChain(text.slice(0, 3000), topics),
+            10_000,
+            "IC LLM timeout (10s)",
+          );
+          if ("ok" in icResult) {
+            const a = icResult.ok;
+            return {
+              originality: a.originality,
+              insight: a.insight,
+              credibility: a.credibility,
+              composite: a.compositeScore,
+              verdict: ("quality" in a.verdict ? "quality" : "slop") as "quality" | "slop",
+              reason: a.reason,
+              topics: a.topics,
+              vSignal: a.vSignal.length > 0 ? a.vSignal[0] : undefined,
+              cContext: a.cContext.length > 0 ? a.cContext[0] : undefined,
+              lSlop: a.lSlop.length > 0 ? a.lSlop[0] : undefined,
+              scoringEngine: "claude-ic" as const,
+            };
+          } else if ("err" in icResult) {
+            console.warn("[scoreText] IC LLM error:", icResult.err);
+          }
+          return null;
+        });
+      } catch (err) {
+        console.warn("[scoreText] IC LLM failed:", errMsg(err));
+      }
     }
-  }
 
-  // Tier 4: Heuristic fallback
-  if (!result) {
-    const { heuristicScores } = await import("@/lib/ingestion/quickFilter");
-    result = { ...heuristicScores(text), scoredByAI: false, scoringEngine: "heuristic" as const };
-  }
+    // Tier 3.5: Claude API with server key (fallback for all prior tiers)
+    if (!result) {
+      result = await Sentry.startSpan({ name: "scoring.server-claude", op: "scoring.tier" }, async () => {
+        const data = await fetchAnalyze(text, userContext);
+        if (data) return { ...data, scoringEngine: "claude-server" as const };
+        console.warn("[scoreText] Server Claude failed, falling back to heuristic");
+        return null;
+      });
+    }
 
-  storeScoringCache(cacheKey, profileHash, result);
+    // Tier 4: Heuristic fallback
+    if (!result) {
+      const { heuristicScores } = await import("@/lib/ingestion/quickFilter");
+      result = { ...heuristicScores(text), scoredByAI: false, scoringEngine: "heuristic" as const };
+    }
 
-  return result;
+    Sentry.setTag("scoring.engine", result.scoringEngine ?? "unknown");
+    storeScoringCache(cacheKey, profileHash, result);
+
+    return result;
+  });
 }

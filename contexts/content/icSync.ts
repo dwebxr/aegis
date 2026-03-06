@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import type { ContentItem } from "@/lib/types/content";
 import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
 import { relativeTime } from "@/lib/utils/scores";
@@ -184,6 +185,7 @@ export async function loadFromICCanister(
 
   const IC_PAGE_TIMEOUT = 15_000;
 
+  await Sentry.startSpan({ name: "ic.loadEvaluations", op: "ic.sync" }, async () => {
   try {
     const PAGE_SIZE = BigInt(100);
     const MAX_PAGES = 50;
@@ -238,4 +240,5 @@ export async function loadFromICCanister(
     setSyncStatus("offline");
     addNotification(`IC sync unavailable — ${errMsgShort(err)}`, "error");
   }
+  });
 }

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { v4 as uuidv4 } from "uuid";
 import { quickSlopFilter } from "./quickFilter";
 import { ArticleDeduplicator } from "./dedup";
@@ -195,6 +196,7 @@ export class IngestionScheduler {
     if (this.running) return;
     this.running = true;
 
+    await Sentry.startSpan({ name: "scheduler.cycle", op: "scheduler" }, async () => {
     try {
       const sources = this.callbacks.getSources();
       const userContext = this.callbacks.getUserContext();
@@ -261,6 +263,7 @@ export class IngestionScheduler {
       await this.dedup.flush();
       this.running = false;
     }
+    });
   }
 
   private async enrichItems(
