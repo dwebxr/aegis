@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   if (checks.sentryDsn === "missing") warnings.push("error tracking disabled — configure SENTRY_DSN");
   if (checks.kvStore.startsWith("missing")) warnings.push("rate limiting is per-instance only — configure KV_REST_API_URL");
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     status: allOk ? "ok" : "degraded",
     ...(warnings.length > 0 && { warnings }),
     timestamp: new Date().toISOString(),
@@ -54,4 +54,6 @@ export async function GET(request: NextRequest) {
     region: (process.env.VERCEL_REGION || "local").trim(),
     checks,
   });
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 }

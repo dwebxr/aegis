@@ -10,6 +10,7 @@ import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 30;
+export const revalidate = 3600;
 
 interface PageProps {
   params: Promise<{ naddr: string }>;

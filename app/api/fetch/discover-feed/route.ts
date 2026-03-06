@@ -130,5 +130,9 @@ export async function POST(request: NextRequest) {
     feeds.push(...probed.filter((f): f is NonNullable<typeof f> => f !== null));
   }
 
-  return NextResponse.json({ feeds });
+  const response = NextResponse.json({ feeds });
+  if (feeds.length > 0) {
+    response.headers.set("Cache-Control", "public, s-maxage=600, stale-while-revalidate=60");
+  }
+  return response;
 }

@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     checks,
   });
 
+  response.headers.set("Cache-Control", "no-store");
   return withCors(response, request.headers.get("origin"));
 }
 

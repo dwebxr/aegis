@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);
   if (limited) return limited;
 
-  return withCors(NextResponse.json({
+  const res = NextResponse.json({
     name: "Aegis",
     description: "D2A Social Agent Platform — AI-curated content briefings with V/C/L scoring",
     version: "1.0",
@@ -50,7 +50,9 @@ export async function GET(request: NextRequest) {
       },
     },
     compatibility: { x402Version: 2 },
-  }), request.headers.get("origin"));
+  });
+  res.headers.set("Cache-Control", "public, max-age=300, s-maxage=300");
+  return withCors(res, request.headers.get("origin"));
 }
 
 export async function OPTIONS(request: NextRequest) {
