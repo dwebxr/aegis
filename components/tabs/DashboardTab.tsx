@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { typography } from "@/lib/design";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard, deriveScoreTags } from "@/components/ui/ContentCard";
-import { colors, fonts, scoreGrade } from "@/styles/theme";
+import { colors, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { exportContentCSV, exportContentJSON } from "@/lib/utils/export";
 import { extractYouTubeVideoId, youTubeEmbedUrl } from "@/lib/utils/youtube";

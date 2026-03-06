@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { typography } from "@/lib/design";
-import { colors, fonts } from "@/styles/theme";
+import { colors } from "@/styles/theme";
 import { isD2AContent } from "@/lib/d2a/activity";
 import { ShieldIcon, FireIcon, ZapIcon } from "@/components/icons";
 import { StatCard } from "@/components/ui/StatCard";

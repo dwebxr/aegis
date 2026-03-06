@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 import { scoreGrade } from "@/styles/theme";
 import type { ParsedBriefing, ParsedBriefingItem } from "@/lib/briefing/serialize";
 

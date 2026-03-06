@@ -1,6 +1,5 @@
 "use client";
 import React, { useMemo } from "react";
-import { cn } from "@/lib/utils";
 import { colors } from "@/styles/theme";
 import { useAgent } from "@/contexts/AgentContext";
 import { getReputation, calculateEffectiveTrust, getTrustTier, type TrustTier } from "@/lib/d2a/reputation";

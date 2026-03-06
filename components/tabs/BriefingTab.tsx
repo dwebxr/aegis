@@ -10,7 +10,6 @@ import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificationBadge";
 import { useContent } from "@/contexts/ContentContext";
-import { colors } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
