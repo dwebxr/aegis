@@ -14,6 +14,7 @@ interface CollapsibleSectionProps {
     onClick: () => void;
   };
   mobile?: boolean;
+  wrapperRef?: React.Ref<HTMLDivElement>;
 }
 
 export function CollapsibleSection({
@@ -26,9 +27,11 @@ export function CollapsibleSection({
   itemCount,
   actionButton,
   mobile = false,
+  wrapperRef,
 }: CollapsibleSectionProps) {
   return (
     <div
+      ref={wrapperRef}
       data-testid={`aegis-section-${id}`}
       className="border border-subtle rounded-lg overflow-hidden transition-all duration-150"
     >

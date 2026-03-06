@@ -23,6 +23,13 @@ if (typeof globalThis.TextEncoder === "undefined") {
   Object.assign(globalThis, { TextEncoder, TextDecoder });
 }
 
+// Mock IntersectionObserver for JSDOM (useAutoReveal hook)
+global.IntersectionObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
+
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { render, fireEvent, screen, act } from "@testing-library/react";
@@ -144,13 +151,14 @@ describe("DashboardCard — rendered via dashboard sections", () => {
   it("renders text truncated to 150 chars for standard cards (Needs Review)", () => {
     const longText = "Z".repeat(300);
     // Create unreviewed quality items that appear in Needs Review
+    // Use unique topics so items don't get consumed by Topic Spotlight
     const fillers = Array.from({ length: 4 }, (_, i) =>
-      makeItem({ id: `trunc-fill-${i}`, text: `Filler text for top3 ${i}`,
+      makeItem({ id: `trunc-fill-${i}`, text: `Filler text for top3 ${i}`, topics: ["filler"],
         scores: { originality: 10, insight: 10, credibility: 10, composite: 10 } }),
     );
     const reviewItems = Array.from({ length: 4 }, (_, i) =>
       makeItem({ id: `trunc-${i}`, text: i === 0 ? longText : `Short unique review text ${i}`,
-        verdict: "quality", scores: { originality: 6, insight: 6, credibility: 6, composite: 6 } }),
+        topics: ["misc"], verdict: "quality", scores: { originality: 6, insight: 6, credibility: 6, composite: 6 } }),
     );
     const { container } = render(
       <DashboardTab content={[...fillers, ...reviewItems]} onValidate={jest.fn()} onFlag={jest.fn()} />
@@ -507,7 +515,7 @@ describe("Mode toggle and localStorage persistence", () => {
 describe("Section and topic expansion", () => {
   beforeEach(() => localStorage.setItem("aegis-home-mode", "dashboard"));
 
-  it("Topic Spotlight auto-expands first topic", () => {
+  it("Topic Spotlight renders topic accordion that can be toggled", () => {
     const items = Array.from({ length: 8 }, (_, i) =>
       makeItem({ id: `texp-${i}`, topics: ["ai"], text: `Topic expand test ${i}`,
         scores: { originality: 7, insight: 7, credibility: 7, composite: 7 } }),
@@ -520,9 +528,13 @@ describe("Section and topic expansion", () => {
     const { container } = render(
       <DashboardTab content={[...fillers, ...items]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    // First topic should have expanded content (the slideDown animation div)
-    const expandedContent = container.querySelector('[style*="slideDown"]');
-    expect(expandedContent).not.toBeNull();
+    // Topic accordion should render with ai topic and a clickable toggle
+    const allButtons = Array.from(container.querySelectorAll('button'));
+    const topicBtn = allButtons.find(btn => (btn.textContent || "").includes("ai") && (btn.textContent || "").includes("▼"));
+    expect(topicBtn).toBeDefined();
+    // Clicking should expand (auto-reveal starts collapsed in test env)
+    fireEvent.click(topicBtn!);
+    expect(container.textContent).toContain("Topic expand test");
   });
 
   it("renders topic accordion button that is clickable", () => {

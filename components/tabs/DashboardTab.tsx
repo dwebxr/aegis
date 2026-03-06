@@ -31,6 +31,7 @@ import { NewItemsBar } from "@/components/ui/NewItemsBar";
 import { useSources } from "@/contexts/SourceContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { useAutoReveal } from "@/hooks/useAutoReveal";
 
 function ScorePill({ gr, tag }: { gr: ReturnType<typeof scoreGrade>; tag: { label: string; color: string } | null }) {
   return (
@@ -334,21 +335,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set());
 
-  // State for collapsible dashboard sections
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
-  // State for Topic Spotlight collapsible topics
-  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
+  // Auto-reveal: sections expand when scrolled into view, remember manual collapses
+  const { isExpanded: isSectionExpanded, toggle: toggleSection, observeRef: sectionRef } = useAutoReveal();
 
   const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
   const moreFiltersActive = verdictFilter === "all" || verdictFilter === "slop" || sourceFilter !== "all";
-
-  const toggleSection = useCallback((id: string) => {
-    setExpandedSections(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  }, []);
-
-  const toggleTopic = useCallback((id: string) => {
-    setExpandedTopics(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  }, []);
 
   const agentContext = useMemo(() => {
     if (!hasEnoughData(profile)) return null;
@@ -370,13 +361,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return computeTopicSpotlight(contentRef.current, profile, dashboardTop3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, dashboardTop3, homeMode, content.length]);
-
-  // Initialize first topic as expanded
-  useEffect(() => {
-    if (dashboardTopicSpotlight.length > 0 && expandedTopics.size === 0) {
-      setExpandedTopics(new Set([dashboardTopicSpotlight[0].topic]));
-    }
-  }, [dashboardTopicSpotlight, expandedTopics.size]);
 
   const { filteredDiscoveries, unreviewedQueue, dashboardSaved } = useMemo(() => {
     if (homeMode !== "dashboard") return EMPTY_SECTIONS;
@@ -865,14 +849,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               ) : (
                 <div className="flex flex-col gap-3">
                   {dashboardTopicSpotlight.map(({ topic, items }) => {
-                    const isExpanded = expandedTopics.has(topic);
+                    const topicId = `topic:${topic}`;
+                    const expanded = isSectionExpanded(topicId);
                     return (
-                      <div key={topic} className="bg-transparent border border-subtle rounded-lg overflow-hidden">
+                      <div key={topic} ref={sectionRef(topicId)} className="bg-transparent border border-subtle rounded-lg overflow-hidden">
                         <button
-                          onClick={() => toggleTopic(topic)}
+                          onClick={() => toggleSection(topicId)}
                           className={cn(
                             "w-full px-4 py-3 border-none cursor-pointer flex items-center gap-2 font-[inherit] transition-fast",
-                            isExpanded ? "bg-card" : "bg-transparent"
+                            expanded ? "bg-card" : "bg-transparent"
                           )}
                         >
                           <span className="text-body-sm font-bold px-2 py-0.5 bg-cyan-500/10 rounded-full text-cyan-400">
@@ -884,12 +869,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                           <div className="flex-1" />
                           <span className={cn(
                             "transition-fast text-xs text-muted-foreground",
-                            isExpanded && "rotate-180"
+                            expanded && "rotate-180"
                           )}>
                             &#x25BC;
                           </span>
                         </button>
-                        {isExpanded && (
+                        {expanded && (
                           <div className="px-4 py-3 border-t border-subtle" style={{ animation: "slideDown .2s ease forwards" }}>
                             <div className={cn(mobile ? "flex flex-col gap-4" : "grid grid-cols-3 gap-4")}>
                               {items.map(item => (
@@ -937,8 +922,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               id="discoveries"
               title="Discoveries"
               icon="&#x1F52D;"
-              isExpanded={expandedSections.has('discoveries')}
+              isExpanded={isSectionExpanded('discoveries')}
               onToggle={toggleSection}
+              wrapperRef={sectionRef('discoveries')}
               itemCount={filteredDiscoveries.length}
               mobile={mobile}
             >
@@ -963,8 +949,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               id="review-queue"
               title="Needs Review"
               icon="&#x1F4CB;"
-              isExpanded={expandedSections.has('review-queue')}
+              isExpanded={isSectionExpanded('review-queue')}
               onToggle={toggleSection}
+              wrapperRef={sectionRef('review-queue')}
               itemCount={unreviewedQueue.length}
               mobile={mobile}
             >

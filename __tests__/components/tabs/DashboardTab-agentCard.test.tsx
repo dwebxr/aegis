@@ -8,6 +8,13 @@ if (typeof globalThis.TextEncoder === "undefined") {
   Object.assign(globalThis, { TextEncoder, TextDecoder });
 }
 
+// Mock IntersectionObserver for JSDOM (useAutoReveal hook)
+global.IntersectionObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
+
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
