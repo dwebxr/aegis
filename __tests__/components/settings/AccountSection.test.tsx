@@ -181,6 +181,143 @@ describe("AccountSection — Danger Zone delete flow", () => {
   });
 });
 
+describe("AccountSection — copy principal", () => {
+  it("copies principal to clipboard", async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    render(<AccountSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-copy-principal"));
+
+    await new Promise(r => setTimeout(r, 10));
+    expect(writeText).toHaveBeenCalledWith("abc-123-principal");
+  });
+
+  it("shows Copied after successful copy", async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    render(<AccountSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-copy-principal"));
+
+    await new Promise(r => setTimeout(r, 10));
+    expect(screen.getByText("Copied")).toBeTruthy();
+  });
+
+  it("shows error notification on clipboard failure", async () => {
+    const writeText = jest.fn().mockRejectedValue(new Error("denied"));
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    render(<AccountSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-copy-principal"));
+
+    await new Promise(r => setTimeout(r, 10));
+    expect(mockAddNotification).toHaveBeenCalledWith("Failed to copy to clipboard", "error");
+  });
+});
+
+describe("AccountSection — login button", () => {
+  it("calls login when login button clicked", () => {
+    mockIsAuthenticated = false;
+    render(<AccountSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-login"));
+    expect(mockLogin).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AccountSection — delete local data", () => {
+  beforeEach(() => {
+    // Set up localStorage with aegis keys
+    localStorage.clear();
+    localStorage.setItem("aegis-prefs", "test");
+    localStorage.setItem("aegis-cache", "test");
+    localStorage.setItem("other-key", "keep");
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("does nothing if DELETE not typed", async () => {
+    render(<AccountSection />);
+    fireEvent.click(screen.getByText("Delete All Local Data"));
+    const input = screen.getByTestId("aegis-settings-delete-input");
+    fireEvent.change(input, { target: { value: "DELET" } });
+    fireEvent.click(screen.getByText("Confirm Delete"));
+
+    await new Promise(r => setTimeout(r, 10));
+    // localStorage should still have aegis keys
+    expect(localStorage.getItem("aegis-prefs")).toBe("test");
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it("deletes aegis localStorage keys and calls logout", async () => {
+    // Mock indexedDB
+    const mockDeleteDatabase = jest.fn().mockImplementation(() => {
+      const req = { onsuccess: null as (() => void) | null, onerror: null as (() => void) | null, error: null };
+      setTimeout(() => req.onsuccess?.(), 0);
+      return req;
+    });
+    Object.defineProperty(window, "indexedDB", {
+      value: { deleteDatabase: mockDeleteDatabase },
+      writable: true,
+      configurable: true,
+    });
+
+    // Mock window.location.reload
+    const reloadMock = jest.fn();
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
+
+    render(<AccountSection />);
+    fireEvent.click(screen.getByText("Delete All Local Data"));
+    const input = screen.getByTestId("aegis-settings-delete-input");
+    fireEvent.change(input, { target: { value: "DELETE" } });
+    fireEvent.click(screen.getByTestId("aegis-settings-delete-confirm"));
+
+    await new Promise(r => setTimeout(r, 50));
+
+    // aegis keys removed, other keys preserved
+    expect(localStorage.getItem("aegis-prefs")).toBeNull();
+    expect(localStorage.getItem("aegis-cache")).toBeNull();
+    expect(localStorage.getItem("other-key")).toBe("keep");
+
+    expect(mockLogout).toHaveBeenCalled();
+    expect(mockAddNotification).toHaveBeenCalledWith("All local data deleted", "success");
+  });
+
+  it("shows Deleting... state on confirm button", async () => {
+    const mockDeleteDatabase = jest.fn().mockImplementation(() => {
+      const req = { onsuccess: null as (() => void) | null, onerror: null as (() => void) | null, error: null };
+      // Deliberately don't call onsuccess to keep in deleting state
+      return req;
+    });
+    Object.defineProperty(window, "indexedDB", {
+      value: { deleteDatabase: mockDeleteDatabase },
+      writable: true,
+      configurable: true,
+    });
+    // prevent reload from actually executing
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, reload: jest.fn() },
+      writable: true,
+      configurable: true,
+    });
+
+    render(<AccountSection />);
+    fireEvent.click(screen.getByText("Delete All Local Data"));
+    const input = screen.getByTestId("aegis-settings-delete-input");
+    fireEvent.change(input, { target: { value: "DELETE" } });
+    fireEvent.click(screen.getByTestId("aegis-settings-delete-confirm"));
+
+    // The button should show "Deleting..."
+    expect(screen.getByText("Deleting...")).toBeTruthy();
+  });
+});
+
 describe("AccountSection — mobile", () => {
   it("renders without error in mobile mode", () => {
     const html = renderToStaticMarkup(<AccountSection mobile />);

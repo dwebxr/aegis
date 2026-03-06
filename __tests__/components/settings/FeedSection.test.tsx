@@ -57,17 +57,26 @@ jest.mock("@/lib/webllm/engine", () => ({
   destroyEngine: async () => {},
 }));
 
+let mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: false };
+const mockSetOllamaConfig = jest.fn();
+
 jest.mock("@/lib/ollama/storage", () => ({
-  getOllamaConfig: () => ({ endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: false }),
-  setOllamaConfig: jest.fn(),
-  isOllamaEnabled: () => false,
+  getOllamaConfig: () => mockOllamaConfig,
+  setOllamaConfig: (c: typeof mockOllamaConfig) => { mockSetOllamaConfig(c); mockOllamaConfig = c; },
+  isOllamaEnabled: () => mockOllamaConfig.enabled,
+}));
+
+jest.mock("@/lib/ollama/engine", () => ({
+  testOllamaConnection: jest.fn().mockResolvedValue({ ok: true, models: ["llama3.1:8b", "mistral:7b"] }),
 }));
 
 beforeEach(() => {
   mockAgentEnabled = false;
   mockStoredKey = null;
   mockWebLLMEnabled = false;
+  mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: false };
   mockAddNotification.mockClear();
+  mockSetOllamaConfig.mockClear();
 });
 
 describe("FeedSection — Filter Mode", () => {
@@ -196,6 +205,124 @@ describe("FeedSection — Local LLM (Ollama)", () => {
     const html = renderToStaticMarkup(<FeedSection />);
     expect(html).toContain("Connect to Ollama");
     expect(html).toContain("zero cost");
+  });
+});
+
+describe("FeedSection — API key save success path", () => {
+  it("shows masked key and API Key Set after saving valid key", () => {
+    render(<FeedSection />);
+    const input = screen.getByPlaceholderText("sk-ant-...");
+    fireEvent.change(input, { target: { value: "sk-ant-api03-validkey123456" } });
+    fireEvent.click(screen.getByText("Save"));
+    expect(screen.getByText("API Key Set")).toBeTruthy();
+    expect(screen.getByText(/sk-ant-/)).toBeTruthy();
+  });
+
+  it("clears input after successful save", () => {
+    render(<FeedSection />);
+    const input = screen.getByPlaceholderText("sk-ant-...") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "sk-ant-api03-validkey123456" } });
+    fireEvent.click(screen.getByText("Save"));
+    // Input should be cleared (component switches to key display mode)
+    expect(screen.queryByPlaceholderText("sk-ant-...")).toBeNull();
+  });
+});
+
+describe("FeedSection — Clear key cancel", () => {
+  it("cancels key removal on Cancel", () => {
+    mockStoredKey = "sk-ant-api03-testkey";
+    render(<FeedSection />);
+    fireEvent.click(screen.getByText("Clear"));
+    expect(screen.getByText("Remove key?")).toBeTruthy();
+    fireEvent.click(screen.getByText("Cancel"));
+    // Should be back to normal state with Clear button
+    expect(screen.getByText("Clear")).toBeTruthy();
+    expect(screen.queryByText("Remove key?")).toBeNull();
+  });
+});
+
+describe("FeedSection — WebLLM toggle", () => {
+  it("enables WebLLM on toggle click", async () => {
+    mockWebLLMEnabled = false;
+    render(<FeedSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-webllm-toggle"));
+    await new Promise(r => setTimeout(r, 10));
+    expect(mockAddNotification).toHaveBeenCalledWith("Browser AI enabled", "success");
+  });
+
+  it("disables WebLLM on toggle click when enabled", async () => {
+    mockWebLLMEnabled = true;
+    render(<FeedSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-webllm-toggle"));
+    await new Promise(r => setTimeout(r, 10));
+    expect(mockAddNotification).toHaveBeenCalledWith("Browser AI disabled", "success");
+  });
+});
+
+describe("FeedSection — Ollama toggle and interactions", () => {
+  it("enables Ollama and shows connection test notification", async () => {
+    render(<FeedSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-ollama-toggle"));
+    await new Promise(r => setTimeout(r, 10));
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      expect.stringContaining("Local LLM enabled"),
+      "success"
+    );
+  });
+
+  it("shows Enabled text after toggle", async () => {
+    render(<FeedSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-ollama-toggle"));
+    await new Promise(r => setTimeout(r, 50));
+    expect(screen.getAllByText("Enabled").length).toBeGreaterThan(0);
+  });
+
+  it("shows endpoint and model inputs when enabled", async () => {
+    mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: true };
+    render(<FeedSection />);
+    expect(screen.getByDisplayValue("http://localhost:11434")).toBeTruthy();
+    expect(screen.getByText("Test")).toBeTruthy();
+    expect(screen.getByText("Endpoint")).toBeTruthy();
+    expect(screen.getByText("Model")).toBeTruthy();
+  });
+
+  it("changes endpoint value", () => {
+    mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: true };
+    render(<FeedSection />);
+    const endpointInput = screen.getByDisplayValue("http://localhost:11434");
+    fireEvent.change(endpointInput, { target: { value: "http://localhost:8080" } });
+    expect(mockSetOllamaConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint: "http://localhost:8080" })
+    );
+  });
+
+  it("changes model value via text input", () => {
+    mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: true };
+    render(<FeedSection />);
+    const modelInput = screen.getByDisplayValue("llama3.1:8b");
+    fireEvent.change(modelInput, { target: { value: "mistral:7b" } });
+    expect(mockSetOllamaConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "mistral:7b" })
+    );
+  });
+
+  it("tests connection and shows success notification", async () => {
+    mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: true };
+    render(<FeedSection />);
+    fireEvent.click(screen.getByText("Test"));
+    await new Promise(r => setTimeout(r, 50));
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      expect.stringContaining("Connected"),
+      "success"
+    );
+  });
+
+  it("disables Ollama on second toggle", async () => {
+    mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: true };
+    render(<FeedSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-ollama-toggle"));
+    await new Promise(r => setTimeout(r, 10));
+    expect(mockAddNotification).toHaveBeenCalledWith("Local LLM disabled", "success");
   });
 });
 
