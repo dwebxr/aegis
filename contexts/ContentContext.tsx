@@ -8,198 +8,21 @@ import { useNotify } from "./NotificationContext";
 import type { ContentItem } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
-import { getUserApiKey } from "@/lib/apiKey/storage";
-import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
-import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
+import type { _SERVICE } from "@/lib/ic/declarations";
+import { errMsg } from "@/lib/utils/errors";
 import { withTimeout } from "@/lib/utils/timeout";
 import { recordUseful, recordSlop } from "@/lib/d2a/reputation";
 import { recordPublishValidation, recordPublishFlag } from "@/lib/reputation/publishGate";
-import { isWebLLMEnabled } from "@/lib/webllm/storage";
-import { isOllamaEnabled } from "@/lib/ollama/storage";
-import { computeScoringCacheKey, computeProfileHash, lookupScoringCache, storeScoringCache } from "@/lib/scoring/cache";
-import { encodeEngineInReason, decodeEngineFromReason, encodeTopicsInReason, decodeTopicsFromReason } from "@/lib/scoring/types";
 import { syncBriefingToCanister } from "@/lib/briefing/sync";
 import type { BriefingState } from "@/lib/briefing/types";
-import { enqueueAction, dequeueAll, removeAction, incrementRetries } from "@/lib/offline/actionQueue";
+import { dequeueAll } from "@/lib/offline/actionQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { isIDBAvailable, idbGet, idbPut, STORE_CONTENT_CACHE } from "@/lib/storage/idb";
+import type { ContentState, PreferenceCallbacks } from "./content/types";
+import { loadCachedContent, saveCachedContent, truncatePreservingActioned } from "./content/cache";
+import { runScoringCascade } from "./content/scoring";
+import { toICEvaluation, syncToIC, drainOfflineQueue, loadFromICCanister } from "./content/icSync";
 
-const CONTENT_CACHE_KEY = "aegis-content-cache";
-const IDB_CONTENT_KEY = "items";
-const MAX_CACHED_ITEMS = 200;
 const MAX_PENDING_BUFFER = 100;
-const SAVE_DEBOUNCE_MS = 1000;
-
-async function fetchAnalyze(
-  text: string,
-  userContext?: UserContext | null,
-  apiKey?: string,
-): Promise<AnalyzeResponse | null> {
-  try {
-    const body: Record<string, unknown> = { text };
-    if (userContext) body.userContext = userContext;
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (apiKey) headers["X-User-API-Key"] = apiKey;
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      console.warn("[analyze] API returned", res.status, data?.error || "");
-      return null;
-    }
-    return data;
-  } catch (err) {
-    console.warn("[analyze] fetch failed:", errMsg(err));
-    return null;
-  }
-}
-
-/** Scoring tier helpers — each returns AnalyzeResponse on success, throws on failure (for Promise.any). */
-async function tryOllama(text: string, topics: string[]): Promise<AnalyzeResponse> {
-  const { scoreWithOllama } = await import("@/lib/ollama/engine");
-  const r = await scoreWithOllama(text, topics);
-  return { ...r, scoredByAI: true, scoringEngine: "ollama" as const };
-}
-
-async function tryWebLLM(text: string, topics: string[]): Promise<AnalyzeResponse> {
-  const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
-  const r = await scoreWithWebLLM(text, topics);
-  return { ...r, scoredByAI: true, scoringEngine: "webllm" as const };
-}
-
-async function tryBYOK(text: string, uc: UserContext | null | undefined, key: string): Promise<AnalyzeResponse> {
-  const data = await fetchAnalyze(text, uc, key);
-  if (!data) throw new Error("BYOK failed");
-  return { ...data, scoringEngine: "claude-byok" as const };
-}
-
-function validateContentItems(parsed: unknown): ContentItem[] {
-  if (!Array.isArray(parsed)) return [];
-  return parsed.filter(
-    (c: unknown): c is ContentItem => {
-      if (!c || typeof c !== "object") return false;
-      const item = c as Record<string, unknown>;
-      return (
-        typeof item.id === "string" &&
-        typeof item.text === "string" &&
-        typeof item.source === "string" &&
-        typeof item.createdAt === "number" &&
-        typeof item.verdict === "string" &&
-        typeof item.validated === "boolean" &&
-        typeof item.flagged === "boolean" &&
-        !!item.scores && typeof item.scores === "object" &&
-        typeof (item.scores as Record<string, unknown>).composite === "number"
-      );
-    },
-  );
-}
-
-async function loadCachedContentAsync(): Promise<ContentItem[]> {
-  if (isIDBAvailable()) {
-    try {
-      const data = await idbGet<unknown>(STORE_CONTENT_CACHE, IDB_CONTENT_KEY);
-      if (data) return validateContentItems(data);
-    } catch (err) {
-      console.warn("[content] IDB load failed, trying localStorage:", errMsg(err));
-    }
-  }
-  if (typeof globalThis.localStorage === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(CONTENT_CACHE_KEY);
-    if (!raw) return [];
-    return validateContentItems(JSON.parse(raw));
-  } catch (err) {
-    console.warn("[content] Failed to parse cached content:", errMsg(err));
-    return [];
-  }
-}
-
-/** Check whether `item` is a duplicate of any item in `existing`. */
-function isDuplicateItem(item: ContentItem, existing: ContentItem[]): boolean {
-  return existing.some(c =>
-    (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
-    (!item.sourceUrl && c.text === item.text),
-  );
-}
-
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let useIDB = false;
-
-function saveCachedContent(items: ContentItem[]): void {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    const truncated = truncatePreservingActioned(items);
-    if (useIDB) {
-      idbPut(STORE_CONTENT_CACHE, IDB_CONTENT_KEY, truncated).catch(err => {
-        console.warn("[content] IDB save failed:", errMsg(err));
-      });
-    } else if (typeof globalThis.localStorage !== "undefined") {
-      try {
-        localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncated));
-      } catch (err) {
-        console.warn("[content] localStorage save failed (quota?):", errMsg(err));
-      }
-    }
-  }, SAVE_DEBOUNCE_MS);
-}
-
-/** Truncate to MAX_CACHED_ITEMS but never drop validated or flagged items. */
-function truncatePreservingActioned(items: ContentItem[]): ContentItem[] {
-  if (items.length <= MAX_CACHED_ITEMS) return items;
-
-  const actioned: ContentItem[] = [];
-  const unactioned: ContentItem[] = [];
-  for (const item of items) {
-    if (item.validated || item.flagged) {
-      actioned.push(item);
-    } else {
-      unactioned.push(item);
-    }
-  }
-
-  const unactionedBudget = Math.max(0, MAX_CACHED_ITEMS - actioned.length);
-  const trimmedUnactioned = unactioned.slice(0, unactionedBudget);
-
-  const preservedIds = new Set([
-    ...actioned.map(c => c.id),
-    ...trimmedUnactioned.map(c => c.id),
-  ]);
-  return items.filter(c => preservedIds.has(c.id));
-}
-
-interface ContentState {
-  content: ContentItem[];
-  isAnalyzing: boolean;
-  syncStatus: "idle" | "syncing" | "synced" | "offline";
-  /** True once the local cache has been checked (IDB/localStorage). */
-  cacheChecked: boolean;
-  analyze: (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
-  /** Run the full scoring cascade without side effects (no state update, no IC save). Used by scheduler. */
-  scoreText: (text: string, userContext?: UserContext | null) => Promise<AnalyzeResponse>;
-  validateItem: (id: string) => void;
-  flagItem: (id: string) => void;
-  addContent: (item: ContentItem) => void;
-  /** Buffer a new item for later display (used by scheduler). */
-  addContentBuffered: (item: ContentItem) => void;
-  /** Move all buffered items into visible content. */
-  flushPendingItems: () => void;
-  pendingCount: number;
-  clearDemoContent: () => void;
-  loadFromIC: () => Promise<void>;
-  syncBriefing: (state: BriefingState, nostrPubkey?: string | null) => void;
-  pendingActions: number;
-  isOnline: boolean;
-}
-
-type PreferenceCallbacks = {
-  onValidate?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => void;
-  onFlag?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", itemId?: string) => void;
-};
 
 const defaultAnalyzeResponse: AnalyzeResponse = { originality: 0, insight: 0, credibility: 0, composite: 0, verdict: "slop" as const, reason: "" };
 
@@ -223,43 +46,12 @@ const ContentContext = createContext<ContentState>({
   isOnline: true,
 });
 
-const SOURCE_KEYS = ["rss", "url", "twitter", "nostr", "manual"] as const;
-
-function mapSource(s: string): ContentSource {
-  const key = SOURCE_KEYS.includes(s as typeof SOURCE_KEYS[number]) ? s : "manual";
-  return { [key]: null } as ContentSource;
-}
-
-function mapSourceBack(s: ContentSource): string {
-  return SOURCE_KEYS.find(k => k in s) || "manual";
-}
-
-function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal").Principal) {
-  return {
-    id: c.id,
-    owner,
-    author: c.author,
-    avatar: c.avatar,
-    text: c.text,
-    source: mapSource(c.source),
-    sourceUrl: c.sourceUrl ? [c.sourceUrl] as [string] : [] as [],
-    imageUrl: c.imageUrl ? [c.imageUrl] as [string] : [] as [],
-    scores: {
-      originality: Math.round(c.scores.originality),
-      insight: Math.round(c.scores.insight),
-      credibility: Math.round(c.scores.credibility),
-      compositeScore: c.scores.composite,
-    },
-    verdict: c.verdict === "quality" ? { quality: null } : { slop: null },
-    reason: encodeTopicsInReason(
-      c.scoringEngine ? encodeEngineInReason(c.scoringEngine, c.reason) : c.reason,
-      c.topics,
-    ),
-    createdAt: BigInt(Math.round(c.createdAt)) * BigInt(1_000_000),
-    validated: c.validated,
-    flagged: c.flagged,
-    validatedAt: c.validatedAt ? [BigInt(Math.round(c.validatedAt)) * BigInt(1_000_000)] as [bigint] : [] as [],
-  };
+/** Check whether `item` is a duplicate of any item in `existing`. */
+function isDuplicateItem(item: ContentItem, existing: ContentItem[]): boolean {
+  return existing.some(c =>
+    (item.sourceUrl && c.sourceUrl === item.sourceUrl) ||
+    (!item.sourceUrl && c.text === item.text),
+  );
 }
 
 export function ContentProvider({ children, preferenceCallbacks }: { children: React.ReactNode; preferenceCallbacks?: PreferenceCallbacks }) {
@@ -282,10 +74,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const backfillCleanupRef = useRef<(() => void) | null>(null);
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
 
+  // ─── Cache load on mount ───
   useEffect(() => {
     let cancelled = false;
-    useIDB = isIDBAvailable();
-    loadCachedContentAsync().then(items => {
+    loadCachedContent().then(items => {
       if (!cancelled && items.length > 0) {
         setContent(items);
       }
@@ -297,22 +89,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     return () => { cancelled = true; };
   }, []);
 
-  /** Fire-and-forget IC call with offline queue fallback. */
-  function syncToIC(promise: Promise<unknown>, actionType: "saveEvaluation" | "updateEvaluation", payload: unknown) {
-    void promise.catch(async (err: unknown) => {
-      console.warn("[content] IC sync failed:", errMsg(err));
-      setSyncStatus("offline");
-      try {
-        await enqueueAction(actionType, payload);
-        setPendingActions(p => p + 1);
-        addNotification("Saved locally \u2014 will sync when online", "info");
-      } catch (qErr) {
-        console.error("[content] Failed to enqueue offline action:", errMsg(qErr));
-        addNotification("Failed to save \u2014 changes may be lost", "error");
-      }
-    });
+  // ─── IC sync helper (fire-and-forget with offline queue) ───
+  function doSyncToIC(promise: Promise<unknown>, actionType: "saveEvaluation" | "updateEvaluation", payload: unknown) {
+    syncToIC(promise, actionType, payload, setSyncStatus, setPendingActions, addNotification);
   }
 
+  // ─── Actor creation & auto-sync on auth ───
   useEffect(() => {
     let stale = false;
     if (isAuthenticated && identity) {
@@ -333,7 +115,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           console.error("[content] Failed to create IC actor:", errMsg(err));
           actorRef.current = null;
           setSyncStatus("offline");
-          addNotification("Could not connect to IC — content won't sync", "error");
+          addNotification("Could not connect to IC \u2014 content won't sync", "error");
         });
     } else {
       actorRef.current = null;
@@ -346,47 +128,17 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     };
   }, [isAuthenticated, identity, addNotification]);
 
-  const drainOfflineQueue = useCallback(async () => {
+  // ─── Offline queue drain ───
+  const doDrainQueue = useCallback(async () => {
     const actor = actorRef.current;
     if (!actor || !isAuthenticated || !principal) return;
-    const actions = await dequeueAll();
-    if (actions.length === 0) return;
-    console.info(`[offline-queue] Draining ${actions.length} pending action(s)`);
-    const MAX_RETRIES = 5;
-    for (const action of actions) {
-      if (action.retries >= MAX_RETRIES) {
-        console.warn(`[offline-queue] Dropping action ${action.id} after ${MAX_RETRIES} retries`);
-        await removeAction(action.id!);
-        continue;
-      }
-      try {
-        if (action.type === "updateEvaluation") {
-          const { id, validated, flagged } = action.payload as { id: string; validated: boolean; flagged: boolean };
-          await actor.updateEvaluation(id, validated, flagged);
-        } else if (action.type === "saveEvaluation") {
-          const { itemId } = action.payload as { itemId: string };
-          const item = contentRef.current.find(c => c.id === itemId);
-          if (item) {
-            await actor.saveEvaluation(toICEvaluation(item, principal));
-          }
-        }
-        await removeAction(action.id!);
-      } catch (err) {
-        console.warn(`[offline-queue] Replay failed for action ${action.id}:`, errMsg(err));
-        await incrementRetries(action.id!);
-      }
-    }
-    const remaining = await dequeueAll();
-    setPendingActions(remaining.length);
-    if (remaining.length === 0) {
-      setSyncStatus("synced");
-      console.info("[offline-queue] All pending actions synced");
-    }
+    await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus);
   }, [isAuthenticated, principal]);
-  drainQueueRef.current = drainOfflineQueue;
+  drainQueueRef.current = doDrainQueue;
 
-  const isOnline = useOnlineStatus(drainOfflineQueue);
+  const isOnline = useOnlineStatus(doDrainQueue);
 
+  // ─── Load pending action count on mount ───
   useEffect(() => {
     let cancelled = false;
     dequeueAll().then(a => {
@@ -397,10 +149,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     return () => { cancelled = true; };
   }, []);
 
+  // ─── Persist content to cache ───
   useEffect(() => {
     saveCachedContent(content);
   }, [content]);
 
+  // ─── Timestamp refresh & visibility-based backfill ───
   useEffect(() => {
     const updateTimestamps = () => {
       if (typeof document !== "undefined" && document.hidden) return;
@@ -433,90 +187,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     };
   }, []);
 
-  /** Run the full scoring cascade: Ollama → WebLLM → BYOK → IC LLM → Server → Heuristic. No side effects. */
+  // ─── Scoring cascade ───
   const scoreText = useCallback(async (text: string, userContext?: UserContext | null): Promise<AnalyzeResponse> => {
-    const profileHash = computeProfileHash(userContext);
-    const cacheKey = computeScoringCacheKey(text, userContext, profileHash);
-    const cached = lookupScoringCache(cacheKey, profileHash);
-    if (cached) return cached;
-
-    let result: AnalyzeResponse | null = null;
-    const userApiKey = getUserApiKey();
-    const topics = userContext
-      ? [...(userContext.highAffinityTopics || []), ...(userContext.recentTopics || [])].slice(0, 10)
-      : [];
-
-    // Tier 0-2: Run enabled local tiers in parallel (fastest wins)
-    const localTiers: Promise<AnalyzeResponse>[] = [];
-    const tierNames: string[] = [];
-    if (isOllamaEnabled()) { localTiers.push(tryOllama(text, topics)); tierNames.push("ollama"); }
-    if (isWebLLMEnabled()) { localTiers.push(tryWebLLM(text, topics)); tierNames.push("webllm"); }
-    if (userApiKey) { localTiers.push(tryBYOK(text, userContext, userApiKey)); tierNames.push("byok"); }
-
-    if (localTiers.length > 0) {
-      try {
-        result = await Promise.any(localTiers);
-      } catch (err) {
-        // All local tiers failed — log each tier's error for debuggability
-        const reasons = err instanceof AggregateError
-          ? err.errors.map((e, i) => `${tierNames[i]}: ${errMsg(e)}`).join("; ")
-          : errMsg(err);
-        console.warn("[scoreText] All local tiers failed:", reasons);
-      }
-    }
-
-    // Tier 3: IC LLM via canister (free, on-chain)
-    if (!result && actorRef.current && isAuthenticated) {
-      try {
-        const icResult = await withTimeout(
-          actorRef.current.analyzeOnChain(text.slice(0, 3000), topics),
-          10_000,
-          "IC LLM timeout (10s)",
-        );
-        if ("ok" in icResult) {
-          const a = icResult.ok;
-          result = {
-            originality: a.originality,
-            insight: a.insight,
-            credibility: a.credibility,
-            composite: a.compositeScore,
-            verdict: "quality" in a.verdict ? "quality" : "slop",
-            reason: a.reason,
-            topics: a.topics,
-            vSignal: a.vSignal.length > 0 ? a.vSignal[0] : undefined,
-            cContext: a.cContext.length > 0 ? a.cContext[0] : undefined,
-            lSlop: a.lSlop.length > 0 ? a.lSlop[0] : undefined,
-            scoringEngine: "claude-ic" as const,
-          };
-        } else if ("err" in icResult) {
-          console.warn("[scoreText] IC LLM error:", icResult.err);
-        }
-      } catch (err) {
-        console.warn("[scoreText] IC LLM failed:", errMsg(err));
-      }
-    }
-
-    // Tier 3.5: Claude API with server key (fallback for all prior tiers)
-    if (!result) {
-      const data = await fetchAnalyze(text, userContext);
-      if (data) {
-        result = { ...data, scoringEngine: "claude-server" as const };
-      } else {
-        console.warn("[scoreText] Server Claude failed, falling back to heuristic");
-      }
-    }
-
-    // Tier 4: Heuristic fallback
-    if (!result) {
-      const { heuristicScores } = await import("@/lib/ingestion/quickFilter");
-      result = { ...heuristicScores(text), scoredByAI: false, scoringEngine: "heuristic" as const };
-    }
-
-    storeScoringCache(cacheKey, profileHash, result);
-
-    return result;
+    return runScoringCascade(text, userContext, actorRef, isAuthenticated);
   }, [isAuthenticated]);
 
+  // ─── Analyze (score + persist) ───
   const analyze = useCallback(async (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }): Promise<AnalyzeResponse> => {
     setIsAnalyzing(true);
     try {
@@ -563,13 +239,14 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       setContent(prev => truncatePreservingActioned([evaluation, ...prev]));
 
       if (actorRef.current && isAuthenticated && principal) {
-        syncToIC(actorRef.current.saveEvaluation(toICEvaluation(evaluation, principal)), "saveEvaluation", { itemId: evaluation.id });
+        doSyncToIC(actorRef.current.saveEvaluation(toICEvaluation(evaluation, principal)), "saveEvaluation", { itemId: evaluation.id });
       }
 
       return result;
     } finally { setIsAnalyzing(false); }
   }, [scoreText, isAuthenticated, principal, addNotification]);
 
+  // ─── Validate / Flag ───
   const validateItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
     if (!item || item.validated) return;
@@ -578,7 +255,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (item.source === "nostr" && item.nostrPubkey) recordUseful(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishValidation(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
-      syncToIC(actorRef.current.updateEvaluation(id, true, false), "updateEvaluation", { id, validated: true, flagged: false });
+      doSyncToIC(actorRef.current.updateEvaluation(id, true, false), "updateEvaluation", { id, validated: true, flagged: false });
     }
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
 
@@ -590,10 +267,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     if (item.source === "nostr" && item.nostrPubkey) recordSlop(item.nostrPubkey);
     if (item.source === "manual" && item.nostrPubkey) recordPublishFlag(item.nostrPubkey);
     if (actorRef.current && isAuthenticated) {
-      syncToIC(actorRef.current.updateEvaluation(id, false, true), "updateEvaluation", { id, validated: false, flagged: true });
+      doSyncToIC(actorRef.current.updateEvaluation(id, false, true), "updateEvaluation", { id, validated: false, flagged: true });
     }
   }, [isAuthenticated, preferenceCallbacks, addNotification]);
 
+  // ─── Add content ───
   const addContent = useCallback((item: ContentItem) => {
     const owned = (!item.owner && isAuthenticated && principal)
       ? { ...item, owner: principal.toText() }
@@ -603,7 +281,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       if (isDuplicateItem(item, prev)) return prev;
 
       if (actorRef.current && isAuthenticated && principal) {
-        syncToIC(actorRef.current.saveEvaluation(toICEvaluation(owned, principal)), "saveEvaluation", { itemId: owned.id });
+        doSyncToIC(actorRef.current.saveEvaluation(toICEvaluation(owned, principal)), "saveEvaluation", { itemId: owned.id });
       }
 
       return truncatePreservingActioned([owned, ...prev]);
@@ -616,7 +294,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       : item;
 
     if (actorRef.current && isAuthenticated && principal) {
-      syncToIC(actorRef.current.saveEvaluation(toICEvaluation(owned, principal)), "saveEvaluation", { itemId: owned.id });
+      doSyncToIC(actorRef.current.saveEvaluation(toICEvaluation(owned, principal)), "saveEvaluation", { itemId: owned.id });
     }
 
     if (isDuplicateItem(item, contentRef.current) || isDuplicateItem(item, pendingItemsRef.current)) return;
@@ -648,6 +326,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const clearDemoContent = () => setContent(prev => prev.filter(c => c.owner !== ""));
 
+  // ─── Image backfill ───
   const backfillImageUrls = useCallback((): (() => void) => {
     const items = contentRef.current
       .filter(c => c.sourceUrl && !c.imageUrl && /^https?:\/\//i.test(c.sourceUrl))
@@ -688,128 +367,24 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated, principal]);
   backfillFnRef.current = backfillImageUrls;
 
+  // ─── Load from IC ───
   const loadFromIC = useCallback(async () => {
     if (!actorRef.current || !isAuthenticated || !principal) return;
-    setSyncStatus("syncing");
-
-    const IC_PAGE_TIMEOUT = 15_000; // 15 seconds per page
-
-    /** Convert a canister evaluation record to a ContentItem. */
-    function evalToContentItem(e: Awaited<ReturnType<_SERVICE["getUserEvaluations"]>>[number]): ContentItem {
-      const { engine, cleanReason: reasonWithTopics } = decodeEngineFromReason(e.reason);
-      const { topics, cleanReason } = decodeTopicsFromReason(reasonWithTopics);
-      return {
-        id: e.id,
-        owner: e.owner.toText(),
-        author: e.author,
-        avatar: e.avatar,
-        text: e.text,
-        source: mapSourceBack(e.source) as ContentItem["source"],
-        sourceUrl: e.sourceUrl.length > 0 ? e.sourceUrl[0] : undefined,
-        imageUrl: e.imageUrl?.length ? e.imageUrl[0] : undefined,
-        scores: {
-          originality: e.scores.originality,
-          insight: e.scores.insight,
-          credibility: e.scores.credibility,
-          composite: e.scores.compositeScore,
-        },
-        verdict: ("quality" in e.verdict ? "quality" : "slop") as ContentItem["verdict"],
-        reason: cleanReason,
-        topics: topics.length > 0 ? topics : undefined,
-        createdAt: Number(e.createdAt) / 1_000_000,
-        validated: e.validated,
-        flagged: e.flagged,
-        validatedAt: e.validatedAt.length > 0 ? Number(e.validatedAt[0]) / 1_000_000 : undefined,
-        timestamp: relativeTime(Number(e.createdAt) / 1_000_000),
-        scoredByAI: engine ? engine !== "heuristic" : !e.reason.startsWith("Heuristic"),
-        scoringEngine: engine,
-      };
-    }
-
-    /** Merge a batch of IC-loaded items into the content state, preserving locally-enriched fields. */
-    function mergePageIntoContent(pageItems: ContentItem[]) {
-      setContent(prev => {
-        const cachedById = new Map(prev.map(c => [c.id, c]));
-        const merged = pageItems.map(l => {
-          const cached = cachedById.get(l.id);
-          if (!cached) return l;
-          return {
-            ...l,
-            topics: l.topics ?? cached.topics,
-            vSignal: l.vSignal ?? cached.vSignal,
-            cContext: l.cContext ?? cached.cContext,
-            lSlop: l.lSlop ?? cached.lSlop,
-            imageUrl: l.imageUrl ?? cached.imageUrl,
-            platform: l.platform ?? cached.platform,
-          };
-        });
-        const loadedIds = new Set(pageItems.map(l => l.id));
-        const nonDuplicates = prev.filter(c => !loadedIds.has(c.id));
-        return [...merged, ...nonDuplicates];
-      });
-    }
-
-    try {
-      const PAGE_SIZE = BigInt(100);
-      const MAX_PAGES = 50; // Safety limit: 5000 evaluations max
-      let offset = BigInt(0);
-      for (let pageNum = 0; pageNum < MAX_PAGES; pageNum++) {
-        const page = await withTimeout(
-          actorRef.current.getUserEvaluations(principal, offset, PAGE_SIZE),
-          IC_PAGE_TIMEOUT,
-          `IC pagination timeout (page ${pageNum})`,
-        );
-
-        const pageItems = page.map(evalToContentItem);
-        if (pageItems.length > 0) mergePageIntoContent(pageItems);
-
-        if (BigInt(page.length) < PAGE_SIZE) break;
-        offset += PAGE_SIZE;
-        if (pageNum === MAX_PAGES - 1) {
-          console.warn(`[content] Pagination limit reached (${MAX_PAGES} pages). Some evaluations may not be loaded.`);
-        }
-      }
-
-      syncRetryRef.current = 0;
-      setSyncStatus("synced");
-
-      backfillCleanupRef.current?.();
-      backfillCleanupRef.current = backfillImageUrls();
-    } catch (err) {
-      if (handleICSessionError(err)) {
-        setSyncStatus("offline");
-        return;
-      }
-      console.error("[content] Failed to load from IC:", errMsg(err));
-
-      if (syncRetryRef.current < 1) {
-        syncRetryRef.current++;
-        console.info("[content] Retrying IC sync in 3s...");
-        setSyncStatus("idle");
-        clearTimeout(syncRetryTimerRef.current);
-        syncRetryTimerRef.current = setTimeout(() => {
-          loadFromICRef.current().catch((retryErr: unknown) => {
-            console.error("[content] IC sync retry failed:", errMsg(retryErr));
-            setSyncStatus("offline");
-            addNotification("IC sync unavailable", "error");
-          });
-        }, 3000);
-        return;
-      }
-
-      syncRetryRef.current = 0;
-      setSyncStatus("offline");
-      addNotification(`IC sync unavailable — ${errMsgShort(err)}`, "error");
-    }
+    await loadFromICCanister(
+      actorRef.current, principal, setContent, setSyncStatus,
+      syncRetryRef, syncRetryTimerRef, loadFromICRef, addNotification,
+      backfillImageUrls, backfillCleanupRef,
+    );
   }, [isAuthenticated, principal, addNotification, backfillImageUrls]);
   loadFromICRef.current = loadFromIC;
 
+  // ─── Briefing sync ───
   const syncBriefing = useCallback((state: BriefingState, nostrPubkey?: string | null) => {
     if (!actorRef.current || !isAuthenticated) return;
     void syncBriefingToCanister(actorRef.current, state, nostrPubkey ?? null).catch((err: unknown) => {
       console.warn("[content] Briefing sync to IC failed:", errMsg(err));
       setSyncStatus("offline");
-      addNotification("Briefing sync failed — will retry on next cycle", "error");
+      addNotification("Briefing sync failed \u2014 will retry on next cycle", "error");
     });
   }, [isAuthenticated, addNotification]);
 
