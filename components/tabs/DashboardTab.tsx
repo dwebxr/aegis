@@ -14,14 +14,11 @@ import { getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
 import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificationBadge";
 import {
-  applyDashboardFilters,
   applyLatestFilter,
   computeDashboardTop3,
   computeTopicSpotlight,
   computeDashboardSaved,
   computeUnreviewedQueue,
-  clusterByStory,
-  type StoryCluster,
 } from "@/lib/dashboard/utils";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
@@ -266,21 +263,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     try { return localStorage.getItem("aegis-home-mode") === "dashboard" ? "dashboard" : "feed"; }
     catch { return "feed"; }
   });
-  const [sortMode, setSortMode] = useState<"latest" | "ranked">(() => {
-    if (typeof window === "undefined") return "latest";
-    try { return localStorage.getItem("aegis-sort-mode") === "ranked" ? "ranked" : "latest"; }
-    catch { return "latest"; }
-  });
   const { profile, addFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem("aegis-home-mode", homeMode); } catch {}
   }, [homeMode]);
-
-  useEffect(() => {
-    try { localStorage.setItem("aegis-sort-mode", sortMode); } catch {}
-  }, [sortMode]);
 
   const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {
     const now = Date.now();
@@ -310,8 +298,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   useEffect(() => {
     setExpanded(null);
     setShowAllContent(false);
-    setExpandedClusters(new Set());
-  }, [verdictFilter, sourceFilter, sortMode]);
+  }, [verdictFilter, sourceFilter]);
 
   // Close "More filters" dropdown on click-outside or Escape
   useEffect(() => {
@@ -335,16 +322,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const bookmarkedIds = useMemo(() => profile.bookmarkedIds ?? [], [profile.bookmarkedIds]);
 
   const filteredContent = useMemo(() => {
-    const filterFn = sortMode === "latest" ? applyLatestFilter : applyDashboardFilters;
-    return deduplicateItems(filterFn(content, verdictFilter, sourceFilter, bookmarkedIds));
-  }, [content, verdictFilter, sourceFilter, bookmarkedIds, sortMode]);
-
-  const clusteredContent = useMemo(
-    () => homeMode === "feed" && sortMode === "ranked" ? clusterByStory(filteredContent) : [],
-    [filteredContent, homeMode, sortMode],
-  );
-
-  const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set());
+    return deduplicateItems(applyLatestFilter(content, verdictFilter, sourceFilter, bookmarkedIds));
+  }, [content, verdictFilter, sourceFilter, bookmarkedIds]);
 
   // Auto-reveal: sections expand when scrolled into view, remember manual collapses
   const { isExpanded: isSectionExpanded, toggle: toggleSection, observeRef: sectionRef } = useAutoReveal();
@@ -453,9 +432,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, []);
 
   const feedItemIds = useMemo(() => {
-    if (sortMode === "latest") return filteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.id);
-    return clusteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.representative.id);
-  }, [sortMode, filteredContent, clusteredContent, showAllContent]);
+    return filteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.id);
+  }, [filteredContent, showAllContent]);
 
   const { focusedId } = useKeyboardNav({
     items: feedItemIds,
@@ -473,8 +451,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     { label: "Go to Analytics", action: () => onTabChange?.("analytics") },
     { label: "Go to Settings", action: () => onTabChange?.("settings") },
     { label: "Go to Sources", action: () => onTabChange?.("sources") },
-    { label: "Sort: Latest", action: () => setSortMode("latest") },
-    { label: "Sort: Ranked", action: () => setSortMode("ranked") },
     { label: "Filter: Quality", action: () => setVerdictFilter("quality") },
     { label: "Filter: Slop", action: () => setVerdictFilter("slop") },
     { label: "Filter: All", action: () => setVerdictFilter("all") },
@@ -511,28 +487,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               );
             })}
           </div>
-          {homeMode === "feed" && (
-            <div className="flex gap-1 bg-navy-lighter rounded-md p-1 border border-border">
-              {(["latest", "ranked"] as const).map(mode => {
-                const active = sortMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    data-testid={`aegis-sort-mode-${mode}`}
-                    onClick={() => setSortMode(mode)}
-                    className={cn(
-                      "px-3 py-2 rounded-sm text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast capitalize",
-                      active
-                        ? "bg-card border border-emphasis text-foreground"
-                        : "bg-transparent border border-transparent text-muted-foreground"
-                    )}
-                  >
-                    {mode === "latest" ? "Latest" : "Ranked"}
-                  </button>
-                );
-              })}
-            </div>
-          )}
           <button
             onClick={() => onTabChange?.("settings:feeds")}
             className={cn(
@@ -742,73 +696,35 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               {pendingCount > 0 && onFlushPending && (
                 <NewItemsBar count={pendingCount} onFlush={onFlushPending} />
               )}
-              {(sortMode === "latest"
-                ? filteredContent.slice(0, showAllContent ? 50 : 5).map(item => ({ item, cluster: null as StoryCluster | null }))
-                : clusteredContent.slice(0, showAllContent ? 50 : 5).map(c => ({ item: c.representative, cluster: c }))
-              ).map(({ item, cluster }, i) => {
-                const hasCluster = cluster !== null && cluster.members.length > 1;
-                const clusterOpen = hasCluster && expandedClusters.has(item.id);
-                return (
-                  <div key={item.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
-                    {verdictFilter === "validated" && item.validatedAt && (
-                      <div className="text-caption text-purple-400 mb-1 ml-1 font-mono font-semibold">
-                        Validated {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                        {" "}
-                        {new Date(item.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                      </div>
-                    )}
-                    <ContentCard
-                      item={item}
-                      expanded={expanded === item.id}
-                      onToggle={handleToggle}
-                      onValidate={handleValidateWithFeedback}
-                      onFlag={handleFlagWithFeedback}
-                      onBookmark={handleBookmark}
-                      isBookmarked={bookmarkSet.has(item.id)}
-                      onAddFilterRule={addFilterRule}
-                      mobile={mobile}
-                      focused={focusedId === item.id}
-                      clusterCount={hasCluster ? cluster!.members.length - 1 : undefined}
-                    />
-                    {hasCluster && (
-                      <button
-                        onClick={() => setExpandedClusters(prev => {
-                          const next = new Set(prev);
-                          if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
-                          return next;
-                        })}
-                        className="flex items-center gap-1 px-3 py-1 my-1 ml-4 mb-2 bg-transparent border border-subtle rounded-full text-muted-foreground text-caption font-semibold cursor-pointer font-[inherit] transition-fast"
-                      >
-                        <span className={cn("inline-block transition-fast", clusterOpen && "rotate-180")}>&#x25BC;</span>
-                        {clusterOpen ? "Hide" : `+${cluster!.members.length - 1} related`}
-                        {cluster!.sharedTopics.length > 0 && ` \u00B7 ${cluster!.sharedTopics.slice(0, 2).join(", ")}`}
-                      </button>
-                    )}
-                    {clusterOpen && cluster!.members.slice(1).map(m => (
-                      <div key={m.id} className="ml-4 border-l-2 border-subtle pl-3">
-                        <ContentCard
-                          item={m}
-                          expanded={expanded === m.id}
-                          onToggle={handleToggle}
-                          onValidate={handleValidateWithFeedback}
-                          onFlag={handleFlagWithFeedback}
-                          onBookmark={handleBookmark}
-                          isBookmarked={bookmarkSet.has(m.id)}
-                          onAddFilterRule={addFilterRule}
-                          mobile={mobile}
-                          focused={focusedId === m.id}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-              {((sortMode === "latest" ? filteredContent.length : clusteredContent.length) > 5) && !showAllContent && (
+              {filteredContent.slice(0, showAllContent ? 50 : 5).map((item, i) => (
+                <div key={item.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
+                  {verdictFilter === "validated" && item.validatedAt && (
+                    <div className="text-caption text-purple-400 mb-1 ml-1 font-mono font-semibold">
+                      Validated {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                      {" "}
+                      {new Date(item.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  )}
+                  <ContentCard
+                    item={item}
+                    expanded={expanded === item.id}
+                    onToggle={handleToggle}
+                    onValidate={handleValidateWithFeedback}
+                    onFlag={handleFlagWithFeedback}
+                    onBookmark={handleBookmark}
+                    isBookmarked={bookmarkSet.has(item.id)}
+                    onAddFilterRule={addFilterRule}
+                    mobile={mobile}
+                    focused={focusedId === item.id}
+                  />
+                </div>
+              ))}
+              {filteredContent.length > 5 && !showAllContent && (
                 <button
                   onClick={() => setShowAllContent(true)}
                   className="w-full px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer font-[inherit] transition-normal mt-2"
                 >
-                  Show all ({filteredContent.length} items{sortMode === "ranked" ? ` in ${clusteredContent.length} groups` : ""})
+                  Show all ({filteredContent.length} items)
                 </button>
               )}
             </>

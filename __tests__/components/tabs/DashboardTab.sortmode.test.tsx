@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  *
- * Integration tests for DashboardTab Latest/Ranked sort mode toggle.
+ * Integration tests for DashboardTab Latest-only feed mode.
  * Tests exercise real rendering paths — ContentCard, filter logic, sort order.
  */
 
@@ -103,56 +103,8 @@ function getCardIds(): string[] {
 
 // ─── Tests ───
 
-describe("DashboardTab — Sort Mode Toggle", () => {
-  it("renders Latest and Ranked toggle buttons", () => {
-    render(
-      <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    expect(screen.getByTestId("aegis-sort-mode-latest")).toBeTruthy();
-    expect(screen.getByTestId("aegis-sort-mode-ranked")).toBeTruthy();
-  });
-
-  it("Latest is the default active sort mode", () => {
-    render(
-      <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    const latestBtn = screen.getByTestId("aegis-sort-mode-latest");
-    const rankedBtn = screen.getByTestId("aegis-sort-mode-ranked");
-    expect(latestBtn.className).toContain("bg-card");
-    expect(rankedBtn.className).not.toContain("bg-card");
-  });
-
-  it("clicking Ranked switches active state", () => {
-    render(
-      <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    fireEvent.click(screen.getByTestId("aegis-sort-mode-ranked"));
-    expect(screen.getByTestId("aegis-sort-mode-ranked").className).toContain("bg-card");
-    expect(screen.getByTestId("aegis-sort-mode-latest").className).not.toContain("bg-card");
-  });
-
-  it("sort mode toggle is hidden in Dashboard mode", () => {
-    render(
-      <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    fireEvent.click(screen.getByTestId("aegis-home-mode-dashboard"));
-    expect(screen.queryByTestId("aegis-sort-mode-latest")).toBeNull();
-    expect(screen.queryByTestId("aegis-sort-mode-ranked")).toBeNull();
-  });
-
-  it("persists sort mode to localStorage", () => {
-    render(
-      <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    fireEvent.click(screen.getByTestId("aegis-sort-mode-ranked"));
-    expect(localStorage.getItem("aegis-sort-mode")).toBe("ranked");
-    fireEvent.click(screen.getByTestId("aegis-sort-mode-latest"));
-    expect(localStorage.getItem("aegis-sort-mode")).toBe("latest");
-  });
-});
-
-describe("DashboardTab — Latest Mode Behavior", () => {
-  it("excludes slop items by default in Latest mode", () => {
+describe("DashboardTab — Latest Feed Behavior", () => {
+  it("excludes slop items by default", () => {
     const items = [
       makeItem({ id: "q1", text: "Quality item alpha", verdict: "quality" }),
       makeItem({ id: "s1", text: "Slop item beta", verdict: "slop" }),
@@ -178,7 +130,7 @@ describe("DashboardTab — Latest Mode Behavior", () => {
     expect(ids.indexOf("middle")).toBeLessThan(ids.indexOf("oldest"));
   });
 
-  it("does not show cluster expand buttons in Latest mode", () => {
+  it("does not show cluster expand buttons", () => {
     const items = [
       makeItem({ id: "c1", text: "Cluster topic alpha beta gamma", topics: ["ai", "ml"], createdAt: now }),
       makeItem({ id: "c2", text: "Cluster topic alpha beta gamma delta", topics: ["ai", "ml"], createdAt: now - 100 }),
@@ -192,7 +144,7 @@ describe("DashboardTab — Latest Mode Behavior", () => {
     expect(screen.queryByText(/related/)).toBeNull();
   });
 
-  it("Slop filter in Latest mode shows only slop", () => {
+  it("Slop filter shows only slop", () => {
     const items = [
       makeItem({ id: "q1", text: "Quality xxx", verdict: "quality" }),
       makeItem({ id: "s1", text: "Slop yyy", verdict: "slop" }),
@@ -206,7 +158,7 @@ describe("DashboardTab — Latest Mode Behavior", () => {
     expect(screen.queryByText(/Slop yyy/)).toBeTruthy();
   });
 
-  it("Validated filter in Latest mode shows only validated items with timestamp badge", () => {
+  it("Validated filter shows only validated items with timestamp badge", () => {
     const items = [
       makeItem({ id: "v1", text: "Validated item zzz", validated: true, validatedAt: now }),
       makeItem({ id: "nv1", text: "Not validated www", validated: false }),
@@ -217,13 +169,12 @@ describe("DashboardTab — Latest Mode Behavior", () => {
     fireEvent.click(screen.getByTestId("aegis-filter-validated"));
     expect(screen.queryByText(/Validated item zzz/)).toBeTruthy();
     expect(screen.queryByText(/Not validated www/)).toBeNull();
-    // Validated timestamp badge appears (caption + purple + mono + semibold)
     const badges = document.querySelectorAll(".text-caption.text-purple-400.font-mono.font-semibold");
     const badge = Array.from(badges).find(el => el.textContent?.includes("Validated"));
     expect(badge).toBeTruthy();
   });
 
-  it("Bookmarked filter in Latest mode shows only bookmarked items", () => {
+  it("Bookmarked filter shows only bookmarked items", () => {
     mockProfile.bookmarkedIds = ["bk1"];
     const items = [
       makeItem({ id: "bk1", text: "Bookmarked content ppp" }),
@@ -237,7 +188,7 @@ describe("DashboardTab — Latest Mode Behavior", () => {
     expect(screen.queryByText(/Not bookmarked qqq/)).toBeNull();
   });
 
-  it("source filter works in Latest mode", () => {
+  it("source filter works", () => {
     const items = [
       makeItem({ id: "sr1", text: "RSS content mmm", source: "rss" }),
       makeItem({ id: "sn1", text: "Nostr content nnn", source: "nostr" }),
@@ -253,44 +204,8 @@ describe("DashboardTab — Latest Mode Behavior", () => {
   });
 });
 
-describe("DashboardTab — Ranked Mode Behavior", () => {
-  it("switching to Ranked mode, All filter shows slop items", () => {
-    const items = [
-      makeItem({ id: "rq1", text: "Ranked quality rrr", verdict: "quality" }),
-      makeItem({ id: "rs1", text: "Ranked slop sss", verdict: "slop" }),
-    ];
-    render(
-      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    fireEvent.click(screen.getByTestId("aegis-sort-mode-ranked"));
-    expect(screen.queryByText(/Ranked quality rrr/)).toBeTruthy();
-    expect(screen.queryByText(/Ranked slop sss/)).toBeTruthy();
-  });
-
-  it("Show all button: item count in Latest, group count in Ranked", () => {
-    const items = Array.from({ length: 6 }, (_, i) =>
-      makeItem({
-        id: `sa-${i}`,
-        text: `Expand test item ${i} unique-${Math.random()}`,
-        createdAt: now - i * 1000,
-        topics: [`topic-unique-${i}`],
-      })
-    );
-    render(
-      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    const showAllBtn = screen.getByText(/^Show all/);
-    expect(showAllBtn.textContent).toContain("6 items");
-    expect(showAllBtn.textContent).not.toContain("groups");
-
-    fireEvent.click(screen.getByTestId("aegis-sort-mode-ranked"));
-    const showAllBtn2 = screen.getByText(/^Show all/);
-    expect(showAllBtn2.textContent).toContain("groups");
-  });
-});
-
-describe("DashboardTab — Sort Mode Edge Cases", () => {
-  it("all items are slop → Latest shows no cards", () => {
+describe("DashboardTab — Feed Edge Cases", () => {
+  it("all items are slop → shows no cards", () => {
     const items = [
       makeItem({ id: "as1", verdict: "slop", text: "All slop one" }),
       makeItem({ id: "as2", verdict: "slop", text: "All slop two" }),
@@ -301,21 +216,7 @@ describe("DashboardTab — Sort Mode Edge Cases", () => {
     expect(getCardIds()).toHaveLength(0);
   });
 
-  it("switching sort modes back and forth preserves filter state", () => {
-    const items = [
-      makeItem({ id: "sw1", text: "Switch test quality", verdict: "quality" }),
-    ];
-    render(
-      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    fireEvent.click(screen.getByTestId("aegis-filter-quality"));
-    expect(screen.getByTestId("aegis-filter-quality").getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByTestId("aegis-sort-mode-ranked"));
-    fireEvent.click(screen.getByTestId("aegis-sort-mode-latest"));
-    expect(screen.getByTestId("aegis-filter-quality").getAttribute("aria-pressed")).toBe("true");
-  });
-
-  it("single item renders correctly in Latest mode", () => {
+  it("single item renders correctly", () => {
     const items = [makeItem({ id: "single", text: "Single item only" })];
     render(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
@@ -347,6 +248,21 @@ describe("DashboardTab — Sort Mode Edge Cases", () => {
     expect(getCardIds()).toHaveLength(6);
   });
 
+  it("Show all button shows item count", () => {
+    const items = Array.from({ length: 6 }, (_, i) =>
+      makeItem({
+        id: `sa-${i}`,
+        text: `Expand test item ${i} unique-${Math.random()}`,
+        createdAt: now - i * 1000,
+      })
+    );
+    render(
+      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    const showAllBtn = screen.getByText(/^Show all/);
+    expect(showAllBtn.textContent).toContain("6 items");
+  });
+
   it("moreFiltersActive dot hidden in default state, visible with slop filter", () => {
     render(
       <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
@@ -359,25 +275,11 @@ describe("DashboardTab — Sort Mode Edge Cases", () => {
     expect(screen.getByTestId("aegis-filter-more").querySelector(".bg-cyan-400")).toBeTruthy();
   });
 
-  it("empty content in Latest mode shows onboarding (no active filter)", () => {
+  it("empty content shows onboarding (no active filter)", () => {
     render(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     const dashboard = screen.getByTestId("aegis-dashboard");
-    // Default "all" filter → no active filter → onboarding (not "No matching content")
     expect(dashboard.textContent).not.toContain("No matching content");
-  });
-
-  it("restores ranked from localStorage", () => {
-    localStorage.setItem("aegis-sort-mode", "ranked");
-    const items = [
-      makeItem({ id: "lr1", text: "Stored ranked item", verdict: "slop" }),
-    ];
-    render(
-      <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
-    );
-    // Ranked mode + all filter → slop visible
-    expect(screen.getByTestId("aegis-sort-mode-ranked").className).toContain("bg-card");
-    expect(screen.queryByText(/Stored ranked item/)).toBeTruthy();
   });
 });
