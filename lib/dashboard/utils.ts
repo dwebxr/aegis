@@ -20,28 +20,14 @@ export function contentDedup(item: ContentItem): string {
     .slice(0, 150);
 }
 
-export function applyDashboardFilters(
-  content: ContentItem[],
-  verdictFilter: "all" | "quality" | "slop" | "validated",
-  sourceFilter: string,
-): ContentItem[] {
-  let items = content;
-  if (verdictFilter === "validated") {
-    items = items.filter(c => c.validated);
-    items = [...items].sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0));
-  } else if (verdictFilter !== "all") {
-    items = items.filter(c => c.verdict === verdictFilter);
-  }
-  if (sourceFilter !== "all") items = items.filter(c => c.source === sourceFilter);
-  return items;
-}
+export type VerdictFilter = "all" | "quality" | "slop" | "validated" | "bookmarked";
 
-/** Latest mode: exclude slop, sort by createdAt descending (newest first). */
-export function applyLatestFilter(
+function applyVerdictAndSource(
   content: ContentItem[],
-  verdictFilter: "all" | "quality" | "slop" | "validated" | "bookmarked",
+  verdictFilter: VerdictFilter,
   sourceFilter: string,
   bookmarkedIds: string[],
+  excludeSlop: boolean,
 ): ContentItem[] {
   let items = content;
 
@@ -52,13 +38,35 @@ export function applyLatestFilter(
     items = items.filter(c => c.validated);
   } else if (verdictFilter === "slop") {
     items = items.filter(c => c.verdict === "slop");
-  } else {
-    // "all" and "quality" both exclude slop in Latest mode
+  } else if (verdictFilter === "quality" || excludeSlop) {
     items = items.filter(c => c.verdict !== "slop");
   }
 
   if (sourceFilter !== "all") items = items.filter(c => c.source === sourceFilter);
+  return items;
+}
 
+export function applyDashboardFilters(
+  content: ContentItem[],
+  verdictFilter: VerdictFilter,
+  sourceFilter: string,
+  bookmarkedIds: string[] = [],
+): ContentItem[] {
+  const items = applyVerdictAndSource(content, verdictFilter, sourceFilter, bookmarkedIds, false);
+  if (verdictFilter === "validated") {
+    return [...items].sort((a, b) => (b.validatedAt ?? 0) - (a.validatedAt ?? 0));
+  }
+  return items;
+}
+
+/** Latest mode: exclude slop, sort by createdAt descending (newest first). */
+export function applyLatestFilter(
+  content: ContentItem[],
+  verdictFilter: VerdictFilter,
+  sourceFilter: string,
+  bookmarkedIds: string[] = [],
+): ContentItem[] {
+  const items = applyVerdictAndSource(content, verdictFilter, sourceFilter, bookmarkedIds, true);
   return [...items].sort((a, b) => b.createdAt - a.createdAt);
 }
 
