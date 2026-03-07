@@ -9,7 +9,7 @@ export default function OfflinePage() {
   useEffect(() => {
     queueSize()
       .then(setPending)
-      .catch(() => { /* IndexedDB unavailable */ });
+      .catch(e => { console.debug("[offline] IndexedDB unavailable:", e); });
   }, []);
 
   return (

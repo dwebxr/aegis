@@ -65,7 +65,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
       const today = new Date().toISOString().slice(0, 10);
       const cached = localStorage.getItem(`aegis-digest-${today}`);
       if (cached) setDigest(cached);
-    } catch { /* SSR / private mode */ }
+    } catch (e) { console.debug("[briefing] Digest cache load failed:", e); }
   }, []);
 
   const generateDigest = useCallback(async () => {

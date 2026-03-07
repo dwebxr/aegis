@@ -4,6 +4,7 @@ import { AuthClient } from "@dfinity/auth-client";
 import type { Identity } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { getInternetIdentityUrl, getDerivationOrigin } from "@/lib/ic/agent";
+import * as Sentry from "@sentry/nextjs";
 import { useNotify } from "./NotificationContext";
 import { errMsg } from "@/lib/utils/errors";
 
@@ -88,11 +89,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn("[auth] Delegation expired — logging out");
           await client.logout();
           setIsAuthenticated(false);
+          Sentry.setUser(null);
           addNotification("Session expired — please log in again", "error");
         } else {
           setIsAuthenticated(true);
           setIdentity(id);
           setPrincipal(id.getPrincipal());
+          Sentry.setUser({ id: id.getPrincipal().toText() });
         }
       } else {
         setIsAuthenticated(false);
@@ -117,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIdentity(id);
           setPrincipal(id.getPrincipal());
           setIsAuthenticated(true);
+          Sentry.setUser({ id: id.getPrincipal().toText() });
           resolve();
         },
         onError: (err) => {
@@ -134,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIdentity(null);
         setPrincipal(null);
         setIsAuthenticated(false);
+        Sentry.setUser(null);
         addNotification("Session expired — please log in again", "error");
       }).catch((err: unknown) => {
         console.warn("[auth] Session logout failed:", errMsg(err));
@@ -149,6 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIdentity(null);
     setPrincipal(null);
     setIsAuthenticated(false);
+    Sentry.setUser(null);
   }, [authClient]);
 
   const principalText = principal ? principal.toText() : "";

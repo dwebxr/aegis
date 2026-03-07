@@ -273,8 +273,6 @@ export function computeTopicDistribution(
     .slice(0, 8);
 }
 
-// ── Topic Trends ────────────────────────────────────────────
-
 export interface TopicTrend {
   topic: string;
   currentCount: number;
@@ -324,8 +322,6 @@ export function computeTopicTrends(content: ContentItem[], weeks = 4): TopicTren
 
   return trends.sort((a, b) => b.currentCount - a.currentCount).slice(0, 8);
 }
-
-// ── Story Clustering ────────────────────────────────────────
 
 export interface StoryCluster {
   representative: ContentItem;

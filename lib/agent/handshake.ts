@@ -104,14 +104,24 @@ function isValidOfferPayload(p: unknown): p is D2AOfferPayload {
 
 const VALID_VERDICTS = new Set(["quality", "slop"]);
 
+function isValidScore(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 10;
+}
+
 function isValidDeliverPayload(p: unknown): p is D2ADeliverPayload {
   if (!p || typeof p !== "object") return false;
   const d = p as D2ADeliverPayload;
-  return typeof d.text === "string" && d.text.length > 0 && d.text.length <= MAX_DELIVER_TEXT_LENGTH &&
-    typeof d.author === "string" && d.author.length > 0 && d.author.length <= 200 &&
-    typeof d.verdict === "string" && VALID_VERDICTS.has(d.verdict) &&
-    Array.isArray(d.topics) && d.topics.length <= MAX_TOPICS_COUNT &&
-    d.topics.every((t: unknown) => typeof t === "string" && t.length <= MAX_TOPIC_LENGTH);
+  if (
+    typeof d.text !== "string" || d.text.length === 0 || d.text.length > MAX_DELIVER_TEXT_LENGTH ||
+    typeof d.author !== "string" || d.author.length === 0 || d.author.length > 200 ||
+    typeof d.verdict !== "string" || !VALID_VERDICTS.has(d.verdict) ||
+    !Array.isArray(d.topics) || d.topics.length > MAX_TOPICS_COUNT ||
+    !d.topics.every((t: unknown) => typeof t === "string" && t.length <= MAX_TOPIC_LENGTH)
+  ) return false;
+  if (!d.scores || typeof d.scores !== "object") return false;
+  const s = d.scores as unknown as Record<string, unknown>;
+  return isValidScore(s.originality) && isValidScore(s.insight) &&
+    isValidScore(s.credibility) && isValidScore(s.composite);
 }
 
 function isValidCommentPayload(p: unknown): p is D2ACommentPayload {
@@ -142,6 +152,11 @@ export function parseD2AMessage(
       !("payload" in parsed)
     ) {
       console.warn("[handshake] Malformed D2A message from", senderPk.slice(0, 8) + "...: missing required fields");
+      return null;
+    }
+
+    if (parsed.fromPubkey !== senderPk) {
+      console.warn("[handshake] Sender pubkey mismatch: payload claims", parsed.fromPubkey.slice(0, 8) + "... but event from", senderPk.slice(0, 8) + "...");
       return null;
     }
 

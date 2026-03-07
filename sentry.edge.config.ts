@@ -5,6 +5,7 @@ const dsn = process.env.SENTRY_DSN?.trim() || process.env.NEXT_PUBLIC_SENTRY_DSN
 if (dsn) {
   Sentry.init({
     dsn,
+    environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
     tracesSampleRate: 0.1,
     beforeSend(event) {
       if (event.request) {
@@ -16,7 +17,7 @@ if (dsn) {
           event.request.cookies = {};
         }
         if (event.request.url) {
-          try { event.request.url = event.request.url.split("?")[0]; } catch { /* keep original */ }
+          event.request.url = event.request.url.split("?")[0];
         }
         if (event.request.query_string) {
           event.request.query_string = "";

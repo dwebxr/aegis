@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { APP_URL } from "@/lib/config";
 
-const ALLOWED_ORIGINS: string[] = process.env.D2A_CORS_ORIGINS
-  ? process.env.D2A_CORS_ORIGINS.split(",").map(o => o.trim()).filter(Boolean)
-  : ["https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io", APP_URL];
+function isValidOrigin(o: string): boolean {
+  try {
+    const url = new URL(o);
+    if (url.protocol === "https:") return true;
+    if (url.protocol === "http:" && url.hostname === "localhost") return true;
+    return false;
+  } catch { return false; }
+}
+
+const ALLOWED_ORIGINS: string[] = (
+  process.env.D2A_CORS_ORIGINS
+    ? process.env.D2A_CORS_ORIGINS.split(",").map(o => o.trim()).filter(Boolean)
+    : ["https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io", APP_URL]
+).filter(isValidOrigin);
 
 const STATIC_CORS: Record<string, string> = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",

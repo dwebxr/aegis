@@ -13,7 +13,7 @@ export const SyncStatusBanner: React.FC = () => {
     const check = () => {
       queueSize()
         .then(n => { if (active) setPending(n); })
-        .catch(() => { /* IndexedDB unavailable */ });
+        .catch(e => { console.debug("[sync] IndexedDB unavailable:", e); });
     };
     check();
     const interval = setInterval(check, 5_000);

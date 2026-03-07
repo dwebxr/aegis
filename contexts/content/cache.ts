@@ -10,23 +10,29 @@ const SAVE_DEBOUNCE_MS = 1000;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let useIDB = false;
 
+function isFiniteInRange(v: unknown): boolean {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 10;
+}
+
 function validateContentItems(parsed: unknown): ContentItem[] {
   if (!Array.isArray(parsed)) return [];
   return parsed.filter(
     (c: unknown): c is ContentItem => {
       if (!c || typeof c !== "object") return false;
       const item = c as Record<string, unknown>;
-      return (
-        typeof item.id === "string" &&
-        typeof item.text === "string" &&
-        typeof item.source === "string" &&
-        typeof item.createdAt === "number" &&
-        typeof item.verdict === "string" &&
-        typeof item.validated === "boolean" &&
-        typeof item.flagged === "boolean" &&
-        !!item.scores && typeof item.scores === "object" &&
-        typeof (item.scores as Record<string, unknown>).composite === "number"
-      );
+      if (
+        typeof item.id !== "string" ||
+        typeof item.text !== "string" ||
+        typeof item.source !== "string" ||
+        typeof item.createdAt !== "number" ||
+        typeof item.verdict !== "string" ||
+        typeof item.validated !== "boolean" ||
+        typeof item.flagged !== "boolean" ||
+        !item.scores || typeof item.scores !== "object"
+      ) return false;
+      const s = item.scores as Record<string, unknown>;
+      return isFiniteInRange(s.composite) && isFiniteInRange(s.originality) &&
+        isFiniteInRange(s.insight) && isFiniteInRange(s.credibility);
     },
   );
 }

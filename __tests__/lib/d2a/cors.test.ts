@@ -121,6 +121,67 @@ describe("withCors", () => {
   });
 });
 
+describe("isValidOrigin filtering", () => {
+  const origEnv = process.env;
+
+  afterEach(() => {
+    process.env = origEnv;
+    jest.resetModules();
+  });
+
+  it("rejects plain http:// origins (non-localhost)", () => {
+    process.env = { ...origEnv, D2A_CORS_ORIGINS: "http://insecure.example.com" };
+    jest.isolateModules(() => {
+      const { corsOptionsResponse: corsFn } = require("@/lib/d2a/cors");
+      const req = new NextRequest("http://localhost/api/d2a/info", {
+        method: "GET",
+        headers: { origin: "http://insecure.example.com" },
+      });
+      const res = corsFn(req);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    });
+  });
+
+  it("allows http://localhost for local development", () => {
+    process.env = { ...origEnv, D2A_CORS_ORIGINS: "http://localhost:3000" };
+    jest.isolateModules(() => {
+      const { corsOptionsResponse: corsFn } = require("@/lib/d2a/cors");
+      const req = new NextRequest("http://localhost/api/d2a/info", {
+        method: "GET",
+        headers: { origin: "http://localhost:3000" },
+      });
+      const res = corsFn(req);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3000");
+    });
+  });
+
+  it("rejects ftp:// and other non-http protocols", () => {
+    process.env = { ...origEnv, D2A_CORS_ORIGINS: "ftp://files.example.com" };
+    jest.isolateModules(() => {
+      const { corsOptionsResponse: corsFn } = require("@/lib/d2a/cors");
+      const req = new NextRequest("http://localhost/api/d2a/info", {
+        method: "GET",
+        headers: { origin: "ftp://files.example.com" },
+      });
+      const res = corsFn(req);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    });
+  });
+
+  it("rejects invalid URL strings", () => {
+    process.env = { ...origEnv, D2A_CORS_ORIGINS: "not-a-url" };
+    jest.isolateModules(() => {
+      const { corsOptionsResponse: corsFn } = require("@/lib/d2a/cors");
+      const req = new NextRequest("http://localhost/api/d2a/info", {
+        method: "GET",
+        headers: { origin: "not-a-url" },
+      });
+      const res = corsFn(req);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    });
+  });
+});
+
 describe("D2A_CORS_ORIGINS env var", () => {
   const origEnv = process.env;
 

@@ -19,6 +19,7 @@ import {
   computeTopicSpotlight,
   computeDashboardSaved,
   computeUnreviewedQueue,
+  type VerdictFilter,
 } from "@/lib/dashboard/utils";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
@@ -242,7 +243,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const { sources } = useSources();
   const { isDemoMode } = useDemo();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop" | "validated" | "bookmarked">("all");
+  const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const moreFiltersRef = useRef<HTMLDivElement>(null);
@@ -267,7 +268,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
-    try { localStorage.setItem("aegis-home-mode", homeMode); } catch {}
+    try { localStorage.setItem("aegis-home-mode", homeMode); } catch (e) { console.debug("[dashboard] localStorage write failed:", e); }
   }, [homeMode]);
 
   const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {
@@ -321,9 +322,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   const bookmarkedIds = useMemo(() => profile.bookmarkedIds ?? [], [profile.bookmarkedIds]);
 
-  const filteredContent = useMemo(() => {
-    return deduplicateItems(applyLatestFilter(content, verdictFilter, sourceFilter, bookmarkedIds));
-  }, [content, verdictFilter, sourceFilter, bookmarkedIds]);
+  const filteredContent = useMemo(
+    () => deduplicateItems(applyLatestFilter(content, verdictFilter, sourceFilter, bookmarkedIds)),
+    [content, verdictFilter, sourceFilter, bookmarkedIds],
+  );
 
   // Auto-reveal: sections expand when scrolled into view, remember manual collapses
   const { isExpanded: isSectionExpanded, toggle: toggleSection, observeRef: sectionRef } = useAutoReveal();
@@ -431,9 +433,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return () => { clearTimeout(feedbackTimerRef.current); };
   }, []);
 
-  const feedItemIds = useMemo(() => {
-    return filteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.id);
-  }, [filteredContent, showAllContent]);
+  const feedItemIds = useMemo(
+    () => filteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.id),
+    [filteredContent, showAllContent],
+  );
 
   const { focusedId } = useKeyboardNav({
     items: feedItemIds,

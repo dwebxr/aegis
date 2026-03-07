@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// ─── KV-backed distributed rate limiter ──────────────────────────────
-
 type KVStore = Awaited<typeof import("@vercel/kv")>["kv"];
 let _kv: KVStore | null | undefined;
 
@@ -57,8 +55,6 @@ export async function distributedRateLimit(
 export function _resetKVCache(): void {
   _kv = undefined;
 }
-
-// ─── In-memory rate limiter (per-instance) ───────────────────────────
 
 interface WindowEntry {
   count: number;

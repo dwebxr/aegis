@@ -1,8 +1,4 @@
-/**
- * Generic IndexedDB utility for Aegis.
- * Single database "aegis-storage" with multiple object stores.
- * Cached connection to avoid repeated open() calls.
- */
+/** IndexedDB wrapper — single "aegis-storage" DB, cached connection. */
 
 const DB_NAME = "aegis-storage";
 const DB_VERSION = 1;

@@ -104,7 +104,8 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
         const result = await testOllamaConnection(updated.endpoint);
         setOllamaStatus({ connected: result.ok, loading: false, models: result.models, error: result.error });
         if (!result.ok) addNotification(`Cannot reach Ollama at ${updated.endpoint}`, "error");
-      } catch {
+      } catch (err) {
+        console.warn("[settings] Ollama connection test failed:", err);
         setOllamaStatus(prev => ({ ...prev, connected: false, error: "Connection test failed" }));
       }
     } else {
@@ -150,7 +151,8 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
       setMaskedKey(maskApiKey(apiKeyInput));
       setApiKeyInput("");
       addNotification("API key saved — Pro mode ready", "success");
-    } catch {
+    } catch (err) {
+      console.error("[settings] Failed to save API key:", err);
       addNotification("Failed to save API key", "error");
     }
   };

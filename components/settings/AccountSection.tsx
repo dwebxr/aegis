@@ -63,7 +63,8 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
       await logout();
       addNotification("All local data deleted", "success");
       window.location.reload();
-    } catch {
+    } catch (err) {
+      console.error("[settings] Failed to delete local data:", err);
       setDeleting(false);
       addNotification("Failed to delete local data", "error");
     }

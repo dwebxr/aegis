@@ -30,6 +30,7 @@ import { HANDSHAKE_TIMEOUT_MS } from "@/lib/agent/protocol";
 
 const sk = new Uint8Array(32);
 const senderPk = "sender-pubkey-hex";
+const FROM_PK = senderPk; // payload.fromPubkey must match senderPk
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -39,7 +40,7 @@ describe("parseD2AMessage", () => {
   it("parses valid offer message", () => {
     (decryptMessage as jest.Mock).mockReturnValueOnce(JSON.stringify({
       type: "offer",
-      fromPubkey: "from",
+      fromPubkey: FROM_PK,
       toPubkey: "to",
       payload: { topic: "ai", score: 8.5, contentPreview: "Preview text" },
     }));
@@ -53,7 +54,7 @@ describe("parseD2AMessage", () => {
   it("parses valid accept message", () => {
     (decryptMessage as jest.Mock).mockReturnValueOnce(JSON.stringify({
       type: "accept",
-      fromPubkey: "from",
+      fromPubkey: FROM_PK,
       toPubkey: "to",
       payload: {},
     }));
@@ -67,7 +68,7 @@ describe("parseD2AMessage", () => {
   it("parses valid reject message", () => {
     (decryptMessage as jest.Mock).mockReturnValueOnce(JSON.stringify({
       type: "reject",
-      fromPubkey: "from",
+      fromPubkey: FROM_PK,
       toPubkey: "to",
       payload: {},
     }));
@@ -79,11 +80,12 @@ describe("parseD2AMessage", () => {
   it("parses valid deliver message", () => {
     (decryptMessage as jest.Mock).mockReturnValueOnce(JSON.stringify({
       type: "deliver",
-      fromPubkey: "from",
+      fromPubkey: FROM_PK,
       toPubkey: "to",
       payload: {
         text: "Content text",
         author: "Author",
+        scores: { originality: 7, insight: 6, credibility: 8, composite: 7 },
         verdict: "quality",
         topics: ["ai"],
       },
@@ -96,7 +98,7 @@ describe("parseD2AMessage", () => {
   it("parses valid comment message", () => {
     (decryptMessage as jest.Mock).mockReturnValueOnce(JSON.stringify({
       type: "comment",
-      fromPubkey: "from",
+      fromPubkey: FROM_PK,
       toPubkey: "to",
       payload: {
         contentHash: "abc123",
@@ -113,7 +115,7 @@ describe("parseD2AMessage", () => {
   it("returns null for invalid offer payload (missing fields)", () => {
     (decryptMessage as jest.Mock).mockReturnValueOnce(JSON.stringify({
       type: "offer",
-      fromPubkey: "from",
+      fromPubkey: FROM_PK,
       toPubkey: "to",
       payload: { topic: "ai" }, // missing score and contentPreview
     }));
@@ -124,7 +126,7 @@ describe("parseD2AMessage", () => {
   it("returns null for invalid deliver payload (bad verdict)", () => {
     (decryptMessage as jest.Mock).mockReturnValueOnce(JSON.stringify({
       type: "deliver",
-      fromPubkey: "from",
+      fromPubkey: FROM_PK,
       toPubkey: "to",
       payload: {
         text: "Content",
@@ -140,7 +142,7 @@ describe("parseD2AMessage", () => {
   it("returns null for invalid comment payload (comment too long)", () => {
     (decryptMessage as jest.Mock).mockReturnValueOnce(JSON.stringify({
       type: "comment",
-      fromPubkey: "from",
+      fromPubkey: FROM_PK,
       toPubkey: "to",
       payload: {
         contentHash: "abc",
@@ -156,7 +158,7 @@ describe("parseD2AMessage", () => {
   it("returns null for unknown message type", () => {
     (decryptMessage as jest.Mock).mockReturnValueOnce(JSON.stringify({
       type: "unknown-type",
-      fromPubkey: "from",
+      fromPubkey: FROM_PK,
       toPubkey: "to",
       payload: {},
     }));
@@ -177,7 +179,7 @@ describe("parseD2AMessage", () => {
   it("returns null for missing payload key", () => {
     (decryptMessage as jest.Mock).mockReturnValueOnce(JSON.stringify({
       type: "accept",
-      fromPubkey: "from",
+      fromPubkey: FROM_PK,
       toPubkey: "to",
     }));
 

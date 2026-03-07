@@ -67,7 +67,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const backfillCleanupRef = useRef<(() => void) | null>(null);
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
 
-  // ─── Cache load on mount ───
   useEffect(() => {
     let cancelled = false;
     loadCachedContent().then(items => {
@@ -82,12 +81,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     return () => { cancelled = true; };
   }, []);
 
-  // ─── IC sync helper (fire-and-forget with offline queue) ───
   const doSyncToIC = useCallback((promise: Promise<unknown>, actionType: "saveEvaluation" | "updateEvaluation", payload: unknown) => {
     syncToIC(promise, actionType, payload, setSyncStatus, setPendingActions, addNotification);
   }, [addNotification]);
 
-  // ─── Actor creation & auto-sync on auth ───
   useEffect(() => {
     let stale = false;
     if (isAuthenticated && identity) {
@@ -122,7 +119,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     };
   }, [isAuthenticated, identity, addNotification]);
 
-  // ─── Offline queue drain ───
   const doDrainQueue = useCallback(async () => {
     const actor = actorRef.current;
     if (!actor || !isAuthenticated || !principal) return;
@@ -132,7 +128,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const isOnline = useOnlineStatus(doDrainQueue);
 
-  // ─── Load pending action count on mount ───
   useEffect(() => {
     let cancelled = false;
     dequeueAll().then(a => {
@@ -143,12 +138,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     return () => { cancelled = true; };
   }, []);
 
-  // ─── Persist content to cache ───
   useEffect(() => {
     saveCachedContent(content);
   }, [content]);
 
-  // ─── Timestamp refresh & visibility-based backfill ───
   useEffect(() => {
     const updateTimestamps = () => {
       if (typeof document !== "undefined" && document.hidden) return;
@@ -181,12 +174,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     };
   }, []);
 
-  // ─── Scoring cascade ───
   const scoreText = useCallback(async (text: string, userContext?: UserContext | null): Promise<AnalyzeResponse> => {
     return runScoringCascade(text, userContext, actorRef, isAuthenticated);
   }, [isAuthenticated]);
 
-  // ─── Analyze (score + persist) ───
   const analyze = useCallback(async (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }): Promise<AnalyzeResponse> => {
     setIsAnalyzing(true);
     try {
@@ -240,7 +231,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     } finally { setIsAnalyzing(false); }
   }, [scoreText, isAuthenticated, principal, addNotification, doSyncToIC]);
 
-  // ─── Validate / Flag ───
   const validateItem = useCallback((id: string) => {
     const item = contentRef.current.find(c => c.id === id);
     if (!item || item.validated) return;
@@ -265,7 +255,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     }
   }, [isAuthenticated, preferenceCallbacks, doSyncToIC]);
 
-  // ─── Add content ───
   const addContent = useCallback((item: ContentItem) => {
     const owned = (!item.owner && isAuthenticated && principal)
       ? { ...item, owner: principal.toText() }
@@ -320,7 +309,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const clearDemoContent = useCallback(() => setContent(prev => prev.filter(c => c.owner !== "")), []);
 
-  // ─── Image backfill ───
   const backfillImageUrls = useCallback((): (() => void) => {
     const items = contentRef.current
       .filter(c => c.sourceUrl && !c.imageUrl && /^https?:\/\//i.test(c.sourceUrl))
@@ -361,7 +349,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated, principal]);
   backfillFnRef.current = backfillImageUrls;
 
-  // ─── Load from IC ───
   const loadFromIC = useCallback(async () => {
     if (!actorRef.current || !isAuthenticated || !principal) return;
     await loadFromICCanister(
@@ -372,7 +359,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated, principal, addNotification, backfillImageUrls]);
   loadFromICRef.current = loadFromIC;
 
-  // ─── Briefing sync ───
   const syncBriefing = useCallback((state: BriefingState, nostrPubkey?: string | null) => {
     if (!actorRef.current || !isAuthenticated) return;
     void syncBriefingToCanister(actorRef.current, state, nostrPubkey ?? null).catch((err: unknown) => {

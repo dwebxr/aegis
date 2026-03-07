@@ -15,7 +15,7 @@ function loadPersistedTheme(): ThemeMode {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
-  } catch { /* Safari private mode or storage disabled */ }
+  } catch (e) { console.debug("[theme] localStorage read failed:", e); }
   return "dark";
 }
 

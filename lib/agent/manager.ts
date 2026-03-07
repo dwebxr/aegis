@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { v4 as uuidv4 } from "uuid";
@@ -208,6 +209,7 @@ export class AgentManager {
   }
 
   private async broadcastMyPresence(): Promise<void> {
+    return Sentry.startSpan({ name: "d2a.broadcast", op: "d2a" }, async () => {
     const prefs = this.callbacks.getPrefs();
     const interests = Object.entries(prefs.topicAffinities ?? {})
       .filter(([, v]) => v >= INTEREST_BROADCAST_THRESHOLD)
@@ -218,6 +220,7 @@ export class AgentManager {
     const content = this.callbacks.getContent();
     await broadcastPresence(this.sk, interests, 5, this.relayUrls, this.principalId, content);
     this.addLog("presence", `Broadcast presence with ${interests.length} interest(s): ${interests.slice(0, 5).join(", ")}${interests.length > 5 ? "…" : ""}`);
+    });
   }
 
   private cleanupStaleHandshakes(): void {
@@ -236,6 +239,7 @@ export class AgentManager {
   }
 
   private async discoverAndNegotiate(): Promise<void> {
+    return Sentry.startSpan({ name: "d2a.discover", op: "d2a" }, async () => {
     this.cleanupStaleHandshakes();
     this.cleanupStalePeers();
 
@@ -295,6 +299,7 @@ export class AgentManager {
         }
       }
     }
+    });
   }
 
   private subscribeToMessages(): void {
@@ -315,6 +320,7 @@ export class AgentManager {
   }
 
   private async handleIncomingMessage(senderPk: string, encryptedContent: string): Promise<void> {
+    return Sentry.startSpan({ name: "d2a.message", op: "d2a", attributes: { "d2a.sender": senderPk.slice(0, 8) } }, async () => {
     const message = parseD2AMessage(encryptedContent, this.sk, senderPk);
     if (!message) return;
 
@@ -336,6 +342,7 @@ export class AgentManager {
         this.callbacks.onComment?.(message, senderPk);
         break;
     }
+    });
   }
 
   private async handleOffer(senderPk: string, offer: D2AOfferPayload): Promise<void> {

@@ -134,7 +134,6 @@ function ScoreTags({ item }: { item: ContentItem }) {
   );
 }
 
-/* ── Action Button Base ──────────────────────────────────── */
 const actionBtnBase = "flex items-center justify-center gap-[5px] rounded-md text-body-sm font-semibold cursor-pointer transition-all duration-150 font-[inherit] min-w-8";
 
 const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, isBookmarked, mobile, variant = "default", rank, focused, clusterCount }) => {

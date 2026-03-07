@@ -46,7 +46,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
       if (saved && PUSH_FREQ_OPTIONS.some(o => o.value === saved)) {
         setPushFreq(saved as PushFrequency);
       }
-    } catch { /* Safari private mode */ }
+    } catch (e) { console.debug("[settings] localStorage read failed:", e); }
   }, []);
 
   const handleFreqChange = (value: PushFrequency) => {

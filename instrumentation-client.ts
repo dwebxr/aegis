@@ -5,6 +5,7 @@ const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim();
 if (dsn) {
   Sentry.init({
     dsn,
+    environment: process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.NODE_ENV || "development",
     tracesSampleRate: 0.1,
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0.1,
@@ -13,7 +14,7 @@ if (dsn) {
       if (event.breadcrumbs) {
         event.breadcrumbs = event.breadcrumbs.map(b => {
           if (b.data?.url && typeof b.data.url === "string") {
-            try { b.data.url = new URL(b.data.url).pathname; } catch { /* keep original */ }
+            try { b.data.url = new URL(b.data.url).pathname; } catch { /* malformed URL — keep original */ }
           }
           return b;
         });

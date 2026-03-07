@@ -9,8 +9,19 @@
 
 ## Latest Updates (March 2026)
 
+### Security Hardening & Production Cleanup
+- **5386 tests, 310 suites** — zero failures, zero skipped
+- **D2A sender pubkey verification**: `handleIncomingMessage` now cross-checks `fromPubkey` in encrypted payload against Nostr event sender — rejects spoofed payloads
+- **D2A deliver payload scores validation**: `isValidDeliverPayload` validates `originality`/`insight`/`credibility`/`composite` are finite numbers in [0, 10]
+- **CORS origin restriction**: `isValidOrigin` now only accepts `https://` origins + `http://localhost` for dev — blocks `http://` in production
+- **Cache score bounds validation**: `validateContentItems` rejects cached items with NaN, Infinity, or out-of-range score values
+- **Sentry observability**: `environment` tag on all 3 configs (server/edge/client), `Sentry.setUser()` on login/logout/session-expiry, `Sentry.startSpan()` on D2A broadcast/discover/message operations
+- **Silent error elimination**: 10 bare `catch {}` blocks converted to `catch (e) { console.debug/warn/error(...) }` across settings, contexts, and UI components
+- **Unnecessary defensive code removed**: try/catch around `String.split("?")` in Sentry configs (can't throw), 23 decorative section divider comments, 1 bloated module docstring
+- **Build type fix**: `ScoreBreakdown` → `Record<string, unknown>` cast via intermediate `unknown` in handshake validation
+
 ### Latest Sort Mode & Code Cleanup
-- **5290 tests, 307 suites** — zero failures, zero skipped
+- **5382 tests, 310 suites** — zero failures, zero skipped
 - **Latest mode (default)**: Home Feed now defaults to reverse-chronological order with automatic Slop exclusion — no clustering, flat list, newest first by `createdAt`
 - **Ranked mode**: Existing quality-ranked view with story clustering preserved as toggle option
 - **Sort mode persistence**: `localStorage` with SSR-safe initialization; CommandPalette commands for mode switching
@@ -861,7 +872,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (5290 unit/integration tests, 307 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
+| Test | Jest + ts-jest (5382 unit/integration tests, 310 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
 
 ## Project Structure
 
@@ -1021,7 +1032,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 5290 Jest tests across 307 suites
+├── __tests__/                           # 5382 Jest tests across 310 suites
 ├── e2e/                                 # Playwright E2E tests (299 tests, 12 specs)
 ├── canisters/
 │   └── aegis_backend/
@@ -1058,7 +1069,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Jest unit + integration tests (5290 tests)
+npm test              # Jest unit + integration tests (5382 tests)
 npm run test:watch    # Watch mode
 npx playwright test   # E2E tests — requires dev server (npm run dev)
 ```
