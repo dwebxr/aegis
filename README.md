@@ -9,6 +9,17 @@
 
 ## Latest Updates (March 2026)
 
+### Latest Sort Mode & Code Cleanup
+- **5290 tests, 307 suites** — zero failures, zero skipped
+- **Latest mode (default)**: Home Feed now defaults to reverse-chronological order with automatic Slop exclusion — no clustering, flat list, newest first by `createdAt`
+- **Ranked mode**: Existing quality-ranked view with story clustering preserved as toggle option
+- **Sort mode persistence**: `localStorage` with SSR-safe initialization; CommandPalette commands for mode switching
+- **Shared filter logic**: `applyVerdictAndSource()` eliminates duplication between Latest and Dashboard filter paths
+- **Bookmarked/Validated filters**: Both Latest and Dashboard modes support bookmarked and validated verdict filters with correct sort semantics (Latest sorts by `createdAt`, Dashboard sorts by `validatedAt`)
+- **Reference stability fix**: `bookmarkedIds` wrapped in `useMemo` to prevent `filteredContent` invalidation on every render when bookmarks are empty
+- **Unified rendering loop**: Latest and Ranked modes share a single `ContentCard` rendering path (eliminated ~60 lines of duplication)
+- **Dead code removal**: Unused imports, `console.log` in production code, stale variables cleaned up across test and source files
+
 ### D2A Discovery Hardening & LARP Audit #3
 - **5242 tests, 305 suites** — zero failures, zero skipped
 - **Pool resource leak fix**: `broadcastPresence` now wraps `pool.publish()` in try/finally — guarantees `pool.destroy()` even on synchronous throw
@@ -730,6 +741,9 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - D2A protocol types use discriminated union (`D2AOfferMessage | D2AAcceptMessage | D2ARejectMessage | D2ADeliverMessage`) for compile-time type safety
 
 ### Dashboard & Briefing
+- **Latest mode (default)**: Reverse-chronological feed with automatic Slop exclusion — clean, flat list sorted by `createdAt`
+- **Ranked mode**: Quality-ranked feed with story clustering (Jaccard similarity, Union-Find) — toggle via Latest/Ranked buttons or CommandPalette
+- Sort mode persisted to localStorage; both modes support all verdict filters (all, quality, slop, validated, bookmarked) and source filters
 - **Top 3 + Topic Spotlight** hero cards with 16:9 thumbnails and inline Validate/Flag buttons
 - YouTube content auto-embeds as playable iframe in hero cards (Top3, Spotlight hero)
 - Unreviewed Queue, Saved Items, and Agent Knowledge in collapsible sections with lazy rendering
@@ -847,7 +861,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (5006 unit/integration tests, 288 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
+| Test | Jest + ts-jest (5290 unit/integration tests, 307 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
 
 ## Project Structure
 
@@ -1007,7 +1021,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 5006 Jest tests across 288 suites
+├── __tests__/                           # 5290 Jest tests across 307 suites
 ├── e2e/                                 # Playwright E2E tests (299 tests, 12 specs)
 ├── canisters/
 │   └── aegis_backend/
@@ -1044,7 +1058,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Jest unit + integration tests (5006 tests)
+npm test              # Jest unit + integration tests (5290 tests)
 npm run test:watch    # Watch mode
 npx playwright test   # E2E tests — requires dev server (npm run dev)
 ```

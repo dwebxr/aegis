@@ -168,9 +168,9 @@ export async function discoverPeers(
         .map(p => `${p.nostrPubkey.slice(0, 8)}…(${(p.resonance ?? 0).toFixed(2)})`);
       msg += ` — dropped ${dropped}: ${details.join(", ")}${dropped > 5 ? "…" : ""}`;
     }
-    console.log(msg);
+    console.debug(msg);
   } else {
-    console.log("[discovery] No aegis-agent-profile events found on relays");
+    console.debug("[discovery] No aegis-agent-profile events found on relays");
   }
 
   return passed.sort((a, b) => (b.resonance ?? 0) - (a.resonance ?? 0));
