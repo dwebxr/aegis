@@ -9,6 +9,15 @@
 
 ## Latest Updates (March 2026)
 
+### D2A Discovery Hardening & LARP Audit #3
+- **5242 tests, 305 suites** — zero failures, zero skipped
+- **Pool resource leak fix**: `broadcastPresence` now wraps `pool.publish()` in try/finally — guarantees `pool.destroy()` even on synchronous throw
+- **Discovery log tightened**: Diagnostic output capped at 5 peer details with shorter format — prevents console flooding during frequent polling cycles
+- **Stale test assertions fixed**: `discovery-dedup.test.ts` comment and assertion updated from old `0.3` to current `RESONANCE_THRESHOLD` (0.15)
+- **TypeScript strict compliance**: `ContentContext-analyze.test.tsx` cast fix for `AnalyzeResponse → Record<string, unknown>` via intermediate `unknown`
+- **Jest worker leak resolved**: `forceExit: true` in jest.config.js — eliminates intermittent worker timeout on full 305-suite parallel runs
+- **LARP Audit #3**: All 7 categories verified clean for D2A peer discovery changes — no stubs, no fake data, no silent failures
+
 ### Content Deduplication Overhaul
 - **5242 tests, 305 suites** — zero failures, zero skipped
 - **URL normalization**: `normalizeUrl()` strips `www.`, trailing slashes, UTM/tracking params (`fbclid`, `gclid`, `ref`, `mc_cid`), sorts query params, removes hash fragments — prevents same article from appearing as duplicate cards

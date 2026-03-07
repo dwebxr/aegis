@@ -111,7 +111,7 @@ describe("ContentContext analyze", () => {
 
     let analyzeResult: Record<string, unknown> | undefined;
     await act(async () => {
-      analyzeResult = await result.current.analyze("Fallback test") as Record<string, unknown>;
+      analyzeResult = await result.current.analyze("Fallback test") as unknown as Record<string, unknown>;
     });
 
     expect(analyzeResult).toBeDefined();

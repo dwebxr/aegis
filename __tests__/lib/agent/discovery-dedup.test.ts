@@ -125,7 +125,7 @@ describe("discoverPeers — tag parsing", () => {
 });
 
 describe("discoverPeers — resonance filtering", () => {
-  it("filters peers below RESONANCE_THRESHOLD (0.3)", async () => {
+  it("filters peers below RESONANCE_THRESHOLD (0.15)", async () => {
     mockQuerySync.mockResolvedValue([
       makeEvent("peer-relevant", [["interest", "ai"], ["interest", "crypto"]], "", 1000),
       makeEvent("peer-irrelevant", [["interest", "gardening"], ["interest", "cooking"]], "", 1000),
@@ -136,7 +136,7 @@ describe("discoverPeers — resonance filtering", () => {
     // peer-irrelevant shares nothing → low resonance
     const relevant = peers.find(p => p.nostrPubkey === "peer-relevant");
     expect(relevant).toBeDefined();
-    expect(relevant!.resonance).toBeGreaterThanOrEqual(0.3);
+    expect(relevant!.resonance).toBeGreaterThanOrEqual(0.15);
   });
 
   it("sorts results by resonance descending", async () => {

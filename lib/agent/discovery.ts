@@ -74,13 +74,15 @@ export async function broadcastPresence(
   const signed = finalizeEvent(template, sk);
 
   const pool = new SimplePool();
-  const promises = pool.publish(relayUrls, signed);
-  const results = await Promise.allSettled(promises);
-  pool.destroy();
-
-  const succeeded = results.filter(r => r.status === "fulfilled").length;
-  if (succeeded === 0 && relayUrls.length > 0) {
-    throw new Error(`Presence broadcast failed on all ${relayUrls.length} relays`);
+  try {
+    const promises = pool.publish(relayUrls, signed);
+    const results = await Promise.allSettled(promises);
+    const succeeded = results.filter(r => r.status === "fulfilled").length;
+    if (succeeded === 0 && relayUrls.length > 0) {
+      throw new Error(`Presence broadcast failed on all ${relayUrls.length} relays`);
+    }
+  } finally {
+    pool.destroy();
   }
 }
 
@@ -158,12 +160,17 @@ export async function discoverPeers(
 
   if (all.length > 0) {
     const dropped = all.length - passed.length;
-    console.log(
-      `[discovery] Found ${all.length} presence event(s), ${passed.length} passed resonance threshold (≥${RESONANCE_THRESHOLD})` +
-      (dropped > 0 ? ` — ${dropped} dropped: ${all.filter(p => (p.resonance ?? 0) < RESONANCE_THRESHOLD).map(p => `${p.nostrPubkey.slice(0, 8)}…(res=${(p.resonance ?? 0).toFixed(2)}, interests=[${p.interests.join(",")}])`).join(", ")}` : ""),
-    );
+    let msg = `[discovery] ${all.length} peer(s), ${passed.length} passed threshold (≥${RESONANCE_THRESHOLD})`;
+    if (dropped > 0) {
+      const details = all
+        .filter(p => (p.resonance ?? 0) < RESONANCE_THRESHOLD)
+        .slice(0, 5) // cap detail output
+        .map(p => `${p.nostrPubkey.slice(0, 8)}…(${(p.resonance ?? 0).toFixed(2)})`);
+      msg += ` — dropped ${dropped}: ${details.join(", ")}${dropped > 5 ? "…" : ""}`;
+    }
+    console.log(msg);
   } else {
-    console.log("[discovery] No Kind 30078 aegis-agent-profile events found on relays");
+    console.log("[discovery] No aegis-agent-profile events found on relays");
   }
 
   return passed.sort((a, b) => (b.resonance ?? 0) - (a.resonance ?? 0));
