@@ -78,12 +78,14 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 }
 
 describe("DashboardTab — empty state", () => {
-  it("shows 'No matching content' when empty with default quality filter", () => {
-    const html = renderToStaticMarkup(
+  it("shows 'No matching content' when empty with active quality filter", () => {
+    const { container } = render(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("No matching content");
-    expect(html).toContain("Try adjusting your filters");
+    // Switch to Quality filter so hasActiveFilter is true
+    fireEvent.click(screen.getByTestId("aegis-filter-quality"));
+    expect(container.textContent).toContain("No matching content");
+    expect(container.textContent).toContain("Try adjusting your filters");
   });
 
   it("shows metric chip labels when content is empty", () => {

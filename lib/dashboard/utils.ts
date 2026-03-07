@@ -36,6 +36,32 @@ export function applyDashboardFilters(
   return items;
 }
 
+/** Latest mode: exclude slop, sort by createdAt descending (newest first). */
+export function applyLatestFilter(
+  content: ContentItem[],
+  verdictFilter: "all" | "quality" | "slop" | "validated" | "bookmarked",
+  sourceFilter: string,
+  bookmarkedIds: string[],
+): ContentItem[] {
+  let items = content;
+
+  if (verdictFilter === "bookmarked") {
+    const bookmarkSet = new Set(bookmarkedIds);
+    items = items.filter(c => bookmarkSet.has(c.id));
+  } else if (verdictFilter === "validated") {
+    items = items.filter(c => c.validated);
+  } else if (verdictFilter === "slop") {
+    items = items.filter(c => c.verdict === "slop");
+  } else {
+    // "all" and "quality" both exclude slop in Latest mode
+    items = items.filter(c => c.verdict !== "slop");
+  }
+
+  if (sourceFilter !== "all") items = items.filter(c => c.source === sourceFilter);
+
+  return [...items].sort((a, b) => b.createdAt - a.createdAt);
+}
+
 export function buildTopicPatternCache(topics: string[]): Map<string, RegExp> {
   return new Map(topics.map(topic => {
     const escaped = topic.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

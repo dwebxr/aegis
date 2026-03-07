@@ -15,6 +15,7 @@ import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
 import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificationBadge";
 import {
   applyDashboardFilters,
+  applyLatestFilter,
   computeDashboardTop3,
   computeTopicSpotlight,
   computeDashboardSaved,
@@ -243,7 +244,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const { sources } = useSources();
   const { isDemoMode } = useDemo();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop" | "validated" | "bookmarked">("quality");
+  const [verdictFilter, setVerdictFilter] = useState<"all" | "quality" | "slop" | "validated" | "bookmarked">("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const moreFiltersRef = useRef<HTMLDivElement>(null);
@@ -264,12 +265,21 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     try { return localStorage.getItem("aegis-home-mode") === "dashboard" ? "dashboard" : "feed"; }
     catch { return "feed"; }
   });
+  const [sortMode, setSortMode] = useState<"latest" | "ranked">(() => {
+    if (typeof window === "undefined") return "latest";
+    try { return localStorage.getItem("aegis-sort-mode") === "ranked" ? "ranked" : "latest"; }
+    catch { return "latest"; }
+  });
   const { profile, addFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem("aegis-home-mode", homeMode); } catch { console.debug("[dashboard] localStorage unavailable"); }
   }, [homeMode]);
+
+  useEffect(() => {
+    try { localStorage.setItem("aegis-sort-mode", sortMode); } catch { console.debug("[dashboard] localStorage unavailable"); }
+  }, [sortMode]);
 
   const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {
     const now = Date.now();
@@ -300,7 +310,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     setExpanded(null);
     setShowAllContent(false);
     setExpandedClusters(new Set());
-  }, [verdictFilter, sourceFilter]);
+  }, [verdictFilter, sourceFilter, sortMode]);
 
   // Close "More filters" dropdown on click-outside or Escape
   useEffect(() => {
@@ -322,16 +332,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, [moreFiltersOpen]);
 
   const filteredContent = useMemo(() => {
+    if (sortMode === "latest") {
+      return deduplicateItems(applyLatestFilter(content, verdictFilter, sourceFilter, profile.bookmarkedIds ?? []));
+    }
     if (verdictFilter === "bookmarked") {
       const bookmarkSet = new Set(profile.bookmarkedIds ?? []);
       return deduplicateItems(content.filter(c => bookmarkSet.has(c.id)).sort((a, b) => b.createdAt - a.createdAt));
     }
     return deduplicateItems(applyDashboardFilters(content, verdictFilter, sourceFilter));
-  }, [content, verdictFilter, sourceFilter, profile.bookmarkedIds]);
+  }, [content, verdictFilter, sourceFilter, profile.bookmarkedIds, sortMode]);
 
   const clusteredContent = useMemo(
-    () => homeMode === "feed" ? clusterByStory(filteredContent) : [],
-    [filteredContent, homeMode],
+    () => homeMode === "feed" && sortMode === "ranked" ? clusterByStory(filteredContent) : [],
+    [filteredContent, homeMode, sortMode],
   );
 
   const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set());
@@ -442,7 +455,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return () => { clearTimeout(feedbackTimerRef.current); };
   }, []);
 
-  const feedItemIds = useMemo(() => clusteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.representative.id), [clusteredContent, showAllContent]);
+  const feedItemIds = useMemo(() => {
+    if (sortMode === "latest") return filteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.id);
+    return clusteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.representative.id);
+  }, [sortMode, filteredContent, clusteredContent, showAllContent]);
 
   const { focusedId } = useKeyboardNav({
     items: feedItemIds,
@@ -460,6 +476,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     { label: "Go to Analytics", action: () => onTabChange?.("analytics") },
     { label: "Go to Settings", action: () => onTabChange?.("settings") },
     { label: "Go to Sources", action: () => onTabChange?.("sources") },
+    { label: "Sort: Latest", action: () => setSortMode("latest") },
+    { label: "Sort: Ranked", action: () => setSortMode("ranked") },
     { label: "Filter: Quality", action: () => setVerdictFilter("quality") },
     { label: "Filter: Slop", action: () => setVerdictFilter("slop") },
     { label: "Filter: All", action: () => setVerdictFilter("all") },
@@ -496,6 +514,28 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               );
             })}
           </div>
+          {homeMode === "feed" && (
+            <div className="flex gap-1 bg-navy-lighter rounded-md p-1 border border-border">
+              {(["latest", "ranked"] as const).map(mode => {
+                const active = sortMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    data-testid={`aegis-sort-mode-${mode}`}
+                    onClick={() => setSortMode(mode)}
+                    className={cn(
+                      "px-3 py-2 rounded-sm text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast capitalize",
+                      active
+                        ? "bg-card border border-emphasis text-foreground"
+                        : "bg-transparent border border-transparent text-muted-foreground"
+                    )}
+                  >
+                    {mode === "latest" ? "Latest" : "Ranked"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <button
             onClick={() => onTabChange?.("settings:feeds")}
             className={cn(
@@ -705,72 +745,110 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               {pendingCount > 0 && onFlushPending && (
                 <NewItemsBar count={pendingCount} onFlush={onFlushPending} />
               )}
-              {clusteredContent.slice(0, showAllContent ? 50 : 5).map((cluster, i) => {
-                const rep = cluster.representative;
-                const hasCluster = cluster.members.length > 1;
-                const clusterExpanded = expandedClusters.has(rep.id);
-                return (
-                  <div key={rep.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
-                    {verdictFilter === "validated" && rep.validatedAt && (
-                      <div className="text-caption text-purple-400 mb-1 ml-1 font-mono font-semibold">
-                        Validated {new Date(rep.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                        {" "}
-                        {new Date(rep.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                      </div>
-                    )}
-                    <ContentCard
-                      item={rep}
-                      expanded={expanded === rep.id}
-                      onToggle={handleToggle}
-                      onValidate={handleValidateWithFeedback}
-                      onFlag={handleFlagWithFeedback}
-                      onBookmark={handleBookmark}
-                      isBookmarked={bookmarkSet.has(rep.id)}
-                      onAddFilterRule={addFilterRule}
-                      mobile={mobile}
-                      focused={focusedId === rep.id}
-                      clusterCount={hasCluster ? cluster.members.length - 1 : undefined}
-                    />
-                    {hasCluster && (
-                      <button
-                        onClick={() => setExpandedClusters(prev => {
-                          const next = new Set(prev);
-                          if (next.has(rep.id)) next.delete(rep.id); else next.add(rep.id);
-                          return next;
-                        })}
-                        className="flex items-center gap-1 px-3 py-1 my-1 ml-4 mb-2 bg-transparent border border-subtle rounded-full text-muted-foreground text-caption font-semibold cursor-pointer font-[inherit] transition-fast"
-                      >
-                        <span className={cn("inline-block transition-fast", clusterExpanded && "rotate-180")}>&#x25BC;</span>
-                        {clusterExpanded ? "Hide" : `+${cluster.members.length - 1} related`}
-                        {cluster.sharedTopics.length > 0 && ` \u00B7 ${cluster.sharedTopics.slice(0, 2).join(", ")}`}
-                      </button>
-                    )}
-                    {hasCluster && clusterExpanded && cluster.members.slice(1).map(m => (
-                      <div key={m.id} className="ml-4 border-l-2 border-subtle pl-3">
+              {sortMode === "latest" ? (
+                <>
+                  {filteredContent.slice(0, showAllContent ? 50 : 5).map((item, i) => (
+                    <div key={item.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
+                      {verdictFilter === "validated" && item.validatedAt && (
+                        <div className="text-caption text-purple-400 mb-1 ml-1 font-mono font-semibold">
+                          Validated {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                          {" "}
+                          {new Date(item.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      )}
+                      <ContentCard
+                        item={item}
+                        expanded={expanded === item.id}
+                        onToggle={handleToggle}
+                        onValidate={handleValidateWithFeedback}
+                        onFlag={handleFlagWithFeedback}
+                        onBookmark={handleBookmark}
+                        isBookmarked={bookmarkSet.has(item.id)}
+                        onAddFilterRule={addFilterRule}
+                        mobile={mobile}
+                        focused={focusedId === item.id}
+                      />
+                    </div>
+                  ))}
+                  {filteredContent.length > 5 && !showAllContent && (
+                    <button
+                      onClick={() => setShowAllContent(true)}
+                      className="w-full px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer font-[inherit] transition-normal mt-2"
+                    >
+                      Show all ({filteredContent.length} items)
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  {clusteredContent.slice(0, showAllContent ? 50 : 5).map((cluster, i) => {
+                    const rep = cluster.representative;
+                    const hasCluster = cluster.members.length > 1;
+                    const clusterExpanded = expandedClusters.has(rep.id);
+                    return (
+                      <div key={rep.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
+                        {verdictFilter === "validated" && rep.validatedAt && (
+                          <div className="text-caption text-purple-400 mb-1 ml-1 font-mono font-semibold">
+                            Validated {new Date(rep.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                            {" "}
+                            {new Date(rep.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                        )}
                         <ContentCard
-                          item={m}
-                          expanded={expanded === m.id}
+                          item={rep}
+                          expanded={expanded === rep.id}
                           onToggle={handleToggle}
                           onValidate={handleValidateWithFeedback}
                           onFlag={handleFlagWithFeedback}
                           onBookmark={handleBookmark}
-                          isBookmarked={bookmarkSet.has(m.id)}
+                          isBookmarked={bookmarkSet.has(rep.id)}
                           onAddFilterRule={addFilterRule}
                           mobile={mobile}
-                          focused={focusedId === m.id}
+                          focused={focusedId === rep.id}
+                          clusterCount={hasCluster ? cluster.members.length - 1 : undefined}
                         />
+                        {hasCluster && (
+                          <button
+                            onClick={() => setExpandedClusters(prev => {
+                              const next = new Set(prev);
+                              if (next.has(rep.id)) next.delete(rep.id); else next.add(rep.id);
+                              return next;
+                            })}
+                            className="flex items-center gap-1 px-3 py-1 my-1 ml-4 mb-2 bg-transparent border border-subtle rounded-full text-muted-foreground text-caption font-semibold cursor-pointer font-[inherit] transition-fast"
+                          >
+                            <span className={cn("inline-block transition-fast", clusterExpanded && "rotate-180")}>&#x25BC;</span>
+                            {clusterExpanded ? "Hide" : `+${cluster.members.length - 1} related`}
+                            {cluster.sharedTopics.length > 0 && ` \u00B7 ${cluster.sharedTopics.slice(0, 2).join(", ")}`}
+                          </button>
+                        )}
+                        {hasCluster && clusterExpanded && cluster.members.slice(1).map(m => (
+                          <div key={m.id} className="ml-4 border-l-2 border-subtle pl-3">
+                            <ContentCard
+                              item={m}
+                              expanded={expanded === m.id}
+                              onToggle={handleToggle}
+                              onValidate={handleValidateWithFeedback}
+                              onFlag={handleFlagWithFeedback}
+                              onBookmark={handleBookmark}
+                              isBookmarked={bookmarkSet.has(m.id)}
+                              onAddFilterRule={addFilterRule}
+                              mobile={mobile}
+                              focused={focusedId === m.id}
+                            />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                );
-              })}
-              {clusteredContent.length > 5 && !showAllContent && (
-                <button
-                  onClick={() => setShowAllContent(true)}
-                  className="w-full px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer font-[inherit] transition-normal mt-2"
-                >
-                  Show all ({filteredContent.length} items in {clusteredContent.length} groups)
-                </button>
+                    );
+                  })}
+                  {clusteredContent.length > 5 && !showAllContent && (
+                    <button
+                      onClick={() => setShowAllContent(true)}
+                      className="w-full px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer font-[inherit] transition-normal mt-2"
+                    >
+                      Show all ({filteredContent.length} items in {clusteredContent.length} groups)
+                    </button>
+                  )}
+                </>
               )}
             </>
           )}

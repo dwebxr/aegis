@@ -598,7 +598,7 @@ describe("More Filters dropdown", () => {
     expect(panel.textContent).toContain("nostr");
   });
 
-  it("clicking All filter shows all content including slop", () => {
+  it("clicking All filter in Ranked mode shows all content including slop", () => {
     const items = [
       makeItem({ id: "fa1", verdict: "quality", text: "Quality content abc123" }),
       makeItem({ id: "fa2", verdict: "slop", text: "Slop content xyz789" }),
@@ -606,9 +606,10 @@ describe("More Filters dropdown", () => {
     render(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    // Default filter is "quality" — slop item should not be visible
+    // Default is Latest mode — slop item excluded even with "all" verdict filter
     expect(screen.queryByText(/Slop content xyz789/)).toBeNull();
-    // Switch to "all" filter
+    // Switch to Ranked mode first, then All filter
+    fireEvent.click(screen.getByTestId("aegis-sort-mode-ranked"));
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
     fireEvent.click(screen.getByTestId("aegis-filter-all"));
     // Both items should now be visible
