@@ -24,25 +24,25 @@ describe("calculateResonance — edge cases", () => {
     expect(calculateResonance(prefs, peer)).toBe(0);
   });
 
-  it("returns 0 when all affinities are below 0.3 threshold", () => {
+  it("returns 0 when all affinities are below 0.2 threshold", () => {
     const prefs = makeProfile({
-      topicAffinities: { a: 0.29, b: 0.0, c: -0.5 },
+      topicAffinities: { a: 0.19, b: 0.0, c: -0.5 },
     });
     const peer = makePeerProfile({ interests: ["a", "b", "c"] });
     expect(calculateResonance(prefs, peer)).toBe(0);
   });
 
-  it("includes topic at exactly 0.3 threshold", () => {
+  it("includes topic at exactly 0.2 threshold", () => {
     const prefs = makeProfile({
-      topicAffinities: { "edge": 0.3 },
+      topicAffinities: { "edge": 0.2 },
     });
     const peer = makePeerProfile({ interests: ["edge"] });
     expect(calculateResonance(prefs, peer)).toBe(1.0);
   });
 
-  it("excludes topic at 0.29 (below threshold)", () => {
+  it("excludes topic at 0.19 (below threshold)", () => {
     const prefs = makeProfile({
-      topicAffinities: { "below": 0.29 },
+      topicAffinities: { "below": 0.19 },
     });
     const peer = makePeerProfile({ interests: ["below"] });
     expect(calculateResonance(prefs, peer)).toBe(0);

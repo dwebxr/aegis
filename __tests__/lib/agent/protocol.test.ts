@@ -47,7 +47,7 @@ describe("protocol constants", () => {
   describe("timing constants", () => {
     it("has reasonable interval values", () => {
       expect(PRESENCE_BROADCAST_INTERVAL_MS).toBe(5 * 60 * 1000); // 5 min
-      expect(PEER_EXPIRY_MS).toBe(15 * 60 * 1000); // 15 min
+      expect(PEER_EXPIRY_MS).toBe(60 * 60 * 1000); // 1 hour
       expect(HANDSHAKE_TIMEOUT_MS).toBe(30 * 1000); // 30 sec
       expect(DISCOVERY_POLL_INTERVAL_MS).toBe(60 * 1000); // 1 min
     });
@@ -63,7 +63,7 @@ describe("protocol constants", () => {
 
   describe("threshold constants", () => {
     it("has correct threshold values", () => {
-      expect(RESONANCE_THRESHOLD).toBe(0.3);
+      expect(RESONANCE_THRESHOLD).toBe(0.15);
       expect(MIN_OFFER_SCORE).toBe(7.0);
     });
 

@@ -16,11 +16,12 @@ export const MAX_TOPIC_LENGTH = 100;
 export const MAX_TOPICS_COUNT = 20;
 
 export const PRESENCE_BROADCAST_INTERVAL_MS = 5 * 60 * 1000;
-export const PEER_EXPIRY_MS = 15 * 60 * 1000;
+export const PEER_EXPIRY_MS = 60 * 60 * 1000; // 1 hour — peers don't need to be online simultaneously
 export const HANDSHAKE_TIMEOUT_MS = 30 * 1000;
 export const DISCOVERY_POLL_INTERVAL_MS = 60 * 1000;
 
-export const RESONANCE_THRESHOLD = 0.3;
+export const INTEREST_BROADCAST_THRESHOLD = 0.2;
+export const RESONANCE_THRESHOLD = 0.15;
 export const MIN_OFFER_SCORE = 7.0;
 
 export const MAX_ACTIVITY_LOG = 50;

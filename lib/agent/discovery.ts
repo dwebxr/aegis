@@ -11,6 +11,7 @@ import {
   TAG_D2A_INTEREST,
   TAG_D2A_CAPACITY,
   TAG_D2A_PRINCIPAL,
+  INTEREST_BROADCAST_THRESHOLD,
   RESONANCE_THRESHOLD,
   PEER_EXPIRY_MS,
 } from "./protocol";
@@ -23,7 +24,7 @@ export function calculateResonance(
   theirProfile: AgentProfile,
 ): number {
   const myHighTopics = Object.entries(myPrefs.topicAffinities)
-    .filter(([, v]) => v >= 0.3)
+    .filter(([, v]) => v >= INTEREST_BROADCAST_THRESHOLD)
     .map(([k]) => k);
 
   if (myHighTopics.length === 0 || theirProfile.interests.length === 0) return 0;
@@ -152,7 +153,18 @@ export async function discoverPeers(
     byPubkey.set(ev.pubkey, profile);
   }
 
-  return Array.from(byPubkey.values())
-    .filter(p => (p.resonance ?? 0) >= RESONANCE_THRESHOLD)
-    .sort((a, b) => (b.resonance ?? 0) - (a.resonance ?? 0));
+  const all = Array.from(byPubkey.values());
+  const passed = all.filter(p => (p.resonance ?? 0) >= RESONANCE_THRESHOLD);
+
+  if (all.length > 0) {
+    const dropped = all.length - passed.length;
+    console.log(
+      `[discovery] Found ${all.length} presence event(s), ${passed.length} passed resonance threshold (≥${RESONANCE_THRESHOLD})` +
+      (dropped > 0 ? ` — ${dropped} dropped: ${all.filter(p => (p.resonance ?? 0) < RESONANCE_THRESHOLD).map(p => `${p.nostrPubkey.slice(0, 8)}…(res=${(p.resonance ?? 0).toFixed(2)}, interests=[${p.interests.join(",")}])`).join(", ")}` : ""),
+    );
+  } else {
+    console.log("[discovery] No Kind 30078 aegis-agent-profile events found on relays");
+  }
+
+  return passed.sort((a, b) => (b.resonance ?? 0) - (a.resonance ?? 0));
 }

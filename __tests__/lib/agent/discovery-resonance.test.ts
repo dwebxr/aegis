@@ -19,8 +19,8 @@ describe("calculateResonance — edge cases", () => {
     expect(calculateResonance(prefs, peer)).toBe(0);
   });
 
-  it("returns 0 when all affinities are below threshold (0.3)", () => {
-    const prefs = { ...createEmptyProfile("low"), topicAffinities: { ai: 0.29, ml: 0.1, crypto: 0.2 } };
+  it("returns 0 when all affinities are below threshold (0.2)", () => {
+    const prefs = { ...createEmptyProfile("low"), topicAffinities: { ai: 0.19, ml: 0.1, crypto: 0.15 } };
     const peer = makePeer(["ai", "ml", "crypto"]);
     expect(calculateResonance(prefs, peer)).toBe(0);
   });
@@ -31,15 +31,15 @@ describe("calculateResonance — edge cases", () => {
     expect(calculateResonance(prefs, peer)).toBe(0);
   });
 
-  it("exact threshold 0.3 is included", () => {
-    const prefs = { ...createEmptyProfile("t"), topicAffinities: { ai: 0.3 } };
+  it("exact threshold 0.2 is included", () => {
+    const prefs = { ...createEmptyProfile("t"), topicAffinities: { ai: 0.2 } };
     const peer = makePeer(["ai"]);
     // 1 overlap, union = 1 → resonance = 1.0
     expect(calculateResonance(prefs, peer)).toBe(1);
   });
 
-  it("0.299 is excluded from high-affinity", () => {
-    const prefs = { ...createEmptyProfile("t"), topicAffinities: { ai: 0.299 } };
+  it("0.199 is excluded from high-affinity", () => {
+    const prefs = { ...createEmptyProfile("t"), topicAffinities: { ai: 0.199 } };
     const peer = makePeer(["ai"]);
     expect(calculateResonance(prefs, peer)).toBe(0);
   });

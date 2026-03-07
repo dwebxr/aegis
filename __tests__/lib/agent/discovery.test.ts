@@ -20,9 +20,9 @@ function makePeerProfile(overrides: Partial<AgentProfile> = {}): AgentProfile {
 describe("calculateResonance", () => {
   it("returns 0 when user has no high-affinity topics", () => {
     const prefs = makeProfile({
-      topicAffinities: { "low": 0.1, "medium": 0.2 }, // all below 0.3
+      topicAffinities: { "low": 0.1, "verylow": 0.05 }, // all below 0.2 threshold
     });
-    const peer = makePeerProfile({ interests: ["low", "medium"] });
+    const peer = makePeerProfile({ interests: ["low", "verylow"] });
     expect(calculateResonance(prefs, peer)).toBe(0);
   });
 
@@ -71,12 +71,12 @@ describe("calculateResonance", () => {
     expect(calculateResonance(prefs, peer)).toBeCloseTo(1 / 3);
   });
 
-  it("only considers topics with affinity >= 0.3 from user", () => {
+  it("only considers topics with affinity >= 0.2 threshold from user", () => {
     const prefs = makeProfile({
       topicAffinities: {
         "high": 0.8,    // included
-        "medium": 0.3,  // included (boundary)
-        "low": 0.29,    // excluded
+        "medium": 0.2,  // included (boundary)
+        "low": 0.19,    // excluded
         "negative": -0.5, // excluded
       },
     });

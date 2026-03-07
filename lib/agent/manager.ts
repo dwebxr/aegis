@@ -16,6 +16,7 @@ import {
   PEER_EXPIRY_MS,
   MIN_OFFER_SCORE,
   MAX_ACTIVITY_LOG,
+  INTEREST_BROADCAST_THRESHOLD,
 } from "./protocol";
 import type { SubCloser } from "nostr-tools/pool";
 import { errMsg } from "@/lib/utils/errors";
@@ -209,14 +210,14 @@ export class AgentManager {
   private async broadcastMyPresence(): Promise<void> {
     const prefs = this.callbacks.getPrefs();
     const interests = Object.entries(prefs.topicAffinities ?? {})
-      .filter(([, v]) => v >= 0.2)
+      .filter(([, v]) => v >= INTEREST_BROADCAST_THRESHOLD)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 20)
       .map(([k]) => k);
 
     const content = this.callbacks.getContent();
     await broadcastPresence(this.sk, interests, 5, this.relayUrls, this.principalId, content);
-    this.addLog("presence", "Broadcast presence to relays");
+    this.addLog("presence", `Broadcast presence with ${interests.length} interest(s): ${interests.slice(0, 5).join(", ")}${interests.length > 5 ? "…" : ""}`);
   }
 
   private cleanupStaleHandshakes(): void {
@@ -239,6 +240,7 @@ export class AgentManager {
     this.cleanupStalePeers();
 
     const prefs = this.callbacks.getPrefs();
+    const myTopicCount = Object.entries(prefs.topicAffinities ?? {}).filter(([, v]) => v >= INTEREST_BROADCAST_THRESHOLD).length;
     const discovered = await discoverPeers(this.pk, prefs, this.relayUrls);
 
     for (const peer of discovered) {
@@ -247,6 +249,7 @@ export class AgentManager {
     if (discovered.length > 0) {
       this.addLog("discovery", `Discovered ${discovered.length} peer${discovered.length > 1 ? "s" : ""}`);
     } else {
+      this.addLog("discovery", `No peers found (my topics: ${myTopicCount}, relays: ${this.relayUrls.length})`);
       this.emitState();
     }
 
