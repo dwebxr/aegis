@@ -332,7 +332,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     };
   }, [moreFiltersOpen]);
 
-  const bookmarkedIds = profile.bookmarkedIds ?? [];
+  const bookmarkedIds = useMemo(() => profile.bookmarkedIds ?? [], [profile.bookmarkedIds]);
 
   const filteredContent = useMemo(() => {
     const filterFn = sortMode === "latest" ? applyLatestFilter : applyDashboardFilters;

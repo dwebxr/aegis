@@ -156,7 +156,7 @@ describe("applyLatestFilter", () => {
     expect(items.map(c => c.id)).toEqual(originalOrder);
   });
 
-  it("handles items with identical createdAt (stable order)", () => {
+  it("handles items with identical createdAt — preserves all items", () => {
     const ts = Date.now();
     const items = [
       makeItem({ id: "a", createdAt: ts }),
@@ -165,6 +165,20 @@ describe("applyLatestFilter", () => {
     ];
     const result = applyLatestFilter(items, "all", "all");
     expect(result).toHaveLength(3);
+    const ids = new Set(result.map(c => c.id));
+    expect(ids).toEqual(new Set(["a", "b", "c"]));
+  });
+
+  it("validated filter maintains createdAt sort (not validatedAt)", () => {
+    const now = Date.now();
+    const items = [
+      makeItem({ id: "v-old-created-but-recently-validated", createdAt: now - 5000, validated: true, validatedAt: now }),
+      makeItem({ id: "v-new-created-but-early-validated", createdAt: now, validated: true, validatedAt: now - 5000 }),
+    ];
+    const result = applyLatestFilter(items, "validated", "all");
+    // Latest mode sorts by createdAt, NOT validatedAt
+    expect(result[0].id).toBe("v-new-created-but-early-validated");
+    expect(result[1].id).toBe("v-old-created-but-recently-validated");
   });
 
   it("bookmarkedIds defaults to empty array", () => {
@@ -232,5 +246,66 @@ describe("applyDashboardFilters with bookmarked", () => {
     const items = [makeItem({ verdict: "quality" })];
     const result = applyDashboardFilters(items, "all", "all");
     expect(result).toHaveLength(1);
+  });
+});
+
+describe("applyLatestFilter vs applyDashboardFilters — behavioral contrast", () => {
+  it("'all' filter: Latest excludes slop, Dashboard includes slop", () => {
+    const items = [
+      makeItem({ id: "cq", verdict: "quality" }),
+      makeItem({ id: "cs", verdict: "slop" }),
+    ];
+    const latest = applyLatestFilter(items, "all", "all");
+    const dashboard = applyDashboardFilters(items, "all", "all");
+    expect(latest.map(c => c.id)).toEqual(["cq"]);
+    expect(dashboard.map(c => c.id)).toEqual(expect.arrayContaining(["cq", "cs"]));
+    expect(dashboard).toHaveLength(2);
+  });
+
+  it("validated: Latest sorts by createdAt, Dashboard sorts by validatedAt", () => {
+    const now = Date.now();
+    const items = [
+      makeItem({ id: "a", createdAt: now, validated: true, validatedAt: now - 2000 }),
+      makeItem({ id: "b", createdAt: now - 2000, validated: true, validatedAt: now }),
+    ];
+    const latest = applyLatestFilter(items, "validated", "all");
+    const dashboard = applyDashboardFilters(items, "validated", "all");
+    // Latest: by createdAt desc → a first
+    expect(latest[0].id).toBe("a");
+    // Dashboard: by validatedAt desc → b first
+    expect(dashboard[0].id).toBe("b");
+  });
+});
+
+describe("applyLatestFilter + deduplicateItems integration", () => {
+  // Import the real deduplicateItems to test the full pipeline
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { deduplicateItems } = require("@/contexts/content/dedup");
+
+  it("dedup after Latest sort keeps newer duplicate", () => {
+    const now = Date.now();
+    const items = [
+      makeItem({ id: "dup-old", text: "Duplicate content text", createdAt: now - 5000 }),
+      makeItem({ id: "dup-new", text: "Duplicate content text", createdAt: now }),
+    ];
+    const sorted = applyLatestFilter(items, "all", "all");
+    // Latest sorts newest first
+    expect(sorted[0].id).toBe("dup-new");
+    // dedup keeps first occurrence → newer one survives
+    const deduped = deduplicateItems(sorted);
+    expect(deduped).toHaveLength(1);
+    expect(deduped[0].id).toBe("dup-new");
+  });
+
+  it("dedup after Latest sort with URL duplicates keeps newer", () => {
+    const now = Date.now();
+    const items = [
+      makeItem({ id: "url-old", text: "Old text", sourceUrl: "https://example.com/article", createdAt: now - 5000 }),
+      makeItem({ id: "url-new", text: "New text", sourceUrl: "https://www.example.com/article?utm_source=twitter", createdAt: now }),
+    ];
+    const sorted = applyLatestFilter(items, "all", "all");
+    const deduped = deduplicateItems(sorted);
+    expect(deduped).toHaveLength(1);
+    expect(deduped[0].id).toBe("url-new");
   });
 });
