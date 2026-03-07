@@ -2,7 +2,6 @@
  * Dashboard mode tests — Top 3, Topic Spotlight, Saved for Later, Recent Activity.
  * All functions imported from lib/dashboard/utils (shared with DashboardTab component).
  */
-import { generateBriefing } from "@/lib/briefing/ranker";
 import {
   computeDashboardTop3,
   computeTopicSpotlight,

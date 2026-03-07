@@ -15,7 +15,7 @@ export function contentDedup(item: ContentItem): string {
   return item.text
     .toLowerCase()
     .replace(/[.,!?;:()\[\]{}"'`]/g, "")
-    .replace(/\s+/g, " ") // \s+ covers newlines too
+    .replace(/\s+/g, " ")
     .trim()
     .slice(0, 150);
 }

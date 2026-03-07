@@ -117,8 +117,6 @@ describe("Dashboard Top3 — memoization behavior", () => {
     act(() => {
       root.render(React.createElement(BriefingHookHarness, { content: items, profile: baseProfile }));
     });
-    const idsBefore = getDiv().getAttribute("data-top3-ids");
-
     const newProfile = { ...baseProfile, topicAffinities: { ai: 0.5 } };
     act(() => {
       root.render(React.createElement(BriefingHookHarness, { content: items, profile: newProfile }));
@@ -135,8 +133,6 @@ describe("Dashboard Top3 — memoization behavior", () => {
     act(() => {
       root.render(React.createElement(BriefingHookHarness, { content: items, profile: baseProfile }));
     });
-    const idsBefore = getDiv().getAttribute("data-top3-ids");
-
     const extraItem = makeItem({
       id: "extra-high",
       text: "Extra high scoring article added by scheduler",

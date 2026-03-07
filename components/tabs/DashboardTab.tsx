@@ -275,11 +275,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
-    try { localStorage.setItem("aegis-home-mode", homeMode); } catch { console.debug("[dashboard] localStorage unavailable"); }
+    try { localStorage.setItem("aegis-home-mode", homeMode); } catch {}
   }, [homeMode]);
 
   useEffect(() => {
-    try { localStorage.setItem("aegis-sort-mode", sortMode); } catch { console.debug("[dashboard] localStorage unavailable"); }
+    try { localStorage.setItem("aegis-sort-mode", sortMode); } catch {}
   }, [sortMode]);
 
   const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {
