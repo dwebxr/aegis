@@ -4,13 +4,15 @@ import type { FilteredItem, FilterPipelineResult } from "@/lib/filtering/types";
 import type { WoTScore } from "@/lib/wot/types";
 import { createEmptyProfile } from "@/lib/preferences/types";
 
+let _itemCounter = 0;
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
+  const n = _itemCounter++;
   return {
-    id: "item-1",
+    id: `item-${n}`,
     owner: "test",
     author: "TestAuthor",
     avatar: "🧪",
-    text: "Test article about technology",
+    text: `Test article about technology #${n}`,
     source: "rss",
     verdict: "quality",
     reason: "Good",

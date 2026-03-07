@@ -13,13 +13,15 @@ function makeHistogram(overrides: Partial<ActivityHistogram> = {}): ActivityHist
   };
 }
 
+let _itemCounter = 0;
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
+  const n = _itemCounter++;
   return {
-    id: `item-${Math.random().toString(36).slice(2)}`,
+    id: `item-${n}`,
     owner: "test",
     author: "Author",
     avatar: "A",
-    text: "Test content",
+    text: `Test content #${n}`,
     source: "rss",
     scores: { originality: 7, insight: 7, credibility: 7, composite: 7 },
     verdict: "quality",

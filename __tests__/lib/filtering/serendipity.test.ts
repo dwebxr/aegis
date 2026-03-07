@@ -7,13 +7,15 @@ import type { FilterPipelineResult, FilteredItem } from "@/lib/filtering/types";
 import type { ContentItem } from "@/lib/types/content";
 import type { WoTScore } from "@/lib/wot/types";
 
+let _itemCounter = 0;
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
+  const n = _itemCounter++;
   return {
-    id: `item-${Math.random().toString(36).slice(2)}`,
+    id: `item-${n}`,
     owner: "test",
     author: "test-author",
     avatar: "\uD83E\uDDEA",
-    text: "Test content for scoring",
+    text: `Test content for scoring #${n}`,
     source: "nostr",
     scores: { originality: 8, insight: 8, credibility: 8, composite: 8 },
     verdict: "quality",

@@ -9,6 +9,16 @@
 
 ## Latest Updates (March 2026)
 
+### Content Deduplication Overhaul
+- **5242 tests, 305 suites** — zero failures, zero skipped
+- **URL normalization**: `normalizeUrl()` strips `www.`, trailing slashes, UTM/tracking params (`fbclid`, `gclid`, `ref`, `mc_cid`), sorts query params, removes hash fragments — prevents same article from appearing as duplicate cards
+- **Multi-signal dedup**: `isDuplicateItem()` now matches by normalized URL **and** exact text — catches same-content-different-URL duplicates (e.g. syndicated articles)
+- **O(n+m) batch dedup**: `filterNewItems()` pre-builds Set index for flush path instead of O(n×m) per-item URL parsing; `deduplicateItems()` for render-layer safety net
+- **Render-layer dedup**: `DashboardTab.filteredContent` and `detectSerendipity()` wrap results in `deduplicateItems()` — eliminates duplicate cards in Discovers and Show All views
+- **Briefing dedup aligned**: `deduplicateBySource()` in ranker now uses `normalizeUrl()` + text matching (was raw URL only)
+- **IC sync ordering fix**: `addContentBuffered()` now checks dedup **before** firing `doSyncToIC` — prevents duplicate items from being needlessly synced to canister
+- **36 new dedup tests**: `normalizeUrl` (12), `deduplicateItems` (8), `filterNewItems` (5), `isDuplicateItem` URL normalization (4), `detectSerendipity` dedup (3), DashboardTab dedup integration (3), plus makeItem uniqueness fixes across 8 test files
+
 ### Security Hardening & Production Audit
 - **5190 tests, 303 suites** — zero failures, zero skipped
 - **Sentry data scrubbing**: Server + edge configs strip URL query params, auth headers, and cookies from error reports; client-side breadcrumbs stripped to pathname only

@@ -1,6 +1,7 @@
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile, ActivityHistogram } from "@/lib/preferences/types";
 import type { BriefingState, BriefingItem, BriefingClassification } from "./types";
+import { normalizeUrl } from "@/contexts/content/dedup";
 
 const PRIORITY_COUNT = 5;
 const RECENCY_HALF_LIFE_HOURS = 7;
@@ -78,15 +79,32 @@ function serendipityScore(item: ContentItem, prefs: UserPreferenceProfile): numb
 }
 
 function deduplicateBySource(items: ContentItem[]): ContentItem[] {
-  const seen = new Map<string, ContentItem>();
+  const urlToItem = new Map<string, ContentItem>();
+  const textToItem = new Map<string, ContentItem>();
+  const kept = new Map<string, ContentItem>(); // id → item
+
   for (const item of items) {
-    const key = item.sourceUrl || item.id;
-    const existing = seen.get(key);
-    if (!existing || item.scores.composite > existing.scores.composite) {
-      seen.set(key, item);
+    const normUrl = item.sourceUrl ? normalizeUrl(item.sourceUrl) : null;
+    const existingByUrl = normUrl ? urlToItem.get(normUrl) : undefined;
+    const existingByText = textToItem.get(item.text);
+    const duplicate = existingByUrl || existingByText;
+
+    if (duplicate) {
+      if (item.scores.composite > duplicate.scores.composite) {
+        // Replace the lower-scored duplicate
+        kept.delete(duplicate.id);
+        kept.set(item.id, item);
+        if (normUrl) urlToItem.set(normUrl, item);
+        textToItem.set(item.text, item);
+      }
+    } else {
+      kept.set(item.id, item);
+      if (normUrl) urlToItem.set(normUrl, item);
+      textToItem.set(item.text, item);
     }
   }
-  return Array.from(seen.values());
+
+  return Array.from(kept.values());
 }
 
 export function generateBriefing(

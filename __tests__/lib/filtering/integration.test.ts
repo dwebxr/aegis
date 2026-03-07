@@ -8,13 +8,15 @@ import { recordFilterRun, getDailyCost, getMonthlyCost } from "@/lib/filtering/c
 import type { ContentItem } from "@/lib/types/content";
 import type { WoTGraph, WoTNode } from "@/lib/wot/types";
 
+let _itemCounter = 0;
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
+  const n = _itemCounter++;
   return {
-    id: `item-${Math.random().toString(36).slice(2)}`,
+    id: `item-${n}`,
     owner: "test",
     author: "test-author",
     avatar: "\uD83E\uDDEA",
-    text: "Test content for integration",
+    text: `Test content for integration #${n}`,
     source: "nostr",
     scores: { originality: 7, insight: 7, credibility: 7, composite: 7 },
     verdict: "quality",

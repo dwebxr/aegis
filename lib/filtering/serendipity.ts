@@ -2,6 +2,7 @@ import type { ContentItem } from "@/lib/types/content";
 import type { FilteredItem, FilterPipelineResult } from "./types";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import { hasEnoughData } from "@/lib/preferences/engine";
+import { deduplicateItems } from "@/contexts/content/dedup";
 
 export type DiscoveryType = "out_of_network" | "cross_language" | "emerging_topic";
 
@@ -93,7 +94,14 @@ export function detectSerendipity(
 
   candidates.sort((a, b) => b.item.scores.composite - a.item.scores.composite);
 
-  return candidates.slice(0, MAX_DISCOVERIES).map(fi => {
+  // Dedup candidates using shared logic, then take top N
+  const dedupedItems = deduplicateItems(candidates.map(fi => fi.item));
+  const dedupedIds = new Set(dedupedItems.map(item => item.id));
+  const unique = candidates
+    .filter(fi => dedupedIds.has(fi.item.id))
+    .slice(0, MAX_DISCOVERIES);
+
+  return unique.map(fi => {
     const discoveryType = classifyDiscovery(fi);
     return {
       item: fi.item,

@@ -2,13 +2,15 @@ import { generateBriefing } from "@/lib/briefing/ranker";
 import type { ContentItem } from "@/lib/types/content";
 import { createEmptyProfile } from "@/lib/preferences/types";
 
+let _itemCounter = 0;
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
+  const n = _itemCounter++;
   return {
-    id: Math.random().toString(36).slice(2),
+    id: `item-${n}`,
     owner: "test",
     author: "Author",
     avatar: "🧪",
-    text: "Test article content",
+    text: `Test article content #${n}`,
     source: "rss",
     verdict: "quality",
     reason: "Good content",

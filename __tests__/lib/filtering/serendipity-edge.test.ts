@@ -7,13 +7,15 @@ import type { FilteredItem, FilterPipelineResult } from "@/lib/filtering/types";
 import type { ContentItem } from "@/lib/types/content";
 import type { WoTScore } from "@/lib/wot/types";
 
+let _itemCounter = 0;
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
+  const n = _itemCounter++;
   return {
-    id: `item-${Math.random().toString(36).slice(2)}`,
+    id: `item-${n}`,
     owner: "test",
     author: "test-author",
     avatar: "\uD83E\uDDEA",
-    text: "Test content for scoring",
+    text: `Test content for scoring #${n}`,
     source: "nostr",
     scores: { originality: 8, insight: 8, credibility: 8, composite: 8 },
     verdict: "quality",
@@ -279,5 +281,35 @@ describe("detectSerendipity — edge cases", () => {
     const result = detectSerendipity(makeResult(items));
     expect(result[0].discoveryType).toBe("out_of_network");
     expect(result[0].reason).toContain("outside your follow network");
+  });
+
+  it("deduplicates candidates with same sourceUrl", () => {
+    const items = [
+      makeFilteredItem({ id: "d1", sourceUrl: "https://example.com/article", scores: { originality: 9, insight: 9, credibility: 9, composite: 9 } }, {}, true),
+      makeFilteredItem({ id: "d2", sourceUrl: "https://example.com/article", scores: { originality: 7, insight: 7, credibility: 7, composite: 7 } }, {}, true),
+      makeFilteredItem({ id: "d3", sourceUrl: "https://other.com/article" }, {}, true),
+    ];
+    const result = detectSerendipity(makeResult(items));
+    expect(result).toHaveLength(2);
+    expect(result.map(r => r.item.id)).toContain("d1");
+    expect(result.map(r => r.item.id)).not.toContain("d2");
+  });
+
+  it("deduplicates candidates with same text but different URLs", () => {
+    const items = [
+      makeFilteredItem({ id: "t1", sourceUrl: "https://a.com", text: "same content" }, {}, true),
+      makeFilteredItem({ id: "t2", sourceUrl: "https://b.com", text: "same content" }, {}, true),
+    ];
+    const result = detectSerendipity(makeResult(items));
+    expect(result).toHaveLength(1);
+  });
+
+  it("deduplicates candidates with normalized URL variants", () => {
+    const items = [
+      makeFilteredItem({ id: "n1", sourceUrl: "https://www.example.com/page/?utm_source=rss" }, {}, true),
+      makeFilteredItem({ id: "n2", sourceUrl: "https://example.com/page" }, {}, true),
+    ];
+    const result = detectSerendipity(makeResult(items));
+    expect(result).toHaveLength(1);
   });
 });

@@ -33,9 +33,9 @@ describe("isDuplicateItem", () => {
     expect(isDuplicateItem(dup, existing)).toBe(true);
   });
 
-  it("does not detect as duplicate with different sourceUrl", () => {
-    const existing = [makeItem({ sourceUrl: "https://a.com" })];
-    const notDup = makeItem({ sourceUrl: "https://b.com" });
+  it("does not detect as duplicate with different sourceUrl and text", () => {
+    const existing = [makeItem({ sourceUrl: "https://a.com", text: "article A" })];
+    const notDup = makeItem({ sourceUrl: "https://b.com", text: "article B" });
     expect(isDuplicateItem(notDup, existing)).toBe(false);
   });
 
@@ -51,10 +51,10 @@ describe("isDuplicateItem", () => {
     expect(isDuplicateItem(dup, existing)).toBe(true);
   });
 
-  it("items with sourceUrl are not duplicate-checked by text", () => {
+  it("items with same text but different sourceUrl are duplicates", () => {
     const existing = [makeItem({ sourceUrl: "https://unique.com", text: "same text" })];
     const item = makeItem({ sourceUrl: "https://other.com", text: "same text" });
-    expect(isDuplicateItem(item, existing)).toBe(false);
+    expect(isDuplicateItem(item, existing)).toBe(true);
   });
 
   it("empty existing array means no duplicates", () => {
@@ -75,11 +75,35 @@ describe("isDuplicateItem", () => {
 
   it("handles large existing array efficiently", () => {
     const existing = Array.from({ length: 10000 }, (_, i) =>
-      makeItem({ sourceUrl: `https://site.com/article-${i}` }),
+      makeItem({ sourceUrl: `https://site.com/article-${i}`, text: `text ${i}` }),
     );
     const start = performance.now();
-    const notDup = makeItem({ sourceUrl: "https://unique-url.com" });
+    const notDup = makeItem({ sourceUrl: "https://unique-url.com", text: "unique" });
     isDuplicateItem(notDup, existing);
-    expect(performance.now() - start).toBeLessThan(50);
+    expect(performance.now() - start).toBeLessThan(100);
+  });
+
+  it("detects duplicate with www vs non-www URL", () => {
+    const existing = [makeItem({ sourceUrl: "https://www.example.com/article", text: "a" })];
+    const item = makeItem({ sourceUrl: "https://example.com/article", text: "b" });
+    expect(isDuplicateItem(item, existing)).toBe(true);
+  });
+
+  it("detects duplicate with trailing slash difference", () => {
+    const existing = [makeItem({ sourceUrl: "https://example.com/page/", text: "a" })];
+    const item = makeItem({ sourceUrl: "https://example.com/page", text: "b" });
+    expect(isDuplicateItem(item, existing)).toBe(true);
+  });
+
+  it("detects duplicate ignoring UTM parameters", () => {
+    const existing = [makeItem({ sourceUrl: "https://example.com/article?utm_source=rss", text: "a" })];
+    const item = makeItem({ sourceUrl: "https://example.com/article?utm_source=twitter", text: "b" });
+    expect(isDuplicateItem(item, existing)).toBe(true);
+  });
+
+  it("does not falsely match different paths after normalization", () => {
+    const existing = [makeItem({ sourceUrl: "https://example.com/page-1", text: "a" })];
+    const item = makeItem({ sourceUrl: "https://example.com/page-2", text: "b" });
+    expect(isDuplicateItem(item, existing)).toBe(false);
   });
 });

@@ -32,6 +32,7 @@ import { useSources } from "@/contexts/SourceContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { useAutoReveal } from "@/hooks/useAutoReveal";
+import { deduplicateItems } from "@/contexts/content/dedup";
 
 function ScorePill({ gr, tag }: { gr: ReturnType<typeof scoreGrade>; tag: { label: string; color: string } | null }) {
   return (
@@ -323,9 +324,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const filteredContent = useMemo(() => {
     if (verdictFilter === "bookmarked") {
       const bookmarkSet = new Set(profile.bookmarkedIds ?? []);
-      return content.filter(c => bookmarkSet.has(c.id)).sort((a, b) => b.createdAt - a.createdAt);
+      return deduplicateItems(content.filter(c => bookmarkSet.has(c.id)).sort((a, b) => b.createdAt - a.createdAt));
     }
-    return applyDashboardFilters(content, verdictFilter, sourceFilter);
+    return deduplicateItems(applyDashboardFilters(content, verdictFilter, sourceFilter));
   }, [content, verdictFilter, sourceFilter, profile.bookmarkedIds]);
 
   const clusteredContent = useMemo(

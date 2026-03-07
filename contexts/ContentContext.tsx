@@ -22,7 +22,7 @@ import type { ContentState, PreferenceCallbacks } from "./content/types";
 import { loadCachedContent, saveCachedContent, truncatePreservingActioned } from "./content/cache";
 import { runScoringCascade } from "./content/scoring";
 import { toICEvaluation, syncToIC, drainOfflineQueue, loadFromICCanister } from "./content/icSync";
-import { isDuplicateItem } from "./content/dedup";
+import { isDuplicateItem, deduplicateItems, filterNewItems } from "./content/dedup";
 
 const MAX_PENDING_BUFFER = 100;
 
@@ -283,6 +283,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [isAuthenticated, principal, doSyncToIC]);
 
   const addContentBuffered = useCallback((item: ContentItem) => {
+    if (isDuplicateItem(item, contentRef.current) || isDuplicateItem(item, pendingItemsRef.current)) return;
+
     const owned = (!item.owner && isAuthenticated && principal)
       ? { ...item, owner: principal.toText() }
       : item;
@@ -291,17 +293,15 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       doSyncToIC(actorRef.current.saveEvaluation(toICEvaluation(owned, principal)), "saveEvaluation", { itemId: owned.id });
     }
 
-    if (isDuplicateItem(item, contentRef.current) || isDuplicateItem(item, pendingItemsRef.current)) return;
-
     pendingItemsRef.current.push(owned);
     setPendingCount(pendingItemsRef.current.length);
 
     if (pendingItemsRef.current.length >= MAX_PENDING_BUFFER) {
-      const items = pendingItemsRef.current;
+      const items = deduplicateItems(pendingItemsRef.current);
       pendingItemsRef.current = [];
       setPendingCount(0);
       setContent(prev => {
-        const fresh = items.filter(item => !isDuplicateItem(item, prev));
+        const fresh = filterNewItems(items, prev);
         return truncatePreservingActioned([...fresh, ...prev]);
       });
     }
@@ -309,11 +309,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const flushPendingItems = useCallback(() => {
     if (pendingItemsRef.current.length === 0) return;
-    const items = pendingItemsRef.current;
+    const items = deduplicateItems(pendingItemsRef.current);
     pendingItemsRef.current = [];
     setPendingCount(0);
     setContent(prev => {
-      const fresh = items.filter(item => !isDuplicateItem(item, prev));
+      const fresh = filterNewItems(items, prev);
       return truncatePreservingActioned([...fresh, ...prev]);
     });
   }, []);

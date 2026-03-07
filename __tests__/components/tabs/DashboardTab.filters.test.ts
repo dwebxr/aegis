@@ -3,18 +3,21 @@
  * Tests exercise real utility functions from lib/dashboard/utils.
  */
 import { applyDashboardFilters, matchesTopic, buildTopicPatternCache } from "@/lib/dashboard/utils";
+import { deduplicateItems } from "@/contexts/content/dedup";
 import { contentToCSV } from "@/lib/utils/csv";
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { createEmptyProfile } from "@/lib/preferences/types";
 import type { ContentItem } from "@/lib/types/content";
 
+let _itemCounter = 0;
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
+  const n = _itemCounter++;
   return {
-    id: `item-${Math.random().toString(36).slice(2)}`,
+    id: `item-${n}`,
     owner: "test-owner",
     author: "test-author",
     avatar: "T",
-    text: "Test content text for testing purposes with enough words",
+    text: `Test content text for testing purposes #${n}`,
     source: "manual",
     scores: { originality: 7, insight: 7, credibility: 7, composite: 7 },
     verdict: "quality",
@@ -219,5 +222,42 @@ describe("generateBriefing edge cases", () => {
     const briefing = generateBriefing(items, profile);
     // Only quality items should appear
     expect(briefing.priority.every(p => p.item.verdict === "quality")).toBe(true);
+  });
+});
+
+// ─── DashboardTab dedup integration (mirrors filteredContent logic) ──
+
+describe("DashboardTab filteredContent dedup", () => {
+  it("removes duplicate items with same normalized URL from filtered results", () => {
+    const items = [
+      makeItem({ id: "dup-1", sourceUrl: "https://www.example.com/article/", verdict: "quality", text: "article A" }),
+      makeItem({ id: "dup-2", sourceUrl: "https://example.com/article", verdict: "quality", text: "article B" }),
+      makeItem({ id: "unique", sourceUrl: "https://other.com/page", verdict: "quality", text: "article C" }),
+    ];
+    const filtered = applyDashboardFilters(items, "quality", "all");
+    const deduped = deduplicateItems(filtered);
+    expect(deduped).toHaveLength(2);
+    expect(deduped[0].id).toBe("dup-1"); // first occurrence kept
+    expect(deduped[1].id).toBe("unique");
+  });
+
+  it("removes duplicate items with same text from filtered results", () => {
+    const items = [
+      makeItem({ id: "t1", sourceUrl: "https://a.com", text: "same content", verdict: "quality" }),
+      makeItem({ id: "t2", sourceUrl: "https://b.com", text: "same content", verdict: "quality" }),
+    ];
+    const filtered = applyDashboardFilters(items, "quality", "all");
+    const deduped = deduplicateItems(filtered);
+    expect(deduped).toHaveLength(1);
+  });
+
+  it("removes duplicates with UTM parameter variations", () => {
+    const items = [
+      makeItem({ id: "utm-1", sourceUrl: "https://example.com/post?utm_source=rss", verdict: "quality", text: "text A" }),
+      makeItem({ id: "utm-2", sourceUrl: "https://example.com/post?utm_source=twitter", verdict: "quality", text: "text B" }),
+    ];
+    const filtered = applyDashboardFilters(items, "quality", "all");
+    const deduped = deduplicateItems(filtered);
+    expect(deduped).toHaveLength(1);
   });
 });
