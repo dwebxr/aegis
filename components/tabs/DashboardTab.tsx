@@ -185,7 +185,7 @@ function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookm
 }
 
 function AgentKnowledgePills({ agentContext, profile, recentActions }: {
-  agentContext: { highAffinityTopics: string[]; trustedAuthors: string[]; recentTopics: string[] };
+  agentContext: { highAffinityTopics: string[]; trustedAuthors: string[] };
   profile: { calibration: { qualityThreshold: number }; totalValidated: number; totalFlagged: number };
   recentActions?: ContentItem[];
 }) {
@@ -269,6 +269,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [expanded, setExpanded] = useState<string | null>(null);
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>("quality");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [topicFilter, setTopicFilter] = useState<string>("all");
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const moreFiltersRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
@@ -295,7 +296,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     try { localStorage.setItem("aegis-home-mode", homeMode); } catch (e) { console.debug("[dashboard] localStorage write failed:", e); }
   }, [homeMode]);
 
-  const { todayContent, todayQual, todaySlop, yesterdayQual, yesterdaySlop, yesterdayEval, yesterdaySources, uniqueSources, availableSources, dailyQuality, dailySlop, streak } = useMemo(() => {
+  const { todayContent, todayQual, todaySlop, yesterdayQual, yesterdaySlop, yesterdayEval, yesterdaySources, todaySources, uniqueSources, availableSources, dailyQuality, dailySlop, streak, streakAtRisk } = useMemo(() => {
     const now = Date.now();
     const dayMs = 86400000;
     const todayStart = now - dayMs;
@@ -309,6 +310,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     const yesterdaySlop = yesterdayContent.filter(c => c.verdict === "slop").length;
     const yesterdayEval = yesterdayContent.length;
     const yesterdaySources = new Set(yesterdayContent.map(c => c.source)).size;
+    const todaySources = new Set(todayContent.map(c => c.source)).size;
     const uniqueSources = new Set(content.map(c => c.source));
     const availableSources = Array.from(uniqueSources).sort();
 
@@ -324,23 +326,30 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       dailySlop.push(dayItems.filter(c => c.verdict === "slop").length);
     }
 
-    // Reading streak: count consecutive days with at least 1 evaluated item
-    let streak = todayContent.length > 0 ? 1 : 0;
+    // Reading streak: count consecutive days where user validated or flagged at least 1 item
+    const reviewedItems = content.filter(c => c.validated || c.flagged);
+    const todayHasReview = reviewedItems.some(c => (c.validatedAt ?? c.createdAt) >= todayStart);
+    let streak = todayHasReview ? 1 : 0;
     for (let d = 1; d <= 30; d++) {
       const dStart = now - (d + 1) * dayMs;
       const dEnd = now - d * dayMs;
-      const hasItems = content.some(c => c.createdAt >= dStart && c.createdAt < dEnd);
-      if (hasItems) streak++;
+      const hasReview = reviewedItems.some(c => {
+        const ts = c.validatedAt ?? c.createdAt;
+        return ts >= dStart && ts < dEnd;
+      });
+      if (hasReview) streak++;
       else break;
     }
+    // streakAtRisk: user had a streak yesterday but hasn't reviewed today
+    const streakAtRisk = !todayHasReview && streak > 0;
 
-    return { todayContent, todayQual, todaySlop, yesterdayQual, yesterdaySlop, yesterdayEval, yesterdaySources, uniqueSources, availableSources, dailyQuality, dailySlop, streak };
+    return { todayContent, todayQual, todaySlop, yesterdayQual, yesterdaySlop, yesterdayEval, yesterdaySources, todaySources, uniqueSources, availableSources, dailyQuality, dailySlop, streak, streakAtRisk };
   }, [content]);
 
   useEffect(() => {
     setExpanded(null);
     setVisibleCount(BATCH_SIZE);
-  }, [verdictFilter, sourceFilter]);
+  }, [verdictFilter, sourceFilter, topicFilter]);
 
   useEffect(() => {
     if (!moreFiltersOpen) return;
@@ -362,14 +371,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   const bookmarkedIds = useMemo(() => profile.bookmarkedIds ?? [], [profile.bookmarkedIds]);
 
-  const filteredContent = useMemo(
-    () => deduplicateItems(applyLatestFilter(content, verdictFilter, sourceFilter, bookmarkedIds)),
-    [content, verdictFilter, sourceFilter, bookmarkedIds],
-  );
+  const filteredContent = useMemo(() => {
+    let items = deduplicateItems(applyLatestFilter(content, verdictFilter, sourceFilter, bookmarkedIds));
+    if (topicFilter !== "all") {
+      const t = topicFilter.toLowerCase();
+      items = items.filter(c => c.topics?.some(tag => tag.toLowerCase() === t));
+    }
+    return items;
+  }, [content, verdictFilter, sourceFilter, topicFilter, bookmarkedIds]);
 
   const { isExpanded: isSectionExpanded, toggle: toggleSection, observeRef: sectionRef } = useAutoReveal();
 
-  const hasActiveFilter = (verdictFilter !== "all" && verdictFilter !== "quality") || sourceFilter !== "all";
+  const hasActiveFilter = (verdictFilter !== "all" && verdictFilter !== "quality") || sourceFilter !== "all" || topicFilter !== "all";
   const moreFiltersActive = verdictFilter === "slop" || sourceFilter !== "all";
 
   const agentContext = useMemo(() => {
@@ -381,45 +394,59 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   const topSources = useMemo(() => {
     if (!showSidebar) return [];
-    const stats = new Map<string, { total: number; quality: number }>();
+    const stats = new Map<string, { total: number; quality: number; displayName: string }>();
     for (const c of content) {
-      const src = c.platform || c.source;
-      const s = stats.get(src) ?? { total: 0, quality: 0 };
+      const filterKey = c.source;
+      const displayName = c.platform || c.source;
+      const s = stats.get(filterKey) ?? { total: 0, quality: 0, displayName };
       s.total++;
       if (c.verdict === "quality") s.quality++;
-      stats.set(src, s);
+      if (c.platform && !s.displayName.includes(c.platform)) s.displayName = displayName;
+      stats.set(filterKey, s);
     }
     return Array.from(stats.entries())
-      .map(([src, s]) => ({ src, count: s.total, qualityRate: s.total > 0 ? s.quality / s.total : 0 }))
+      .map(([filterKey, s]) => ({ filterKey, displayName: s.displayName, count: s.total, qualityRate: s.total > 0 ? s.quality / s.total : 0 }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   }, [content, showSidebar]);
 
-  const topTopicsRef = useRef<Map<string, number>>(new Map());
+  const [prevAffinities] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = localStorage.getItem("aegis-prev-affinities");
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
+
   const topTopics = useMemo(() => {
     if (!showSidebar) return [];
-    const prev = topTopicsRef.current;
+    const hasPrev = Object.keys(prevAffinities).length > 0;
     const entries = Object.entries(profile.topicAffinities)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([topic, score]) => {
-        const prevScore = prev.get(topic);
-        const isNew = prevScore === undefined && score >= 0.3;
+        const prevScore = prevAffinities[topic];
+        const isNew = hasPrev && prevScore === undefined && score >= 0.3;
         const direction: "up" | "down" | "stable" =
-          prevScore === undefined ? "stable" :
+          !hasPrev || prevScore === undefined ? "stable" :
           score - prevScore > 0.05 ? "up" :
           score - prevScore < -0.05 ? "down" : "stable";
         return { topic, score, direction, isNew };
       });
-    topTopicsRef.current = new Map(Object.entries(profile.topicAffinities));
     return entries;
-  }, [profile.topicAffinities, showSidebar]);
+  }, [profile.topicAffinities, showSidebar, prevAffinities]);
+
+  useEffect(() => {
+    if (Object.keys(profile.topicAffinities).length > 0) {
+      try { localStorage.setItem("aegis-prev-affinities", JSON.stringify(profile.topicAffinities)); } catch {}
+    }
+  }, [profile.topicAffinities]);
 
   const metricsItems = [
     { icon: "\u{1F6E1}", value: todayQual.length, delta: todayQual.length - yesterdayQual, label: "quality", colorClass: "text-cyan-400" },
     { icon: "\u{1F525}", value: todaySlop.length, delta: todaySlop.length - yesterdaySlop, label: "burned", colorClass: "text-orange-400" },
     { icon: "\u26A1", value: todayContent.length, delta: todayContent.length - yesterdayEval, label: "eval", colorClass: "text-purple-400" },
-    { icon: "\u{1F4E1}", value: uniqueSources.size, delta: uniqueSources.size - yesterdaySources, label: "sources", colorClass: "text-sky-400" },
+    { icon: "\u{1F4E1}", value: uniqueSources.size, delta: todaySources - yesterdaySources, label: "sources", colorClass: "text-sky-400" },
   ];
 
   const sidebarUnreviewed = useMemo(() => {
@@ -945,9 +972,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                       );
                     })}
                   </div>
-                  {todayContent.length === 0 && (
+                  {streakAtRisk && (
                     <div className="text-tiny text-orange-400/70 mt-1.5 text-center">
-                      Evaluate content today to keep your streak!
+                      Review content today to keep your streak!
                     </div>
                   )}
                 </div>
@@ -968,7 +995,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                       <button
                         key={item.id}
                         onClick={() => {
-                          const el = document.querySelector(`[data-content-id="${item.id}"]`);
+                          const el = document.getElementById(`card-${item.id}`);
                           if (el) {
                             el.scrollIntoView({ behavior: "smooth", block: "center" });
                             setExpanded(item.id);
@@ -1017,20 +1044,20 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   <div className="flex flex-col gap-2">
                     {topSources.map((s, i) => (
                       <button
-                        key={s.src}
-                        onClick={() => setSourceFilter(sourceFilter === s.src ? "all" : s.src)}
+                        key={s.filterKey}
+                        onClick={() => setSourceFilter(sourceFilter === s.filterKey ? "all" : s.filterKey)}
                         className={cn(
                           "flex items-center gap-2 text-body-sm bg-transparent border-none cursor-pointer font-[inherit] p-0 text-left group transition-fast",
-                          sourceFilter === s.src && "text-cyan-400"
+                          sourceFilter === s.filterKey && "text-cyan-400"
                         )}
                       >
                         <span className="text-tiny text-disabled font-mono w-4 text-right">{i + 1}</span>
                         <div className="flex-1 min-w-0">
                           <div className={cn(
                             "font-medium truncate transition-fast",
-                            sourceFilter === s.src ? "text-cyan-400" : "text-secondary-foreground group-hover:text-cyan-400"
+                            sourceFilter === s.filterKey ? "text-cyan-400" : "text-secondary-foreground group-hover:text-cyan-400"
                           )}>
-                            {s.src}
+                            {s.displayName}
                           </div>
                           <div className="flex items-center gap-1 mt-0.5">
                             <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
@@ -1080,11 +1107,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     {topTopics.map((t, i) => (
                       <button
                         key={t.topic}
-                        onClick={() => setSourceFilter("all")}
-                        className="flex items-center gap-2 text-body-sm bg-transparent border-none cursor-pointer font-[inherit] p-0 text-left group"
+                        onClick={() => setTopicFilter(topicFilter === t.topic ? "all" : t.topic)}
+                        className={cn(
+                          "flex items-center gap-2 text-body-sm bg-transparent border-none cursor-pointer font-[inherit] p-0 text-left group transition-fast",
+                          topicFilter === t.topic && "text-cyan-400"
+                        )}
                       >
                         <span className="text-tiny text-disabled font-mono w-4 text-right">{i + 1}</span>
-                        <span className="text-cyan-400 font-medium truncate flex-1 group-hover:text-cyan-300 transition-fast">
+                        <span className={cn(
+                          "font-medium truncate flex-1 transition-fast",
+                          topicFilter === t.topic ? "text-cyan-300" : "text-cyan-400 group-hover:text-cyan-300"
+                        )}>
                           {t.topic}
                           {t.isNew && (
                             <span className="ml-1 text-tiny px-1.5 py-px bg-purple-500/[0.15] border border-purple-500/20 rounded-full text-purple-400 font-bold">
@@ -1102,6 +1135,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         </span>
                       </button>
                     ))}
+                    {topicFilter !== "all" && (
+                      <button
+                        onClick={() => setTopicFilter("all")}
+                        className="mt-1 text-caption text-cyan-400 bg-transparent border-none cursor-pointer font-[inherit] font-semibold"
+                      >
+                        Clear topic filter
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
