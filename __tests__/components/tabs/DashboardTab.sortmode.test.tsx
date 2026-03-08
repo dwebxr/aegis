@@ -222,34 +222,34 @@ describe("DashboardTab — Feed Edge Cases", () => {
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     expect(getCardIds()).toContain("single");
-    expect(screen.queryByText(/Show all/)).toBeNull();
+    expect(screen.queryByText(/Load remaining/)).toBeNull();
   });
 
-  it("exactly 5 items: no Show all button", () => {
+  it("exactly 5 items: no Load remaining button", () => {
     const items = Array.from({ length: 5 }, (_, i) =>
       makeItem({ id: `five-${i}`, text: `Five items ${i} ${Math.random()}`, createdAt: now - i * 1000 })
     );
     render(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(screen.queryByText(/Show all/)).toBeNull();
+    expect(screen.queryByText(/Load remaining/)).toBeNull();
     expect(getCardIds()).toHaveLength(5);
   });
 
-  it("6 items: Show all reveals 6th item", () => {
-    const items = Array.from({ length: 6 }, (_, i) =>
-      makeItem({ id: `six-${i}`, text: `Six items ${i} ${Math.random()}`, createdAt: now - i * 1000 })
+  it("45 items: Load remaining reveals next batch", () => {
+    const items = Array.from({ length: 45 }, (_, i) =>
+      makeItem({ id: `fortyfive-${i}`, text: `Fortyfive items ${i} ${Math.random()}`, createdAt: now - i * 1000 })
     );
     render(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(getCardIds()).toHaveLength(5);
-    fireEvent.click(screen.getByText(/Show all/));
-    expect(getCardIds()).toHaveLength(6);
+    expect(getCardIds()).toHaveLength(40);
+    fireEvent.click(screen.getByText(/Load remaining/));
+    expect(getCardIds()).toHaveLength(45);
   });
 
-  it("Show all button shows item count", () => {
-    const items = Array.from({ length: 6 }, (_, i) =>
+  it("Load remaining button shows remaining count", () => {
+    const items = Array.from({ length: 50 }, (_, i) =>
       makeItem({
         id: `sa-${i}`,
         text: `Expand test item ${i} unique-${Math.random()}`,
@@ -259,8 +259,8 @@ describe("DashboardTab — Feed Edge Cases", () => {
     render(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    const showAllBtn = screen.getByText(/^Show all/);
-    expect(showAllBtn.textContent).toContain("6 items");
+    const loadBtn = screen.getByText(/^Load remaining/);
+    expect(loadBtn.textContent).toContain("10 items");
   });
 
   it("moreFiltersActive dot hidden in default state, visible with slop filter", () => {

@@ -611,11 +611,11 @@ describe("DashboardTab — Sidebar edge cases", () => {
     render(
       <DashboardTab content={items} onValidate={noop} onFlag={noop} mobile={false} />
     );
-    // 5 items visible by default
+    // All 8 items visible (< BATCH_SIZE of 40)
     const cards = document.querySelectorAll('[data-testid="aegis-content-card"]');
-    expect(cards.length).toBe(5);
-    // "Show all" button present
-    expect(screen.getByText(/Show all/)).toBeTruthy();
+    expect(cards.length).toBe(8);
+    // No "Load remaining" since 8 < 40
+    expect(screen.queryByText(/Load remaining/)).toBeNull();
   });
 
   it("filter buttons still work with sidebar present", () => {

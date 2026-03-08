@@ -32,6 +32,7 @@ import { useSources } from "@/contexts/SourceContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { useAutoReveal } from "@/hooks/useAutoReveal";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { deduplicateItems } from "@/contexts/content/dedup";
 
 function ScorePill({ gr, tag }: { gr: ReturnType<typeof scoreGrade>; tag: { label: string; color: string } | null }) {
@@ -249,7 +250,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const moreFiltersRef = useRef<HTMLDivElement>(null);
-  const [showAllContent, setShowAllContent] = useState(false);
+  const BATCH_SIZE = 40;
+  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const markImgFailed = useCallback((id: string) =>
     setFailedImages(prev => { const next = new Set(prev); next.add(id); return next; }), []);
@@ -300,7 +302,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   useEffect(() => {
     setExpanded(null);
-    setShowAllContent(false);
+    setVisibleCount(BATCH_SIZE);
   }, [verdictFilter, sourceFilter]);
 
   // Close "More filters" dropdown on click-outside or Escape
@@ -463,9 +465,23 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return () => { clearTimeout(feedbackTimerRef.current); };
   }, []);
 
+  const visibleItems = useMemo(
+    () => filteredContent.slice(0, visibleCount),
+    [filteredContent, visibleCount],
+  );
+
+  const hasMore = visibleCount < filteredContent.length;
+  const remainingCount = filteredContent.length - visibleItems.length;
+
+  const loadMore = useCallback(() => {
+    setVisibleCount(prev => Math.min(prev + BATCH_SIZE, filteredContent.length));
+  }, [filteredContent.length]);
+
+  const sentinelRef = useInfiniteScroll(hasMore, loadMore);
+
   const feedItemIds = useMemo(
-    () => filteredContent.slice(0, showAllContent ? 50 : 5).map(c => c.id),
-    [filteredContent, showAllContent],
+    () => visibleItems.map(c => c.id),
+    [visibleItems],
   );
 
   const { focusedId } = useKeyboardNav({
@@ -715,36 +731,58 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 {pendingCount > 0 && onFlushPending && (
                   <NewItemsBar count={pendingCount} onFlush={onFlushPending} />
                 )}
-                {filteredContent.slice(0, showAllContent ? 50 : 5).map((item, i) => (
-                  <div key={item.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
-                    {verdictFilter === "validated" && item.validatedAt && (
-                      <div className="text-caption text-purple-400 mb-1 ml-1 font-mono font-semibold">
-                        Validated {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                        {" "}
-                        {new Date(item.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                {visibleItems.map((item, i) => (
+                  <React.Fragment key={item.id}>
+                    {i > 0 && i % BATCH_SIZE === 0 && (
+                      <div data-testid="aegis-batch-separator" className="flex items-center gap-3 py-2">
+                        <div className="flex-1 border-t border-border" />
+                        <span className="text-caption text-disabled whitespace-nowrap">
+                          Showing {i} of {filteredContent.length} items
+                        </span>
+                        <div className="flex-1 border-t border-border" />
                       </div>
                     )}
-                    <ContentCard
-                      item={item}
-                      expanded={expanded === item.id}
-                      onToggle={handleToggle}
-                      onValidate={handleValidateWithFeedback}
-                      onFlag={handleFlagWithFeedback}
-                      onBookmark={handleBookmark}
-                      isBookmarked={bookmarkSet.has(item.id)}
-                      onAddFilterRule={addFilterRule}
-                      mobile={mobile}
-                      focused={focusedId === item.id}
-                    />
-                  </div>
+                    <div style={i < BATCH_SIZE ? { animation: `slideUp .2s ease ${i * 0.03}s both` } : undefined}>
+                      {verdictFilter === "validated" && item.validatedAt && (
+                        <div className="text-caption text-purple-400 mb-1 ml-1 font-mono font-semibold">
+                          Validated {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                          {" "}
+                          {new Date(item.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      )}
+                      <ContentCard
+                        item={item}
+                        expanded={expanded === item.id}
+                        onToggle={handleToggle}
+                        onValidate={handleValidateWithFeedback}
+                        onFlag={handleFlagWithFeedback}
+                        onBookmark={handleBookmark}
+                        isBookmarked={bookmarkSet.has(item.id)}
+                        onAddFilterRule={addFilterRule}
+                        mobile={mobile}
+                        focused={focusedId === item.id}
+                      />
+                    </div>
+                  </React.Fragment>
                 ))}
-                {filteredContent.length > 5 && !showAllContent && (
+                {hasMore && <div ref={sentinelRef} className="h-1" />}
+                {hasMore && (
                   <button
-                    onClick={() => setShowAllContent(true)}
+                    data-testid="aegis-load-remaining"
+                    onClick={loadMore}
                     className="w-full px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer font-[inherit] transition-normal mt-2"
                   >
-                    Show all ({filteredContent.length} items)
+                    Load remaining {remainingCount} items
                   </button>
+                )}
+                {!hasMore && filteredContent.length > BATCH_SIZE && (
+                  <div className="flex items-center gap-3 py-3 mt-1">
+                    <div className="flex-1 border-t border-border" />
+                    <span className="text-caption text-disabled whitespace-nowrap">
+                      Showing {filteredContent.length} of {filteredContent.length} items
+                    </span>
+                    <div className="flex-1 border-t border-border" />
+                  </div>
                 )}
               </>
             )}

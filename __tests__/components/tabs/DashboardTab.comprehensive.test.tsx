@@ -832,21 +832,20 @@ describe("Image failure handling", () => {
 // 14. Show All button interaction
 // ═══════════════════════════════════════════════════════════
 
-describe("Show All button", () => {
-  it("clicking Show All reveals all content", () => {
-    // Need items with unique topics to avoid clustering into fewer groups
-    const items = Array.from({ length: 8 }, (_, i) =>
-      makeItem({ id: `show-${i}`, text: `Unique show-all test content number ${i}`,
+describe("Load remaining button", () => {
+  it("clicking Load remaining loads next batch", () => {
+    const items = Array.from({ length: 50 }, (_, i) =>
+      makeItem({ id: `show-${i}`, text: `Unique load-remaining test content number ${i}`,
         topics: [`unique-topic-${i}`] }),
     );
     render(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    const showAllBtn = screen.getByText(/Show all/);
-    expect(showAllBtn).toBeTruthy();
-    fireEvent.click(showAllBtn);
-    // After clicking, the button should disappear
-    expect(screen.queryByText(/Show all/)).toBeNull();
+    const loadBtn = screen.getByText(/Load remaining/);
+    expect(loadBtn).toBeTruthy();
+    fireEvent.click(loadBtn);
+    // After clicking (50 items, batch 40 → all loaded), the button should disappear
+    expect(screen.queryByText(/Load remaining/)).toBeNull();
   });
 });
 
@@ -885,9 +884,9 @@ describe("Filter change resets expanded state", () => {
     // Switch filter
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
     fireEvent.click(screen.getByTestId("aegis-filter-all"));
-    // showAllContent should be reset to false
-    // Items beyond 5 should be hidden again (if more existed)
-    expect(screen.queryByText(/Show all/)).toBeNull(); // 3 items < 5
+    // visibleCount should be reset to BATCH_SIZE
+    // Items beyond 40 should be hidden again (if more existed)
+    expect(screen.queryByText(/Load remaining/)).toBeNull(); // 3 items < 40
   });
 });
 

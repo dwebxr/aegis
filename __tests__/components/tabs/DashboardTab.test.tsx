@@ -237,26 +237,26 @@ describe("DashboardTab — mobile mode", () => {
   });
 });
 
-describe("DashboardTab — show all button", () => {
-  it("shows 'Show all' button when more than 5 quality items", () => {
-    const items = Array.from({ length: 8 }, (_, i) =>
+describe("DashboardTab — infinite scroll load remaining", () => {
+  it("shows 'Load remaining' button when more than 40 items", () => {
+    const items = Array.from({ length: 50 }, (_, i) =>
       makeItem({ id: `item-${i}`, topics: [`unique-topic-${i}`], text: `Unique content ${i}` })
     );
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).toContain("Show all");
-    expect(html).toContain("8 items");
+    expect(html).toContain("Load remaining");
+    expect(html).toContain("10 items");
   });
 
-  it("does not show 'Show all' button when 5 or fewer items", () => {
-    const items = Array.from({ length: 5 }, (_, i) =>
+  it("does not show 'Load remaining' button when 40 or fewer items", () => {
+    const items = Array.from({ length: 40 }, (_, i) =>
       makeItem({ id: `item-${i}`, topics: [`unique-topic-${i}`], text: `Unique content ${i}` })
     );
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(html).not.toContain("Show all");
+    expect(html).not.toContain("Load remaining");
   });
 });
 

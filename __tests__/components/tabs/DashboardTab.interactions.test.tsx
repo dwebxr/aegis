@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  *
  * Integration tests for DashboardTab UI interactions — CommandPalette, filter resets,
- * click-outside, demo mode, Show all + filter, pending flush.
+ * click-outside, demo mode, infinite scroll + filter, pending flush.
  */
 
 if (typeof globalThis.TextEncoder === "undefined") {
@@ -189,26 +189,26 @@ describe("DashboardTab — More Filters dropdown", () => {
   });
 });
 
-// ─── Show All + Filter Reset ───
+// ─── Infinite Scroll + Filter Reset ───
 
-describe("DashboardTab — Show all + filter interaction", () => {
-  it("Show all resets when changing filter", () => {
-    const items = Array.from({ length: 8 }, (_, i) =>
+describe("DashboardTab — Infinite scroll + filter interaction", () => {
+  it("visibleCount resets when changing filter", () => {
+    const items = Array.from({ length: 50 }, (_, i) =>
       makeItem({ id: `reset-${i}`, text: `Reset item ${i} ${Math.random()}`, createdAt: now - i * 1000 }),
     );
     render(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    // Initially 5 visible
-    expect(getCardIds()).toHaveLength(5);
-    // Show all
-    fireEvent.click(screen.getByText(/Show all/));
-    expect(getCardIds()).toHaveLength(8);
+    // Initially 40 visible (BATCH_SIZE)
+    expect(getCardIds()).toHaveLength(40);
+    // Load remaining
+    fireEvent.click(screen.getByText(/Load remaining/));
+    expect(getCardIds()).toHaveLength(50);
 
-    // Change filter → should reset showAllContent and show <= 5
+    // Change filter → should reset visibleCount to BATCH_SIZE
     fireEvent.click(screen.getByTestId("aegis-filter-bookmarked"));
     fireEvent.click(screen.getByTestId("aegis-filter-quality"));
-    expect(getCardIds().length).toBeLessThanOrEqual(5);
+    expect(getCardIds().length).toBeLessThanOrEqual(40);
   });
 
   it("expanded card resets when changing filter", () => {
