@@ -225,6 +225,8 @@ function AgentKnowledgePills({ agentContext, profile }: {
 
 const EMPTY_SECTIONS = { filteredDiscoveries: [] as SerendipityItem[], unreviewedQueue: [] as ContentItem[], dashboardSaved: [] as ContentItem[] };
 
+const CHROME_CTA_URL = "https://chromewebstore.google.com/detail/aegis-score/pnnpkepiojfpkppjpoimolkamflhbjhh";
+
 interface DashboardTabProps {
   content: ContentItem[];
   mobile?: boolean;
@@ -338,6 +340,34 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     return getContext(profile);
   }, [profile]);
 
+  const showSidebar = homeMode === "feed" && !mobile;
+
+  const topSources = useMemo(() => {
+    if (!showSidebar) return [];
+    const counts = new Map<string, number>();
+    for (const c of content) {
+      const src = c.platform || c.source;
+      counts.set(src, (counts.get(src) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+  }, [content, showSidebar]);
+
+  const topTopics = useMemo(() => {
+    if (!showSidebar) return [];
+    return Object.entries(profile.topicAffinities)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+  }, [profile.topicAffinities, showSidebar]);
+
+  const metricsItems = [
+    { icon: "\u{1F6E1}", value: todayQual.length, label: "quality", colorClass: "text-cyan-400" },
+    { icon: "\u{1F525}", value: todaySlop.length, label: "burned", colorClass: "text-orange-400" },
+    { icon: "\u26A1", value: todayContent.length, label: "eval", colorClass: "text-purple-400" },
+    { icon: "\u{1F4E1}", value: uniqueSources.size, label: "sources", colorClass: "text-sky-400" },
+  ];
+
   // Dashboard computations: skipped in Feed mode, computed only when homeMode === "dashboard".
   const contentRef = useRef(content);
   contentRef.current = content;
@@ -448,6 +478,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     enabled: !mobile && homeMode === "feed",
   });
 
+  const agentKnowsCard = agentContext && (
+    <div
+      className={cn(
+        "px-4 py-3 bg-card rounded-md transition-all duration-500",
+        agentKnowsHighlight
+          ? "border border-purple-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]"
+          : "border border-border"
+      )}
+    >
+      <div className="text-body-sm font-semibold text-tertiary mb-2">
+        Your Agent Knows
+      </div>
+      <AgentKnowledgePills agentContext={agentContext} profile={profile} />
+    </div>
+  );
+
   const paletteCommands: PaletteCommand[] = useMemo(() => [
     { label: "Go to Feed", action: () => setHomeMode("feed") },
     { label: "Go to Dashboard", action: () => setHomeMode("dashboard") },
@@ -510,7 +556,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         </div>
       </div>
 
-      {/* Signal feedback loop message */}
       {feedbackMsg && (
         <div
           key={feedbackMsg.key}
@@ -521,238 +566,290 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       )}
 
       {homeMode === "feed" && (
-        <>
-          <div data-testid="aegis-metrics-bar" className={cn(
-            "flex flex-wrap items-center mb-3 px-4 py-2 bg-card border border-border rounded-md",
-            mobile ? "gap-3" : "gap-4"
-          )}>
-            <div className="flex flex-wrap gap-3 flex-1">
-              {[
-                { icon: "\u{1F6E1}", value: todayQual.length, label: "quality", colorClass: "text-cyan-400" },
-                { icon: "\u{1F525}", value: todaySlop.length, label: "burned", colorClass: "text-orange-400" },
-                { icon: "\u26A1", value: todayContent.length, label: "eval", colorClass: "text-purple-400" },
-                { icon: "\u{1F4E1}", value: uniqueSources.size, label: "sources", colorClass: "text-sky-400" },
-              ].map(m => (
-                <span key={m.label} className="flex items-center gap-1 text-body-sm text-muted-foreground">
-                  <span>{m.icon}</span>
-                  <span className={cn("font-bold font-mono", m.colorClass)}>{m.value}</span>
-                  <span>{m.label}</span>
-                </span>
-              ))}
-            </div>
-            <div className="flex gap-3 items-center">
-              <div className="flex items-center gap-1">
-                <div className="w-[60px]">
-                  <MiniChart data={dailyQuality} color={colors.cyan[400]} h={20} />
+        <div className={cn(!mobile && "flex gap-6")}>
+          {/* ── Center column: filters + content ── */}
+          <div className="flex-1 min-w-0">
+            {/* Metrics bar — mobile only (desktop moves to sidebar) */}
+            {mobile && (
+              <div data-testid="aegis-metrics-bar" className="flex flex-wrap items-center mb-3 px-4 py-2 bg-card border border-border rounded-md gap-3">
+                <div className="flex flex-wrap gap-3 flex-1">
+                  {metricsItems.map(m => (
+                    <span key={m.label} className="flex items-center gap-1 text-body-sm text-muted-foreground">
+                      <span>{m.icon}</span>
+                      <span className={cn("font-bold font-mono", m.colorClass)}>{m.value}</span>
+                      <span>{m.label}</span>
+                    </span>
+                  ))}
                 </div>
-                <span className="text-tiny text-cyan-400 font-mono">
-                  {dailyQuality.length > 0 ? dailyQuality[dailyQuality.length - 1] : 0}%
-                </span>
               </div>
-              <div className="flex items-center gap-1">
-                <div className="w-[60px]">
-                  <MiniChart data={dailySlop} color={colors.orange[500]} h={20} />
-                </div>
-                <span className="text-tiny text-orange-500 font-mono">
-                  {dailySlop.length > 0 ? dailySlop[dailySlop.length - 1] : 0}
-                </span>
+            )}
+
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div className="text-h3 font-semibold text-tertiary">
+                Filtered Signal {hasActiveFilter && <span data-testid="aegis-filter-count" className="text-body-sm text-disabled">({filteredContent.length})</span>}
               </div>
-            </div>
-          </div>
-
-          {/* Content filters */}
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <div className="text-h3 font-semibold text-tertiary">
-              Filtered Signal {hasActiveFilter && <span data-testid="aegis-filter-count" className="text-body-sm text-disabled">({filteredContent.length})</span>}
-            </div>
-            <div className="flex gap-1 flex-wrap items-center">
-              {/* Primary filter buttons */}
-              {([
-                { id: "quality" as const, label: "Quality", activeClass: "bg-emerald-500/[0.08] border-emerald-500/20 text-emerald-400" },
-                { id: "bookmarked" as const, label: "\uD83D\uDD16 Saved", activeClass: "bg-cyan-500/[0.05] border-cyan-500/[0.15] text-cyan-400" },
-                { id: "validated" as const, label: "\u2713 Validated", activeClass: "bg-purple-400/[0.06] border-purple-400/15 text-purple-400" },
-              ]).map(({ id: v, label, activeClass }) => (
-                <button
-                  key={v}
-                  data-testid={`aegis-filter-${v}`}
-                  aria-pressed={verdictFilter === v}
-                  onClick={() => { setVerdictFilter(v); setMoreFiltersOpen(false); }}
-                  className={cn(
-                    "px-3 py-1 rounded-full text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
-                    verdictFilter === v
-                      ? `border ${activeClass}`
-                      : "bg-transparent border border-border text-disabled"
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-
-              {/* "More filters" dropdown */}
-              <div ref={moreFiltersRef} className="relative">
-                <button
-                  data-testid="aegis-filter-more"
-                  aria-expanded={moreFiltersOpen}
-                  aria-haspopup="true"
-                  onClick={() => setMoreFiltersOpen(prev => !prev)}
-                  className={cn(
-                    "inline-flex items-center gap-1 px-3 py-1 rounded-full text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
-                    moreFiltersActive
-                      ? "bg-navy-lighter border border-emphasis text-secondary-foreground"
-                      : "bg-transparent border border-border text-disabled"
-                  )}
-                >
-                  More filters
-                  {moreFiltersActive && (
-                    <span className="size-1.5 rounded-full bg-cyan-400 shrink-0" />
-                  )}
-                  <span className="text-caption leading-none">{moreFiltersOpen ? "\u25B4" : "\u25BE"}</span>
-                </button>
-
-                {moreFiltersOpen && (
-                  <div
-                    data-testid="aegis-filter-more-panel"
-                    role="menu"
-                    className="absolute right-0 top-[calc(100%+4px)] min-w-[160px] z-50 bg-card border border-border rounded-md py-2 shadow-lg"
+              <div className="flex gap-1 flex-wrap items-center">
+                {([
+                  { id: "quality" as const, label: "Quality", activeClass: "bg-emerald-500/[0.08] border-emerald-500/20 text-emerald-400" },
+                  { id: "bookmarked" as const, label: "\uD83D\uDD16 Saved", activeClass: "bg-cyan-500/[0.05] border-cyan-500/[0.15] text-cyan-400" },
+                  { id: "validated" as const, label: "\u2713 Validated", activeClass: "bg-purple-400/[0.06] border-purple-400/15 text-purple-400" },
+                ]).map(({ id: v, label, activeClass }) => (
+                  <button
+                    key={v}
+                    data-testid={`aegis-filter-${v}`}
+                    aria-pressed={verdictFilter === v}
+                    onClick={() => { setVerdictFilter(v); setMoreFiltersOpen(false); }}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
+                      verdictFilter === v
+                        ? `border ${activeClass}`
+                        : "bg-transparent border border-border text-disabled"
+                    )}
                   >
-                    {/* VERDICT section */}
-                    <div className="px-3 py-1 text-tiny font-bold text-disabled uppercase tracking-wide">Verdict</div>
-                    {([
-                      { id: "all" as const, label: "All" },
-                      { id: "slop" as const, label: "Slop" },
-                    ]).map(({ id: v, label }) => (
-                      <button
-                        key={v}
-                        role="menuitem"
-                        data-testid={`aegis-filter-${v}`}
-                        aria-current={verdictFilter === v ? "true" : undefined}
-                        onClick={() => { setVerdictFilter(v); setMoreFiltersOpen(false); }}
-                        className={cn(
-                          "block w-full text-left px-3 py-2 border-none text-body-sm cursor-pointer font-[inherit] transition-fast",
-                          verdictFilter === v
-                            ? "bg-cyan-400/[0.06] text-cyan-400 font-bold"
-                            : "bg-transparent text-muted-foreground font-medium"
-                        )}
-                      >{label}</button>
-                    ))}
+                    {label}
+                  </button>
+                ))}
 
-                    {/* Separator */}
-                    <div className="h-px bg-border my-2" />
+                <div ref={moreFiltersRef} className="relative">
+                  <button
+                    data-testid="aegis-filter-more"
+                    aria-expanded={moreFiltersOpen}
+                    aria-haspopup="true"
+                    onClick={() => setMoreFiltersOpen(prev => !prev)}
+                    className={cn(
+                      "inline-flex items-center gap-1 px-3 py-1 rounded-full text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
+                      moreFiltersActive
+                        ? "bg-navy-lighter border border-emphasis text-secondary-foreground"
+                        : "bg-transparent border border-border text-disabled"
+                    )}
+                  >
+                    More filters
+                    {moreFiltersActive && (
+                      <span className="size-1.5 rounded-full bg-cyan-400 shrink-0" />
+                    )}
+                    <span className="text-caption leading-none">{moreFiltersOpen ? "\u25B4" : "\u25BE"}</span>
+                  </button>
 
-                    {/* SOURCE section */}
-                    <div className="px-3 py-1 text-tiny font-bold text-disabled uppercase tracking-wide">Source</div>
-                    {["all", ...availableSources].map(s => (
-                      <button
-                        key={s}
-                        role="menuitem"
-                        onClick={() => { setSourceFilter(s); setMoreFiltersOpen(false); }}
-                        className={cn(
-                          "block w-full text-left px-3 py-2 border-none text-body-sm cursor-pointer font-[inherit] transition-fast",
-                          sourceFilter === s
-                            ? "bg-cyan-400/[0.06] text-cyan-400 font-bold"
-                            : "bg-transparent text-muted-foreground font-medium"
-                        )}
-                      >{s === "all" ? "All sources" : s}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+                  {moreFiltersOpen && (
+                    <div
+                      data-testid="aegis-filter-more-panel"
+                      role="menu"
+                      className="absolute right-0 top-[calc(100%+4px)] min-w-[160px] z-50 bg-card border border-border rounded-md py-2 shadow-lg"
+                    >
+                      <div className="px-3 py-1 text-tiny font-bold text-disabled uppercase tracking-wide">Verdict</div>
+                      {([
+                        { id: "all" as const, label: "All" },
+                        { id: "slop" as const, label: "Slop" },
+                      ]).map(({ id: v, label }) => (
+                        <button
+                          key={v}
+                          role="menuitem"
+                          data-testid={`aegis-filter-${v}`}
+                          aria-current={verdictFilter === v ? "true" : undefined}
+                          onClick={() => { setVerdictFilter(v); setMoreFiltersOpen(false); }}
+                          className={cn(
+                            "block w-full text-left px-3 py-2 border-none text-body-sm cursor-pointer font-[inherit] transition-fast",
+                            verdictFilter === v
+                              ? "bg-cyan-400/[0.06] text-cyan-400 font-bold"
+                              : "bg-transparent text-muted-foreground font-medium"
+                          )}
+                        >{label}</button>
+                      ))}
 
-          {/* Content list */}
-          {isLoading ? (
-            <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
-              <div className="text-[32px] mb-3 animate-pulse">&#x1F6E1;</div>
-              <div className="text-h3 font-semibold text-tertiary">Loading content...</div>
-              <div className="text-body-sm mt-2">Syncing from Internet Computer</div>
-            </div>
-          ) : filteredContent.length === 0 ? (
-            <>
-              {hasActiveFilter ? (
-                <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
-                  <div className="text-[32px] mb-3">&#x1F50D;</div>
-                  <div className="text-h3 font-semibold text-tertiary">No matching content</div>
-                  <div className="text-body-sm mt-2">Try adjusting your filters</div>
-                </div>
-              ) : !isDemoMode ? (
-                <OnboardingFlow
-                  context={{
-                    sourcesCount: sources.length,
-                    contentCount: content.length,
-                    validatedCount: profile.totalValidated,
-                    flaggedCount: profile.totalFlagged,
-                  }}
-                  mobile={mobile}
-                  onTabChange={onTabChange}
-                />
-              ) : (
-                <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
-                  <div className="text-[32px] mb-3">&#x1F50D;</div>
-                  <div className="text-h3 font-semibold text-tertiary">No content yet</div>
-                  <div className="text-body-sm mt-2">Add sources to start filtering, or try the incinerator for manual evaluation</div>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {pendingCount > 0 && onFlushPending && (
-                <NewItemsBar count={pendingCount} onFlush={onFlushPending} />
-              )}
-              {filteredContent.slice(0, showAllContent ? 50 : 5).map((item, i) => (
-                <div key={item.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
-                  {verdictFilter === "validated" && item.validatedAt && (
-                    <div className="text-caption text-purple-400 mb-1 ml-1 font-mono font-semibold">
-                      Validated {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                      {" "}
-                      {new Date(item.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                      <div className="h-px bg-border my-2" />
+                      <div className="px-3 py-1 text-tiny font-bold text-disabled uppercase tracking-wide">Source</div>
+                      {["all", ...availableSources].map(s => (
+                        <button
+                          key={s}
+                          role="menuitem"
+                          onClick={() => { setSourceFilter(s); setMoreFiltersOpen(false); }}
+                          className={cn(
+                            "block w-full text-left px-3 py-2 border-none text-body-sm cursor-pointer font-[inherit] transition-fast",
+                            sourceFilter === s
+                              ? "bg-cyan-400/[0.06] text-cyan-400 font-bold"
+                              : "bg-transparent text-muted-foreground font-medium"
+                          )}
+                        >{s === "all" ? "All sources" : s}</button>
+                      ))}
                     </div>
                   )}
-                  <ContentCard
-                    item={item}
-                    expanded={expanded === item.id}
-                    onToggle={handleToggle}
-                    onValidate={handleValidateWithFeedback}
-                    onFlag={handleFlagWithFeedback}
-                    onBookmark={handleBookmark}
-                    isBookmarked={bookmarkSet.has(item.id)}
-                    onAddFilterRule={addFilterRule}
-                    mobile={mobile}
-                    focused={focusedId === item.id}
-                  />
                 </div>
-              ))}
-              {filteredContent.length > 5 && !showAllContent && (
-                <button
-                  onClick={() => setShowAllContent(true)}
-                  className="w-full px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer font-[inherit] transition-normal mt-2"
-                >
-                  Show all ({filteredContent.length} items)
-                </button>
-              )}
-            </>
-          )}
-
-          {/* Agent Knowledge */}
-          {agentContext && (
-            <div
-              className={cn(
-                "mt-4 px-4 py-3 bg-card rounded-md transition-all duration-500",
-                agentKnowsHighlight
-                  ? "border border-purple-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]"
-                  : "border border-border"
-              )}
-            >
-              <div className="text-body-sm font-semibold text-tertiary mb-2">
-                Your Agent Knows
               </div>
-              <AgentKnowledgePills agentContext={agentContext} profile={profile} />
             </div>
-          )}
 
-          {/* D2A Network visualization */}
-          <D2ANetworkMini mobile={mobile} />
-        </>
+            {isLoading ? (
+              <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
+                <div className="text-[32px] mb-3 animate-pulse">&#x1F6E1;</div>
+                <div className="text-h3 font-semibold text-tertiary">Loading content...</div>
+                <div className="text-body-sm mt-2">Syncing from Internet Computer</div>
+              </div>
+            ) : filteredContent.length === 0 ? (
+              <>
+                {hasActiveFilter ? (
+                  <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
+                    <div className="text-[32px] mb-3">&#x1F50D;</div>
+                    <div className="text-h3 font-semibold text-tertiary">No matching content</div>
+                    <div className="text-body-sm mt-2">Try adjusting your filters</div>
+                  </div>
+                ) : !isDemoMode ? (
+                  <OnboardingFlow
+                    context={{
+                      sourcesCount: sources.length,
+                      contentCount: content.length,
+                      validatedCount: profile.totalValidated,
+                      flaggedCount: profile.totalFlagged,
+                    }}
+                    mobile={mobile}
+                    onTabChange={onTabChange}
+                  />
+                ) : (
+                  <div className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
+                    <div className="text-[32px] mb-3">&#x1F50D;</div>
+                    <div className="text-h3 font-semibold text-tertiary">No content yet</div>
+                    <div className="text-body-sm mt-2">Add sources to start filtering, or try the incinerator for manual evaluation</div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {pendingCount > 0 && onFlushPending && (
+                  <NewItemsBar count={pendingCount} onFlush={onFlushPending} />
+                )}
+                {filteredContent.slice(0, showAllContent ? 50 : 5).map((item, i) => (
+                  <div key={item.id} style={{ animation: `slideUp .2s ease ${i * 0.03}s both` }}>
+                    {verdictFilter === "validated" && item.validatedAt && (
+                      <div className="text-caption text-purple-400 mb-1 ml-1 font-mono font-semibold">
+                        Validated {new Date(item.validatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                        {" "}
+                        {new Date(item.validatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    )}
+                    <ContentCard
+                      item={item}
+                      expanded={expanded === item.id}
+                      onToggle={handleToggle}
+                      onValidate={handleValidateWithFeedback}
+                      onFlag={handleFlagWithFeedback}
+                      onBookmark={handleBookmark}
+                      isBookmarked={bookmarkSet.has(item.id)}
+                      onAddFilterRule={addFilterRule}
+                      mobile={mobile}
+                      focused={focusedId === item.id}
+                    />
+                  </div>
+                ))}
+                {filteredContent.length > 5 && !showAllContent && (
+                  <button
+                    onClick={() => setShowAllContent(true)}
+                    className="w-full px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer font-[inherit] transition-normal mt-2"
+                  >
+                    Show all ({filteredContent.length} items)
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* Agent Knowledge — mobile inline */}
+            {mobile && agentKnowsCard && <div className="mt-4">{agentKnowsCard}</div>}
+
+            <D2ANetworkMini mobile={mobile} />
+
+            {/* Keyboard hint — inside center column so it aligns with content, not sidebar */}
+            {!mobile && (
+              <div className="text-center mt-3 text-tiny text-disabled">
+                <span className="font-mono">J/K</span> navigate &middot; <span className="font-mono">V</span> validate &middot; <span className="font-mono">F</span> flag &middot; <span className="font-mono">{navigator?.platform?.includes("Mac") ? "\u2318" : "Ctrl"}+K</span> commands
+              </div>
+            )}
+          </div>
+
+          {/* ── Right sidebar — desktop only ── */}
+          {showSidebar && (
+            <aside data-testid="aegis-feed-sidebar" className="w-[280px] shrink-0 sticky top-4 self-start flex flex-col gap-3">
+              <div data-testid="aegis-metrics-bar" className="px-4 py-3 bg-card border border-border rounded-md">
+                <div className="flex flex-col gap-2">
+                  {metricsItems.map(m => (
+                    <span key={m.label} className="flex items-center gap-1.5 text-body-sm text-muted-foreground">
+                      <span>{m.icon}</span>
+                      <span className={cn("font-bold font-mono", m.colorClass)}>{m.value}</span>
+                      <span>{m.label}</span>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-3 items-center mt-3 pt-3 border-t border-border">
+                  <div className="flex items-center gap-1 flex-1">
+                    <div className="w-[50px]">
+                      <MiniChart data={dailyQuality} color={colors.cyan[400]} h={18} />
+                    </div>
+                    <span className="text-tiny text-cyan-400 font-mono">
+                      {dailyQuality[dailyQuality.length - 1]}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 flex-1">
+                    <div className="w-[50px]">
+                      <MiniChart data={dailySlop} color={colors.orange[500]} h={18} />
+                    </div>
+                    <span className="text-tiny text-orange-500 font-mono">
+                      {dailySlop[dailySlop.length - 1]}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {agentKnowsCard}
+
+              {topSources.length > 0 && (
+                <div className="px-4 py-3 bg-card border border-border rounded-md">
+                  <div className="text-body-sm font-semibold text-tertiary mb-2">
+                    Top Sources
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {topSources.map(([src, count], i) => (
+                      <div key={src} className="flex items-center gap-2 text-body-sm">
+                        <span className="text-tiny text-disabled font-mono w-4 text-right">{i + 1}</span>
+                        <span className="text-secondary-foreground font-medium truncate flex-1">{src}</span>
+                        <span className="text-tiny text-disabled font-mono">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {topTopics.length > 0 && (
+                <div className="px-4 py-3 bg-card border border-border rounded-md">
+                  <div className="text-body-sm font-semibold text-tertiary mb-2">
+                    Top Topics
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {topTopics.map(([topic, score], i) => (
+                      <div key={topic} className="flex items-center gap-2 text-body-sm">
+                        <span className="text-tiny text-disabled font-mono w-4 text-right">{i + 1}</span>
+                        <span className="text-cyan-400 font-medium truncate flex-1">{topic}</span>
+                        <span className="text-tiny text-disabled font-mono">{score.toFixed(1)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <a
+                href={CHROME_CTA_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-3 bg-gradient-to-br from-cyan-500/[0.03] to-blue-600/[0.02] border border-cyan-500/[0.12] rounded-lg no-underline transition-normal"
+              >
+                <span className="text-xl shrink-0">&#x1F9E9;</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-body-sm font-semibold text-cyan-400">
+                    Aegis Score for Chrome
+                  </div>
+                  <div className="text-caption text-muted-foreground mt-0.5">
+                    1-click V/C/L scores on any page
+                  </div>
+                </div>
+              </a>
+            </aside>
+          )}
+        </div>
       )}
 
       {homeMode === "dashboard" && (
@@ -947,32 +1044,27 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
         </div>
       )}
 
-      {/* Chrome Extension CTA */}
-      <a
-        href="https://chromewebstore.google.com/detail/aegis-score/pnnpkepiojfpkppjpoimolkamflhbjhh"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-3 mt-4 px-4 py-3 bg-gradient-to-br from-cyan-500/[0.03] to-blue-600/[0.02] border border-cyan-500/[0.12] rounded-lg no-underline transition-normal"
-      >
-        <span className="text-xl shrink-0">&#x1F9E9;</span>
-        <div className="flex-1 min-w-0">
-          <div className="text-body-sm font-semibold text-cyan-400">
-            Aegis Score for Chrome
+      {/* Desktop feed has CTA in sidebar; other modes show it here */}
+      {(homeMode === "dashboard" || mobile) && (
+        <a
+          href={CHROME_CTA_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 mt-4 px-4 py-3 bg-gradient-to-br from-cyan-500/[0.03] to-blue-600/[0.02] border border-cyan-500/[0.12] rounded-lg no-underline transition-normal"
+        >
+          <span className="text-xl shrink-0">&#x1F9E9;</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-body-sm font-semibold text-cyan-400">
+              Aegis Score for Chrome
+            </div>
+            <div className="text-caption text-muted-foreground mt-0.5">
+              1-click V/C/L scores on any page &mdash; send articles to Aegis without leaving your browser
+            </div>
           </div>
-          <div className="text-caption text-muted-foreground mt-0.5">
-            1-click V/C/L scores on any page &mdash; send articles to Aegis without leaving your browser
-          </div>
-        </div>
-        <span className="text-caption text-cyan-400 font-semibold whitespace-nowrap shrink-0">
-          Install &rarr;
-        </span>
-      </a>
-
-      {/* Keyboard shortcut hint */}
-      {!mobile && homeMode === "feed" && (
-        <div className="text-center mt-3 text-tiny text-disabled">
-          <span className="font-mono">J/K</span> navigate &middot; <span className="font-mono">V</span> validate &middot; <span className="font-mono">F</span> flag &middot; <span className="font-mono">{navigator?.platform?.includes("Mac") ? "\u2318" : "Ctrl"}+K</span> commands
-        </div>
+          <span className="text-caption text-cyan-400 font-semibold whitespace-nowrap shrink-0">
+            Install &rarr;
+          </span>
+        </a>
       )}
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={paletteCommands} mobile={mobile} />

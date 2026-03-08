@@ -38,6 +38,8 @@ import type { UserPreferenceProfile } from "@/lib/preferences/types";
 
 function makeProfile(): UserPreferenceProfile {
   return {
+    version: 1,
+    principalId: "test-principal",
     topicAffinities: {},
     authorTrust: {},
     recentTopics: [],
@@ -45,6 +47,7 @@ function makeProfile(): UserPreferenceProfile {
     totalFlagged: 0,
     calibration: { qualityThreshold: 4.0 },
     bookmarkedIds: [],
+    lastUpdated: Date.now(),
   };
 }
 

@@ -9,6 +9,16 @@
 
 ## Latest Updates (March 2026)
 
+### Home Feed Right Sidebar
+- **5453 tests, 313 suites** — zero failures, zero skipped
+- **Desktop 2-column layout**: Feed mode renders sticky right sidebar (`w-[280px]`, `sticky top-4`) alongside content column — mobile stays single-column with metrics inline
+- **Metrics Bar**: Quality/Slop/Evaluated counts displayed in sidebar on desktop, inline on mobile
+- **Top Sources (3)**: Ranked by item count, uses `platform || source` for display name — skips computation on mobile via early-return guard
+- **Top Topics (3)**: Ranked by topic affinity from user preference profile — only computed when sidebar visible
+- **Agent Knowledge card**: Shared render variable (`agentKnowsCard`) eliminates JSX duplication between sidebar and mobile inline positions
+- **Aegis Score for Chrome CTA**: Sidebar on desktop feed, bottom section on dashboard/mobile — `CHROME_CTA_URL` constant prevents URL duplication
+- **41 new sidebar tests**: Layout, metrics placement, Top Sources ordering/counts, Top Topics, Agent Knowledge, Chrome CTA positioning, section ordering, edge cases (empty content, undefined mobile, single source, small affinity values)
+
 ### YouTube Preview in Feed & Briefing
 - **5412 tests, 312 suites** — zero failures, zero skipped
 - **YouTube click-to-play preview**: `YouTubePreview` component renders thumbnail from `img.youtube.com` with play button overlay; clicking replaces thumbnail with autoplay iframe — avoids eager iframe loading for performance
