@@ -9,6 +9,19 @@
 
 ## Latest Updates (March 2026)
 
+### Sidebar Enhancements & Topic Filtering
+- **5529 tests, 316 suites** — zero failures, zero skipped
+- **Interactive source filtering**: Click any source in Top Sources to filter feed by that source — quality rate bars show quality/total ratio per source
+- **Interactive topic filtering**: Click topics in Top Topics to filter feed — active topic chip appears in filter bar with `×` dismiss, CommandPalette dynamically generates topic filter commands
+- **Metrics delta indicators**: ↑/↓ arrows comparing today vs yesterday for quality, slop, and source counts — "High quality day!" badge when today's quality exceeds yesterday's
+- **Reading streak**: Counts consecutive days with user-reviewed items (`validated || flagged`), "at risk" nudge when no reviews today — streak resets on gap days
+- **Unreviewed queue**: Top 3 unreviewed quality items in collapsible sidebar section — click-to-scroll auto-expands `visibleCount` when target item is beyond current batch
+- **Topic trend arrows**: ↑ rising / ↓ falling / NEW badge based on affinity changes persisted to localStorage across sessions — top 5 topics (up from 3)
+- **Section collapse persistence**: Sidebar sections (metrics, streak, unreviewed, knowledge, sources, topics) collapse/expand with state persisted to localStorage
+- **Agent knowledge milestones**: Progress bar toward next milestone with remaining count — milestone reached celebration message
+- **Source filterKey/displayName split**: Sources keyed by `c.source` (matching filter logic) but displayed by `c.platform ?? c.source` — fixes platform/source mismatch bug
+- **40 new tests**: 39 sidebar enhancement tests + 1 infinite scroll sentinel fix
+
 ### Infinite Scroll & Timer Cleanup
 - **5489 tests, 315 suites** — zero failures, zero skipped
 - **Infinite scroll replaces "Show All"**: `BATCH_SIZE=40` initial items, auto-load +40 on scroll via IntersectionObserver (300px rootMargin sentinel pattern)
@@ -21,15 +34,15 @@
 - **Dangling timer cleanup**: 3 test files (`timeout-edge`, `timeout-thorough`, `scoring-edge`) now `clearTimeout()` timers that kept event loop alive after test completion
 - **36 new tests**: 13 hook unit tests (intersection, null ref, rapid fire, empty entries, stable ref), 23 DashboardTab integration tests (batch boundaries 0/1/40/41/80/130 items, separators, stagger animation, filter reset, keyboard nav, Load remaining button)
 
-### Home Feed Right Sidebar
+### Home Feed Right Sidebar (Foundation)
 - **5453 tests, 313 suites** — zero failures, zero skipped
 - **Desktop 2-column layout**: Feed mode renders sticky right sidebar (`w-[280px]`, `sticky top-4`) alongside content column — mobile stays single-column with metrics inline
 - **Metrics Bar**: Quality/Slop/Evaluated counts displayed in sidebar on desktop, inline on mobile
-- **Top Sources (3)**: Ranked by item count, uses `platform || source` for display name — skips computation on mobile via early-return guard
-- **Top Topics (3)**: Ranked by topic affinity from user preference profile — only computed when sidebar visible
+- **Top Sources**: Ranked by item count — skips computation on mobile via early-return guard
+- **Top Topics**: Ranked by topic affinity from user preference profile — only computed when sidebar visible
 - **Agent Knowledge card**: Shared render variable (`agentKnowsCard`) eliminates JSX duplication between sidebar and mobile inline positions
 - **Aegis Score for Chrome CTA**: Sidebar on desktop feed, bottom section on dashboard/mobile — `CHROME_CTA_URL` constant prevents URL duplication
-- **41 new sidebar tests**: Layout, metrics placement, Top Sources ordering/counts, Top Topics, Agent Knowledge, Chrome CTA positioning, section ordering, edge cases (empty content, undefined mobile, single source, small affinity values)
+- **41 new sidebar tests**: Layout, metrics placement, Top Sources ordering/counts, Top Topics, Agent Knowledge, Chrome CTA positioning, section ordering, edge cases
 
 ### YouTube Preview in Feed & Briefing
 - **5412 tests, 312 suites** — zero failures, zero skipped
