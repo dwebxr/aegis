@@ -394,18 +394,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   const topSources = useMemo(() => {
     if (!showSidebar) return [];
-    const stats = new Map<string, { total: number; quality: number; displayName: string }>();
+    const stats = new Map<string, { total: number; quality: number; platform: string | undefined }>();
     for (const c of content) {
       const filterKey = c.source;
-      const displayName = c.platform || c.source;
-      const s = stats.get(filterKey) ?? { total: 0, quality: 0, displayName };
+      const s = stats.get(filterKey) ?? { total: 0, quality: 0, platform: undefined };
       s.total++;
       if (c.verdict === "quality") s.quality++;
-      if (c.platform && !s.displayName.includes(c.platform)) s.displayName = displayName;
+      if (c.platform && !s.platform) s.platform = c.platform;
       stats.set(filterKey, s);
     }
     return Array.from(stats.entries())
-      .map(([filterKey, s]) => ({ filterKey, displayName: s.displayName, count: s.total, qualityRate: s.total > 0 ? s.quality / s.total : 0 }))
+      .map(([filterKey, s]) => ({
+        filterKey,
+        displayName: s.platform ?? filterKey,
+        count: s.total,
+        qualityRate: s.total > 0 ? s.quality / s.total : 0,
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   }, [content, showSidebar]);
@@ -593,6 +597,33 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     enabled: !mobile && homeMode === "feed",
   });
 
+  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pendingScrollId) return;
+    const el = document.getElementById(`card-${pendingScrollId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setExpanded(pendingScrollId);
+      setPendingScrollId(null);
+    }
+  }, [pendingScrollId, visibleCount]);
+
+  const scrollToItem = useCallback((itemId: string) => {
+    const el = document.getElementById(`card-${itemId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setExpanded(itemId);
+      return;
+    }
+    // Item not rendered yet — find its position in filteredContent and expand batch
+    const idx = filteredContent.findIndex(c => c.id === itemId);
+    if (idx >= 0) {
+      setVisibleCount(Math.min(idx + BATCH_SIZE, filteredContent.length));
+      setPendingScrollId(itemId);
+    }
+  }, [filteredContent]);
+
   const recentLearningActions = useMemo(() =>
     content
       .filter(c => c.validated || c.flagged)
@@ -617,20 +648,29 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     </div>
   );
 
-  const paletteCommands: PaletteCommand[] = useMemo(() => [
-    { label: "Go to Feed", action: () => setHomeMode("feed") },
-    { label: "Go to Dashboard", action: () => setHomeMode("dashboard") },
-    { label: "Go to Analytics", action: () => onTabChange?.("analytics") },
-    { label: "Go to Settings", action: () => onTabChange?.("settings") },
-    { label: "Go to Sources", action: () => onTabChange?.("sources") },
-    { label: "Filter: Quality", action: () => setVerdictFilter("quality") },
-    { label: "Filter: Slop", action: () => setVerdictFilter("slop") },
-    { label: "Filter: All", action: () => setVerdictFilter("all") },
-    { label: "Filter: Validated", action: () => setVerdictFilter("validated") },
-    { label: "Filter: Saved", action: () => setVerdictFilter("bookmarked") },
-    { label: "Export CSV", action: () => exportContentCSV(content) },
-    { label: "Export JSON", action: () => exportContentJSON(content) },
-  ], [onTabChange, content]);
+  const paletteCommands: PaletteCommand[] = useMemo(() => {
+    const cmds: PaletteCommand[] = [
+      { label: "Go to Feed", action: () => setHomeMode("feed") },
+      { label: "Go to Dashboard", action: () => setHomeMode("dashboard") },
+      { label: "Go to Analytics", action: () => onTabChange?.("analytics") },
+      { label: "Go to Settings", action: () => onTabChange?.("settings") },
+      { label: "Go to Sources", action: () => onTabChange?.("sources") },
+      { label: "Filter: Quality", action: () => setVerdictFilter("quality") },
+      { label: "Filter: Slop", action: () => setVerdictFilter("slop") },
+      { label: "Filter: All", action: () => setVerdictFilter("all") },
+      { label: "Filter: Validated", action: () => setVerdictFilter("validated") },
+      { label: "Filter: Saved", action: () => setVerdictFilter("bookmarked") },
+      { label: "Export CSV", action: () => exportContentCSV(content) },
+      { label: "Export JSON", action: () => exportContentJSON(content) },
+    ];
+    if (topicFilter !== "all") {
+      cmds.push({ label: `Clear topic filter: ${topicFilter}`, action: () => setTopicFilter("all") });
+    }
+    for (const t of topTopics) {
+      cmds.push({ label: `Topic: ${t.topic}`, action: () => setTopicFilter(topicFilter === t.topic ? "all" : t.topic) });
+    }
+    return cmds;
+  }, [onTabChange, content, topTopics, topicFilter]);
 
   return (
     <div data-testid="aegis-dashboard" className="animate-fade-in">
@@ -732,6 +772,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     {label}
                   </button>
                 ))}
+
+                {topicFilter !== "all" && (
+                  <button
+                    data-testid="aegis-filter-topic-active"
+                    onClick={() => setTopicFilter("all")}
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-caption font-semibold cursor-pointer font-[inherit] transition-fast border bg-cyan-500/[0.05] border-cyan-500/[0.15] text-cyan-400"
+                  >
+                    {topicFilter} <span className="text-cyan-400/60">&times;</span>
+                  </button>
+                )}
 
                 <div ref={moreFiltersRef} className="relative">
                   <button
@@ -994,13 +1044,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     {sidebarUnreviewed.map(item => (
                       <button
                         key={item.id}
-                        onClick={() => {
-                          const el = document.getElementById(`card-${item.id}`);
-                          if (el) {
-                            el.scrollIntoView({ behavior: "smooth", block: "center" });
-                            setExpanded(item.id);
-                          }
-                        }}
+                        onClick={() => scrollToItem(item.id)}
                         className="flex flex-col gap-0.5 text-left bg-transparent border-none cursor-pointer font-[inherit] p-0 group"
                       >
                         <div className="text-caption text-secondary-foreground font-medium truncate group-hover:text-cyan-400 transition-fast">

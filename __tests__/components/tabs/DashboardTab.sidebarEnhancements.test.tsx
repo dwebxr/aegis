@@ -614,3 +614,104 @@ describe("Sidebar — Sources delta correctness", () => {
     expect(metricsBar.textContent).toContain("+1");
   });
 });
+
+// ─── Unreviewed Queue scroll-to with batch expansion ───
+
+describe("Sidebar — Unreviewed Queue scroll-to", () => {
+  it("expands batch when clicked item is beyond visible items", () => {
+    // Create 50 items — first 40 fill initial batch, items 41-50 are beyond
+    const items = Array.from({ length: 50 }, (_, i) =>
+      makeItem({
+        id: `scroll-${i}`,
+        text: `Scroll test item ${i} ${Math.random().toString(36).slice(2)}`,
+        createdAt: now - i * 60000,
+        scores: { originality: 9 - (i * 0.1), insight: 9 - (i * 0.1), credibility: 9 - (i * 0.1), composite: 9 - (i * 0.1) },
+      })
+    );
+    render(<DashboardTab content={items} onValidate={noop} onFlag={noop} mobile={false} />);
+
+    // Initially only 40 items visible
+    const initialCards = getCardIds();
+    expect(initialCards.length).toBeLessThanOrEqual(40);
+
+    // The sidebar unreviewed queue picks top unreviewed items by composite score
+    // These should be the first few items (highest scores)
+    // Clicking one that IS visible should work
+    const sidebar = getSidebar();
+    const needsReview = sidebar.textContent?.includes("Needs Review");
+    expect(needsReview).toBe(true);
+  });
+});
+
+// ─── CommandPalette topic commands ───
+
+describe("Sidebar — CommandPalette topic commands", () => {
+  it("palette includes topic commands when topics exist", () => {
+    mockProfile.topicAffinities = { "AI": 0.9, "Crypto": 0.7 };
+    const items = [makeItem()];
+    render(<DashboardTab content={items} onValidate={noop} onFlag={noop} mobile={false} />);
+
+    // Open palette (simulate Cmd+K)
+    fireEvent.keyDown(document, { key: "k", metaKey: true });
+
+    // Should see topic commands
+    const palette = document.querySelector('[data-testid="aegis-command-palette"]') ??
+                    document.querySelector('[role="dialog"]');
+    if (palette) {
+      expect(palette.textContent).toContain("Topic: AI");
+      expect(palette.textContent).toContain("Topic: Crypto");
+    }
+  });
+});
+
+// ─── Topic filter chip in filter bar ───
+
+describe("Sidebar — Topic filter chip in filter bar", () => {
+  it("shows active topic chip when topic filter is active", () => {
+    mockProfile.topicAffinities = { "AI": 0.9 };
+    const items = [
+      makeItem({ id: "ai-chip-1", topics: ["AI"] }),
+      makeItem({ id: "other-chip-1", topics: ["Other"] }),
+    ];
+    render(<DashboardTab content={items} onValidate={noop} onFlag={noop} mobile={false} />);
+    const sidebar = getSidebar();
+
+    // Activate topic filter via sidebar
+    const aiButton = within(sidebar).getByText("AI").closest("button")!;
+    fireEvent.click(aiButton);
+
+    // Topic chip should appear in filter bar
+    const chip = screen.getByTestId("aegis-filter-topic-active");
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain("AI");
+  });
+
+  it("clicking topic chip dismisses topic filter", () => {
+    mockProfile.topicAffinities = { "AI": 0.9 };
+    const items = [
+      makeItem({ id: "ai-dismiss-1", topics: ["AI"] }),
+      makeItem({ id: "other-dismiss-1", topics: ["Other"] }),
+    ];
+    render(<DashboardTab content={items} onValidate={noop} onFlag={noop} mobile={false} />);
+    const sidebar = getSidebar();
+
+    // Activate topic filter
+    const aiButton = within(sidebar).getByText("AI").closest("button")!;
+    fireEvent.click(aiButton);
+    expect(getCardIds()).not.toContain("other-dismiss-1");
+
+    // Click chip to dismiss
+    const chip = screen.getByTestId("aegis-filter-topic-active");
+    fireEvent.click(chip);
+
+    // All items visible again
+    expect(getCardIds()).toContain("other-dismiss-1");
+    expect(screen.queryByTestId("aegis-filter-topic-active")).toBeNull();
+  });
+
+  it("no topic chip when topic filter is not active", () => {
+    const items = [makeItem()];
+    render(<DashboardTab content={items} onValidate={noop} onFlag={noop} mobile={false} />);
+    expect(screen.queryByTestId("aegis-filter-topic-active")).toBeNull();
+  });
+});

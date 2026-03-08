@@ -513,7 +513,7 @@ describe("DashboardTab — Chrome CTA placement", () => {
 // ─── Sidebar section ordering ───
 
 describe("DashboardTab — Sidebar section ordering", () => {
-  it("sections appear in correct order: Metrics → Agent → Sources → Topics → CTA", () => {
+  it("sections appear in correct order: Metrics → Unreviewed → Agent → Sources → Topics → CTA", () => {
     mockProfile.totalValidated = 3;
     mockProfile.totalFlagged = 1;
     mockProfile.topicAffinities = { "AI": 0.8 };
@@ -527,15 +527,51 @@ describe("DashboardTab — Sidebar section ordering", () => {
     const text = sidebar.textContent!;
 
     const metricsIdx = text.indexOf("quality");
+    const unreviewedIdx = text.indexOf("Needs Review");
     const agentIdx = text.indexOf("Your Agent Knows");
     const sourcesIdx = text.indexOf("Top Sources");
     const topicsIdx = text.indexOf("Top Topics");
     const ctaIdx = text.indexOf("Aegis Score for Chrome");
 
-    expect(metricsIdx).toBeLessThan(agentIdx);
+    expect(metricsIdx).toBeGreaterThanOrEqual(0);
+    expect(unreviewedIdx).toBeGreaterThanOrEqual(0);
+    expect(agentIdx).toBeGreaterThanOrEqual(0);
+    expect(sourcesIdx).toBeGreaterThanOrEqual(0);
+    expect(topicsIdx).toBeGreaterThanOrEqual(0);
+    expect(ctaIdx).toBeGreaterThanOrEqual(0);
+
+    expect(metricsIdx).toBeLessThan(unreviewedIdx);
+    expect(unreviewedIdx).toBeLessThan(agentIdx);
     expect(agentIdx).toBeLessThan(sourcesIdx);
     expect(sourcesIdx).toBeLessThan(topicsIdx);
     expect(topicsIdx).toBeLessThan(ctaIdx);
+  });
+
+  it("Reading Streak appears between Metrics and Unreviewed when user has streak", () => {
+    mockProfile.totalValidated = 3;
+    mockProfile.totalFlagged = 1;
+    mockProfile.topicAffinities = { "AI": 0.8 };
+    mockProfile.authorTrust = { "Alice": { trust: 0.8, interactions: 5 } };
+
+    const items = [
+      makeItem({ source: "rss", validated: true, validatedAt: Date.now() - 1000 }),
+      makeItem({ source: "nostr" }),
+    ];
+    render(
+      <DashboardTab content={items} onValidate={noop} onFlag={noop} mobile={false} />
+    );
+    const sidebar = screen.getByTestId("aegis-feed-sidebar");
+    const text = sidebar.textContent!;
+
+    const metricsIdx = text.indexOf("quality");
+    const streakIdx = text.indexOf("Reading Streak");
+    const unreviewedIdx = text.indexOf("Needs Review");
+
+    expect(streakIdx).toBeGreaterThanOrEqual(0);
+    expect(metricsIdx).toBeLessThan(streakIdx);
+    if (unreviewedIdx >= 0) {
+      expect(streakIdx).toBeLessThan(unreviewedIdx);
+    }
   });
 });
 
