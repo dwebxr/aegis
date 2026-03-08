@@ -3,22 +3,27 @@ import { withTimeout } from "@/lib/utils/timeout";
 describe("withTimeout — concurrent and edge cases", () => {
   describe("concurrent races", () => {
     it("handles multiple concurrent withTimeout calls independently", async () => {
+      let t1: ReturnType<typeof setTimeout>;
+      let t2: ReturnType<typeof setTimeout>;
       const fast = withTimeout(
-        new Promise<string>(resolve => setTimeout(() => resolve("fast"), 10)),
+        new Promise<string>(resolve => { t1 = setTimeout(() => resolve("fast"), 10); }),
         1000,
       );
       const slow = withTimeout(
-        new Promise<string>(resolve => setTimeout(() => resolve("slow"), 500)),
+        new Promise<string>(resolve => { t2 = setTimeout(() => resolve("slow"), 500); }),
         1000,
       );
 
       const results = await Promise.all([fast, slow]);
       expect(results).toEqual(["fast", "slow"]);
+      clearTimeout(t1!);
+      clearTimeout(t2!);
     });
 
     it("one timing out does not affect another", async () => {
+      let t1: ReturnType<typeof setTimeout>;
       const willTimeout = withTimeout(
-        new Promise<string>(resolve => setTimeout(() => resolve("late"), 500)),
+        new Promise<string>(resolve => { t1 = setTimeout(() => resolve("late"), 500); }),
         10,
         "timed-out",
       );
@@ -31,6 +36,7 @@ describe("withTimeout — concurrent and edge cases", () => {
       if (successResult.status === "fulfilled") {
         expect(successResult.value).toBe("ok");
       }
+      clearTimeout(t1!);
     });
   });
 
@@ -47,8 +53,10 @@ describe("withTimeout — concurrent and edge cases", () => {
     });
 
     it("handles very short timeout (1ms)", async () => {
-      const slow = new Promise<string>(resolve => setTimeout(() => resolve("slow"), 1000));
+      let t: ReturnType<typeof setTimeout>;
+      const slow = new Promise<string>(resolve => { t = setTimeout(() => resolve("slow"), 1000); });
       await expect(withTimeout(slow, 1, "too-slow")).rejects.toThrow("too-slow");
+      clearTimeout(t!);
     });
   });
 

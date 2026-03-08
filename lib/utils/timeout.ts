@@ -10,6 +10,6 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, message = "timeo
     timer = setTimeout(() => reject(new Error(message)), ms);
   });
   // Prevent unhandled rejection if the original promise rejects after timeout wins
-  promise.catch((e) => { console.warn(`[timeout] Late rejection suppressed (${message}, ${ms}ms):`, e); });
+  promise.catch(() => {});
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }

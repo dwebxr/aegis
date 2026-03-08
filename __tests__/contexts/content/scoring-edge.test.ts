@@ -116,16 +116,18 @@ describe("concurrent local tiers (Promise.any)", () => {
       verdict: "quality", reason: "Ollama fast", topics: [],
     });
     // WebLLM resolves slower
+    let webllmTimer: ReturnType<typeof setTimeout>;
     (scoreWithWebLLM as jest.Mock).mockImplementation(() =>
-      new Promise(resolve => setTimeout(() => resolve({
+      new Promise(resolve => { webllmTimer = setTimeout(() => resolve({
         originality: 7, insight: 7, credibility: 7, composite: 7,
         verdict: "quality", reason: "WebLLM slow", topics: [],
-      }), 100)),
+      }), 100); }),
     );
 
     const result = await runScoringCascade("test text", null, actorRef, false);
     // Should use Ollama (faster)
     expect(result.scoringEngine).toBe("ollama");
+    clearTimeout(webllmTimer!);
   });
 
   it("succeeds when one of multiple tiers fails", async () => {

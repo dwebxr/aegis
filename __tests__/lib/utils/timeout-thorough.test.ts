@@ -7,8 +7,10 @@ describe("withTimeout — basic behavior", () => {
   });
 
   it("rejects with timeout error when promise takes too long", async () => {
-    const slow = new Promise<string>((resolve) => setTimeout(() => resolve("late"), 500));
+    let t: ReturnType<typeof setTimeout>;
+    const slow = new Promise<string>((resolve) => { t = setTimeout(() => resolve("late"), 500); });
     await expect(withTimeout(slow, 10, "timed out")).rejects.toThrow("timed out");
+    clearTimeout(t!);
   });
 
   it("uses default message when none provided", async () => {
