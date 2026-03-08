@@ -3,8 +3,11 @@ import { useRef, useCallback, useEffect } from "react";
 /**
  * Triggers `onLoadMore` when a sentinel element scrolls near the viewport.
  * Returns a callback ref to attach to a sentinel div at the bottom of the list.
+ *
+ * The sentinel should be conditionally rendered (`{hasMore && <div ref={ref} />}`)
+ * so it unmounts when there is nothing left to load.
  */
-export function useInfiniteScroll(hasMore: boolean, onLoadMore: () => void) {
+export function useInfiniteScroll(onLoadMore: () => void) {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const onLoadMoreRef = useRef(onLoadMore);
@@ -27,25 +30,15 @@ export function useInfiniteScroll(hasMore: boolean, onLoadMore: () => void) {
     return () => { observerRef.current?.disconnect(); };
   }, []);
 
-  // Re-observe when hasMore changes (disconnect when nothing left)
-  useEffect(() => {
-    if (!observerRef.current || !sentinelRef.current) return;
-    if (hasMore) {
-      observerRef.current.observe(sentinelRef.current);
-    } else {
-      observerRef.current.unobserve(sentinelRef.current);
-    }
-  }, [hasMore]);
-
   const ref = useCallback((el: HTMLDivElement | null) => {
     if (sentinelRef.current && observerRef.current) {
       observerRef.current.unobserve(sentinelRef.current);
     }
     sentinelRef.current = el;
-    if (el && observerRef.current && hasMore) {
+    if (el && observerRef.current) {
       observerRef.current.observe(el);
     }
-  }, [hasMore]);
+  }, []);
 
   return ref;
 }

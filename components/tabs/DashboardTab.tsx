@@ -228,6 +228,9 @@ const EMPTY_SECTIONS = { filteredDiscoveries: [] as SerendipityItem[], unreviewe
 
 const CHROME_CTA_URL = "https://chromewebstore.google.com/detail/aegis-score/pnnpkepiojfpkppjpoimolkamflhbjhh";
 
+/** Items per infinite-scroll batch. No debounce needed — setVisibleCount is idempotent. */
+const BATCH_SIZE = 40;
+
 interface DashboardTabProps {
   content: ContentItem[];
   mobile?: boolean;
@@ -250,7 +253,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const moreFiltersRef = useRef<HTMLDivElement>(null);
-  const BATCH_SIZE = 40;
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const markImgFailed = useCallback((id: string) =>
@@ -305,7 +307,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     setVisibleCount(BATCH_SIZE);
   }, [verdictFilter, sourceFilter]);
 
-  // Close "More filters" dropdown on click-outside or Escape
   useEffect(() => {
     if (!moreFiltersOpen) return;
     const handleClick = (e: MouseEvent) => {
@@ -331,7 +332,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     [content, verdictFilter, sourceFilter, bookmarkedIds],
   );
 
-  // Auto-reveal: sections expand when scrolled into view, remember manual collapses
   const { isExpanded: isSectionExpanded, toggle: toggleSection, observeRef: sectionRef } = useAutoReveal();
 
   const hasActiveFilter = (verdictFilter !== "all" && verdictFilter !== "quality") || sourceFilter !== "all";
@@ -401,7 +401,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardTop3, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds, homeMode, content.length]);
 
-  // Signal feedback loop
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; key: number } | null>(null);
   const [agentKnowsHighlight, setAgentKnowsHighlight] = useState(false);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -470,14 +469,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     [filteredContent, visibleCount],
   );
 
-  const hasMore = visibleCount < filteredContent.length;
+  const hasMore = visibleItems.length < filteredContent.length;
   const remainingCount = filteredContent.length - visibleItems.length;
 
   const loadMore = useCallback(() => {
     setVisibleCount(prev => Math.min(prev + BATCH_SIZE, filteredContent.length));
   }, [filteredContent.length]);
 
-  const sentinelRef = useInfiniteScroll(hasMore, loadMore);
+  const sentinelRef = useInfiniteScroll(loadMore);
 
   const feedItemIds = useMemo(
     () => visibleItems.map(c => c.id),
@@ -892,7 +891,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
       {homeMode === "dashboard" && (
         <div className="mt-3">
-          {/* Today's Top 3 */}
           <div data-testid="aegis-top3-section" className="mb-4">
             <div className="text-h3 font-semibold text-tertiary mb-3 flex items-center gap-2">
               <span>&#x2B50;</span> Today&#39;s Top 3
@@ -931,7 +929,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             )}
           </div>
 
-            {/* Topic Spotlight */}
             <div className="mb-4">
               <div className="text-h3 font-semibold text-tertiary mb-3 flex items-center gap-2">
                 <span>&#x1F3AF;</span> Topic Spotlight
@@ -984,7 +981,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               )}
             </div>
 
-          {/* Your Agent */}
           <div className={cn(
             "px-4 py-3 bg-card rounded-lg mb-4 transition-all duration-500",
             agentKnowsHighlight
@@ -1010,7 +1006,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             {agentContext && <AgentKnowledgePills agentContext={agentContext} profile={profile} />}
           </div>
 
-          {/* Discoveries - Collapsible */}
           {filteredDiscoveries.length > 0 && (
             <CollapsibleSection
               id="discoveries"
@@ -1036,7 +1031,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </CollapsibleSection>
           )}
 
-          {/* Needs Review - Collapsible */}
           {unreviewedQueue.length > 0 && (
             <div className="my-4">
             <CollapsibleSection
@@ -1058,7 +1052,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             </div>
           )}
 
-          {/* Saved */}
           {dashboardSaved.length > 0 && (
             <div className="mb-4">
               <div className="text-h3 font-semibold text-tertiary mb-3 flex items-center gap-2">

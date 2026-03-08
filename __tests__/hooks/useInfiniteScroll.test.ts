@@ -41,23 +41,20 @@ function simulateIntersection(isIntersecting: boolean) {
 
 describe("useInfiniteScroll", () => {
   it("returns a callback ref function", () => {
-    const onLoadMore = jest.fn();
-    const { result } = renderHook(() => useInfiniteScroll(true, onLoadMore));
+    const { result } = renderHook(() => useInfiniteScroll(jest.fn()));
     expect(typeof result.current).toBe("function");
   });
 
   it("creates IntersectionObserver with 300px rootMargin", () => {
-    const onLoadMore = jest.fn();
-    renderHook(() => useInfiniteScroll(true, onLoadMore));
+    renderHook(() => useInfiniteScroll(jest.fn()));
     expect(lastObserverOptions?.rootMargin).toBe("0px 0px 300px 0px");
     expect(lastObserverOptions?.threshold).toBe(0);
   });
 
   it("calls onLoadMore when sentinel intersects", () => {
     const onLoadMore = jest.fn();
-    const { result } = renderHook(() => useInfiniteScroll(true, onLoadMore));
+    const { result } = renderHook(() => useInfiniteScroll(onLoadMore));
 
-    // Attach sentinel
     const sentinel = document.createElement("div");
     result.current(sentinel);
 
@@ -67,7 +64,7 @@ describe("useInfiniteScroll", () => {
 
   it("does not call onLoadMore when not intersecting", () => {
     const onLoadMore = jest.fn();
-    const { result } = renderHook(() => useInfiniteScroll(true, onLoadMore));
+    const { result } = renderHook(() => useInfiniteScroll(onLoadMore));
 
     const sentinel = document.createElement("div");
     result.current(sentinel);
@@ -77,8 +74,7 @@ describe("useInfiniteScroll", () => {
   });
 
   it("observes sentinel element when attached", () => {
-    const onLoadMore = jest.fn();
-    const { result } = renderHook(() => useInfiniteScroll(true, onLoadMore));
+    const { result } = renderHook(() => useInfiniteScroll(jest.fn()));
 
     const sentinel = document.createElement("div");
     result.current(sentinel);
@@ -87,8 +83,7 @@ describe("useInfiniteScroll", () => {
   });
 
   it("unobserves previous sentinel when ref changes", () => {
-    const onLoadMore = jest.fn();
-    const { result } = renderHook(() => useInfiniteScroll(true, onLoadMore));
+    const { result } = renderHook(() => useInfiniteScroll(jest.fn()));
 
     const sentinel1 = document.createElement("div");
     result.current(sentinel1);
@@ -101,8 +96,7 @@ describe("useInfiniteScroll", () => {
   });
 
   it("disconnects observer on unmount", () => {
-    const onLoadMore = jest.fn();
-    const { unmount } = renderHook(() => useInfiniteScroll(true, onLoadMore));
+    const { unmount } = renderHook(() => useInfiniteScroll(jest.fn()));
     unmount();
     expect(disconnectCount).toBeGreaterThan(0);
   });
@@ -113,18 +107,75 @@ describe("useInfiniteScroll", () => {
     const onLoadMore2 = jest.fn(() => { callCount = 2; });
 
     const { result, rerender } = renderHook(
-      ({ hasMore, onLoadMore }) => useInfiniteScroll(hasMore, onLoadMore),
-      { initialProps: { hasMore: true, onLoadMore: onLoadMore1 } },
+      ({ onLoadMore }: { onLoadMore: () => void }) => useInfiniteScroll(onLoadMore),
+      { initialProps: { onLoadMore: onLoadMore1 } },
     );
 
     const sentinel = document.createElement("div");
     result.current(sentinel);
 
-    // Update to new callback
-    rerender({ hasMore: true, onLoadMore: onLoadMore2 });
+    rerender({ onLoadMore: onLoadMore2 });
 
     simulateIntersection(true);
-    // Should call the latest callback
     expect(callCount).toBe(2);
+  });
+
+  it("handles null ref (sentinel removal)", () => {
+    const onLoadMore = jest.fn();
+    const { result } = renderHook(() => useInfiniteScroll(onLoadMore));
+
+    const sentinel = document.createElement("div");
+    result.current(sentinel);
+    expect(observedElements).toContain(sentinel);
+
+    // Remove sentinel (React unmounts the element)
+    result.current(null);
+    expect(unobservedElements).toContain(sentinel);
+
+    // Intersection after removal should still call onLoadMore
+    // (observer was already created — this tests the guard path)
+    simulateIntersection(true);
+    expect(onLoadMore).toHaveBeenCalled();
+  });
+
+  it("handles multiple rapid intersections", () => {
+    const onLoadMore = jest.fn();
+    const { result } = renderHook(() => useInfiniteScroll(onLoadMore));
+
+    const sentinel = document.createElement("div");
+    result.current(sentinel);
+
+    simulateIntersection(true);
+    simulateIntersection(true);
+    simulateIntersection(true);
+    expect(onLoadMore).toHaveBeenCalledTimes(3);
+  });
+
+  it("handles empty entries array gracefully", () => {
+    const onLoadMore = jest.fn();
+    renderHook(() => useInfiniteScroll(onLoadMore));
+
+    // Simulate empty entries (edge case from IntersectionObserver)
+    for (const cb of observeCallbacks) {
+      cb([], {} as IntersectionObserver);
+    }
+    expect(onLoadMore).not.toHaveBeenCalled();
+  });
+
+  it("only creates one IntersectionObserver instance", () => {
+    const onLoadMore = jest.fn();
+    renderHook(() => useInfiniteScroll(onLoadMore));
+    expect(IntersectionObserver).toHaveBeenCalledTimes(1);
+  });
+
+  it("ref is stable across rerenders (same function identity)", () => {
+    const { result, rerender } = renderHook(
+      ({ onLoadMore }: { onLoadMore: () => void }) => useInfiniteScroll(onLoadMore),
+      { initialProps: { onLoadMore: jest.fn() } },
+    );
+    const ref1 = result.current;
+    rerender({ onLoadMore: jest.fn() });
+    const ref2 = result.current;
+    expect(ref1).toBe(ref2);
   });
 });
