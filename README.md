@@ -9,6 +9,18 @@
 
 ## Latest Updates (March 2026)
 
+### Infinite Scroll & Timer Cleanup
+- **5489 tests, 315 suites** — zero failures, zero skipped
+- **Infinite scroll replaces "Show All"**: `BATCH_SIZE=40` initial items, auto-load +40 on scroll via IntersectionObserver (300px rootMargin sentinel pattern)
+- **Batch separators**: "Showing X of Y items" divider at each 40-item boundary — lightweight visual progress indicator
+- **"Load remaining N items" fallback button**: Manual trigger at bottom of visible list for users who prefer explicit loading or when IntersectionObserver is unavailable
+- **Stagger animation capped to first batch**: Items 0–39 get `slideUp` animation with incremental delay; subsequent batches render instantly (prevents 6s animation queue at item #200)
+- **Filter change resets batch state**: Switching verdict or source filter resets `visibleCount` to `BATCH_SIZE`
+- **`useInfiniteScroll` hook**: 1-param API (`onLoadMore`) — sentinel conditionally rendered (`{hasMore && <div ref={...} />`}) eliminates need for `hasMore` in hook; `onLoadMoreRef` pattern prevents observer re-creation on callback changes; stable ref identity via `useCallback([], [])`
+- **`withTimeout` late-rejection fix**: Silent no-op `.catch()` replaces noisy `console.warn` that fired on every rejection (including normal pre-timeout ones)
+- **Dangling timer cleanup**: 3 test files (`timeout-edge`, `timeout-thorough`, `scoring-edge`) now `clearTimeout()` timers that kept event loop alive after test completion
+- **36 new tests**: 13 hook unit tests (intersection, null ref, rapid fire, empty entries, stable ref), 23 DashboardTab integration tests (batch boundaries 0/1/40/41/80/130 items, separators, stagger animation, filter reset, keyboard nav, Load remaining button)
+
 ### Home Feed Right Sidebar
 - **5453 tests, 313 suites** — zero failures, zero skipped
 - **Desktop 2-column layout**: Feed mode renders sticky right sidebar (`w-[280px]`, `sticky top-4`) alongside content column — mobile stays single-column with metrics inline
