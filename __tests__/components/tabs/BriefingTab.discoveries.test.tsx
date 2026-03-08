@@ -6,6 +6,7 @@ import type { SerendipityItem } from "@/lib/filtering/serendipity";
 
 jest.mock("@/components/ui/ContentCard", () => ({
   ContentCard: () => <div data-testid="content-card" />,
+  YouTubePreview: () => null,
 }));
 
 jest.mock("@/components/ui/ShareBriefingModal", () => ({

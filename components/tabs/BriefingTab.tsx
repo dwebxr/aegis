@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { typography } from "@/lib/design";
-import { ContentCard } from "@/components/ui/ContentCard";
+import { ContentCard, YouTubePreview } from "@/components/ui/ContentCard";
 import { ShareBriefingModal } from "@/components/ui/ShareBriefingModal";
 import { ShareIcon } from "@/components/icons";
 import { generateBriefing } from "@/lib/briefing/ranker";
@@ -287,6 +287,8 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 <p className={cn("text-purple-300 leading-body m-0 break-words", mobile ? "text-[13px]" : "text-body")}>
                   {d.item.text}
                 </p>
+
+                <YouTubePreview sourceUrl={d.item.sourceUrl} />
 
                 <div className="mt-2 text-caption text-purple-400 italic">{d.reason}</div>
 

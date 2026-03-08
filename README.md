@@ -9,6 +9,14 @@
 
 ## Latest Updates (March 2026)
 
+### YouTube Preview in Feed & Briefing
+- **5412 tests, 312 suites** — zero failures, zero skipped
+- **YouTube click-to-play preview**: `YouTubePreview` component renders thumbnail from `img.youtube.com` with play button overlay; clicking replaces thumbnail with autoplay iframe — avoids eager iframe loading for performance
+- **ContentCard integration**: YouTube preview appears below text in all card variants (default, priority, serendipity) across Home Feed list view, Briefing, and Discoveries
+- **CSP `frame-src` fix**: Added `frame-src https://www.youtube.com` to Content-Security-Policy — resolves iframe blocking for both new previews and existing DashboardCard embeds
+- **URL pattern support**: watch, youtu.be, shorts, embed, live via existing `extractYouTubeVideoId` utility
+- **stopPropagation**: Clicking the preview does not toggle the parent card expand/collapse
+
 ### Security Hardening & Production Cleanup
 - **5386 tests, 310 suites** — zero failures, zero skipped
 - **D2A sender pubkey verification**: `handleIncomingMessage` now cross-checks `fromPubkey` in encrypted payload against Nostr event sender — rejects spoofed payloads
