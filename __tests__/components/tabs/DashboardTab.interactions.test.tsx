@@ -206,6 +206,7 @@ describe("DashboardTab — Show all + filter interaction", () => {
     expect(getCardIds()).toHaveLength(8);
 
     // Change filter → should reset showAllContent and show <= 5
+    fireEvent.click(screen.getByTestId("aegis-filter-bookmarked"));
     fireEvent.click(screen.getByTestId("aegis-filter-quality"));
     expect(getCardIds().length).toBeLessThanOrEqual(5);
   });
@@ -390,19 +391,19 @@ describe("DashboardTab — Validated timestamp badge", () => {
 describe("DashboardTab — Filter count", () => {
   it("shows count when active filter is applied", () => {
     const items = [
-      makeItem({ verdict: "quality" }),
-      makeItem({ verdict: "quality" }),
+      makeItem({ validated: true }),
+      makeItem({ validated: true }),
     ];
     render(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    fireEvent.click(screen.getByTestId("aegis-filter-quality"));
+    fireEvent.click(screen.getByTestId("aegis-filter-validated"));
     const count = screen.queryByTestId("aegis-filter-count");
     expect(count).toBeTruthy();
     expect(count!.textContent).toContain("2");
   });
 
-  it("does not show count with default 'all' filter and 'all' source", () => {
+  it("does not show count with default quality filter", () => {
     render(
       <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );

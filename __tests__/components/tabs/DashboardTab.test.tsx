@@ -78,12 +78,12 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 }
 
 describe("DashboardTab — empty state", () => {
-  it("shows 'No matching content' when empty with active quality filter", () => {
+  it("shows 'No matching content' when empty with active non-default filter", () => {
     const { container } = render(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    // Switch to Quality filter so hasActiveFilter is true
-    fireEvent.click(screen.getByTestId("aegis-filter-quality"));
+    // Switch to Validated filter so hasActiveFilter is true
+    fireEvent.click(screen.getByTestId("aegis-filter-validated"));
     expect(container.textContent).toContain("No matching content");
     expect(container.textContent).toContain("Try adjusting your filters");
   });

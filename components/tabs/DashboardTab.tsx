@@ -243,7 +243,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const { sources } = useSources();
   const { isDemoMode } = useDemo();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>("all");
+  const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>("quality");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const moreFiltersRef = useRef<HTMLDivElement>(null);
@@ -330,7 +330,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   // Auto-reveal: sections expand when scrolled into view, remember manual collapses
   const { isExpanded: isSectionExpanded, toggle: toggleSection, observeRef: sectionRef } = useAutoReveal();
 
-  const hasActiveFilter = verdictFilter !== "all" || sourceFilter !== "all";
+  const hasActiveFilter = (verdictFilter !== "all" && verdictFilter !== "quality") || sourceFilter !== "all";
   const moreFiltersActive = verdictFilter === "slop" || sourceFilter !== "all";
 
   const agentContext = useMemo(() => {
