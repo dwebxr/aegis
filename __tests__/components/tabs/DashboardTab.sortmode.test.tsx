@@ -112,8 +112,8 @@ describe("DashboardTab — Latest Feed Behavior", () => {
     render(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(screen.queryByText(/Quality item alpha/)).toBeTruthy();
-    expect(screen.queryByText(/Slop item beta/)).toBeNull();
+    expect(getCardIds()).toContain("q1");
+    expect(getCardIds()).not.toContain("s1");
   });
 
   it("shows items in chronological order (newest first), not by score", () => {
@@ -154,8 +154,8 @@ describe("DashboardTab — Latest Feed Behavior", () => {
     );
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
     fireEvent.click(screen.getByTestId("aegis-filter-slop"));
-    expect(screen.queryByText(/Quality xxx/)).toBeNull();
-    expect(screen.queryByText(/Slop yyy/)).toBeTruthy();
+    expect(getCardIds()).not.toContain("q1");
+    expect(getCardIds()).toContain("s1");
   });
 
   it("Validated filter shows only validated items with timestamp badge", () => {
@@ -167,8 +167,8 @@ describe("DashboardTab — Latest Feed Behavior", () => {
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     fireEvent.click(screen.getByTestId("aegis-filter-validated"));
-    expect(screen.queryByText(/Validated item zzz/)).toBeTruthy();
-    expect(screen.queryByText(/Not validated www/)).toBeNull();
+    expect(getCardIds()).toContain("v1");
+    expect(getCardIds()).not.toContain("nv1");
     const badges = document.querySelectorAll(".text-caption.text-purple-400.font-mono.font-semibold");
     const badge = Array.from(badges).find(el => el.textContent?.includes("Validated"));
     expect(badge).toBeTruthy();
@@ -184,8 +184,8 @@ describe("DashboardTab — Latest Feed Behavior", () => {
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     fireEvent.click(screen.getByTestId("aegis-filter-bookmarked"));
-    expect(screen.queryByText(/Bookmarked content ppp/)).toBeTruthy();
-    expect(screen.queryByText(/Not bookmarked qqq/)).toBeNull();
+    expect(getCardIds()).toContain("bk1");
+    expect(getCardIds()).not.toContain("bk2");
   });
 
   it("source filter works", () => {
@@ -199,8 +199,8 @@ describe("DashboardTab — Latest Feed Behavior", () => {
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
     const panel = screen.getByTestId("aegis-filter-more-panel");
     fireEvent.click(within(panel).getByText("nostr"));
-    expect(screen.queryByText(/RSS content mmm/)).toBeNull();
-    expect(screen.queryByText(/Nostr content nnn/)).toBeTruthy();
+    expect(getCardIds()).not.toContain("sr1");
+    expect(getCardIds()).toContain("sn1");
   });
 });
 

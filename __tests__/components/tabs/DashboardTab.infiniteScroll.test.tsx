@@ -324,10 +324,8 @@ describe("DashboardTab — Sentinel element", () => {
     render(<DashboardTab content={items} onValidate={noop} onFlag={noop} />);
     // No Load remaining button = no sentinel
     expect(screen.queryByTestId("aegis-load-remaining")).toBeNull();
-    // No sentinel div (h-1) in the dashboard at all
-    const dashboard = screen.getByTestId("aegis-dashboard");
-    const sentinels = dashboard.querySelectorAll(".h-1");
-    expect(sentinels).toHaveLength(0);
+    // No sentinel div in the dashboard
+    expect(screen.queryByTestId("aegis-scroll-sentinel")).toBeNull();
   });
 });
 

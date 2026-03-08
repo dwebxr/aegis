@@ -184,10 +184,15 @@ function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookm
   );
 }
 
-function AgentKnowledgePills({ agentContext, profile }: {
-  agentContext: { highAffinityTopics: string[]; trustedAuthors: string[] };
+function AgentKnowledgePills({ agentContext, profile, recentActions }: {
+  agentContext: { highAffinityTopics: string[]; trustedAuthors: string[]; recentTopics: string[] };
   profile: { calibration: { qualityThreshold: number }; totalValidated: number; totalFlagged: number };
+  recentActions?: ContentItem[];
 }) {
+  const totalReviews = profile.totalValidated + profile.totalFlagged;
+  const nextMilestone = totalReviews < 10 ? 10 : totalReviews < 25 ? 25 : totalReviews < 50 ? 50 : totalReviews < 100 ? 100 : Math.ceil((totalReviews + 1) / 50) * 50;
+  const remaining = nextMilestone - totalReviews;
+
   return (
     <>
       <div className="flex flex-wrap gap-2">
@@ -217,8 +222,21 @@ function AgentKnowledgePills({ agentContext, profile }: {
           </span>
         )}
       </div>
+      {recentActions && recentActions.length > 0 && (
+        <div className="mt-2 flex flex-col gap-1">
+          <span className="text-tiny text-disabled">Recent learning:</span>
+          {recentActions.slice(0, 2).map(a => (
+            <div key={a.id} className="text-tiny text-muted-foreground truncate">
+              {a.validated ? "\u2713" : "\u2717"} {a.topics?.[0] ?? a.author ?? "item"} &middot; {a.author !== "You" ? a.author : ""}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="text-tiny text-disabled mt-2">
-        Threshold: {profile.calibration.qualityThreshold.toFixed(1)} &middot; Reviews: {profile.totalValidated + profile.totalFlagged}
+        Threshold: {profile.calibration.qualityThreshold.toFixed(1)} &middot; Reviews: {totalReviews}
+        {remaining > 0 && remaining <= 10 && (
+          <span className="text-purple-400"> &middot; {remaining} more to next milestone</span>
+        )}
       </div>
     </>
   );
@@ -277,14 +295,20 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     try { localStorage.setItem("aegis-home-mode", homeMode); } catch (e) { console.debug("[dashboard] localStorage write failed:", e); }
   }, [homeMode]);
 
-  const { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop } = useMemo(() => {
+  const { todayContent, todayQual, todaySlop, yesterdayQual, yesterdaySlop, yesterdayEval, yesterdaySources, uniqueSources, availableSources, dailyQuality, dailySlop, streak } = useMemo(() => {
     const now = Date.now();
     const dayMs = 86400000;
     const todayStart = now - dayMs;
+    const yesterdayStart = now - 2 * dayMs;
 
     const todayContent = content.filter(c => c.createdAt >= todayStart);
     const todayQual = todayContent.filter(c => c.verdict === "quality");
     const todaySlop = todayContent.filter(c => c.verdict === "slop");
+    const yesterdayContent = content.filter(c => c.createdAt >= yesterdayStart && c.createdAt < todayStart);
+    const yesterdayQual = yesterdayContent.filter(c => c.verdict === "quality").length;
+    const yesterdaySlop = yesterdayContent.filter(c => c.verdict === "slop").length;
+    const yesterdayEval = yesterdayContent.length;
+    const yesterdaySources = new Set(yesterdayContent.map(c => c.source)).size;
     const uniqueSources = new Set(content.map(c => c.source));
     const availableSources = Array.from(uniqueSources).sort();
 
@@ -299,7 +323,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       dailyQuality.push(dayTotal > 0 ? Math.round((dayQual / dayTotal) * 100) : 0);
       dailySlop.push(dayItems.filter(c => c.verdict === "slop").length);
     }
-    return { todayContent, todayQual, todaySlop, uniqueSources, availableSources, dailyQuality, dailySlop };
+
+    // Reading streak: count consecutive days with at least 1 evaluated item
+    let streak = todayContent.length > 0 ? 1 : 0;
+    for (let d = 1; d <= 30; d++) {
+      const dStart = now - (d + 1) * dayMs;
+      const dEnd = now - d * dayMs;
+      const hasItems = content.some(c => c.createdAt >= dStart && c.createdAt < dEnd);
+      if (hasItems) streak++;
+      else break;
+    }
+
+    return { todayContent, todayQual, todaySlop, yesterdayQual, yesterdaySlop, yesterdayEval, yesterdaySources, uniqueSources, availableSources, dailyQuality, dailySlop, streak };
   }, [content]);
 
   useEffect(() => {
@@ -346,29 +381,67 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   const topSources = useMemo(() => {
     if (!showSidebar) return [];
-    const counts = new Map<string, number>();
+    const stats = new Map<string, { total: number; quality: number }>();
     for (const c of content) {
       const src = c.platform || c.source;
-      counts.set(src, (counts.get(src) || 0) + 1);
+      const s = stats.get(src) ?? { total: 0, quality: 0 };
+      s.total++;
+      if (c.verdict === "quality") s.quality++;
+      stats.set(src, s);
     }
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
+    return Array.from(stats.entries())
+      .map(([src, s]) => ({ src, count: s.total, qualityRate: s.total > 0 ? s.quality / s.total : 0 }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
   }, [content, showSidebar]);
 
+  const topTopicsRef = useRef<Map<string, number>>(new Map());
   const topTopics = useMemo(() => {
     if (!showSidebar) return [];
-    return Object.entries(profile.topicAffinities)
+    const prev = topTopicsRef.current;
+    const entries = Object.entries(profile.topicAffinities)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
+      .slice(0, 5)
+      .map(([topic, score]) => {
+        const prevScore = prev.get(topic);
+        const isNew = prevScore === undefined && score >= 0.3;
+        const direction: "up" | "down" | "stable" =
+          prevScore === undefined ? "stable" :
+          score - prevScore > 0.05 ? "up" :
+          score - prevScore < -0.05 ? "down" : "stable";
+        return { topic, score, direction, isNew };
+      });
+    topTopicsRef.current = new Map(Object.entries(profile.topicAffinities));
+    return entries;
   }, [profile.topicAffinities, showSidebar]);
 
   const metricsItems = [
-    { icon: "\u{1F6E1}", value: todayQual.length, label: "quality", colorClass: "text-cyan-400" },
-    { icon: "\u{1F525}", value: todaySlop.length, label: "burned", colorClass: "text-orange-400" },
-    { icon: "\u26A1", value: todayContent.length, label: "eval", colorClass: "text-purple-400" },
-    { icon: "\u{1F4E1}", value: uniqueSources.size, label: "sources", colorClass: "text-sky-400" },
+    { icon: "\u{1F6E1}", value: todayQual.length, delta: todayQual.length - yesterdayQual, label: "quality", colorClass: "text-cyan-400" },
+    { icon: "\u{1F525}", value: todaySlop.length, delta: todaySlop.length - yesterdaySlop, label: "burned", colorClass: "text-orange-400" },
+    { icon: "\u26A1", value: todayContent.length, delta: todayContent.length - yesterdayEval, label: "eval", colorClass: "text-purple-400" },
+    { icon: "\u{1F4E1}", value: uniqueSources.size, delta: uniqueSources.size - yesterdaySources, label: "sources", colorClass: "text-sky-400" },
   ];
+
+  const sidebarUnreviewed = useMemo(() => {
+    if (!showSidebar) return [];
+    return computeUnreviewedQueue(content, new Set()).slice(0, 3);
+  }, [content, showSidebar]);
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = localStorage.getItem("aegis-sidebar-collapsed");
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
+
+  const toggleSidebarSection = useCallback((key: string) => {
+    setSidebarCollapsed(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem("aegis-sidebar-collapsed", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   // Dashboard computations: skipped in Feed mode, computed only when homeMode === "dashboard".
   const contentRef = useRef(content);
@@ -493,6 +566,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     enabled: !mobile && homeMode === "feed",
   });
 
+  const recentLearningActions = useMemo(() =>
+    content
+      .filter(c => c.validated || c.flagged)
+      .sort((a, b) => (b.validatedAt ?? b.createdAt) - (a.validatedAt ?? a.createdAt))
+      .slice(0, 2),
+    [content],
+  );
+
   const agentKnowsCard = agentContext && (
     <div
       className={cn(
@@ -505,7 +586,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       <div className="text-body-sm font-semibold text-tertiary mb-2">
         Your Agent Knows
       </div>
-      <AgentKnowledgePills agentContext={agentContext} profile={profile} />
+      <AgentKnowledgePills agentContext={agentContext} profile={profile} recentActions={recentLearningActions} />
     </div>
   );
 
@@ -764,7 +845,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     </div>
                   </React.Fragment>
                 ))}
-                {hasMore && <div ref={sentinelRef} className="h-1" />}
+                {hasMore && <div ref={sentinelRef} data-testid="aegis-scroll-sentinel" className="h-1" />}
                 {hasMore && (
                   <button
                     data-testid="aegis-load-remaining"
@@ -801,7 +882,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
           {/* ── Right sidebar — desktop only ── */}
           {showSidebar && (
-            <aside data-testid="aegis-feed-sidebar" className="w-[280px] shrink-0 sticky top-4 self-start flex flex-col gap-3">
+            <aside data-testid="aegis-feed-sidebar" className="w-[280px] shrink-0 sticky top-4 self-start flex flex-col gap-3 max-h-[calc(100vh-2rem)] overflow-y-auto scrollbar-none">
+              {/* ── Metrics bar ── */}
               <div data-testid="aegis-metrics-bar" className="px-4 py-3 bg-card border border-border rounded-md">
                 <div className="flex flex-col gap-2">
                   {metricsItems.map(m => (
@@ -809,6 +891,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                       <span>{m.icon}</span>
                       <span className={cn("font-bold font-mono", m.colorClass)}>{m.value}</span>
                       <span>{m.label}</span>
+                      {m.delta !== 0 && (
+                        <span className={cn("text-tiny font-mono", m.delta > 0 ? "text-emerald-400" : "text-red-400")}>
+                          {m.delta > 0 ? "+" : ""}{m.delta}
+                        </span>
+                      )}
                     </span>
                   ))}
                 </div>
@@ -830,44 +917,205 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                     </span>
                   </div>
                 </div>
+                {dailyQuality[dailyQuality.length - 1] >= 70 && todayContent.length >= 5 && (
+                  <div className="text-tiny text-emerald-400 mt-2 text-center font-semibold">
+                    High quality day!
+                  </div>
+                )}
               </div>
 
+              {/* ── Reading Streak ── */}
+              {streak > 0 && (
+                <div className="px-4 py-3 bg-card border border-border rounded-md">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-body-sm font-semibold text-tertiary">Reading Streak</span>
+                    <span className="text-body-sm font-bold text-orange-400 font-mono">{streak}d</span>
+                  </div>
+                  <div className="flex gap-0.5">
+                    {Array.from({ length: 7 }, (_, i) => {
+                      const active = i < Math.min(streak, 7);
+                      return (
+                        <div
+                          key={i}
+                          className={cn(
+                            "h-1.5 flex-1 rounded-full transition-all",
+                            active ? "bg-orange-400" : "bg-border"
+                          )}
+                        />
+                      );
+                    })}
+                  </div>
+                  {todayContent.length === 0 && (
+                    <div className="text-tiny text-orange-400/70 mt-1.5 text-center">
+                      Evaluate content today to keep your streak!
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Unreviewed Queue ── */}
+              {!sidebarCollapsed["unreviewed"] && sidebarUnreviewed.length > 0 && (
+                <div className="px-4 py-3 bg-card border border-border rounded-md">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-body-sm font-semibold text-tertiary">Needs Review</span>
+                    <button
+                      onClick={() => toggleSidebarSection("unreviewed")}
+                      className="text-tiny text-disabled bg-transparent border-none cursor-pointer font-[inherit]"
+                    >&#x25BC;</button>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {sidebarUnreviewed.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          const el = document.querySelector(`[data-content-id="${item.id}"]`);
+                          if (el) {
+                            el.scrollIntoView({ behavior: "smooth", block: "center" });
+                            setExpanded(item.id);
+                          }
+                        }}
+                        className="flex flex-col gap-0.5 text-left bg-transparent border-none cursor-pointer font-[inherit] p-0 group"
+                      >
+                        <div className="text-caption text-secondary-foreground font-medium truncate group-hover:text-cyan-400 transition-fast">
+                          {item.text.slice(0, 60)}{item.text.length > 60 ? "..." : ""}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-tiny text-disabled">
+                          <span>{item.source}</span>
+                          <span className="font-mono text-cyan-400">{item.scores.composite.toFixed(1)}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {sidebarCollapsed["unreviewed"] && sidebarUnreviewed.length > 0 && (
+                <button
+                  onClick={() => toggleSidebarSection("unreviewed")}
+                  className="px-4 py-2 bg-card border border-border rounded-md text-body-sm font-semibold text-tertiary flex items-center justify-between cursor-pointer font-[inherit]"
+                >
+                  <span>Needs Review</span>
+                  <span className="flex items-center gap-1">
+                    <span className="text-caption text-muted-foreground bg-navy-lighter px-2 py-0.5 rounded-sm">{sidebarUnreviewed.length}</span>
+                    <span className="text-tiny text-disabled">&#x25B6;</span>
+                  </span>
+                </button>
+              )}
+
+              {/* ── Agent Knowledge ── */}
               {agentKnowsCard}
 
-              {topSources.length > 0 && (
+              {/* ── Top Sources (interactive) ── */}
+              {topSources.length > 0 && !sidebarCollapsed["sources"] && (
                 <div className="px-4 py-3 bg-card border border-border rounded-md">
-                  <div className="text-body-sm font-semibold text-tertiary mb-2">
-                    Top Sources
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-body-sm font-semibold text-tertiary">Top Sources</span>
+                    <button
+                      onClick={() => toggleSidebarSection("sources")}
+                      className="text-tiny text-disabled bg-transparent border-none cursor-pointer font-[inherit]"
+                    >&#x25BC;</button>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {topSources.map((s, i) => (
+                      <button
+                        key={s.src}
+                        onClick={() => setSourceFilter(sourceFilter === s.src ? "all" : s.src)}
+                        className={cn(
+                          "flex items-center gap-2 text-body-sm bg-transparent border-none cursor-pointer font-[inherit] p-0 text-left group transition-fast",
+                          sourceFilter === s.src && "text-cyan-400"
+                        )}
+                      >
+                        <span className="text-tiny text-disabled font-mono w-4 text-right">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className={cn(
+                            "font-medium truncate transition-fast",
+                            sourceFilter === s.src ? "text-cyan-400" : "text-secondary-foreground group-hover:text-cyan-400"
+                          )}>
+                            {s.src}
+                          </div>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-400/60 rounded-full"
+                                style={{ width: `${Math.round(s.qualityRate * 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-tiny text-disabled font-mono">{Math.round(s.qualityRate * 100)}%</span>
+                          </div>
+                        </div>
+                        <span className="text-tiny text-disabled font-mono">{s.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {sourceFilter !== "all" && (
+                    <button
+                      onClick={() => setSourceFilter("all")}
+                      className="mt-2 text-caption text-cyan-400 bg-transparent border-none cursor-pointer font-[inherit] font-semibold"
+                    >
+                      Clear filter
+                    </button>
+                  )}
+                </div>
+              )}
+              {topSources.length > 0 && sidebarCollapsed["sources"] && (
+                <button
+                  onClick={() => toggleSidebarSection("sources")}
+                  className="px-4 py-2 bg-card border border-border rounded-md text-body-sm font-semibold text-tertiary flex items-center justify-between cursor-pointer font-[inherit]"
+                >
+                  <span>Top Sources</span>
+                  <span className="text-tiny text-disabled">&#x25B6;</span>
+                </button>
+              )}
+
+              {/* ── Top Topics (with trends) ── */}
+              {topTopics.length > 0 && !sidebarCollapsed["topics"] && (
+                <div className="px-4 py-3 bg-card border border-border rounded-md">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-body-sm font-semibold text-tertiary">Top Topics</span>
+                    <button
+                      onClick={() => toggleSidebarSection("topics")}
+                      className="text-tiny text-disabled bg-transparent border-none cursor-pointer font-[inherit]"
+                    >&#x25BC;</button>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    {topSources.map(([src, count], i) => (
-                      <div key={src} className="flex items-center gap-2 text-body-sm">
+                    {topTopics.map((t, i) => (
+                      <button
+                        key={t.topic}
+                        onClick={() => setSourceFilter("all")}
+                        className="flex items-center gap-2 text-body-sm bg-transparent border-none cursor-pointer font-[inherit] p-0 text-left group"
+                      >
                         <span className="text-tiny text-disabled font-mono w-4 text-right">{i + 1}</span>
-                        <span className="text-secondary-foreground font-medium truncate flex-1">{src}</span>
-                        <span className="text-tiny text-disabled font-mono">{count}</span>
-                      </div>
+                        <span className="text-cyan-400 font-medium truncate flex-1 group-hover:text-cyan-300 transition-fast">
+                          {t.topic}
+                          {t.isNew && (
+                            <span className="ml-1 text-tiny px-1.5 py-px bg-purple-500/[0.15] border border-purple-500/20 rounded-full text-purple-400 font-bold">
+                              NEW
+                            </span>
+                          )}
+                        </span>
+                        <span className={cn(
+                          "text-tiny font-mono",
+                          t.direction === "up" ? "text-emerald-400" :
+                          t.direction === "down" ? "text-red-400" :
+                          "text-disabled"
+                        )}>
+                          {t.direction === "up" ? "\u2191" : t.direction === "down" ? "\u2193" : ""}{t.score.toFixed(1)}
+                        </span>
+                      </button>
                     ))}
                   </div>
                 </div>
               )}
-
-              {topTopics.length > 0 && (
-                <div className="px-4 py-3 bg-card border border-border rounded-md">
-                  <div className="text-body-sm font-semibold text-tertiary mb-2">
-                    Top Topics
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    {topTopics.map(([topic, score], i) => (
-                      <div key={topic} className="flex items-center gap-2 text-body-sm">
-                        <span className="text-tiny text-disabled font-mono w-4 text-right">{i + 1}</span>
-                        <span className="text-cyan-400 font-medium truncate flex-1">{topic}</span>
-                        <span className="text-tiny text-disabled font-mono">{score.toFixed(1)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {topTopics.length > 0 && sidebarCollapsed["topics"] && (
+                <button
+                  onClick={() => toggleSidebarSection("topics")}
+                  className="px-4 py-2 bg-card border border-border rounded-md text-body-sm font-semibold text-tertiary flex items-center justify-between cursor-pointer font-[inherit]"
+                >
+                  <span>Top Topics</span>
+                  <span className="text-tiny text-disabled">&#x25B6;</span>
+                </button>
               )}
 
+              {/* ── Chrome Extension CTA ── */}
               <a
                 href={CHROME_CTA_URL}
                 target="_blank"

@@ -128,8 +128,8 @@ describe("DashboardTab — CommandPalette commands", () => {
     // Use More filters dropdown instead (palette may need keyboard focus)
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
     fireEvent.click(screen.getByTestId("aegis-filter-slop"));
-    expect(screen.queryByText(/Quality article aaa/)).toBeNull();
-    expect(screen.queryByText(/Slop article bbb/)).toBeTruthy();
+    expect(getCardIds()).not.toContain("q1");
+    expect(getCardIds()).toContain("s1");
   });
 
   it("Filter: Validated command activates validated filter", () => {
@@ -141,8 +141,8 @@ describe("DashboardTab — CommandPalette commands", () => {
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     fireEvent.click(screen.getByTestId("aegis-filter-validated"));
-    expect(screen.queryByText(/Validated aaa/)).toBeTruthy();
-    expect(screen.queryByText(/Not validated bbb/)).toBeNull();
+    expect(getCardIds()).toContain("v1");
+    expect(getCardIds()).not.toContain("nv1");
   });
 });
 

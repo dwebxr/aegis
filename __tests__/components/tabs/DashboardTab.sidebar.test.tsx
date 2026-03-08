@@ -310,12 +310,14 @@ describe("DashboardTab — Top Sources", () => {
 // ─── Top Topics ───
 
 describe("DashboardTab — Top Topics", () => {
-  it("shows top 3 topics ranked by affinity score", () => {
+  it("shows top 5 topics ranked by affinity score", () => {
     mockProfile.topicAffinities = {
       "AI": 0.9,
       "Crypto": 0.7,
       "Politics": 0.5,
       "Sports": 0.3,
+      "Music": 0.2,
+      "Film": 0.1,
     };
     render(
       <DashboardTab content={[makeItem()]} onValidate={noop} onFlag={noop} mobile={false} />
@@ -325,8 +327,10 @@ describe("DashboardTab — Top Topics", () => {
     expect(sidebar.textContent).toContain("AI");
     expect(sidebar.textContent).toContain("Crypto");
     expect(sidebar.textContent).toContain("Politics");
-    // Sports (0.3) should not appear — only top 3
-    expect(sidebar.textContent).not.toContain("Sports");
+    expect(sidebar.textContent).toContain("Sports");
+    expect(sidebar.textContent).toContain("Music");
+    // Film (0.1) should not appear — only top 5
+    expect(sidebar.textContent).not.toContain("Film");
   });
 
   it("shows affinity scores next to topic names", () => {
