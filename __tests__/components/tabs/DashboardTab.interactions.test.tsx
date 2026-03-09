@@ -4,6 +4,7 @@
  * Integration tests for DashboardTab UI interactions — CommandPalette, filter resets,
  * click-outside, demo mode, infinite scroll + filter, pending flush.
  */
+import "@testing-library/jest-dom";
 
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -114,7 +115,7 @@ describe("DashboardTab — CommandPalette commands", () => {
     fireEvent.keyDown(document, { key: "k", metaKey: true });
     const palette = document.querySelector('[role="dialog"]') ?? document.querySelector('[data-testid="command-palette"]');
     // Palette should be in the DOM (it renders when paletteOpen is true)
-    expect(palette || screen.queryByText("Filter: Quality")).toBeTruthy();
+    expect(palette || screen.queryByText("Filter: Quality")).toBeInTheDocument();
   });
 
   it("Filter: Slop command activates slop filter", () => {
@@ -154,7 +155,7 @@ describe("DashboardTab — More Filters dropdown", () => {
       <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
-    expect(screen.getByTestId("aegis-filter-more-panel")).toBeTruthy();
+    expect(screen.getByTestId("aegis-filter-more-panel")).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByTestId("aegis-filter-more-panel")).toBeNull();
@@ -165,7 +166,7 @@ describe("DashboardTab — More Filters dropdown", () => {
       <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
-    expect(screen.getByTestId("aegis-filter-more-panel")).toBeTruthy();
+    expect(screen.getByTestId("aegis-filter-more-panel")).toBeInTheDocument();
 
     // Click on the dashboard container (outside the dropdown)
     fireEvent.mouseDown(screen.getByTestId("aegis-dashboard"));
@@ -269,7 +270,7 @@ describe("DashboardTab — NewItemsBar", () => {
       />
     );
     const bar = screen.queryByText(/3 new/i) ?? screen.queryByText(/new items/i);
-    expect(bar).toBeTruthy();
+    expect(bar).toBeInTheDocument();
   });
 
   it("does not render when pendingCount is 0", () => {
@@ -297,7 +298,7 @@ describe("DashboardTab — Loading state", () => {
         isLoading={true}
       />
     );
-    expect(screen.getByText(/Loading content/)).toBeTruthy();
+    expect(screen.getByText(/Loading content/)).toBeInTheDocument();
   });
 
   it("does not show loading when isLoading=false", () => {
@@ -367,7 +368,7 @@ describe("DashboardTab — Validated timestamp badge", () => {
     fireEvent.click(screen.getByTestId("aegis-filter-validated"));
     const badges = document.querySelectorAll(".text-caption.text-purple-400.font-mono.font-semibold");
     const badge = Array.from(badges).find(el => el.textContent?.includes("Validated"));
-    expect(badge).toBeTruthy();
+    expect(badge).toBeInTheDocument();
     // Should contain a date string
     expect(badge!.textContent).toMatch(/\w+ \d+/); // "Mar 1" etc.
   });
@@ -399,7 +400,7 @@ describe("DashboardTab — Filter count", () => {
     );
     fireEvent.click(screen.getByTestId("aegis-filter-validated"));
     const count = screen.queryByTestId("aegis-filter-count");
-    expect(count).toBeTruthy();
+    expect(count).toBeInTheDocument();
     expect(count!.textContent).toContain("2");
   });
 
@@ -418,7 +419,7 @@ describe("DashboardTab — Keyboard shortcut hint", () => {
     render(
       <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} mobile={false} />
     );
-    expect(screen.getByText(/J\/K/)).toBeTruthy();
+    expect(screen.getByText(/J\/K/)).toBeInTheDocument();
   });
 
   it("hides keyboard hint on mobile", () => {

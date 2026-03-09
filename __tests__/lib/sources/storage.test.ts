@@ -86,7 +86,8 @@ describe("sources/storage", () => {
     it("persists data to localStorage", () => {
       saveSources("p-1", [makeFakeSource({ label: "Saved!" })]);
       const raw = localStorage.getItem("aegis_sources_p-1");
-      expect(raw).toBeTruthy();
+      expect(typeof raw).toBe("string");
+      expect(raw!.length).toBeGreaterThan(0);
       const parsed = JSON.parse(raw!);
       expect(parsed[0].label).toBe("Saved!");
     });

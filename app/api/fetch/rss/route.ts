@@ -7,7 +7,7 @@ import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
 export const maxDuration = 30;
 
 function feedErrorResponse(err: unknown, feedUrl: string, context: string): NextResponse {
-  console.error(`[fetch/rss] ${context}:`, feedUrl, err);
+  console.error(`[fetch/rss] ${context}:`, feedUrl, errMsg(err));
   const msg = errMsg(err);
   if (msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
     return NextResponse.json({ error: "Could not reach this feed. Check the URL and try again." }, { status: 502 });
@@ -112,12 +112,14 @@ export async function POST(request: NextRequest) {
     const xml = await res.text();
     const feed = await parser.parseString(xml);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       feedTitle: feed.title || feedUrl,
       etag: res.headers.get("etag") || undefined,
       lastModified: res.headers.get("last-modified") || undefined,
       items: buildItems(feed, limit),
     });
+    response.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=60");
+    return response;
   } catch (err: unknown) {
     return feedErrorResponse(err, feedUrl, "Fetch/parse failed");
   }
@@ -126,7 +128,7 @@ export async function POST(request: NextRequest) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- rss-parser Output type uses `any` for media extensions
 function buildItems(feed: Parser.Output<any>, limit: number) {
   return (feed.items || []).slice(0, Math.min(limit, 50)).map(item => {
-    const raw = item as unknown as Record<string, unknown>;
+    const raw = item as Record<string, unknown>;
     const contentEncoded = typeof raw["content:encoded"] === "string" ? raw["content:encoded"] : "";
     const rawContent: string = contentEncoded || item.content || item.contentSnippet || item.summary || "";
     const textContent = rawContent.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();

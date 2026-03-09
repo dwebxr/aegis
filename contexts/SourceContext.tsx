@@ -166,7 +166,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         if (cancelled) return;
         if (handleICSessionError(err)) return;
-        console.error("[sources] IC query failed:", errMsg(err), err);
+        console.error("[sources] IC query failed:", errMsg(err));
         setSyncStatus("error");
         setSyncError(errMsg(err));
         addNotification(`IC sync unavailable — ${errMsgShort(err)}`, "error");
@@ -349,7 +349,7 @@ function savedToIC(s: SavedSource, owner: import("@dfinity/principal").Principal
 function icToSaved(ic: SourceConfigEntry): SavedSource | null {
   let parsed: Record<string, unknown>;
   try { parsed = JSON.parse(ic.configJson); } catch (err) {
-    console.warn(`[sources] Corrupted configJson for source ${ic.id}, skipping:`, err);
+    console.warn(`[sources] Corrupted configJson for source ${ic.id}, skipping:`, errMsg(err));
     return null;
   }
   if (ic.sourceType !== "rss" && ic.sourceType !== "nostr" && ic.sourceType !== "farcaster") {

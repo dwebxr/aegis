@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 // Polyfill TextEncoder for react-dom/server in jsdom environment
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -40,8 +41,8 @@ jest.mock("@/components/filtering/FilterModeSelector", () => ({
 
 jest.mock("@/lib/apiKey/storage", () => ({
   getUserApiKey: () => mockStoredKey,
-  setUserApiKey: (key: string) => { mockStoredKey = key; },
-  clearUserApiKey: () => { mockStoredKey = null; },
+  setUserApiKey: (key: string) => { mockStoredKey = key; return true; },
+  clearUserApiKey: () => { mockStoredKey = null; return true; },
   maskApiKey: (key: string) => key.length <= 12 ? key : `${key.slice(0, 7)}...${key.slice(-4)}`,
 }));
 
@@ -82,7 +83,7 @@ beforeEach(() => {
 describe("FeedSection — Filter Mode", () => {
   it("renders FilterModeSelector", () => {
     render(<FeedSection />);
-    expect(screen.getByTestId("filter-mode-selector")).toBeTruthy();
+    expect(screen.getByTestId("filter-mode-selector")).toBeInTheDocument();
   });
 
   it("shows engine status indicators", () => {
@@ -160,9 +161,9 @@ describe("FeedSection — AI Scoring (BYOK)", () => {
     mockStoredKey = "sk-ant-api03-testkey";
     render(<FeedSection />);
     fireEvent.click(screen.getByText("Clear"));
-    expect(screen.getByText("Remove key?")).toBeTruthy();
-    expect(screen.getByText("Confirm")).toBeTruthy();
-    expect(screen.getByText("Cancel")).toBeTruthy();
+    expect(screen.getByText("Remove key?")).toBeInTheDocument();
+    expect(screen.getByText("Confirm")).toBeInTheDocument();
+    expect(screen.getByText("Cancel")).toBeInTheDocument();
   });
 
   it("Clear key confirms and removes", () => {
@@ -216,8 +217,8 @@ describe("FeedSection — API key save success path", () => {
     const input = screen.getByPlaceholderText("sk-ant-...");
     fireEvent.change(input, { target: { value: "sk-ant-api03-validkey123456" } });
     fireEvent.click(screen.getByText("Save"));
-    expect(screen.getByText("API Key Set")).toBeTruthy();
-    expect(screen.getByText(/sk-ant-/)).toBeTruthy();
+    expect(screen.getByText("API Key Set")).toBeInTheDocument();
+    expect(screen.getByText(/sk-ant-/)).toBeInTheDocument();
   });
 
   it("clears input after successful save", () => {
@@ -235,10 +236,10 @@ describe("FeedSection — Clear key cancel", () => {
     mockStoredKey = "sk-ant-api03-testkey";
     render(<FeedSection />);
     fireEvent.click(screen.getByText("Clear"));
-    expect(screen.getByText("Remove key?")).toBeTruthy();
+    expect(screen.getByText("Remove key?")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Cancel"));
     // Should be back to normal state with Clear button
-    expect(screen.getByText("Clear")).toBeTruthy();
+    expect(screen.getByText("Clear")).toBeInTheDocument();
     expect(screen.queryByText("Remove key?")).toBeNull();
   });
 });
@@ -286,10 +287,10 @@ describe("FeedSection — Ollama toggle and interactions", () => {
   it("shows endpoint and model inputs when enabled", async () => {
     mockOllamaConfig = { endpoint: "http://localhost:11434", model: "llama3.1:8b", enabled: true };
     render(<FeedSection />);
-    expect(screen.getByDisplayValue("http://localhost:11434")).toBeTruthy();
-    expect(screen.getByText("Test")).toBeTruthy();
-    expect(screen.getByText("Endpoint")).toBeTruthy();
-    expect(screen.getByText("Model")).toBeTruthy();
+    expect(screen.getByDisplayValue("http://localhost:11434")).toBeInTheDocument();
+    expect(screen.getByText("Test")).toBeInTheDocument();
+    expect(screen.getByText("Endpoint")).toBeInTheDocument();
+    expect(screen.getByText("Model")).toBeInTheDocument();
   });
 
   it("changes endpoint value", () => {
@@ -371,7 +372,7 @@ describe("FeedSection — Ollama connection failure", () => {
     fireEvent.click(screen.getByTestId("aegis-settings-ollama-toggle"));
 
     await waitFor(() => {
-      expect(screen.getByText(/Connected — using/)).toBeTruthy();
+      expect(screen.getByText(/Connected — using/)).toBeInTheDocument();
     });
   });
 });

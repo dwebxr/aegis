@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 // Polyfill TextEncoder for react-dom/server in jsdom environment
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -54,7 +55,7 @@ jest.mock("@/lib/webllm/engine", () => ({
 }));
 
 jest.mock("@/lib/apiKey/storage", () => ({
-  getUserApiKey: () => null, setUserApiKey: jest.fn(), clearUserApiKey: jest.fn(),
+  getUserApiKey: () => null, setUserApiKey: jest.fn().mockReturnValue(true), clearUserApiKey: jest.fn().mockReturnValue(true),
   maskApiKey: (key: string) => key,
 }));
 
@@ -66,15 +67,15 @@ jest.mock("@/lib/ollama/storage", () => ({
 describe("SettingsTab — sub-tab click navigation", () => {
   it("defaults to General tab content on initial render", () => {
     render(<SettingsTab />);
-    expect(screen.getByText("Appearance")).toBeTruthy();
-    expect(screen.getByText("Theme")).toBeTruthy();
+    expect(screen.getByText("Appearance")).toBeInTheDocument();
+    expect(screen.getByText("Theme")).toBeInTheDocument();
   });
 
   it("switches to Agent tab on click", () => {
     render(<SettingsTab />);
     fireEvent.click(screen.getByTestId("settings-tab-agent"));
-    expect(screen.getByText("Agent Preferences")).toBeTruthy();
-    expect(screen.getByText("D2A Social Agent")).toBeTruthy();
+    expect(screen.getByText("Agent Preferences")).toBeInTheDocument();
+    expect(screen.getByText("D2A Social Agent")).toBeInTheDocument();
     // General content should be gone
     expect(screen.queryByText("Appearance")).toBeNull();
   });
@@ -82,21 +83,21 @@ describe("SettingsTab — sub-tab click navigation", () => {
   it("switches to Feeds tab on click", () => {
     render(<SettingsTab />);
     fireEvent.click(screen.getByTestId("settings-tab-feeds"));
-    expect(screen.getByText("AI Scoring")).toBeTruthy();
+    expect(screen.getByText("AI Scoring")).toBeInTheDocument();
     expect(screen.queryByText("Appearance")).toBeNull();
   });
 
   it("switches to Data tab on click", () => {
     render(<SettingsTab />);
     fireEvent.click(screen.getByTestId("settings-tab-data"));
-    expect(screen.getByText("Data Management")).toBeTruthy();
+    expect(screen.getByText("Data Management")).toBeInTheDocument();
     expect(screen.queryByText("Appearance")).toBeNull();
   });
 
   it("switches to Account tab on click", () => {
     render(<SettingsTab />);
     fireEvent.click(screen.getByTestId("settings-tab-account"));
-    expect(screen.getByText("AEGIS")).toBeTruthy();
+    expect(screen.getByText("AEGIS")).toBeInTheDocument();
     expect(screen.queryByText("Appearance")).toBeNull();
   });
 
@@ -104,10 +105,10 @@ describe("SettingsTab — sub-tab click navigation", () => {
     render(<SettingsTab />);
     // General → Agent → General
     fireEvent.click(screen.getByTestId("settings-tab-agent"));
-    expect(screen.getByText("Agent Preferences")).toBeTruthy();
+    expect(screen.getByText("Agent Preferences")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("settings-tab-general"));
-    expect(screen.getByText("Appearance")).toBeTruthy();
+    expect(screen.getByText("Appearance")).toBeInTheDocument();
     expect(screen.queryByText("Agent Preferences")).toBeNull();
   });
 });
@@ -151,18 +152,18 @@ describe("SettingsTab — initialSubTab prop", () => {
 describe("SettingsTab — all sub-tab buttons render with data-testid", () => {
   it("renders all 5 sub-tab buttons", () => {
     render(<SettingsTab />);
-    expect(screen.getByTestId("settings-tab-general")).toBeTruthy();
-    expect(screen.getByTestId("settings-tab-agent")).toBeTruthy();
-    expect(screen.getByTestId("settings-tab-feeds")).toBeTruthy();
-    expect(screen.getByTestId("settings-tab-data")).toBeTruthy();
-    expect(screen.getByTestId("settings-tab-account")).toBeTruthy();
+    expect(screen.getByTestId("settings-tab-general")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-tab-agent")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-tab-feeds")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-tab-data")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-tab-account")).toBeInTheDocument();
   });
 });
 
 describe("SettingsTab — header", () => {
   it("renders heading with data-testid", () => {
     render(<SettingsTab />);
-    expect(screen.getByTestId("aegis-settings-heading")).toBeTruthy();
+    expect(screen.getByTestId("aegis-settings-heading")).toBeInTheDocument();
     expect(screen.getByTestId("aegis-settings-heading").textContent).toBe("Settings");
   });
 });

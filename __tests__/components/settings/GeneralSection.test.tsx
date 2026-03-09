@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 // Polyfill TextEncoder for react-dom/server in jsdom environment
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -101,7 +102,7 @@ describe("GeneralSection — Appearance", () => {
 describe("GeneralSection — Push Notifications", () => {
   it("renders NotificationToggle component", () => {
     render(<GeneralSection />);
-    expect(screen.getByTestId("notification-toggle")).toBeTruthy();
+    expect(screen.getByTestId("notification-toggle")).toBeInTheDocument();
   });
 
   it("does not show frequency options when not subscribed", () => {
@@ -134,7 +135,7 @@ describe("GeneralSection — Push Notifications", () => {
     render(<GeneralSection />);
     // The "Realtime" button should appear with active styling
     const btn = screen.getByText("Realtime");
-    expect(btn).toBeTruthy();
+    expect(btn).toBeInTheDocument();
   });
 });
 

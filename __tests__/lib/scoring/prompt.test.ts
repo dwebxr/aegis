@@ -32,7 +32,7 @@ describe("buildScoringPrompt", () => {
     const prompt = buildScoringPrompt(longText, undefined, 100);
     // The prompt should contain at most 100 'a' characters from the content
     const contentMatch = prompt.match(/Content: "(a+)"/);
-    expect(contentMatch).toBeTruthy();
+    expect(contentMatch).not.toBeNull();
     expect(contentMatch![1].length).toBe(100);
   });
 
@@ -40,7 +40,7 @@ describe("buildScoringPrompt", () => {
     const longText = "b".repeat(5000);
     const prompt = buildScoringPrompt(longText);
     const contentMatch = prompt.match(/Content: "(b+)"/);
-    expect(contentMatch).toBeTruthy();
+    expect(contentMatch).not.toBeNull();
     expect(contentMatch![1].length).toBe(3000);
   });
 
@@ -54,7 +54,7 @@ describe("buildScoringPrompt", () => {
     const text = "x".repeat(100);
     const prompt = buildScoringPrompt(text, undefined, 100);
     const contentMatch = prompt.match(/Content: "(x+)"/);
-    expect(contentMatch).toBeTruthy();
+    expect(contentMatch).not.toBeNull();
     expect(contentMatch![1].length).toBe(100);
   });
 

@@ -116,7 +116,8 @@ describe("POST /api/fetch/rss — branch coverage", () => {
 
       const res = await POST(makeRequest({ feedUrl: "https://example.com/feed.xml" }));
       const data = await res.json();
-      expect(data.items[0].author).toBeTruthy();
+      expect(typeof data.items[0].author).toBe("string");
+      expect(data.items[0].author.length).toBeGreaterThan(0);
       // Verify actual author content from raw RSS author field
       expect(data.items[0].author).toContain("Jane Doe");
     });

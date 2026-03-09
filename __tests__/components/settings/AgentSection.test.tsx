@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 // Polyfill TextEncoder for react-dom/server in jsdom environment
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -211,8 +212,8 @@ describe("AgentSection — quality threshold", () => {
 describe("AgentSection — D2A Social Agent", () => {
   it("shows D2A card with AgentStatusBadge", () => {
     render(<AgentSection />);
-    expect(screen.getByTestId("agent-badge")).toBeTruthy();
-    expect(screen.getByText("D2A Social Agent")).toBeTruthy();
+    expect(screen.getByTestId("agent-badge")).toBeInTheDocument();
+    expect(screen.getByText("D2A Social Agent")).toBeInTheDocument();
   });
 
   it("shows protocol params when agent enabled", () => {

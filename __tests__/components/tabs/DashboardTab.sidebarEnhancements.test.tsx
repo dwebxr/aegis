@@ -5,6 +5,7 @@
  * topic filtering, source filter via sidebar, section collapse, high quality day,
  * agent recent learning, topic trend direction/isNew.
  */
+import "@testing-library/jest-dom";
 
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -317,7 +318,7 @@ describe("Sidebar — Unreviewed Queue", () => {
     const collapseBtn = within(sidebar).getAllByText("\u25BC").find(
       el => el.closest("div")?.textContent?.includes("Needs Review")
     );
-    expect(collapseBtn).toBeTruthy();
+    expect(collapseBtn).toBeInTheDocument();
     fireEvent.click(collapseBtn!);
 
     // After collapse, item text should be hidden, but section header still visible
@@ -347,7 +348,7 @@ describe("Sidebar — Top Sources interactive filter", () => {
     const rssButton = Array.from(sourceButtons).find(
       btn => btn.querySelector(".font-medium")?.textContent === "rss"
     );
-    expect(rssButton).toBeTruthy();
+    expect(rssButton).toBeInTheDocument();
     fireEvent.click(rssButton!);
 
     // Only rss items should show in feed
@@ -370,7 +371,7 @@ describe("Sidebar — Top Sources interactive filter", () => {
     const rssButton = Array.from(sourceButtons).find(
       btn => btn.querySelector(".font-medium")?.textContent === "rss"
     );
-    expect(rssButton).toBeTruthy();
+    expect(rssButton).toBeInTheDocument();
     fireEvent.click(rssButton!);
     expect(getCardIds()).not.toContain("nostr-2");
 
@@ -403,7 +404,7 @@ describe("Sidebar — Top Sources interactive filter", () => {
       btn => btn.querySelector(".font-medium")?.textContent?.includes("rss") ||
              btn.querySelector(".font-medium")?.textContent?.includes("youtube")
     );
-    expect(rssButton).toBeTruthy();
+    expect(rssButton).toBeInTheDocument();
     fireEvent.click(rssButton!);
 
     // Both items should show since both have source="rss"
@@ -523,7 +524,7 @@ describe("Sidebar — Section collapse persistence", () => {
     const topicsCollapseBtn = collapseButtons.find(
       el => el.closest("div")?.textContent?.includes("Top Topics")
     );
-    expect(topicsCollapseBtn).toBeTruthy();
+    expect(topicsCollapseBtn).toBeInTheDocument();
     fireEvent.click(topicsCollapseBtn!);
 
     // Check localStorage
@@ -543,7 +544,7 @@ describe("Sidebar — Section collapse persistence", () => {
     const topicsExpand = expandBtns.find(
       el => el.closest("button")?.textContent?.includes("Top Topics")
     );
-    expect(topicsExpand).toBeTruthy();
+    expect(topicsExpand).toBeInTheDocument();
     // Score should not be visible when collapsed
     expect(sidebar.textContent).not.toContain("0.9");
   });
@@ -682,7 +683,7 @@ describe("Sidebar — Topic filter chip in filter bar", () => {
 
     // Topic chip should appear in filter bar
     const chip = screen.getByTestId("aegis-filter-topic-active");
-    expect(chip).toBeTruthy();
+    expect(chip).toBeInTheDocument();
     expect(chip.textContent).toContain("AI");
   });
 

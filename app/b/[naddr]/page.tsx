@@ -64,7 +64,7 @@ async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
     if (msg === "timeout") {
       console.warn("[briefing/page] Relay query timed out for", naddr);
     } else {
-      console.error("[briefing/page] Relay query failed:", err);
+      console.error("[briefing/page] Relay query failed:", errMsg(err));
     }
     briefingCache.set(naddr, { data: null, at: Date.now() });
     return null;

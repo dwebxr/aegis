@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     if (msg === "timeout") {
       return NextResponse.json({ error: "Relay query timed out" }, { status: 504 });
     }
-    console.error("[fetch/briefing] Relay query failed:", err);
+    console.error("[fetch/briefing] Relay query failed:", errMsg(err));
     return NextResponse.json({ error: "Relay query failed" }, { status: 502 });
   } finally {
     pool.close(relays);

@@ -9,6 +9,16 @@
 
 ## Latest Updates (March 2026)
 
+### Production Hardening & Test Quality Overhaul
+- **5588 tests, 322 suites** — zero failures, zero skipped, zero `toBeTruthy()` shallow assertions
+- **Push endpoint authorization**: HMAC-SHA256 token system — `/api/push/token` issues tokens, `/api/push/send` validates before dispatching; prevents unauthorized push spam
+- **Error logging standardized**: All `console.warn`/`console.error` calls across 9 files now use `errMsg()` utility — no raw Error objects that produce `[object Object]` in logs
+- **Test assertion quality**: 188 `toBeTruthy()` replaced — DOM assertions use `toBeInTheDocument()` (via `@testing-library/jest-dom`), non-DOM use `typeof`/`not.toBeNull()`/`toBeDefined()` with specific type checks
+- **Boolean return propagation**: `setUserApiKey`/`clearUserApiKey` return `boolean` — callers (FeedSection, SettingsTab) check return value and show error notification on storage failure
+- **Indeterminate test assertions eliminated**: OR-based `expect(a || b).toBe(true)` split into deterministic per-case tests; shallow `toBeTruthy` on step fields replaced with type + length checks
+- **Redundant code removed**: unnecessary `typeof window` in useEffect, double-cast `as unknown as` eliminated where direct property access works, 7 restating comments removed from preference storage
+- **`generatePushToken` extracted to `lib/api/pushToken.ts`**: satisfies Next.js route type constraints (route files can only export HTTP handlers + config)
+
 ### Sidebar Enhancements & Topic Filtering
 - **5529 tests, 316 suites** — zero failures, zero skipped
 - **Interactive source filtering**: Click any source in Top Sources to filter feed by that source — quality rate bars show quality/total ratio per source

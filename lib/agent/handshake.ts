@@ -119,9 +119,8 @@ function isValidDeliverPayload(p: unknown): p is D2ADeliverPayload {
     !d.topics.every((t: unknown) => typeof t === "string" && t.length <= MAX_TOPIC_LENGTH)
   ) return false;
   if (!d.scores || typeof d.scores !== "object") return false;
-  const s = d.scores as unknown as Record<string, unknown>;
-  return isValidScore(s.originality) && isValidScore(s.insight) &&
-    isValidScore(s.credibility) && isValidScore(s.composite);
+  return isValidScore(d.scores.originality) && isValidScore(d.scores.insight) &&
+    isValidScore(d.scores.credibility) && isValidScore(d.scores.composite);
 }
 
 function isValidCommentPayload(p: unknown): p is D2ACommentPayload {

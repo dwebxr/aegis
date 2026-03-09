@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 
@@ -35,28 +36,28 @@ beforeEach(() => {
 describe("OnboardingFlow", () => {
   it("renders first step when no sources added", () => {
     render(<OnboardingFlow context={makeContext()} />);
-    expect(screen.getByText("Add Sources")).toBeTruthy();
-    expect(screen.getByText(/Add RSS feeds/)).toBeTruthy();
+    expect(screen.getByText("Add Sources")).toBeInTheDocument();
+    expect(screen.getByText(/Add RSS feeds/)).toBeInTheDocument();
   });
 
   it("renders second step when sources exist but no content", () => {
     render(<OnboardingFlow context={makeContext({ sourcesCount: 2 })} />);
-    expect(screen.getByText("Receive Content")).toBeTruthy();
+    expect(screen.getByText("Receive Content")).toBeInTheDocument();
   });
 
   it("shows content count on wait-content step", () => {
     render(<OnboardingFlow context={makeContext({ sourcesCount: 2, contentCount: 1 })} />);
-    expect(screen.getByText(/1 item received so far/)).toBeTruthy();
+    expect(screen.getByText(/1 item received so far/)).toBeInTheDocument();
   });
 
   it("shows waiting message when content count is 0 on wait step", () => {
     render(<OnboardingFlow context={makeContext({ sourcesCount: 2, contentCount: 0 })} />);
-    expect(screen.getByText(/This usually takes a minute/)).toBeTruthy();
+    expect(screen.getByText(/This usually takes a minute/)).toBeInTheDocument();
   });
 
   it("renders third step when content exists but not enough validates", () => {
     render(<OnboardingFlow context={makeContext({ sourcesCount: 2, contentCount: 5 })} />);
-    expect(screen.getByText("Review & Validate")).toBeTruthy();
+    expect(screen.getByText("Review & Validate")).toBeInTheDocument();
   });
 
   it("returns null when all steps complete", () => {
@@ -94,12 +95,12 @@ describe("OnboardingFlow", () => {
 
   it("shows progress counter", () => {
     render(<OnboardingFlow context={makeContext({ sourcesCount: 2 })} />);
-    expect(screen.getByText("1/4")).toBeTruthy();
+    expect(screen.getByText("1/4")).toBeInTheDocument();
   });
 
   it("shows 0/4 when nothing completed", () => {
     render(<OnboardingFlow context={makeContext()} />);
-    expect(screen.getByText("0/4")).toBeTruthy();
+    expect(screen.getByText("0/4")).toBeInTheDocument();
   });
 
   it("applies mobile styling", () => {
@@ -110,11 +111,11 @@ describe("OnboardingFlow", () => {
 
   it("shows plural 'items' for multiple content", () => {
     render(<OnboardingFlow context={makeContext({ sourcesCount: 2, contentCount: 2 })} />);
-    expect(screen.getByText(/2 items received/)).toBeTruthy();
+    expect(screen.getByText(/2 items received/)).toBeInTheDocument();
   });
 
   it("shows singular 'item' for 1 content", () => {
     render(<OnboardingFlow context={makeContext({ sourcesCount: 2, contentCount: 1 })} />);
-    expect(screen.getByText(/1 item received/)).toBeTruthy();
+    expect(screen.getByText(/1 item received/)).toBeInTheDocument();
   });
 });

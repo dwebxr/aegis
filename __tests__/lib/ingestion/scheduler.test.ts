@@ -236,7 +236,8 @@ describe("IngestionScheduler", () => {
       expect(onNewContent).toHaveBeenCalledTimes(1);
       const item = onNewContent.mock.calls[0][0];
       // Verify it's a real ContentItem with expected structure
-      expect(item.id).toBeTruthy();
+      expect(typeof item.id).toBe("string");
+      expect(item.id.length).toBeGreaterThan(0);
       expect(item.author).toBe("Dr. Research");
       expect(item.source).toBe("rss");
       expect(item.sourceUrl).toBe("https://example.com/article");

@@ -77,13 +77,21 @@ describe("guardAndParse", () => {
 });
 
 describe("checkBodySize", () => {
-  it("returns null when no content-length header", () => {
+  it("returns null when content-length is absent or under limit", () => {
     const req = makeRequest({ ip: "10.0.0.7" });
-    // Default request may or may not have content-length depending on body
+    // NextRequest auto-sets content-length from body (16 bytes for '{"text":"hello"}')
+    // checkBodySize returns null when content-length <= maxBytes or absent
     const result = checkBodySize(req, 100);
-    // If content-length is present and under limit, should return null
-    // If absent, returns null
-    expect(result === null || result?.status === 413).toBe(true);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when content-length header is truly absent", () => {
+    // Request with no body → no content-length header
+    const req = new NextRequest("http://localhost:3000/api/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "10.0.0.7b" },
+    });
+    expect(checkBodySize(req, 100)).toBeNull();
   });
 
   it("returns null when content-length is under limit", () => {

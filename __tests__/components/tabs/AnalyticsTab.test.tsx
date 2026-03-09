@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 
 // Polyfill TextEncoder for react-dom/server in jsdom environment
 if (typeof globalThis.TextEncoder === "undefined") {
@@ -110,7 +111,7 @@ describe("AnalyticsTab — Activity Trends section", () => {
 
     // Verify the rendered text reflects the "today" range counts
     const trendsContainer = container.querySelector('[data-testid="aegis-analytics-activity-trends"]');
-    expect(trendsContainer).toBeTruthy();
+    expect(trendsContainer).toBeInTheDocument();
     expect(trendsContainer!.textContent).toContain("1");
   });
 });

@@ -132,8 +132,14 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
 
   const [sourceStates, setSourceStates] = useState<Record<string, SourceRuntimeState>>(loadSourceStates);
   useEffect(() => {
-    const id = setInterval(() => setSourceStates(loadSourceStates()), 30_000);
-    return () => clearInterval(id);
+    const refresh = () => setSourceStates(loadSourceStates());
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      refresh();
+    }, 60_000);
+    const onVisible = () => { if (!document.hidden) refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
   // Deep link: auto-fill URL and trigger extraction

@@ -4,6 +4,7 @@
  * Tests for Home Feed right sidebar — layout, metrics placement, Agent Knowledge,
  * Top Sources, Top Topics, Chrome CTA, desktop/mobile split, edge cases.
  */
+import "@testing-library/jest-dom";
 
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -108,7 +109,7 @@ describe("DashboardTab — Sidebar layout", () => {
     render(
       <DashboardTab content={[makeItem()]} onValidate={noop} onFlag={noop} mobile={false} />
     );
-    expect(screen.getByTestId("aegis-feed-sidebar")).toBeTruthy();
+    expect(screen.getByTestId("aegis-feed-sidebar")).toBeInTheDocument();
   });
 
   it("does NOT render sidebar on mobile", () => {
@@ -130,7 +131,7 @@ describe("DashboardTab — Sidebar layout", () => {
     render(
       <DashboardTab content={[makeItem()]} onValidate={noop} onFlag={noop} mobile={false} />
     );
-    expect(screen.getByTestId("aegis-feed-sidebar")).toBeTruthy();
+    expect(screen.getByTestId("aegis-feed-sidebar")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("aegis-home-mode-dashboard"));
     expect(screen.queryByTestId("aegis-feed-sidebar")).toBeNull();
@@ -144,7 +145,7 @@ describe("DashboardTab — Sidebar layout", () => {
     expect(screen.queryByTestId("aegis-feed-sidebar")).toBeNull();
 
     fireEvent.click(screen.getByTestId("aegis-home-mode-feed"));
-    expect(screen.getByTestId("aegis-feed-sidebar")).toBeTruthy();
+    expect(screen.getByTestId("aegis-feed-sidebar")).toBeInTheDocument();
   });
 });
 
@@ -165,7 +166,7 @@ describe("DashboardTab — Metrics bar placement", () => {
       <DashboardTab content={[makeItem()]} onValidate={noop} onFlag={noop} mobile={true} />
     );
     expect(screen.queryByTestId("aegis-feed-sidebar")).toBeNull();
-    expect(screen.getByTestId("aegis-metrics-bar")).toBeTruthy();
+    expect(screen.getByTestId("aegis-metrics-bar")).toBeInTheDocument();
   });
 
   it("metrics bar shows correct counts on desktop sidebar", () => {
@@ -225,7 +226,7 @@ describe("DashboardTab — Top Sources", () => {
     );
     const sidebar = screen.getByTestId("aegis-feed-sidebar");
     const sourcesSection = Array.from(sidebar.children).find(el => el.textContent?.includes("Top Sources"));
-    expect(sourcesSection).toBeTruthy();
+    expect(sourcesSection).toBeInTheDocument();
     const sourceRows = sourcesSection!.querySelectorAll(".flex.items-center.gap-2.text-body-sm");
     expect(sourceRows.length).toBe(3);
     // Verify order: rss(3) > nostr(2) > farcaster(1)
@@ -251,7 +252,7 @@ describe("DashboardTab — Top Sources", () => {
     const rows = sidebar.querySelectorAll(".flex.items-center.gap-2.text-body-sm");
     // Filter to Top Sources rows (those inside the sources card, which has "Top Sources" heading)
     const sourcesSection = Array.from(sidebar.children).find(el => el.textContent?.includes("Top Sources"));
-    expect(sourcesSection).toBeTruthy();
+    expect(sourcesSection).toBeInTheDocument();
     const sourceRows = sourcesSection!.querySelectorAll(".flex.items-center.gap-2.text-body-sm");
     expect(sourceRows.length).toBe(2); // rss and nostr
     // First row: rss with count 2
@@ -370,7 +371,7 @@ describe("DashboardTab — Top Topics", () => {
     );
     const sidebar = screen.getByTestId("aegis-feed-sidebar");
     const topicsSection = Array.from(sidebar.children).find(el => el.textContent?.includes("Top Topics"));
-    expect(topicsSection).toBeTruthy();
+    expect(topicsSection).toBeInTheDocument();
     const topicRows = topicsSection!.querySelectorAll(".flex.items-center.gap-2.text-body-sm");
     expect(topicRows.length).toBe(3);
     // Verify descending order: AI(0.8) > Crypto(0.3) > Spam(-0.5)
@@ -582,15 +583,15 @@ describe("DashboardTab — Sidebar edge cases", () => {
     render(
       <DashboardTab content={[makeItem()]} onValidate={noop} onFlag={noop} mobile={false} />
     );
-    expect(screen.getByTestId("aegis-feed-sidebar")).toBeTruthy();
+    expect(screen.getByTestId("aegis-feed-sidebar")).toBeInTheDocument();
   });
 
   it("sidebar renders with loading state and no content", () => {
     render(
       <DashboardTab content={[]} onValidate={noop} onFlag={noop} mobile={false} isLoading={true} />
     );
-    expect(screen.getByTestId("aegis-feed-sidebar")).toBeTruthy();
-    expect(screen.getByTestId("aegis-metrics-bar")).toBeTruthy();
+    expect(screen.getByTestId("aegis-feed-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("aegis-metrics-bar")).toBeInTheDocument();
   });
 
   it("sidebar renders when mobile prop is undefined (treated as desktop)", () => {
@@ -598,7 +599,7 @@ describe("DashboardTab — Sidebar edge cases", () => {
       <DashboardTab content={[makeItem()]} onValidate={noop} onFlag={noop} />
     );
     // mobile is undefined → falsy → sidebar should render
-    expect(screen.getByTestId("aegis-feed-sidebar")).toBeTruthy();
+    expect(screen.getByTestId("aegis-feed-sidebar")).toBeInTheDocument();
   });
 
   it("Top Sources handles all items having same source", () => {
@@ -612,7 +613,7 @@ describe("DashboardTab — Sidebar edge cases", () => {
     );
     const sidebar = screen.getByTestId("aegis-feed-sidebar");
     const sourcesSection = Array.from(sidebar.children).find(el => el.textContent?.includes("Top Sources"));
-    expect(sourcesSection).toBeTruthy();
+    expect(sourcesSection).toBeInTheDocument();
     const sourceRows = sourcesSection!.querySelectorAll(".flex.items-center.gap-2.text-body-sm");
     // Exactly 1 source entry
     expect(sourceRows.length).toBe(1);
@@ -673,6 +674,6 @@ describe("DashboardTab — Sidebar edge cases", () => {
     const cards = document.querySelectorAll('[data-testid="aegis-content-card"]');
     expect(cards.length).toBe(1);
     // Sidebar still present
-    expect(screen.getByTestId("aegis-feed-sidebar")).toBeTruthy();
+    expect(screen.getByTestId("aegis-feed-sidebar")).toBeInTheDocument();
   });
 });

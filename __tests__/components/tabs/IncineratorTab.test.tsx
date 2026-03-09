@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 
@@ -34,12 +35,12 @@ describe("IncineratorTab", () => {
   it("renders heading and description", () => {
     render(<IncineratorTab isAnalyzing={false} onAnalyze={mockOnAnalyze} />);
     expect(screen.getByTestId("aegis-incinerator-heading").textContent).toBe("Slop Incinerator + Signal");
-    expect(screen.getByText(/Evaluate content quality/)).toBeTruthy();
+    expect(screen.getByText(/Evaluate content quality/)).toBeInTheDocument();
   });
 
   it("shows ManualInput when onPublishSignal is not provided", () => {
     render(<IncineratorTab isAnalyzing={false} onAnalyze={mockOnAnalyze} />);
-    expect(screen.getByTestId("manual-input")).toBeTruthy();
+    expect(screen.getByTestId("manual-input")).toBeInTheDocument();
     expect(screen.queryByTestId("signal-composer")).toBeNull();
   });
 
@@ -53,16 +54,16 @@ describe("IncineratorTab", () => {
         nostrPubkey="npub123"
       />,
     );
-    expect(screen.getByTestId("signal-composer")).toBeTruthy();
+    expect(screen.getByTestId("signal-composer")).toBeInTheDocument();
     expect(screen.queryByTestId("manual-input")).toBeNull();
   });
 
   it("renders all 4 pipeline stages", () => {
     render(<IncineratorTab isAnalyzing={false} onAnalyze={mockOnAnalyze} />);
-    expect(screen.getByText("Heuristic Filter")).toBeTruthy();
-    expect(screen.getByText("Structural")).toBeTruthy();
-    expect(screen.getByText("LLM Score")).toBeTruthy();
-    expect(screen.getByText("Cross-Valid")).toBeTruthy();
+    expect(screen.getByText("Heuristic Filter")).toBeInTheDocument();
+    expect(screen.getByText("Structural")).toBeInTheDocument();
+    expect(screen.getByText("LLM Score")).toBeInTheDocument();
+    expect(screen.getByText("Cross-Valid")).toBeInTheDocument();
   });
 
   it("shows IDLE for all stages when not analyzing", () => {
@@ -88,6 +89,6 @@ describe("IncineratorTab", () => {
 
   it("renders mobile variant", () => {
     render(<IncineratorTab isAnalyzing={false} onAnalyze={mockOnAnalyze} mobile />);
-    expect(screen.getByTestId("aegis-incinerator-heading")).toBeTruthy();
+    expect(screen.getByTestId("aegis-incinerator-heading")).toBeInTheDocument();
   });
 });

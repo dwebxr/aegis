@@ -2,17 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardAndParse } from "@/lib/api/rateLimit";
 import { safeFetch } from "@/lib/utils/url";
 import { errMsg } from "@/lib/utils/errors";
+import { getOgCached, setOgCache } from "@/lib/cache/ogimage";
 
 export const maxDuration = 15;
 
-export async function POST(request: NextRequest) {
-  const { body, error } = await guardAndParse<{ url?: string }>(request, { limit: 60 });
-  if (error) return error;
-
-  const { url } = body;
-  if (!url || typeof url !== "string") {
-    return NextResponse.json({ error: "URL is required" }, { status: 400 });
-  }
+async function extractOgImage(url: string): Promise<string | null> {
+  const cached = getOgCached(url);
+  if (cached !== undefined) return cached;
 
   try {
     const res = await safeFetch(url, {
@@ -22,12 +18,15 @@ export async function POST(request: NextRequest) {
 
     if (!res.ok) {
       console.debug(`[fetch/ogimage] upstream returned ${res.status} for ${url}`);
-      return NextResponse.json({ imageUrl: null });
+      setOgCache(url, null);
+      return null;
     }
 
-    // Read only first 50KB to find OG tags (avoid downloading full page)
     const reader = res.body?.getReader();
-    if (!reader) return NextResponse.json({ imageUrl: null });
+    if (!reader) {
+      setOgCache(url, null);
+      return null;
+    }
 
     let html = "";
     const decoder = new TextDecoder();
@@ -50,11 +49,42 @@ export async function POST(request: NextRequest) {
       || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
 
     const raw = ogMatch?.[1] || null;
-    // Resolve relative URLs against the page origin
     const imageUrl = raw ? new URL(raw, url).href : null;
-    return NextResponse.json({ imageUrl });
+    setOgCache(url, imageUrl);
+    return imageUrl;
   } catch (err) {
     console.warn("[fetch/ogimage] OG extraction failed:", errMsg(err));
-    return NextResponse.json({ imageUrl: null });
+    setOgCache(url, null);
+    return null;
   }
+}
+
+export async function POST(request: NextRequest) {
+  const { body, error } = await guardAndParse<{ url?: string; urls?: string[] }>(request, { limit: 60 });
+  if (error) return error;
+
+  const { url, urls } = body;
+
+  // Batch mode: accept array of URLs, return results for all
+  if (urls && Array.isArray(urls)) {
+    const validUrls = urls.filter(u => typeof u === "string" && u.length > 0).slice(0, 30);
+    if (validUrls.length === 0) {
+      return NextResponse.json({ error: "At least one valid URL is required" }, { status: 400 });
+    }
+    const results = await Promise.all(
+      validUrls.map(async (u) => ({
+        url: u,
+        imageUrl: await extractOgImage(u),
+      })),
+    );
+    return NextResponse.json({ results });
+  }
+
+  // Single mode (backward compatible)
+  if (!url || typeof url !== "string") {
+    return NextResponse.json({ error: "URL is required" }, { status: 400 });
+  }
+
+  const imageUrl = await extractOgImage(url);
+  return NextResponse.json({ imageUrl });
 }

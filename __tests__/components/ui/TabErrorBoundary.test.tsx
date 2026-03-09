@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TabErrorBoundary } from "@/components/ui/TabErrorBoundary";
@@ -25,7 +26,7 @@ describe("TabErrorBoundary", () => {
         <div>Hello</div>
       </TabErrorBoundary>,
     );
-    expect(screen.getByText("Hello")).toBeTruthy();
+    expect(screen.getByText("Hello")).toBeInTheDocument();
   });
 
   it("shows error UI with tab name when child throws", () => {
@@ -34,9 +35,9 @@ describe("TabErrorBoundary", () => {
         <ThrowingChild shouldThrow />
       </TabErrorBoundary>,
     );
-    expect(screen.getByText("Dashboard encountered an error")).toBeTruthy();
-    expect(screen.getByText("Tab crash")).toBeTruthy();
-    expect(screen.getByText("Retry")).toBeTruthy();
+    expect(screen.getByText("Dashboard encountered an error")).toBeInTheDocument();
+    expect(screen.getByText("Tab crash")).toBeInTheDocument();
+    expect(screen.getByText("Retry")).toBeInTheDocument();
   });
 
   it("reports error to Sentry with tab name", () => {
@@ -64,12 +65,12 @@ describe("TabErrorBoundary", () => {
         <ConditionalChild />
       </TabErrorBoundary>,
     );
-    expect(screen.getByText("Settings encountered an error")).toBeTruthy();
+    expect(screen.getByText("Settings encountered an error")).toBeInTheDocument();
 
     // Resolve the error condition before retrying
     shouldThrow = false;
     fireEvent.click(screen.getByText("Retry"));
-    expect(screen.getByText("Content OK")).toBeTruthy();
+    expect(screen.getByText("Content OK")).toBeInTheDocument();
   });
 
   it("isolates errors — siblings remain unaffected", () => {
@@ -81,8 +82,8 @@ describe("TabErrorBoundary", () => {
         <div>Sibling OK</div>
       </div>,
     );
-    expect(screen.getByText("Broken encountered an error")).toBeTruthy();
-    expect(screen.getByText("Sibling OK")).toBeTruthy();
+    expect(screen.getByText("Broken encountered an error")).toBeInTheDocument();
+    expect(screen.getByText("Sibling OK")).toBeInTheDocument();
   });
 
   it("re-catches error when Retry is clicked but error persists", () => {
@@ -91,12 +92,12 @@ describe("TabErrorBoundary", () => {
         <ThrowingChild shouldThrow />
       </TabErrorBoundary>,
     );
-    expect(screen.getByText("Stuck encountered an error")).toBeTruthy();
+    expect(screen.getByText("Stuck encountered an error")).toBeInTheDocument();
 
     // Click Retry — error still throws, boundary should re-catch
     fireEvent.click(screen.getByText("Retry"));
-    expect(screen.getByText("Stuck encountered an error")).toBeTruthy();
-    expect(screen.getByText("Tab crash")).toBeTruthy();
+    expect(screen.getByText("Stuck encountered an error")).toBeInTheDocument();
+    expect(screen.getByText("Tab crash")).toBeInTheDocument();
   });
 
   it("handles error with empty message gracefully", () => {
@@ -108,6 +109,6 @@ describe("TabErrorBoundary", () => {
         <EmptyErrorChild />
       </TabErrorBoundary>,
     );
-    expect(screen.getByText("Empty encountered an error")).toBeTruthy();
+    expect(screen.getByText("Empty encountered an error")).toBeInTheDocument();
   });
 });

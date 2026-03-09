@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       "user.fields": ["name", "username"],
     }), 15_000, "X API request timed out");
   } catch (err: unknown) {
-    console.error("[fetch/twitter] X API error:", err);
+    console.error("[fetch/twitter] X API error:", errMsg(err));
     const msg = errMsg(err);
     if (msg.includes("401") || msg.includes("Unauthorized")) {
       return NextResponse.json({ error: "Invalid or expired X API bearer token. Please check your token." }, { status: 401 });

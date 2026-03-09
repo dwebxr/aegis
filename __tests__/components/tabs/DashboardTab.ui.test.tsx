@@ -169,7 +169,7 @@ describe("DashboardTab — YouTube iframe embedding", () => {
     expect(html).toContain("<iframe");
     // The embed URL appears in iframe src, not in an href
     const iframeMatch = html.match(/<iframe[^>]*src="([^"]+)"/);
-    expect(iframeMatch).toBeTruthy();
+    expect(iframeMatch).not.toBeNull();
     expect(iframeMatch![1]).toContain("youtube.com/embed");
   });
 });

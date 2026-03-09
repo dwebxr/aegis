@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 
@@ -21,7 +22,7 @@ beforeEach(() => {
 describe("CreateGroupModal", () => {
   it("renders modal with title", () => {
     render(<CreateGroupModal {...defaultProps} />);
-    expect(screen.getByText("Create Curation Group")).toBeTruthy();
+    expect(screen.getByText("Create Curation Group")).toBeInTheDocument();
   });
 
   it("Create button is disabled when name is empty", () => {
@@ -89,7 +90,7 @@ describe("CreateGroupModal", () => {
     fireEvent.change(topicInput, { target: { value: "ai" } });
     fireEvent.keyDown(topicInput, { key: "Enter" });
 
-    expect(screen.getByText("ai")).toBeTruthy();
+    expect(screen.getByText("ai")).toBeInTheDocument();
     expect((topicInput as HTMLInputElement).value).toBe("");
   });
 
@@ -100,7 +101,7 @@ describe("CreateGroupModal", () => {
     fireEvent.change(topicInput, { target: { value: "crypto" } });
     fireEvent.click(screen.getByText("+"));
 
-    expect(screen.getByText("crypto")).toBeTruthy();
+    expect(screen.getByText("crypto")).toBeInTheDocument();
   });
 
   it("prevents duplicate topics", () => {
@@ -123,7 +124,7 @@ describe("CreateGroupModal", () => {
 
     fireEvent.change(topicInput, { target: { value: "removeme" } });
     fireEvent.click(screen.getByText("+"));
-    expect(screen.getByText("removeme")).toBeTruthy();
+    expect(screen.getByText("removeme")).toBeInTheDocument();
 
     // Click the × button
     fireEvent.click(screen.getByText("×"));
@@ -148,7 +149,7 @@ describe("CreateGroupModal", () => {
     fireEvent.change(topicInput, { target: { value: "AI" } });
     fireEvent.click(screen.getByText("+"));
 
-    expect(screen.getByText("ai")).toBeTruthy();
+    expect(screen.getByText("ai")).toBeInTheDocument();
   });
 
   it("includes topics in onCreate payload", () => {

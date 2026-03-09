@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -92,19 +93,19 @@ beforeEach(() => {
 describe("SourcesTab — tab switching", () => {
   it("renders URL tab by default with url input", () => {
     render(<SourcesTab onAnalyze={noop} isAnalyzing={false} />);
-    expect(screen.getByTestId("aegis-sources-url-input")).toBeTruthy();
+    expect(screen.getByTestId("aegis-sources-url-input")).toBeInTheDocument();
   });
 
   it("switches to RSS tab", () => {
     render(<SourcesTab onAnalyze={noop} isAnalyzing={false} />);
     fireEvent.click(screen.getByText("RSS"));
-    expect(screen.getByTestId("aegis-sources-rss-input")).toBeTruthy();
+    expect(screen.getByTestId("aegis-sources-rss-input")).toBeInTheDocument();
   });
 
   it("switches to Nostr tab", () => {
     render(<SourcesTab onAnalyze={noop} isAnalyzing={false} />);
     fireEvent.click(screen.getByText("Nostr"));
-    expect(screen.getByPlaceholderText(/npub or hex pubkey/i)).toBeTruthy();
+    expect(screen.getByPlaceholderText(/npub or hex pubkey/i)).toBeInTheDocument();
   });
 });
 
@@ -143,10 +144,10 @@ describe("SourcesTab — URL extraction", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("aegis-sources-url-result")).toBeTruthy();
-      expect(screen.getByText("Test Article")).toBeTruthy();
-      expect(screen.getByText(/Test Author/)).toBeTruthy();
-      expect(screen.getByText("Analyze This Content")).toBeTruthy();
+      expect(screen.getByTestId("aegis-sources-url-result")).toBeInTheDocument();
+      expect(screen.getByText("Test Article")).toBeInTheDocument();
+      expect(screen.getByText(/Test Author/)).toBeInTheDocument();
+      expect(screen.getByText("Analyze This Content")).toBeInTheDocument();
     });
   });
 
@@ -163,7 +164,7 @@ describe("SourcesTab — URL extraction", () => {
     fireEvent.click(screen.getByTestId("aegis-sources-extract-btn"));
 
     await waitFor(() => {
-      expect(screen.getByText("Page not found")).toBeTruthy();
+      expect(screen.getByText("Page not found")).toBeInTheDocument();
     });
   });
 
@@ -178,7 +179,7 @@ describe("SourcesTab — URL extraction", () => {
     fireEvent.click(screen.getByTestId("aegis-sources-extract-btn"));
 
     await waitFor(() => {
-      expect(screen.getByText(/timed out/i)).toBeTruthy();
+      expect(screen.getByText(/timed out/i)).toBeInTheDocument();
     });
   });
 
@@ -209,7 +210,7 @@ describe("SourcesTab — RSS feed", () => {
     fireEvent.click(screen.getByText("Fetch Feed"));
 
     await waitFor(() => {
-      expect(screen.getByText(/Tech Blog/)).toBeTruthy();
+      expect(screen.getByText(/Tech Blog/)).toBeInTheDocument();
     });
   });
 
@@ -227,7 +228,7 @@ describe("SourcesTab — RSS feed", () => {
     fireEvent.click(screen.getByText("Fetch Feed"));
 
     await waitFor(() => {
-      expect(screen.getByText("Invalid feed format")).toBeTruthy();
+      expect(screen.getByText("Invalid feed format")).toBeInTheDocument();
     });
   });
 
@@ -248,7 +249,7 @@ describe("SourcesTab — RSS feed", () => {
     fireEvent.click(screen.getByText("Fetch Feed"));
 
     await waitFor(() => {
-      expect(screen.getByText(/My Blog/)).toBeTruthy();
+      expect(screen.getByText(/My Blog/)).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText("Save as Source"));
@@ -282,12 +283,12 @@ describe("SourcesTab — RSS feed", () => {
     fireEvent.click(screen.getByText("Fetch Feed"));
 
     await waitFor(() => {
-      expect(screen.getByText(/Dup Blog/)).toBeTruthy();
+      expect(screen.getByText(/Dup Blog/)).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText("Save as Source"));
 
-    expect(screen.getByText("This feed is already saved")).toBeTruthy();
+    expect(screen.getByText("This feed is already saved")).toBeInTheDocument();
   });
 
   it("discovers feeds from website URL and renders them", async () => {
@@ -317,7 +318,7 @@ describe("SourcesTab — RSS feed", () => {
 
     // Verify discovered feed renders as a selectable button
     await waitFor(() => {
-      expect(screen.getByText(/Main Feed/)).toBeTruthy();
+      expect(screen.getByText(/Main Feed/)).toBeInTheDocument();
     });
   });
 
@@ -336,7 +337,7 @@ describe("SourcesTab — RSS feed", () => {
     fireEvent.click(screen.getByText(/auto-discover/i));
 
     await waitFor(() => {
-      expect(screen.getByText(/no feeds found/i)).toBeTruthy();
+      expect(screen.getByText(/no feeds found/i)).toBeInTheDocument();
     });
   });
 });
@@ -366,7 +367,7 @@ describe("SourcesTab — Nostr save", () => {
 
     fireEvent.click(screen.getByText("Save Relay Config"));
 
-    expect(screen.getByText(/wss:\/\/ protocol/)).toBeTruthy();
+    expect(screen.getByText(/wss:\/\/ protocol/)).toBeInTheDocument();
     expect(mockAddSource).not.toHaveBeenCalled();
   });
 });
@@ -405,7 +406,7 @@ describe("SourcesTab — source management", () => {
 
     render(<SourcesTab onAnalyze={noop} isAnalyzing={false} />);
 
-    expect(screen.getByTitle("Enable")).toBeTruthy();
+    expect(screen.getByTitle("Enable")).toBeInTheDocument();
   });
 });
 
@@ -416,8 +417,8 @@ describe("SourcesTab — platform badges", () => {
     ];
 
     render(<SourcesTab onAnalyze={noop} isAnalyzing={false} />);
-    expect(screen.getByText("YT Channel")).toBeTruthy();
-    expect(screen.getByTitle("Remove source")).toBeTruthy();
+    expect(screen.getByText("YT Channel")).toBeInTheDocument();
+    expect(screen.getByTitle("Remove source")).toBeInTheDocument();
   });
 
   it("renders GitHub source with label", () => {
@@ -426,7 +427,7 @@ describe("SourcesTab — platform badges", () => {
     ];
 
     render(<SourcesTab onAnalyze={noop} isAnalyzing={false} />);
-    expect(screen.getByText("user/repo")).toBeTruthy();
+    expect(screen.getByText("user/repo")).toBeInTheDocument();
   });
 });
 
@@ -442,7 +443,7 @@ describe("SourcesTab — network error on RSS", () => {
     fireEvent.click(screen.getByText("Fetch Feed"));
 
     await waitFor(() => {
-      expect(screen.getByText(/network error/i)).toBeTruthy();
+      expect(screen.getByText(/network error/i)).toBeInTheDocument();
     });
   });
 });

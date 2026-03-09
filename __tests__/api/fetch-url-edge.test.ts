@@ -8,6 +8,7 @@ jest.mock("@extractus/article-extractor", () => ({
 }));
 
 import { POST } from "@/app/api/fetch/url/route";
+import { _resetUrlCache } from "@/lib/cache/urlExtract";
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost:3000/api/fetch/url", {
@@ -20,6 +21,7 @@ function makeRequest(body: unknown): NextRequest {
 describe("POST /api/fetch/url — extraction", () => {
   beforeEach(() => {
     _resetRateLimits();
+    _resetUrlCache();
     mockExtract.mockReset();
   });
 

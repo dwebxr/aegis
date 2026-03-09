@@ -4,6 +4,7 @@
  * Integration tests for DashboardTab Latest-only feed mode.
  * Tests exercise real rendering paths — ContentCard, filter logic, sort order.
  */
+import "@testing-library/jest-dom";
 
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -171,7 +172,7 @@ describe("DashboardTab — Latest Feed Behavior", () => {
     expect(getCardIds()).not.toContain("nv1");
     const badges = document.querySelectorAll(".text-caption.text-purple-400.font-mono.font-semibold");
     const badge = Array.from(badges).find(el => el.textContent?.includes("Validated"));
-    expect(badge).toBeTruthy();
+    expect(badge).toBeInTheDocument();
   });
 
   it("Bookmarked filter shows only bookmarked items", () => {
@@ -272,7 +273,7 @@ describe("DashboardTab — Feed Edge Cases", () => {
 
     fireEvent.click(moreBtn);
     fireEvent.click(screen.getByTestId("aegis-filter-slop"));
-    expect(screen.getByTestId("aegis-filter-more").querySelector(".bg-cyan-400")).toBeTruthy();
+    expect(screen.getByTestId("aegis-filter-more").querySelector(".bg-cyan-400")).toBeInTheDocument();
   });
 
   it("empty content shows onboarding (no active filter)", () => {

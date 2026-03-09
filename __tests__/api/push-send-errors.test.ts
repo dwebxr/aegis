@@ -29,6 +29,7 @@ process.env.VAPID_PRIVATE_KEY = "test-private-key";
 process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = "test-public-key";
 
 import { POST } from "@/app/api/push/send/route";
+import { generatePushToken } from "@/lib/api/pushToken";
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/push/send", {
@@ -36,6 +37,11 @@ function makeRequest(body: unknown): NextRequest {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+/** Helper: creates request body with valid HMAC token for the given principal. */
+function withToken(principal: string, extra: Record<string, unknown> = {}) {
+  return { principal, token: generatePushToken(principal), ...extra };
 }
 
 describe("POST /api/push/send — error paths", () => {
@@ -63,7 +69,7 @@ describe("POST /api/push/send — error paths", () => {
   it("returns 400 for invalid principal text", async () => {
     mockFromText.mockImplementation(() => { throw new Error("Invalid principal format"); });
 
-    const res = await POST(makeRequest({ principal: "not-a-valid-principal!!!" }));
+    const res = await POST(makeRequest(withToken("not-a-valid-principal!!!")));
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toContain("Invalid principal");
@@ -76,7 +82,7 @@ describe("POST /api/push/send — error paths", () => {
     mockSendNotification.mockRejectedValue({ statusCode: 404 });
     mockRemovePushSubscriptions.mockResolvedValue(true);
 
-    const res = await POST(makeRequest({ principal: "abc-123" }));
+    const res = await POST(makeRequest(withToken("abc-123")));
     const data = await res.json();
     expect(data.expired).toBe(1);
     expect(mockRemovePushSubscriptions).toHaveBeenCalledTimes(1);
@@ -88,7 +94,7 @@ describe("POST /api/push/send — error paths", () => {
     ]);
     mockSendNotification.mockRejectedValue({ statusCode: 500 });
 
-    const res = await POST(makeRequest({ principal: "abc-123" }));
+    const res = await POST(makeRequest(withToken("abc-123")));
     const data = await res.json();
     expect(data.failed).toBe(1);
     expect(data.expired).toBe(0);
@@ -102,7 +108,7 @@ describe("POST /api/push/send — error paths", () => {
     mockSendNotification.mockRejectedValue({ statusCode: 410 });
     mockRemovePushSubscriptions.mockRejectedValue(new Error("IC canister error"));
 
-    const res = await POST(makeRequest({ principal: "abc-123" }));
+    const res = await POST(makeRequest(withToken("abc-123")));
     // Should still return 200 (not crash), just log the error
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -115,7 +121,7 @@ describe("POST /api/push/send — error paths", () => {
     const { HttpAgent } = require("@dfinity/agent");
     HttpAgent.create.mockRejectedValueOnce(new Error("IC unreachable"));
 
-    const res = await POST(makeRequest({ principal: "abc-123" }));
+    const res = await POST(makeRequest(withToken("abc-123")));
     expect(res.status).toBe(500);
     const data = await res.json();
     expect(data.error).toContain("Failed to send");
@@ -124,7 +130,7 @@ describe("POST /api/push/send — error paths", () => {
   it("returns 500 when getPushSubscriptions throws", async () => {
     mockGetPushSubscriptions.mockRejectedValue(new Error("Canister call failed"));
 
-    const res = await POST(makeRequest({ principal: "abc-123" }));
+    const res = await POST(makeRequest(withToken("abc-123")));
     expect(res.status).toBe(500);
     const data = await res.json();
     expect(data.error).toContain("Failed to send");
@@ -136,7 +142,7 @@ describe("POST /api/push/send — error paths", () => {
     ]);
     mockSendNotification.mockResolvedValue({ statusCode: 201 });
 
-    await POST(makeRequest({ principal: "abc-123" }));
+    await POST(makeRequest(withToken("abc-123")));
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
     expect(payload.url).toBe("/");
     expect(payload.tag).toBe("aegis-briefing");
@@ -148,7 +154,7 @@ describe("POST /api/push/send — error paths", () => {
     ]);
     mockSendNotification.mockResolvedValue({ statusCode: 201 });
 
-    await POST(makeRequest({ principal: "abc-123", url: "/briefing/123", tag: "custom-tag" }));
+    await POST(makeRequest(withToken("abc-123", { url: "/briefing/123", tag: "custom-tag" })));
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
     expect(payload.url).toBe("/briefing/123");
     expect(payload.tag).toBe("custom-tag");

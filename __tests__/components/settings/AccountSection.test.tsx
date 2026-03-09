@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 // Polyfill TextEncoder for react-dom/server in jsdom environment
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -127,16 +128,16 @@ describe("AccountSection — Danger Zone delete flow", () => {
   it("shows confirmation form when Delete button clicked", () => {
     render(<AccountSection />);
     fireEvent.click(screen.getByText("Delete All Local Data"));
-    expect(screen.getByPlaceholderText(/DELETE/)).toBeTruthy();
-    expect(screen.getByText("Confirm Delete")).toBeTruthy();
-    expect(screen.getByText("Cancel")).toBeTruthy();
+    expect(screen.getByPlaceholderText(/DELETE/)).toBeInTheDocument();
+    expect(screen.getByText("Confirm Delete")).toBeInTheDocument();
+    expect(screen.getByText("Cancel")).toBeInTheDocument();
   });
 
   it("shows warning about IC data persisting", () => {
     render(<AccountSection />);
     fireEvent.click(screen.getByText("Delete All Local Data"));
-    expect(screen.getByText(/Data stored on the Internet Computer/)).toBeTruthy();
-    expect(screen.getByText(/will re-sync on next login/)).toBeTruthy();
+    expect(screen.getByText(/Data stored on the Internet Computer/)).toBeInTheDocument();
+    expect(screen.getByText(/will re-sync on next login/)).toBeInTheDocument();
   });
 
   it("Confirm Delete button is disabled until DELETE is typed", () => {
@@ -158,10 +159,10 @@ describe("AccountSection — Danger Zone delete flow", () => {
   it("Cancel hides the confirmation form", () => {
     render(<AccountSection />);
     fireEvent.click(screen.getByText("Delete All Local Data"));
-    expect(screen.getByPlaceholderText(/DELETE/)).toBeTruthy();
+    expect(screen.getByPlaceholderText(/DELETE/)).toBeInTheDocument();
     fireEvent.click(screen.getByText("Cancel"));
     expect(screen.queryByPlaceholderText(/DELETE/)).toBeNull();
-    expect(screen.getByText("Delete All Local Data")).toBeTruthy();
+    expect(screen.getByText("Delete All Local Data")).toBeInTheDocument();
   });
 
   it("rejects partial DELETE input", () => {
@@ -204,7 +205,7 @@ describe("AccountSection — copy principal", () => {
     fireEvent.click(screen.getByTestId("aegis-settings-copy-principal"));
 
     await waitFor(() => {
-      expect(screen.getByText("Copied")).toBeTruthy();
+      expect(screen.getByText("Copied")).toBeInTheDocument();
     });
   });
 
@@ -322,7 +323,7 @@ describe("AccountSection — delete local data", () => {
       expect(mockAddNotification).toHaveBeenCalledWith("Failed to delete local data", "error");
     });
     // Should exit deleting state
-    expect(screen.getByText("Confirm Delete")).toBeTruthy();
+    expect(screen.getByText("Confirm Delete")).toBeInTheDocument();
   });
 
   it("shows Deleting... state on confirm button", async () => {
@@ -350,7 +351,7 @@ describe("AccountSection — delete local data", () => {
     fireEvent.click(screen.getByTestId("aegis-settings-delete-confirm"));
 
     // The button should show "Deleting..."
-    expect(screen.getByText("Deleting...")).toBeTruthy();
+    expect(screen.getByText("Deleting...")).toBeInTheDocument();
   });
 });
 

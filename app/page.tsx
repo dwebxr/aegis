@@ -96,8 +96,8 @@ function AegisAppInner() {
 
   // One-time migration from localStorage to IndexedDB + scoring cache init
   useEffect(() => {
-    migrateToIDB().catch(err => console.warn("[page] IDB migration failed:", err));
-    initScoringCache().catch(err => console.warn("[page] Scoring cache init failed:", err));
+    migrateToIDB().catch(err => console.warn("[page] IDB migration failed:", errMsg(err)));
+    initScoringCache().catch(err => console.warn("[page] Scoring cache init failed:", errMsg(err)));
   }, []);
 
   // Listen for cross-context notification events (e.g. preference corruption)
@@ -211,7 +211,7 @@ function AegisAppInner() {
   const handleLinkAccount = useCallback((account: LinkedNostrAccount | null) => {
     setLinkedAccount(account);
     if (!account) {
-      void clearWoTCache().catch(err => console.warn("[page] clearWoTCache failed:", err));
+      void clearWoTCache().catch(err => console.warn("[page] clearWoTCache failed:", errMsg(err)));
       setWotPromptDismissed(false);
       try { sessionStorage.removeItem("aegis-wot-prompt-dismissed"); } catch { console.debug("[page] sessionStorage unavailable"); }
     }
@@ -375,7 +375,7 @@ function AegisAppInner() {
             const lastPush = Number(localStorage.getItem("aegis-push-last") || "0");
             if (Date.now() - lastPush < throttleMs) return;
           }
-        } catch (err) { console.warn("[push] localStorage unavailable, skipping push:", err); return; }
+        } catch (err) { console.warn("[push] localStorage unavailable, skipping push:", errMsg(err)); return; }
         const quality = items.filter(i => i.verdict === "quality");
         // Apply notification rules if set
         const notifPrefs = profileRef.current.notificationPrefs;
@@ -398,18 +398,28 @@ function AegisAppInner() {
           .map(i => `${i.verdict === "quality" ? "\u2713" : "\u2717"} ${i.text.slice(0, 60).replace(/\n/g, " ")}`)
           .join("\n");
         const summary = `${filteredItems.length} item${filteredItems.length !== 1 ? "s" : ""} matched`;
-        try { localStorage.setItem("aegis-push-last", String(Date.now())); } catch (err) { console.warn("[push] Failed to save push timestamp:", err); }
-        void fetch("/api/push/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            principal: pt,
-            title: `Aegis: ${summary}`,
-            body: preview || summary,
-            url: "/",
-            tag: `briefing-${new Date().toISOString().slice(0, 10)}`,
-          }),
-        }).then(r => { void r.arrayBuffer(); }).catch((err: unknown) => {
+        try { localStorage.setItem("aegis-push-last", String(Date.now())); } catch (err) { console.warn("[push] Failed to save push timestamp:", errMsg(err)); }
+        void (async () => {
+          const tokenRes = await fetch("/api/push/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ principal: pt }),
+          });
+          if (!tokenRes.ok) return;
+          const { token } = await tokenRes.json();
+          await fetch("/api/push/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              principal: pt,
+              token,
+              title: `Aegis: ${summary}`,
+              body: preview || summary,
+              url: "/",
+              tag: `briefing-${new Date().toISOString().slice(0, 10)}`,
+            }),
+          });
+        })().catch((err: unknown) => {
           console.warn("[push] Send notification failed:", errMsg(err));
         });
       },

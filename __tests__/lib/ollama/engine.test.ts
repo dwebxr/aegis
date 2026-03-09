@@ -215,7 +215,8 @@ describe("ollama/engine", () => {
       const result = await testOllamaConnection("http://localhost:11434");
       expect(result.ok).toBe(false);
       expect(result.models).toEqual([]);
-      expect(result.error).toBeTruthy();
+      expect(typeof result.error).toBe("string");
+      expect(result.error!.length).toBeGreaterThan(0);
     });
 
     it("strips trailing slashes from endpoint", async () => {

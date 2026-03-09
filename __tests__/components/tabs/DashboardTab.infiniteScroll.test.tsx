@@ -4,6 +4,7 @@
  * Comprehensive tests for Home Feed infinite scroll — batch loading, separators,
  * boundary conditions, animation, keyboard nav, filter interactions.
  */
+import "@testing-library/jest-dom";
 
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -313,7 +314,7 @@ describe("DashboardTab — Sentinel element", () => {
     // Sentinel is a 1px-high div right before the Load remaining button
     const loadBtn = screen.getByTestId("aegis-load-remaining");
     const sentinel = loadBtn.previousElementSibling;
-    expect(sentinel).toBeTruthy();
+    expect(sentinel).toBeInTheDocument();
     expect(sentinel?.className).toContain("h-1");
   });
 
@@ -373,7 +374,7 @@ describe("DashboardTab — Filter resets batch state", () => {
 
     // Should reset to first batch
     expect(getCardIds()).toHaveLength(40);
-    expect(screen.getByTestId("aegis-load-remaining")).toBeTruthy();
+    expect(screen.getByTestId("aegis-load-remaining")).toBeInTheDocument();
   });
 
   it("source filter change resets batch", () => {
@@ -390,7 +391,7 @@ describe("DashboardTab — Filter resets batch state", () => {
     // Click "rss" source button (inside the more filters panel)
     const panel = screen.getByTestId("aegis-filter-more-panel");
     const rssBtn = Array.from(panel.querySelectorAll("button")).find(b => b.textContent === "rss");
-    expect(rssBtn).toBeTruthy();
+    expect(rssBtn).toBeInTheDocument();
     fireEvent.click(rssBtn!);
 
     // Should show only rss items (25), within one batch
@@ -438,7 +439,7 @@ describe("DashboardTab — Load remaining button", () => {
       makeItem({ id: `tid-${i}`, createdAt: now - i * 1000 }),
     );
     render(<DashboardTab content={items} onValidate={noop} onFlag={noop} />);
-    expect(screen.getByTestId("aegis-load-remaining")).toBeTruthy();
+    expect(screen.getByTestId("aegis-load-remaining")).toBeInTheDocument();
   });
 
   it("remaining count updates after each load", () => {

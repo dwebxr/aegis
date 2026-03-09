@@ -81,13 +81,16 @@ describe("IngestionScheduler — enrichment flow", () => {
           }],
         }),
       })
-      // Enrichment: /api/fetch/url returns full article (scoring handled by scoreFn)
+      // Enrichment: /api/fetch/url batch returns full article
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          title: "Full Article Title",
-          content: "This is a much more detailed article content with extensive data analysis showing significant improvements. The comprehensive benchmark results demonstrate a 35% accuracy increase across multiple evaluation datasets. Researchers conducted ablation studies to understand the contribution of each component in the proposed architecture.",
-          imageUrl: "https://example.com/enriched-img.jpg",
+          results: [{
+            url: "https://example.com/article-full",
+            title: "Full Article Title",
+            content: "This is a much more detailed article content with extensive data analysis showing significant improvements. The comprehensive benchmark results demonstrate a 35% accuracy increase across multiple evaluation datasets. Researchers conducted ablation studies to understand the contribution of each component in the proposed architecture.",
+            imageUrl: "https://example.com/enriched-img.jpg",
+          }],
         }),
       });
 
@@ -95,7 +98,7 @@ describe("IngestionScheduler — enrichment flow", () => {
     const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
     await runCycle();
 
-    // Should have called /api/fetch/url for enrichment
+    // Should have called /api/fetch/url for batch enrichment
     const urlFetchCalls = (global.fetch as jest.Mock).mock.calls.filter(
       (c: [string, ...unknown[]]) => c[0] === "/api/fetch/url"
     );
@@ -129,14 +132,14 @@ describe("IngestionScheduler — enrichment flow", () => {
           }],
         }),
       })
-      // Enrichment fails (scoring handled by scoreFn if item passes quickFilter)
+      // Batch enrichment fails
       .mockRejectedValueOnce(new Error("Enrichment failed"));
 
     const scheduler = new IngestionScheduler(callbacks);
     const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
     await runCycle();
 
-    // Both mocks consumed: RSS feed fetch + rejected enrichment fetch
+    // Both mocks consumed: RSS feed fetch + rejected batch enrichment fetch
     const fetchCalls = (global.fetch as jest.Mock).mock.calls;
     expect(fetchCalls.length).toBe(2);
     // Scheduler survived the rejected enrichment without crashing
@@ -194,15 +197,18 @@ describe("IngestionScheduler — enrichment flow", () => {
           }],
         }),
       })
-      // Enrichment returns full article with imageUrl (scoring handled by scoreFn)
+      // Enrichment batch returns full article with imageUrl
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          title: "Full Article",
-          content: "Detailed research with benchmark data showing 40% improvement in model accuracy. " +
-            "The methodology uses a novel approach combining attention mechanisms with retrieval augmentation. " +
-            "Experiments were conducted across multiple datasets to validate the findings comprehensively.",
-          imageUrl: "https://example.com/enriched-og-image.jpg",
+          results: [{
+            url: "https://example.com/article-img",
+            title: "Full Article",
+            content: "Detailed research with benchmark data showing 40% improvement in model accuracy. " +
+              "The methodology uses a novel approach combining attention mechanisms with retrieval augmentation. " +
+              "Experiments were conducted across multiple datasets to validate the findings comprehensively.",
+            imageUrl: "https://example.com/enriched-og-image.jpg",
+          }],
         }),
       });
 
@@ -239,14 +245,17 @@ describe("IngestionScheduler — enrichment flow", () => {
           }],
         }),
       })
-      // Enrichment returns full article with different imageUrl (scoring handled by scoreFn)
+      // Enrichment batch returns full article with different imageUrl
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          title: "Full Article",
-          content: "Detailed research with benchmark data showing 35% improvement across evaluation datasets. " +
-            "The methodology demonstrates consistent gains across five model architectures with reproducible results.",
-          imageUrl: "https://example.com/enriched-different-img.jpg",
+          results: [{
+            url: "https://example.com/article-orig-img",
+            title: "Full Article",
+            content: "Detailed research with benchmark data showing 35% improvement across evaluation datasets. " +
+              "The methodology demonstrates consistent gains across five model architectures with reproducible results.",
+            imageUrl: "https://example.com/enriched-different-img.jpg",
+          }],
         }),
       });
 
@@ -281,26 +290,30 @@ describe("IngestionScheduler — enrichment flow", () => {
         json: async () => ({ items }),
       });
 
-    // Mock enrichment calls — all return long content (scoring handled by scoreFn)
-    for (let i = 0; i < 5; i++) {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+    // Mock single batch enrichment call with results for 3 items (MAX_ENRICH_PER_CYCLE)
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        results: Array.from({ length: 3 }, (_, i) => ({
+          url: `https://example.com/article-${i}`,
           title: `Full Article ${i}`,
           content: "Very detailed content. ".repeat(30),
-        }),
-      });
-    }
+        })),
+      }),
+    });
 
     const scheduler = new IngestionScheduler(callbacks);
     const runCycle = (scheduler as unknown as { runCycle: () => Promise<void> }).runCycle.bind(scheduler);
     await runCycle();
 
-    // Count enrichment calls (calls to /api/fetch/url)
+    // Batch enrichment: single call to /api/fetch/url with urls array
     const enrichCalls = (global.fetch as jest.Mock).mock.calls.filter(
       (c: [string, ...unknown[]]) => c[0] === "/api/fetch/url"
     );
-    expect(enrichCalls.length).toBeLessThanOrEqual(3);
+    expect(enrichCalls.length).toBe(1);
+    // Verify the batch contains at most 3 URLs
+    const batchBody = JSON.parse(enrichCalls[0][1].body);
+    expect(batchBody.urls.length).toBeLessThanOrEqual(3);
   });
 });
 

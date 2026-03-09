@@ -168,7 +168,8 @@ describe("preferences/storage", () => {
       saveProfile(profile);
 
       const raw = localStorage.getItem("aegis_prefs_user-1");
-      expect(raw).toBeTruthy();
+      expect(typeof raw).toBe("string");
+      expect(raw!.length).toBeGreaterThan(0);
       const parsed = JSON.parse(raw!) as UserPreferenceProfile;
       expect(parsed.totalValidated).toBe(7);
     });

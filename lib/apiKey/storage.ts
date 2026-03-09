@@ -10,24 +10,28 @@ export function getUserApiKey(): string | null {
   }
 }
 
-export function setUserApiKey(key: string): void {
+export function setUserApiKey(key: string): boolean {
   if (!key.startsWith("sk-ant-")) {
     throw new Error("Invalid API key format: must start with sk-ant-");
   }
-  if (typeof globalThis.localStorage === "undefined") return;
+  if (typeof globalThis.localStorage === "undefined") return false;
   try {
     localStorage.setItem(STORAGE_KEY, key);
+    return true;
   } catch (err) {
     console.warn("[apiKey] Failed to save key (quota?):", err);
+    return false;
   }
 }
 
-export function clearUserApiKey(): void {
-  if (typeof globalThis.localStorage === "undefined") return;
+export function clearUserApiKey(): boolean {
+  if (typeof globalThis.localStorage === "undefined") return false;
   try {
     localStorage.removeItem(STORAGE_KEY);
+    return true;
   } catch (err) {
     console.warn("[apiKey] Failed to clear key:", err);
+    return false;
   }
 }
 

@@ -122,8 +122,6 @@ export async function POST(request: NextRequest) {
   }
 
   const response = NextResponse.json({ feeds });
-  if (feeds.length > 0) {
-    response.headers.set("Cache-Control", "public, s-maxage=600, stale-while-revalidate=60");
-  }
+  response.headers.set("Cache-Control", "public, s-maxage=600, stale-while-revalidate=60");
   return response;
 }

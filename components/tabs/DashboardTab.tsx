@@ -8,6 +8,7 @@ import { colors, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { exportContentCSV, exportContentJSON } from "@/lib/utils/export";
 import { extractYouTubeVideoId } from "@/lib/utils/youtube";
+import { errMsg } from "@/lib/utils/errors";
 import { useFilterMode } from "@/contexts/FilterModeContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { getContext, hasEnoughData } from "@/lib/preferences/engine";
@@ -442,7 +443,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
 
   useEffect(() => {
     if (Object.keys(profile.topicAffinities).length > 0) {
-      try { localStorage.setItem("aegis-prev-affinities", JSON.stringify(profile.topicAffinities)); } catch {}
+      try { localStorage.setItem("aegis-prev-affinities", JSON.stringify(profile.topicAffinities)); } catch (err) { console.warn("[dashboard] Failed to persist affinities:", errMsg(err)); }
     }
   }, [profile.topicAffinities]);
 
@@ -469,7 +470,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const toggleSidebarSection = useCallback((key: string) => {
     setSidebarCollapsed(prev => {
       const next = { ...prev, [key]: !prev[key] };
-      try { localStorage.setItem("aegis-sidebar-collapsed", JSON.stringify(next)); } catch {}
+      try { localStorage.setItem("aegis-sidebar-collapsed", JSON.stringify(next)); } catch (err) { console.warn("[dashboard] Failed to persist sidebar state:", errMsg(err)); }
       return next;
     });
   }, []);

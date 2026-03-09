@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { CommentThread } from "@/components/ui/CommentThread";
@@ -26,7 +27,7 @@ describe("CommentThread", () => {
 
   it("renders a single comment", () => {
     render(<CommentThread comments={[makeComment({ comment: "Hello world" })]} />);
-    expect(screen.getByText("Hello world")).toBeTruthy();
+    expect(screen.getByText("Hello world")).toBeInTheDocument();
   });
 
   it("sorts comments by timestamp ascending", () => {
@@ -46,7 +47,7 @@ describe("CommentThread", () => {
         comments={[makeComment({ direction: "sent", comment: "My message" })]}
       />,
     );
-    expect(screen.getByText(/You/)).toBeTruthy();
+    expect(screen.getByText(/You/)).toBeInTheDocument();
   });
 
   it("marks received comments with truncated sender pubkey", () => {
@@ -55,7 +56,7 @@ describe("CommentThread", () => {
         comments={[makeComment({ senderPk: "abcdefghijklmnop", direction: "received" })]}
       />,
     );
-    expect(screen.getByText(/abcdefgh\.\.\./)).toBeTruthy();
+    expect(screen.getByText(/abcdefgh\.\.\./)).toBeInTheDocument();
   });
 
   it("identifies sent comments by currentUserPk match", () => {
@@ -65,7 +66,7 @@ describe("CommentThread", () => {
         currentUserPk="my-pk"
       />,
     );
-    expect(screen.getByText(/You/)).toBeTruthy();
+    expect(screen.getByText(/You/)).toBeInTheDocument();
   });
 
   it("renders multiple comments", () => {
@@ -74,8 +75,8 @@ describe("CommentThread", () => {
       makeComment({ id: "c2", comment: "Second comment" }),
     ];
     render(<CommentThread comments={comments} />);
-    expect(screen.getByText("First comment")).toBeTruthy();
-    expect(screen.getByText("Second comment")).toBeTruthy();
+    expect(screen.getByText("First comment")).toBeInTheDocument();
+    expect(screen.getByText("Second comment")).toBeInTheDocument();
   });
 
   it("formats timestamp with date and time", () => {
@@ -84,7 +85,7 @@ describe("CommentThread", () => {
     );
     // Should contain some formatted date string (locale-dependent)
     const timeEl = container.querySelector(".text-tiny");
-    expect(timeEl).toBeTruthy();
+    expect(timeEl).toBeInTheDocument();
     expect(timeEl!.textContent!.length).toBeGreaterThan(5);
   });
 
@@ -93,7 +94,7 @@ describe("CommentThread", () => {
       <CommentThread comments={[makeComment({ direction: "sent" })]} />,
     );
     const wrapper = container.querySelector(".justify-end");
-    expect(wrapper).toBeTruthy();
+    expect(wrapper).toBeInTheDocument();
   });
 
   it("aligns received messages to the left", () => {
@@ -101,6 +102,6 @@ describe("CommentThread", () => {
       <CommentThread comments={[makeComment({ direction: "received" })]} />,
     );
     const wrapper = container.querySelector(".justify-start");
-    expect(wrapper).toBeTruthy();
+    expect(wrapper).toBeInTheDocument();
   });
 });

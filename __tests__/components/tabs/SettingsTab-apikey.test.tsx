@@ -39,8 +39,8 @@ jest.mock("@/contexts/FilterModeContext", () => ({
 let mockStoredKey: string | null = null;
 jest.mock("@/lib/apiKey/storage", () => ({
   getUserApiKey: () => mockStoredKey,
-  setUserApiKey: jest.fn(),
-  clearUserApiKey: jest.fn(),
+  setUserApiKey: jest.fn().mockReturnValue(true),
+  clearUserApiKey: jest.fn().mockReturnValue(true),
   maskApiKey: (key: string) => key.length <= 12 ? key : `${key.slice(0, 7)}...${key.slice(-4)}`,
 }));
 

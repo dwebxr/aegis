@@ -31,6 +31,7 @@ process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = "test-public-key";
 process.env.VAPID_SUBJECT = "mailto:test@example.com";
 
 import { POST } from "@/app/api/push/send/route";
+import { generatePushToken } from "@/lib/api/pushToken";
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/push/send", {
@@ -38,6 +39,11 @@ function makeRequest(body: unknown): NextRequest {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+/** Helper: creates request body with valid HMAC token for the given principal. */
+function withToken(principal: string, extra: Record<string, unknown> = {}) {
+  return { principal, token: generatePushToken(principal), ...extra };
 }
 
 describe("POST /api/push/send", () => {
@@ -53,9 +59,21 @@ describe("POST /api/push/send", () => {
     expect(data.error).toBe("principal required");
   });
 
+  it("returns 403 when token is missing", async () => {
+    const res = await POST(makeRequest({ principal: "abc-123" }));
+    expect(res.status).toBe(403);
+    const data = await res.json();
+    expect(data.error).toContain("token");
+  });
+
+  it("returns 403 when token is invalid", async () => {
+    const res = await POST(makeRequest({ principal: "abc-123", token: "wrong-token" }));
+    expect(res.status).toBe(403);
+  });
+
   it("returns 0 sent when no subscriptions exist", async () => {
     mockGetPushSubscriptions.mockResolvedValue([]);
-    const res = await POST(makeRequest({ principal: "abc-123" }));
+    const res = await POST(makeRequest(withToken("abc-123")));
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.sent).toBe(0);
@@ -68,7 +86,7 @@ describe("POST /api/push/send", () => {
     ]);
     mockSendNotification.mockResolvedValue({ statusCode: 201 });
 
-    const res = await POST(makeRequest({ principal: "abc-123", title: "Test", body: "Hello" }));
+    const res = await POST(makeRequest(withToken("abc-123", { title: "Test", body: "Hello" })));
     const data = await res.json();
     expect(data.sent).toBe(2);
     expect(data.failed).toBe(0);
@@ -82,7 +100,7 @@ describe("POST /api/push/send", () => {
     mockSendNotification.mockRejectedValue({ statusCode: 410 });
     mockRemovePushSubscriptions.mockResolvedValue(true);
 
-    const res = await POST(makeRequest({ principal: "abc-123" }));
+    const res = await POST(makeRequest(withToken("abc-123")));
     const data = await res.json();
     expect(data.sent).toBe(0);
     expect(data.failed).toBe(1);
@@ -94,10 +112,10 @@ describe("POST /api/push/send", () => {
   it("rate limits after 5 requests", async () => {
     mockGetPushSubscriptions.mockResolvedValue([]);
     for (let i = 0; i < 5; i++) {
-      const res = await POST(makeRequest({ principal: "abc-123" }));
+      const res = await POST(makeRequest(withToken("abc-123")));
       expect(res.status).toBe(200);
     }
-    const res = await POST(makeRequest({ principal: "abc-123" }));
+    const res = await POST(makeRequest(withToken("abc-123")));
     expect(res.status).toBe(429);
   });
 
@@ -107,9 +125,20 @@ describe("POST /api/push/send", () => {
     ]);
     mockSendNotification.mockResolvedValue({ statusCode: 201 });
 
-    await POST(makeRequest({ principal: "abc-123" }));
+    await POST(makeRequest(withToken("abc-123")));
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
     expect(payload.title).toBe("Aegis Briefing");
     expect(payload.body).toBe("Your new briefing is ready.");
+  });
+
+  it("generatePushToken is deterministic", () => {
+    const t1 = generatePushToken("abc");
+    const t2 = generatePushToken("abc");
+    expect(t1).toBe(t2);
+    expect(t1.length).toBe(32);
+  });
+
+  it("generatePushToken differs by principal", () => {
+    expect(generatePushToken("alice")).not.toBe(generatePushToken("bob"));
   });
 });

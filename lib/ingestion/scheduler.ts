@@ -272,38 +272,49 @@ export class IngestionScheduler {
   ): Promise<RawItem[]> {
     if (sourceType !== "rss") return items;
 
-    let enrichCount = 0;
-    const result: typeof items = [];
-
-    for (const item of items) {
-      const wordCount = item.text.split(/\s+/).length;
-
-      if (wordCount < ENRICH_MIN_WORDS && item.sourceUrl && enrichCount < MAX_ENRICH_PER_CYCLE) {
-        try {
-          const res = await fetch("/api/fetch/url", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: item.sourceUrl }),
-            signal: AbortSignal.timeout(30_000),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            const fullText = `${data.title || ""}\n\n${data.content || ""}`.slice(0, MAX_TEXT_LENGTH);
-            if (fullText.split(/\s+/).length > wordCount) {
-              result.push({ ...item, text: fullText, imageUrl: item.imageUrl || data.imageUrl });
-              enrichCount++;
-              continue;
-            }
-          }
-        } catch (err) {
-          console.warn("[scheduler] Enrichment failed for", item.sourceUrl, ":", errMsg(err));
-        }
+    const toEnrich: Array<{ index: number; url: string }> = [];
+    for (let i = 0; i < items.length; i++) {
+      if (toEnrich.length >= MAX_ENRICH_PER_CYCLE) break;
+      const wordCount = items[i].text.split(/\s+/).length;
+      if (wordCount < ENRICH_MIN_WORDS && items[i].sourceUrl) {
+        toEnrich.push({ index: i, url: items[i].sourceUrl! });
       }
-
-      result.push(item);
     }
 
-    return result;
+    if (toEnrich.length === 0) return items;
+
+    const enrichedData = new Map<number, { title?: string; content?: string; imageUrl?: string }>();
+    try {
+      const res = await fetch("/api/fetch/url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls: toEnrich.map(e => e.url) }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const results: Array<{ url: string; title?: string; content?: string; imageUrl?: string; error?: string }> = data.results || [];
+        for (let i = 0; i < results.length && i < toEnrich.length; i++) {
+          const r = results[i];
+          if (!r.error && r.content) {
+            enrichedData.set(toEnrich[i].index, r);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[scheduler] Batch enrichment failed:", errMsg(err));
+    }
+
+    return items.map((item, i) => {
+      const data = enrichedData.get(i);
+      if (!data) return item;
+      const fullText = `${data.title || ""}\n\n${data.content || ""}`.slice(0, MAX_TEXT_LENGTH);
+      const origWordCount = item.text.split(/\s+/).length;
+      if (fullText.split(/\s+/).length > origWordCount) {
+        return { ...item, text: fullText, imageUrl: item.imageUrl || data.imageUrl };
+      }
+      return item;
+    });
   }
 
   private get fetcherCallbacks(): FetcherCallbacks {

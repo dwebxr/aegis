@@ -124,8 +124,8 @@ export default function RootLayout({
       </head>
       <body>
         <Providers>{children}</Providers>
-        <Analytics />
-        <SpeedInsights />
+        {process.env.NODE_ENV === "production" && <Analytics />}
+        {process.env.NODE_ENV === "production" && <SpeedInsights />}
       </body>
     </html>
   );

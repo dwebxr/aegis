@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
@@ -49,23 +50,23 @@ describe("LoginButton", () => {
   it("shows loading spinner when isLoading", () => {
     mockAuthState.isLoading = true;
     const { container } = render(<LoginButton />);
-    expect(container.querySelector(".animate-spin")).toBeTruthy();
+    expect(container.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
   it("shows 'Login with Internet Identity' when not authenticated", () => {
     render(<LoginButton />);
-    expect(screen.getByText("Login with Internet Identity")).toBeTruthy();
+    expect(screen.getByText("Login with Internet Identity")).toBeInTheDocument();
   });
 
   it("shows 'Login' (short) when compact", () => {
     render(<LoginButton compact />);
-    expect(screen.getByText("Login")).toBeTruthy();
+    expect(screen.getByText("Login")).toBeInTheDocument();
   });
 
   it("shows 'Logout' button when authenticated", () => {
     mockAuthState.isAuthenticated = true;
     render(<LoginButton />);
-    expect(screen.getByText("Logout")).toBeTruthy();
+    expect(screen.getByText("Logout")).toBeInTheDocument();
   });
 
   it("calls login() on click when not authenticated", () => {
@@ -127,21 +128,21 @@ describe("UserBadge", () => {
     mockAuthState.isAuthenticated = true;
     mockAuthState.principalText = "abcde12345fghij67890";
     render(<UserBadge />);
-    expect(screen.getByText("abcde...67890")).toBeTruthy();
+    expect(screen.getByText("abcde...67890")).toBeInTheDocument();
   });
 
   it("shows full principal when <= 12 chars", () => {
     mockAuthState.isAuthenticated = true;
     mockAuthState.principalText = "short-id";
     render(<UserBadge />);
-    expect(screen.getByText("short-id")).toBeTruthy();
+    expect(screen.getByText("short-id")).toBeInTheDocument();
   });
 
   it("shows 'Connected' status", () => {
     mockAuthState.isAuthenticated = true;
     mockAuthState.principalText = "test-principal";
     render(<UserBadge />);
-    expect(screen.getByText("Connected")).toBeTruthy();
+    expect(screen.getByText("Connected")).toBeInTheDocument();
   });
 
   it("calls logout on button click", () => {

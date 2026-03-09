@@ -9,13 +9,11 @@ export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile
   const p = parsed as Record<string, unknown>;
   if (p.version !== 1 || typeof p.principalId !== "string") return false;
 
-  // topicAffinities: Record<string, number>
   if (typeof p.topicAffinities !== "object" || p.topicAffinities === null || Array.isArray(p.topicAffinities)) return false;
   for (const v of Object.values(p.topicAffinities as Record<string, unknown>)) {
     if (typeof v !== "number") return false;
   }
 
-  // authorTrust: Record<string, AuthorTrust>
   if (typeof p.authorTrust !== "object" || p.authorTrust === null || Array.isArray(p.authorTrust)) return false;
   for (const v of Object.values(p.authorTrust as Record<string, unknown>)) {
     if (!v || typeof v !== "object" || Array.isArray(v)) return false;
@@ -23,11 +21,9 @@ export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile
     if (typeof at.validates !== "number" || typeof at.flags !== "number" || typeof at.trust !== "number") return false;
   }
 
-  // calibration
   if (!p.calibration || typeof p.calibration !== "object" || Array.isArray(p.calibration)) return false;
   if (typeof (p.calibration as Record<string, unknown>).qualityThreshold !== "number") return false;
 
-  // recentTopics: RecentTopic[]
   if (!Array.isArray(p.recentTopics)) return false;
   for (const rt of p.recentTopics as unknown[]) {
     if (!rt || typeof rt !== "object") return false;
@@ -38,7 +34,6 @@ export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile
   if (typeof p.totalValidated !== "number" || typeof p.totalFlagged !== "number") return false;
   if (typeof p.lastUpdated !== "number") return false;
 
-  // Optional: customFilterRules
   if (p.customFilterRules !== undefined) {
     if (!Array.isArray(p.customFilterRules)) return false;
     for (const r of p.customFilterRules as unknown[]) {
@@ -50,7 +45,6 @@ export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile
     }
   }
 
-  // Optional: activityHistogram
   if (p.activityHistogram !== undefined) {
     const ah = p.activityHistogram as Record<string, unknown>;
     if (!Array.isArray(ah.hourCounts) || (ah.hourCounts as unknown[]).length !== 24) return false;
@@ -60,7 +54,6 @@ export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile
     if (typeof ah.lastActivityAt !== "number" || typeof ah.totalEvents !== "number") return false;
   }
 
-  // Optional: bookmarkedIds
   if (p.bookmarkedIds !== undefined) {
     if (!Array.isArray(p.bookmarkedIds)) return false;
     for (const id of p.bookmarkedIds as unknown[]) {
@@ -68,7 +61,6 @@ export function isValidProfile(parsed: unknown): parsed is UserPreferenceProfile
     }
   }
 
-  // Optional: notificationPrefs
   if (p.notificationPrefs !== undefined) {
     const np = p.notificationPrefs as Record<string, unknown>;
     if (typeof np !== "object" || np === null || Array.isArray(np)) return false;
@@ -158,7 +150,7 @@ export async function loadPreferencesFromIC(
     if (result.length === 0) return null;
 
     const parsed = JSON.parse(result[0].preferencesJson);
-    // Set principalId before validation so isValidProfile can check it
+    // isValidProfile checks principalId, which IC response doesn't include
     if (parsed && typeof parsed === "object") parsed.principalId = principalText;
     if (!isValidProfile(parsed)) {
       console.warn("[prefs] IC preference data failed validation");

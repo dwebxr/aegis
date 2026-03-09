@@ -16,6 +16,7 @@
  * - Command palette commands
  * - Edge cases (boundary conditions, empty/null data)
  */
+import "@testing-library/jest-dom";
 
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -343,7 +344,7 @@ describe("Feedback loop — agent learned messages", () => {
     const { validate } = findActionButtons(container);
     expect(validate.length).toBeGreaterThan(0);
     act(() => { fireEvent.click(validate[0]); });
-    expect(screen.getByText(/Agent learned/)).toBeTruthy();
+    expect(screen.getByText(/Agent learned/)).toBeInTheDocument();
     expect(onValidate).toHaveBeenCalled();
   });
 
@@ -359,7 +360,7 @@ describe("Feedback loop — agent learned messages", () => {
     const { flag } = findActionButtons(container);
     expect(flag.length).toBeGreaterThan(0);
     act(() => { fireEvent.click(flag[0]); });
-    expect(screen.getByText(/Agent learned/)).toBeTruthy();
+    expect(screen.getByText(/Agent learned/)).toBeInTheDocument();
     expect(onFlag).toHaveBeenCalled();
   });
 
@@ -373,7 +374,7 @@ describe("Feedback loop — agent learned messages", () => {
     );
     const { validate } = findActionButtons(container);
     act(() => { fireEvent.click(validate[0]); });
-    expect(screen.getByText(/Agent learned/)).toBeTruthy();
+    expect(screen.getByText(/Agent learned/)).toBeInTheDocument();
 
     act(() => { jest.advanceTimersByTime(3500); });
     expect(screen.queryByText(/Agent learned/)).toBeNull();
@@ -407,7 +408,7 @@ describe("Feedback loop — agent learned messages", () => {
     const { validate } = findActionButtons(container);
     expect(validate.length).toBeGreaterThanOrEqual(2);
     act(() => { fireEvent.click(validate[0]); });
-    expect(screen.getByText(/Agent learned/)).toBeTruthy();
+    expect(screen.getByText(/Agent learned/)).toBeInTheDocument();
     // Second validation replaces the first message
     act(() => { fireEvent.click(validate[1]); });
     const messages = screen.getAllByText(/Agent learned/);
@@ -479,10 +480,10 @@ describe("Mode toggle and localStorage persistence", () => {
     render(
       <DashboardTab content={[]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    expect(screen.getByText("Filtered Signal")).toBeTruthy();
+    expect(screen.getByText("Filtered Signal")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("aegis-home-mode-dashboard"));
     expect(screen.queryByText("Filtered Signal")).toBeNull();
-    expect(screen.getByText(/Top 3/)).toBeTruthy();
+    expect(screen.getByText(/Top 3/)).toBeInTheDocument();
   });
 
   it("persists mode switch to localStorage", () => {
@@ -574,7 +575,7 @@ describe("More Filters dropdown", () => {
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
-    expect(screen.getByTestId("aegis-filter-more-panel")).toBeTruthy();
+    expect(screen.getByTestId("aegis-filter-more-panel")).toBeInTheDocument();
   });
 
   it("shows verdict and source filters in dropdown", () => {
@@ -589,8 +590,8 @@ describe("More Filters dropdown", () => {
     const panel = screen.getByTestId("aegis-filter-more-panel");
     // Verdict section
     expect(panel.textContent).toContain("Verdict");
-    expect(screen.getByTestId("aegis-filter-all")).toBeTruthy();
-    expect(screen.getByTestId("aegis-filter-slop")).toBeTruthy();
+    expect(screen.getByTestId("aegis-filter-all")).toBeInTheDocument();
+    expect(screen.getByTestId("aegis-filter-slop")).toBeInTheDocument();
     // Source section
     expect(panel.textContent).toContain("Source");
     expect(panel.textContent).toContain("All sources");
@@ -611,7 +612,7 @@ describe("More Filters dropdown", () => {
     // Switch to Slop filter to see slop items
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
     fireEvent.click(screen.getByTestId("aegis-filter-slop"));
-    expect(screen.getByText(/Slop content xyz789/)).toBeTruthy();
+    expect(screen.getByText(/Slop content xyz789/)).toBeInTheDocument();
   });
 
   it("clicking Slop filter shows only slop items", () => {
@@ -635,7 +636,7 @@ describe("More Filters dropdown", () => {
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
-    expect(screen.getByTestId("aegis-filter-more-panel")).toBeTruthy();
+    expect(screen.getByTestId("aegis-filter-more-panel")).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByTestId("aegis-filter-more-panel")).toBeNull();
   });
@@ -646,7 +647,7 @@ describe("More Filters dropdown", () => {
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
-    expect(screen.getByTestId("aegis-filter-more-panel")).toBeTruthy();
+    expect(screen.getByTestId("aegis-filter-more-panel")).toBeInTheDocument();
     fireEvent.mouseDown(document.body);
     expect(screen.queryByTestId("aegis-filter-more-panel")).toBeNull();
   });
@@ -705,7 +706,7 @@ describe("OnboardingFlow", () => {
     // Switch to slop filter
     fireEvent.click(screen.getByTestId("aegis-filter-more"));
     fireEvent.click(screen.getByTestId("aegis-filter-slop"));
-    expect(screen.getByText("No matching content")).toBeTruthy();
+    expect(screen.getByText("No matching content")).toBeInTheDocument();
   });
 });
 
@@ -842,7 +843,7 @@ describe("Load remaining button", () => {
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     const loadBtn = screen.getByText(/Load remaining/);
-    expect(loadBtn).toBeTruthy();
+    expect(loadBtn).toBeInTheDocument();
     fireEvent.click(loadBtn);
     // After clicking (50 items, batch 40 → all loaded), the button should disappear
     expect(screen.queryByText(/Load remaining/)).toBeNull();
@@ -865,7 +866,7 @@ describe("Review All button in Dashboard mode", () => {
     );
     fireEvent.click(screen.getByText("Review All →"));
     // Should switch to feed mode
-    expect(screen.getByText("Filtered Signal")).toBeTruthy();
+    expect(screen.getByText("Filtered Signal")).toBeInTheDocument();
   });
 });
 

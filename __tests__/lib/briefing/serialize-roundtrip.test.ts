@@ -114,7 +114,6 @@ describe("serializeBriefing — edge cases", () => {
     // Summary should use fallback format with actual content
     const summaryTag = result.tags.find(t => t[0] === "summary");
     expect(summaryTag).toBeDefined();
-    expect(summaryTag![1]).toBeTruthy();
     expect(typeof summaryTag![1]).toBe("string");
     expect(summaryTag![1].length).toBeGreaterThan(0);
   });

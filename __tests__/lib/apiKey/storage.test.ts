@@ -25,8 +25,8 @@ describe("apiKey/storage", () => {
   });
 
   describe("setUserApiKey", () => {
-    it("stores a valid key in localStorage", () => {
-      setUserApiKey("sk-ant-api03-mykey");
+    it("stores a valid key and returns true", () => {
+      expect(setUserApiKey("sk-ant-api03-mykey")).toBe(true);
       expect(localStorage.getItem("aegis-user-api-key")).toBe("sk-ant-api03-mykey");
     });
 
@@ -39,22 +39,36 @@ describe("apiKey/storage", () => {
     });
 
     it("accepts any key starting with sk-ant-", () => {
-      setUserApiKey("sk-ant-anything");
+      expect(setUserApiKey("sk-ant-anything")).toBe(true);
       expect(getUserApiKey()).toBe("sk-ant-anything");
+    });
+
+    it("returns false when localStorage throws (quota)", () => {
+      const orig = Storage.prototype.setItem;
+      Storage.prototype.setItem = () => { throw new Error("QuotaExceededError"); };
+      expect(setUserApiKey("sk-ant-api03-key")).toBe(false);
+      Storage.prototype.setItem = orig;
     });
   });
 
   describe("clearUserApiKey", () => {
-    it("removes the stored key", () => {
+    it("removes the stored key and returns true", () => {
       setUserApiKey("sk-ant-api03-toremove");
       expect(getUserApiKey()).toBe("sk-ant-api03-toremove");
 
-      clearUserApiKey();
+      expect(clearUserApiKey()).toBe(true);
       expect(getUserApiKey()).toBeNull();
     });
 
-    it("does not throw when no key exists", () => {
-      expect(() => clearUserApiKey()).not.toThrow();
+    it("returns true when no key exists", () => {
+      expect(clearUserApiKey()).toBe(true);
+    });
+
+    it("returns false when localStorage throws", () => {
+      const orig = Storage.prototype.removeItem;
+      Storage.prototype.removeItem = () => { throw new Error("Denied"); };
+      expect(clearUserApiKey()).toBe(false);
+      Storage.prototype.removeItem = orig;
     });
   });
 

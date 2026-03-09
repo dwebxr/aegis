@@ -63,8 +63,8 @@ jest.mock("@/lib/webllm/engine", () => ({
 
 jest.mock("@/lib/apiKey/storage", () => ({
   getUserApiKey: () => mockStoredKey,
-  setUserApiKey: (key: string) => { mockStoredKey = key; },
-  clearUserApiKey: () => { mockStoredKey = null; },
+  setUserApiKey: (key: string) => { mockStoredKey = key; return true; },
+  clearUserApiKey: () => { mockStoredKey = null; return true; },
   maskApiKey: (key: string) => key.length <= 12 ? key : `${key.slice(0, 7)}...${key.slice(-4)}`,
 }));
 

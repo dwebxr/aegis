@@ -1,6 +1,7 @@
 import { POST } from "@/app/api/fetch/ogimage/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";
+import { _resetOgCache } from "@/lib/cache/ogimage";
 
 function makeRequest(body: Record<string, unknown>): NextRequest {
   return new NextRequest("http://localhost:3000/api/fetch/ogimage", {
@@ -16,6 +17,7 @@ const originalFetch = global.fetch;
 describe("POST /api/fetch/ogimage", () => {
   beforeEach(() => {
     _resetRateLimits();
+    _resetOgCache();
     global.fetch = originalFetch;
   });
 

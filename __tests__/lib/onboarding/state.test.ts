@@ -36,11 +36,14 @@ describe("STEPS", () => {
     expect(ids).toEqual(["add-sources", "wait-content", "review-validate", "personalized"]);
   });
 
-  it("each step has label, description, and id", () => {
+  it("each step has non-empty string label, description, and id", () => {
     for (const step of STEPS) {
-      expect(step.id).toBeTruthy();
-      expect(step.label).toBeTruthy();
-      expect(step.description).toBeTruthy();
+      expect(typeof step.id).toBe("string");
+      expect(step.id.length).toBeGreaterThan(0);
+      expect(typeof step.label).toBe("string");
+      expect(step.label.length).toBeGreaterThan(0);
+      expect(typeof step.description).toBe("string");
+      expect(step.description.length).toBeGreaterThan(5);
     }
   });
 

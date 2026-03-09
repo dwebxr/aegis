@@ -12,8 +12,7 @@ export function useInstallPrompt() {
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    // Check if already installed (standalone mode)
-    if (typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches) {
+    if (window.matchMedia("(display-mode: standalone)").matches) {
       setInstalled(true);
       return;
     }

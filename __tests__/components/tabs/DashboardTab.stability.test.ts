@@ -94,7 +94,8 @@ describe("Dashboard Top3 — memoization behavior", () => {
       root.render(React.createElement(BriefingHookHarness, { content: items, profile: baseProfile }));
     });
     const ids1 = getDiv().getAttribute("data-top3-ids");
-    expect(ids1).toBeTruthy();
+    expect(typeof ids1).toBe("string");
+    expect(ids1!.length).toBeGreaterThan(0);
     expect(ids1!.split(",")).toHaveLength(3);
   });
 
@@ -125,7 +126,8 @@ describe("Dashboard Top3 — memoization behavior", () => {
     // useMemo recomputed due to profile change — Top3 IDs may or may not differ
     // but the computation ran with Date.now() (fresh timestamp)
     const idsAfter = getDiv().getAttribute("data-top3-ids");
-    expect(idsAfter).toBeTruthy();
+    expect(typeof idsAfter).toBe("string");
+    expect(idsAfter!.length).toBeGreaterThan(0);
     expect(idsAfter!.split(",")).toHaveLength(3);
   });
 

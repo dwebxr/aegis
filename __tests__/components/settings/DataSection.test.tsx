@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import "@testing-library/jest-dom";
 // Polyfill TextEncoder for react-dom/server in jsdom environment
 if (typeof globalThis.TextEncoder === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -137,9 +138,9 @@ describe("DataSection — Data Management", () => {
     render(<DataSection content={[]} />);
     fireEvent.click(screen.getByText("Clear Content Cache"));
     // Should show confirmation state
-    expect(screen.getByText("Clear cache?")).toBeTruthy();
-    expect(screen.getByText("Confirm")).toBeTruthy();
-    expect(screen.getByText("Cancel")).toBeTruthy();
+    expect(screen.getByText("Clear cache?")).toBeInTheDocument();
+    expect(screen.getByText("Confirm")).toBeInTheDocument();
+    expect(screen.getByText("Cancel")).toBeInTheDocument();
   });
 
   it("Clear Cache clears localStorage on Confirm", () => {
@@ -157,7 +158,7 @@ describe("DataSection — Data Management", () => {
     render(<DataSection content={[]} />);
     fireEvent.click(screen.getByText("Clear Content Cache"));
     fireEvent.click(screen.getByText("Cancel"));
-    expect(screen.getByText("Clear Content Cache")).toBeTruthy();
+    expect(screen.getByText("Clear Content Cache")).toBeInTheDocument();
     expect(screen.queryByText("Clear cache?")).toBeNull();
   });
 

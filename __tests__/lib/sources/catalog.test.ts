@@ -5,12 +5,18 @@ describe("catalog data integrity", () => {
 
   it("every source has required fields", () => {
     for (const s of POPULAR_SOURCES) {
-      expect(s.id).toBeTruthy();
-      expect(s.label).toBeTruthy();
-      expect(s.feedUrl).toBeTruthy();
-      expect(s.category).toBeTruthy();
-      expect(s.emoji).toBeTruthy();
-      expect(s.color).toBeTruthy();
+      expect(typeof s.id).toBe("string");
+      expect(s.id.length).toBeGreaterThan(0);
+      expect(typeof s.label).toBe("string");
+      expect(s.label.length).toBeGreaterThan(0);
+      expect(typeof s.feedUrl).toBe("string");
+      expect(s.feedUrl.length).toBeGreaterThan(0);
+      expect(typeof s.category).toBe("string");
+      expect(s.category.length).toBeGreaterThan(0);
+      expect(typeof s.emoji).toBe("string");
+      expect(s.emoji.length).toBeGreaterThan(0);
+      expect(typeof s.color).toBe("string");
+      expect(s.color.length).toBeGreaterThan(0);
     }
   });
 

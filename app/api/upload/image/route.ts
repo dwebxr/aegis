@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
   try {
     data = await res.json();
   } catch (err) {
-    console.error("[upload/image] Failed to parse image host response:", err);
+    console.error("[upload/image] Failed to parse image host response:", errMsg(err));
     return NextResponse.json({ error: "Invalid response from image host" }, { status: 502 });
   }
 

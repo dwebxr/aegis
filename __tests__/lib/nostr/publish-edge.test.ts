@@ -192,8 +192,8 @@ describe("publishSignalToNostr — relay fallback", () => {
 
   it("returns a valid eventId", async () => {
     const result = await publishSignalToNostr("test signal", keys.sk, [["t", "test"]]);
-    expect(result.eventId).toBeTruthy();
     expect(typeof result.eventId).toBe("string");
+    expect(result.eventId.length).toBeGreaterThan(0);
     expect(result.eventId).toMatch(/^[0-9a-f]{64}$/);
   });
 

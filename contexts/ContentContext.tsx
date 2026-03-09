@@ -315,37 +315,54 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       .slice(0, 30);
     if (items.length === 0) return () => {};
 
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    items.forEach((item, i) => {
-      timers.push(setTimeout(async () => {
-        try {
-          const res = await fetch("/api/fetch/ogimage", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: item.sourceUrl }),
-            signal: AbortSignal.timeout(10_000),
-          });
-          if (!res.ok) return;
-          const data = await res.json();
-          if (!data.imageUrl) return;
-          setContent(prev => prev.map(c =>
-            c.id === item.id && !c.imageUrl ? { ...c, imageUrl: data.imageUrl } : c,
-          ));
-          if (actorRef.current && isAuthenticated) {
-            const updated = contentRef.current.find(c => c.id === item.id);
-            if (updated && principal) {
-              void actorRef.current.saveEvaluation(toICEvaluation({ ...updated, imageUrl: data.imageUrl }, principal)).catch((err: unknown) => {
-                console.warn("[content] IC imageUrl backfill save failed:", errMsg(err));
-                setSyncStatus("offline");
-              });
-            }
-          }
-        } catch (err) {
-          console.debug("[content] Image backfill failed for", item.id, errMsg(err));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+
+    (async () => {
+      try {
+        const urls = items.map(item => item.sourceUrl!);
+        const res = await fetch("/api/fetch/ogimage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls }),
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const results: Array<{ url: string; imageUrl: string | null }> = data.results || [];
+
+        const urlToImage = new Map<string, string>();
+        for (const r of results) {
+          if (r.imageUrl) urlToImage.set(r.url, r.imageUrl);
         }
-      }, i * 300));
-    });
-    return () => timers.forEach(clearTimeout);
+        if (urlToImage.size === 0) return;
+
+        setContent(prev => prev.map(c => {
+          if (c.imageUrl || !c.sourceUrl) return c;
+          const img = urlToImage.get(c.sourceUrl);
+          return img ? { ...c, imageUrl: img } : c;
+        }));
+
+        if (actorRef.current && isAuthenticated && principal) {
+          for (const item of items) {
+            const img = urlToImage.get(item.sourceUrl!);
+            if (!img) continue;
+            void actorRef.current.saveEvaluation(toICEvaluation({ ...item, imageUrl: img }, principal)).catch((err: unknown) => {
+              console.warn("[content] IC imageUrl backfill save failed:", errMsg(err));
+              setSyncStatus("offline");
+            });
+          }
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          console.debug("[content] Image backfill batch failed:", errMsg(err));
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+    })();
+
+    return () => { clearTimeout(timeout); controller.abort(); };
   }, [isAuthenticated, principal]);
   backfillFnRef.current = backfillImageUrls;
 

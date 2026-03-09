@@ -4,6 +4,7 @@ import { HttpAgent, Actor } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { idlFactory } from "@/lib/ic/declarations/idlFactory";
 import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { generatePushToken } from "@/lib/api/pushToken";
 import { errMsg } from "@/lib/utils/errors";
 import { getCanisterId, getHost } from "@/lib/ic/config";
 import type { _SERVICE, PushSubscription } from "@/lib/ic/declarations/aegis_backend.did";
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Push not configured" }, { status: 503 });
   }
 
-  let body: { principal?: string; title?: string; body?: string; url?: string; tag?: string };
+  let body: { principal?: string; token?: string; title?: string; body?: string; url?: string; tag?: string };
   try {
     body = await request.json();
   } catch (err) {
@@ -38,6 +39,12 @@ export async function POST(request: NextRequest) {
 
   if (!body.principal) {
     return NextResponse.json({ error: "principal required" }, { status: 400 });
+  }
+
+  // Verify caller authorization via HMAC token
+  const expected = generatePushToken(body.principal);
+  if (!body.token || body.token !== expected) {
+    return NextResponse.json({ error: "Invalid or missing push token" }, { status: 403 });
   }
 
   let userPrincipal: Principal;

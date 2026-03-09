@@ -146,7 +146,11 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
       return;
     }
     try {
-      setUserApiKey(apiKeyInput);
+      const saved = setUserApiKey(apiKeyInput);
+      if (!saved) {
+        addNotification("Failed to save API key (storage full?)", "error");
+        return;
+      }
       setHasApiKey(true);
       setMaskedKey(maskApiKey(apiKeyInput));
       setApiKeyInput("");
@@ -162,7 +166,11 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
       setConfirmAction("clearApiKey");
       return;
     }
-    clearUserApiKey();
+    const cleared = clearUserApiKey();
+    if (!cleared) {
+      addNotification("Failed to clear API key", "error");
+      return;
+    }
     setHasApiKey(false);
     setMaskedKey("");
     setConfirmAction(null);
