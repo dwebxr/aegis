@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { cn } from "@/lib/utils";
-import { ShieldIcon, GearIcon, ChartIcon, GitHubIcon } from "@/components/icons";
+import { ShieldIcon, GearIcon, ChartIcon, GitHubIcon, DiscordIcon, MediumIcon, XIcon } from "@/components/icons";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserBadge } from "@/components/auth/UserBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -129,6 +129,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
           </div>
         )}
       </a>
+
+      {/* Social links */}
+      <div className={cn(
+        "flex items-center gap-1 mb-2",
+        collapsed ? "justify-center" : "px-3"
+      )}>
+        {[
+          { href: "https://discord.gg/85JVzJaatT", icon: <DiscordIcon s={14} />, title: "Discord" },
+          { href: "https://medium.com/aegis-ai", icon: <MediumIcon s={14} />, title: "Medium" },
+          { href: "https://x.com/Coo_aiagent", icon: <XIcon s={14} />, title: "X" },
+        ].map(link => (
+          <a
+            key={link.title}
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={link.title}
+            className="flex items-center justify-center size-7 rounded-sm text-disabled hover:text-tertiary transition-all duration-150"
+          >
+            {link.icon}
+          </a>
+        ))}
+      </div>
 
       {/* Status indicator */}
       <div className={cn(

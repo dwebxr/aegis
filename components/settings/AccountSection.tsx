@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useContent } from "@/contexts/ContentContext";
 import { useNotify } from "@/contexts/NotificationContext";
 import { NostrAccountLink } from "@/components/ui/NostrAccountLink";
-import { GitHubIcon } from "@/components/icons";
+import { GitHubIcon, DiscordIcon, MediumIcon, XIcon } from "@/components/icons";
 import { clearUserApiKey } from "@/lib/apiKey/storage";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 import { cardClass, sectionTitleClass, cancelBtnClass } from "./styles";
@@ -138,15 +138,26 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
             <span className="text-caption font-[800] text-foreground tracking-[2px]">AEGIS</span>
             <span className="text-tiny text-disabled ml-2">v3.0 — D2A Social Agent Platform</span>
           </div>
-          <a
-            href="https://github.com/dwebxr/aegis"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-caption text-muted-foreground no-underline"
-          >
-            <GitHubIcon s={14} />
-            <span className="font-semibold text-emerald-400">GitHub</span>
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href="https://github.com/dwebxr/aegis"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-caption text-muted-foreground no-underline"
+            >
+              <GitHubIcon s={14} />
+              <span className="font-semibold text-emerald-400">GitHub</span>
+            </a>
+            <a href="https://discord.gg/85JVzJaatT" target="_blank" rel="noopener noreferrer" title="Discord" className="text-disabled hover:text-tertiary transition-all duration-150">
+              <DiscordIcon s={16} />
+            </a>
+            <a href="https://medium.com/aegis-ai" target="_blank" rel="noopener noreferrer" title="Medium" className="text-disabled hover:text-tertiary transition-all duration-150">
+              <MediumIcon s={16} />
+            </a>
+            <a href="https://x.com/Coo_aiagent" target="_blank" rel="noopener noreferrer" title="X" className="text-disabled hover:text-tertiary transition-all duration-150">
+              <XIcon s={16} />
+            </a>
+          </div>
         </div>
       </div>
 
