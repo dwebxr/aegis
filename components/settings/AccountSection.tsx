@@ -109,6 +109,13 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
                 </span>
               )}
             </div>
+            <button
+              data-testid="aegis-settings-logout"
+              onClick={logout}
+              className="mt-3 px-4 py-1.5 bg-red-dim border border-red-border rounded-sm text-red-400 text-caption font-semibold cursor-pointer font-[inherit] self-start"
+            >
+              Logout
+            </button>
           </div>
         ) : (
           <div className="flex items-center gap-3">

@@ -2,7 +2,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { GearIcon, ChartIcon, GitHubIcon } from "@/components/icons";
+import { GearIcon, ChartIcon, GitHubIcon, DiscordIcon, MediumIcon, XIcon } from "@/components/icons";
 import type { NavItem } from "./Sidebar";
 
 const footerButtons = [
@@ -17,10 +17,7 @@ interface MobileNavProps {
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTabChange }) => {
-  const { isAuthenticated, principalText, login, logout } = useAuth();
-  const short = principalText.length > 8
-    ? principalText.slice(0, 4) + ".." + principalText.slice(-3)
-    : principalText;
+  const { isAuthenticated, login } = useAuth();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-navy/95 backdrop-blur-lg border-t border-subtle flex flex-col pb-[env(safe-area-inset-bottom,8px)] z-50">
@@ -51,13 +48,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
       <div className="flex justify-center items-center gap-2 flex-wrap px-3 pb-1">
         {isAuthenticated ? (
           <>
-            <button
-              onClick={logout}
-              className="flex items-center gap-1.5 px-4 py-1 bg-red-dim border border-red-border rounded-sm text-red-400 text-caption font-semibold cursor-pointer font-[inherit]"
-            >
-              <span className="text-caption text-emerald-400 font-mono">{short}</span>
-              <span>Logout</span>
-            </button>
             {footerButtons.map(btn => {
               const active = activeTab === btn.id;
               return (
@@ -77,6 +67,31 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
                 </button>
               );
             })}
+            {[
+              { href: "https://discord.gg/85JVzJaatT", icon: <DiscordIcon s={12} />, title: "Discord" },
+              { href: "https://medium.com/aegis-ai", icon: <MediumIcon s={12} />, title: "Medium" },
+              { href: "https://x.com/Coo_aiagent", icon: <XIcon s={12} />, title: "X" },
+            ].map(link => (
+              <a
+                key={link.title}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={link.title}
+                className="flex items-center justify-center size-7 rounded-sm text-disabled hover:text-tertiary transition-all duration-150"
+              >
+                {link.icon}
+              </a>
+            ))}
+            <a
+              href="https://github.com/dwebxr/aegis"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-3 py-1 text-caption text-disabled no-underline rounded-sm"
+            >
+              <GitHubIcon s={12} />
+              <span className="text-emerald-400 font-semibold tracking-wide">OSS</span>
+            </a>
           </>
         ) : (
           <button
@@ -86,15 +101,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
             Login with Internet Identity
           </button>
         )}
-        <a
-          href="https://github.com/dwebxr/aegis"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 px-3 py-1 text-caption text-disabled no-underline rounded-sm"
-        >
-          <GitHubIcon s={12} />
-          <span className="text-emerald-400 font-semibold tracking-wide">OSS</span>
-        </a>
       </div>
     </nav>
   );
