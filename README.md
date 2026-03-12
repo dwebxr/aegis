@@ -9,6 +9,14 @@
 
 ## Latest Updates (March 2026)
 
+### Social Links & Logout UX Refinement
+- **5627 tests, 324 suites** — zero failures, zero skipped
+- **Social link icons**: Discord, Medium, X icon buttons added to landing page footer, desktop sidebar, mobile nav footer, and Settings > About card
+- **`SOCIAL_LINKS` single source of truth**: `lib/config.ts` constant — URL changes propagate to all 4 locations automatically
+- **`SocialIcon` component**: Key-to-icon resolver in `components/icons/index.tsx` — maps `SOCIAL_LINKS` keys to SVG components, returns null for unknown keys
+- **Logout moved to Settings > Account**: Removed logout button from mobile nav footer (reclaimed space for social icons), added explicit Logout button in Settings > Account card
+- **Landing page redesign**: Image-rich sections with concise 1+1 sentence copy per section
+
 ### Production Hardening & Test Quality Overhaul
 - **5588 tests, 322 suites** — zero failures, zero skipped, zero `toBeTruthy()` shallow assertions
 - **Push endpoint authorization**: HMAC-SHA256 token system — `/api/push/token` issues tokens, `/api/push/send` validates before dispatching; prevents unauthorized push spam
@@ -1294,6 +1302,13 @@ If your published signals are consistently rated as low-quality by the community
 ### Do I need to deposit ICP before I can use Aegis?
 
 **No.** You can browse, filter, score, curate content, and publish signals indefinitely without any deposit. Deposits are only triggered as an anti-spam measure for publishers whose signals are consistently flagged.
+
+## Community
+
+- [Discord](https://discord.gg/85JVzJaatT)
+- [Medium](https://medium.com/aegis-ai)
+- [X](https://x.com/Coo_aiagent)
+- [GitHub](https://github.com/dwebxr/aegis)
 
 ## License
 
