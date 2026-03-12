@@ -14,9 +14,7 @@ import type { NavItem } from "@/components/layout/Sidebar";
 
 let mockAuth = {
   isAuthenticated: false,
-  principalText: "",
   login: jest.fn(),
-  logout: jest.fn(),
 };
 
 jest.mock("@/contexts/AuthContext", () => ({
@@ -33,9 +31,7 @@ describe("MobileNav", () => {
   beforeEach(() => {
     mockAuth = {
       isAuthenticated: false,
-      principalText: "",
       login: jest.fn(),
-      logout: jest.fn(),
     };
   });
 
@@ -64,50 +60,53 @@ describe("MobileNav", () => {
     expect(html).toContain("Login with Internet Identity");
   });
 
-  it("shows logout + footer buttons when authenticated", () => {
-    mockAuth = {
-      isAuthenticated: true,
-      principalText: "abcde-12345-fghij-67890",
-      login: jest.fn(),
-      logout: jest.fn(),
-    };
+  it("does not show social links or GitHub when unauthenticated", () => {
     const html = renderToStaticMarkup(
       <MobileNav navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} />,
     );
-    expect(html).toContain("Logout");
-    // Footer buttons (Settings, Stats) rendered from footerButtons config
+    expect(html).not.toContain("discord.gg");
+    expect(html).not.toContain("github.com/dwebxr/aegis");
+  });
+
+  it("shows footer buttons when authenticated", () => {
+    mockAuth = { isAuthenticated: true, login: jest.fn() };
+    const html = renderToStaticMarkup(
+      <MobileNav navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} />,
+    );
     expect(html).toContain("Settings");
     expect(html).toContain("Stats");
   });
 
-  it("truncates long principal text", () => {
-    mockAuth = {
-      isAuthenticated: true,
-      principalText: "abcdefghijklmnop",
-      login: jest.fn(),
-      logout: jest.fn(),
-    };
+  it("does not show logout button (moved to Settings)", () => {
+    mockAuth = { isAuthenticated: true, login: jest.fn() };
     const html = renderToStaticMarkup(
       <MobileNav navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} />,
     );
-    // Should show truncated: first 4 + ".." + last 3
-    expect(html).toContain("abcd..nop");
+    expect(html).not.toContain("Logout");
   });
 
-  it("shows full short principal text without truncation", () => {
-    mockAuth = {
-      isAuthenticated: true,
-      principalText: "short",
-      login: jest.fn(),
-      logout: jest.fn(),
-    };
+  it("renders social links when authenticated", () => {
+    mockAuth = { isAuthenticated: true, login: jest.fn() };
     const html = renderToStaticMarkup(
       <MobileNav navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} />,
     );
-    expect(html).toContain("short");
+    expect(html).toContain("discord.gg/85JVzJaatT");
+    expect(html).toContain("medium.com/aegis-ai");
+    expect(html).toContain("x.com/Coo_aiagent");
   });
 
-  it("renders GitHub OSS link", () => {
+  it("renders social links with target=_blank and rel=noopener", () => {
+    mockAuth = { isAuthenticated: true, login: jest.fn() };
+    const html = renderToStaticMarkup(
+      <MobileNav navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} />,
+    );
+    const discordLink = html.match(/<a[^>]*discord\.gg[^>]*>/)?.[0] || "";
+    expect(discordLink).toContain('target="_blank"');
+    expect(discordLink).toContain('rel="noopener noreferrer"');
+  });
+
+  it("renders GitHub OSS link when authenticated", () => {
+    mockAuth = { isAuthenticated: true, login: jest.fn() };
     const html = renderToStaticMarkup(
       <MobileNav navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} />,
     );
@@ -115,25 +114,18 @@ describe("MobileNav", () => {
     expect(html).toContain("OSS");
   });
 
-  it("highlights active tab with blue color and underline indicator", () => {
+  it("highlights active tab with blue color", () => {
     const html = renderToStaticMarkup(
       <MobileNav navItems={navItems} activeTab="briefing" onTabChange={jest.fn()} />,
     );
-    // Active tab has Tailwind blue color class
     expect(html).toContain("text-blue-400");
   });
 
   it("highlights active footer button (settings)", () => {
-    mockAuth = {
-      isAuthenticated: true,
-      principalText: "abcde-12345-fghij",
-      login: jest.fn(),
-      logout: jest.fn(),
-    };
+    mockAuth = { isAuthenticated: true, login: jest.fn() };
     const html = renderToStaticMarkup(
       <MobileNav navItems={navItems} activeTab="settings" onTabChange={jest.fn()} />,
     );
-    // Settings button should have active background class
     expect(html).toContain("bg-blue-600/[0.12]");
   });
 
@@ -141,7 +133,6 @@ describe("MobileNav", () => {
     const html = renderToStaticMarkup(
       <MobileNav navItems={[]} activeTab="" onTabChange={jest.fn()} />,
     );
-    // Should still render the nav structure without crashing
     expect(html).toContain("nav");
   });
 });

@@ -1,7 +1,8 @@
 "use client";
 import React from "react";
 import { cn } from "@/lib/utils";
-import { ShieldIcon, GearIcon, ChartIcon, GitHubIcon, DiscordIcon, MediumIcon, XIcon } from "@/components/icons";
+import { ShieldIcon, GearIcon, ChartIcon, GitHubIcon, SocialIcon } from "@/components/icons";
+import { SOCIAL_LINKS } from "@/lib/config";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserBadge } from "@/components/auth/UserBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -135,20 +136,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         "flex items-center gap-1 mb-2",
         collapsed ? "justify-center" : "px-3"
       )}>
-        {[
-          { href: "https://discord.gg/85JVzJaatT", icon: <DiscordIcon s={14} />, title: "Discord" },
-          { href: "https://medium.com/aegis-ai", icon: <MediumIcon s={14} />, title: "Medium" },
-          { href: "https://x.com/Coo_aiagent", icon: <XIcon s={14} />, title: "X" },
-        ].map(link => (
+        {SOCIAL_LINKS.map(link => (
           <a
-            key={link.title}
+            key={link.key}
             href={link.href}
             target="_blank"
             rel="noopener noreferrer"
             title={link.title}
             className="flex items-center justify-center size-7 rounded-sm text-disabled hover:text-tertiary transition-all duration-150"
           >
-            {link.icon}
+            <SocialIcon name={link.key} s={14} />
           </a>
         ))}
       </div>

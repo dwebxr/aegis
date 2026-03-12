@@ -5,7 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useContent } from "@/contexts/ContentContext";
 import { useNotify } from "@/contexts/NotificationContext";
 import { NostrAccountLink } from "@/components/ui/NostrAccountLink";
-import { GitHubIcon, DiscordIcon, MediumIcon, XIcon } from "@/components/icons";
+import { GitHubIcon, SocialIcon } from "@/components/icons";
+import { SOCIAL_LINKS } from "@/lib/config";
 import { clearUserApiKey } from "@/lib/apiKey/storage";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 import { cardClass, sectionTitleClass, cancelBtnClass } from "./styles";
@@ -155,15 +156,11 @@ export const AccountSection: React.FC<AccountSectionProps> = ({ mobile, linkedAc
               <GitHubIcon s={14} />
               <span className="font-semibold text-emerald-400">GitHub</span>
             </a>
-            <a href="https://discord.gg/85JVzJaatT" target="_blank" rel="noopener noreferrer" title="Discord" className="text-disabled hover:text-tertiary transition-all duration-150">
-              <DiscordIcon s={16} />
-            </a>
-            <a href="https://medium.com/aegis-ai" target="_blank" rel="noopener noreferrer" title="Medium" className="text-disabled hover:text-tertiary transition-all duration-150">
-              <MediumIcon s={16} />
-            </a>
-            <a href="https://x.com/Coo_aiagent" target="_blank" rel="noopener noreferrer" title="X" className="text-disabled hover:text-tertiary transition-all duration-150">
-              <XIcon s={16} />
-            </a>
+            {SOCIAL_LINKS.map(link => (
+              <a key={link.key} href={link.href} target="_blank" rel="noopener noreferrer" title={link.title} className="text-disabled hover:text-tertiary transition-all duration-150">
+                <SocialIcon name={link.key} s={16} />
+              </a>
+            ))}
           </div>
         </div>
       </div>

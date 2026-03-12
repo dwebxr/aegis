@@ -66,6 +66,20 @@ describe("LandingHero", () => {
     expect(html).toContain("translate feature");
   });
 
+  it("renders social links in footer (Discord, Medium, X)", () => {
+    const html = render();
+    expect(html).toContain("discord.gg/85JVzJaatT");
+    expect(html).toContain("medium.com/aegis-ai");
+    expect(html).toContain("x.com/Coo_aiagent");
+  });
+
+  it("social links open in new tab", () => {
+    const html = render();
+    const xLink = html.match(/<a[^>]*x\.com\/Coo_aiagent[^>]*>/)?.[0] || "";
+    expect(xLink).toContain('target="_blank"');
+    expect(xLink).toContain('rel="noopener noreferrer"');
+  });
+
   /* ----------------------------------------------------------- */
   /* Image src attributes point to real files                     */
   /* ----------------------------------------------------------- */

@@ -138,4 +138,32 @@ describe("Sidebar", () => {
     );
     expect(html).toContain("Overview");
   });
+
+  it("renders social links (Discord, Medium, X)", () => {
+    const html = renderToStaticMarkup(
+      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
+    );
+    expect(html).toContain("discord.gg/85JVzJaatT");
+    expect(html).toContain("medium.com/aegis-ai");
+    expect(html).toContain("x.com/Coo_aiagent");
+  });
+
+  it("renders social links with correct attributes", () => {
+    const html = renderToStaticMarkup(
+      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
+    );
+    const discordLink = html.match(/<a[^>]*discord\.gg[^>]*>/)?.[0] || "";
+    expect(discordLink).toContain('target="_blank"');
+    expect(discordLink).toContain('rel="noopener noreferrer"');
+    expect(discordLink).toContain('title="Discord"');
+  });
+
+  it("renders social links in collapsed mode", () => {
+    const html = renderToStaticMarkup(
+      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={true} />,
+    );
+    expect(html).toContain("discord.gg/85JVzJaatT");
+    expect(html).toContain("medium.com/aegis-ai");
+    expect(html).toContain("x.com/Coo_aiagent");
+  });
 });

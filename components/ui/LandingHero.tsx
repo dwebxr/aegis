@@ -2,7 +2,8 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import { ShieldIcon, ChromeIcon, GitHubIcon, DiscordIcon, MediumIcon, XIcon } from "@/components/icons";
+import { ShieldIcon, ChromeIcon, GitHubIcon, SocialIcon } from "@/components/icons";
+import { SOCIAL_LINKS } from "@/lib/config";
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -618,15 +619,11 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
     {/* Footer */}
     <footer className="w-full text-center py-8 text-caption text-disabled">
       <div className="flex items-center justify-center gap-5 mb-4">
-        <a href="https://discord.gg/85JVzJaatT" target="_blank" rel="noopener noreferrer" title="Discord" className="text-disabled hover:text-primary transition-normal">
-          <DiscordIcon s={22} />
-        </a>
-        <a href="https://medium.com/aegis-ai" target="_blank" rel="noopener noreferrer" title="Medium" className="text-disabled hover:text-primary transition-normal">
-          <MediumIcon s={22} />
-        </a>
-        <a href="https://x.com/Coo_aiagent" target="_blank" rel="noopener noreferrer" title="X" className="text-disabled hover:text-primary transition-normal">
-          <XIcon s={22} />
-        </a>
+        {SOCIAL_LINKS.map(link => (
+          <a key={link.key} href={link.href} target="_blank" rel="noopener noreferrer" title={link.title} className="text-disabled hover:text-primary transition-normal">
+            <SocialIcon name={link.key} s={22} />
+          </a>
+        ))}
       </div>
       <span className="font-mono">Aegis v3.0</span>
       <span>

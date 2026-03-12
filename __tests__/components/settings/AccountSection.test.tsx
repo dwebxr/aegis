@@ -109,6 +109,26 @@ describe("AccountSection — Nostr account", () => {
   });
 });
 
+describe("AccountSection — logout button", () => {
+  it("shows Logout button when authenticated", () => {
+    const html = renderToStaticMarkup(<AccountSection />);
+    expect(html).toContain("Logout");
+    expect(html).toContain("aegis-settings-logout");
+  });
+
+  it("calls logout when Logout button clicked", () => {
+    render(<AccountSection />);
+    fireEvent.click(screen.getByTestId("aegis-settings-logout"));
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show Logout when unauthenticated", () => {
+    mockIsAuthenticated = false;
+    const html = renderToStaticMarkup(<AccountSection />);
+    expect(html).not.toContain("aegis-settings-logout");
+  });
+});
+
 describe("AccountSection — About section", () => {
   it("shows AEGIS branding", () => {
     const html = renderToStaticMarkup(<AccountSection />);
@@ -121,6 +141,20 @@ describe("AccountSection — About section", () => {
     const html = renderToStaticMarkup(<AccountSection />);
     expect(html).toContain("https://github.com/dwebxr/aegis");
     expect(html).toContain("GitHub");
+  });
+
+  it("shows social links (Discord, Medium, X)", () => {
+    const html = renderToStaticMarkup(<AccountSection />);
+    expect(html).toContain("discord.gg/85JVzJaatT");
+    expect(html).toContain("medium.com/aegis-ai");
+    expect(html).toContain("x.com/Coo_aiagent");
+  });
+
+  it("renders social links with target=_blank", () => {
+    const html = renderToStaticMarkup(<AccountSection />);
+    const mediumLink = html.match(/<a[^>]*medium\.com[^>]*>/)?.[0] || "";
+    expect(mediumLink).toContain('target="_blank"');
+    expect(mediumLink).toContain('rel="noopener noreferrer"');
   });
 });
 

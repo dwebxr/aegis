@@ -2,7 +2,8 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { GearIcon, ChartIcon, GitHubIcon, DiscordIcon, MediumIcon, XIcon } from "@/components/icons";
+import { GearIcon, ChartIcon, GitHubIcon, SocialIcon } from "@/components/icons";
+import { SOCIAL_LINKS } from "@/lib/config";
 import type { NavItem } from "./Sidebar";
 
 const footerButtons = [
@@ -67,20 +68,16 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
                 </button>
               );
             })}
-            {[
-              { href: "https://discord.gg/85JVzJaatT", icon: <DiscordIcon s={12} />, title: "Discord" },
-              { href: "https://medium.com/aegis-ai", icon: <MediumIcon s={12} />, title: "Medium" },
-              { href: "https://x.com/Coo_aiagent", icon: <XIcon s={12} />, title: "X" },
-            ].map(link => (
+            {SOCIAL_LINKS.map(link => (
               <a
-                key={link.title}
+                key={link.key}
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
                 title={link.title}
                 className="flex items-center justify-center size-7 rounded-sm text-disabled hover:text-tertiary transition-all duration-150"
               >
-                {link.icon}
+                <SocialIcon name={link.key} s={12} />
               </a>
             ))}
             <a
