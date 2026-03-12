@@ -279,3 +279,87 @@ describe("ContentCard — data-source-url attribute", () => {
     expect(html).toContain('aria-label="Flag as slop"');
   });
 });
+
+describe("ContentCard — float layout and font sizing", () => {
+  it("uses float-right on GradeBadge container for default variant", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard item={makeItem()} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("float-right");
+  });
+
+  it("uses float-right on GradeBadge container for priority variant", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard item={makeItem()} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} variant="priority" />
+    );
+    expect(html).toContain("float-right");
+  });
+
+  it("contains float with flow-root BFC on text container", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard item={makeItem()} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    // flow-root establishes BFC to contain floats without clipping box-shadow
+    expect(html).toContain("flow-root");
+  });
+
+  it("uses text-body-lg for default card text", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard item={makeItem()} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("text-body-lg");
+    expect(html).toContain("leading-body-lg");
+  });
+
+  it("uses text-body-lg for default card on mobile too (unified sizing)", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard item={makeItem()} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} mobile />
+    );
+    // Body text uses text-body-lg on mobile (same as desktop)
+    expect(html).toContain("text-body-lg");
+    // The <p> tag should have text-body-lg, not the old mobile-specific text-[13px]
+    // (text-[13px] still appears on the author name in the header — that's expected)
+    expect(html).toMatch(/<p[^>]*text-body-lg/);
+  });
+
+  it("uses 16px font for large (priority) variant", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard item={makeItem()} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} variant="priority" />
+    );
+    expect(html).toContain("text-[16px]");
+    expect(html).toContain("leading-[1.35]");
+  });
+
+  it("uses 16px font for serendipity variant", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard item={makeItem()} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} variant="serendipity" />
+    );
+    expect(html).toContain("text-[16px]");
+  });
+
+  it("does not leak clear-right outside float container", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard item={makeItem()} expanded={true} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    // overflow-hidden on the float parent establishes BFC — no clear-right needed outside
+    // Count occurrences: clear-right should NOT appear at all (removed from expanded and outer divs)
+    const clearCount = (html.match(/clear-right/g) || []).length;
+    expect(clearCount).toBe(0);
+  });
+
+  it("wraps image and text in flex when imageUrl is present", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard item={makeItem({ imageUrl: "https://example.com/img.jpg" })} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("flex gap-3 items-start");
+  });
+
+  it("does not use flex wrapper when no imageUrl", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard item={makeItem({ imageUrl: undefined })} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    // The body wrapper div should NOT have "flex gap-3" when there is no image
+    // Check that "flex gap-3 items-start" does not appear (the header row has a different flex)
+    expect(html).not.toContain("flex gap-3 items-start");
+  });
+});

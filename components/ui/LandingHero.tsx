@@ -1,195 +1,287 @@
 "use client";
 import React from "react";
 import { cn } from "@/lib/utils";
-import { ShieldIcon, FireIcon, ZapIcon, ChartIcon, GitHubIcon, RSSIcon, SearchIcon, ShareIcon, GlobeIcon, ChromeIcon } from "@/components/icons";
+import Image from "next/image";
+import { ShieldIcon, ChromeIcon, GitHubIcon } from "@/components/icons";
 
+/* ------------------------------------------------------------------ */
+/*  Props                                                              */
+/* ------------------------------------------------------------------ */
 interface LandingHeroProps {
   onTryDemo: () => void;
   onLogin: () => void;
   mobile?: boolean;
 }
 
-const HOW_IT_WORKS = [
-  {
-    step: "1",
-    icon: <RSSIcon s={22} />,
-    title: "Add Your Feeds",
-    desc: "Register RSS feeds, Nostr relays, or social sources you already follow.",
-    colorClass: "text-cyan-400",
-  },
-  {
-    step: "2",
-    icon: <ShieldIcon s={22} />,
-    title: "AI Filters the Noise",
-    desc: "Every article is scored for quality, originality, and credibility. Low-effort content is filtered out.",
-    colorClass: "text-blue-400",
-  },
-  {
-    step: "3",
-    icon: <SearchIcon s={22} />,
-    title: "Read What Matters",
-    desc: "Get a curated reading list daily. Only articles worth your time.",
-    colorClass: "text-emerald-400",
-  },
-];
+/* ------------------------------------------------------------------ */
+/*  Shared layout: image + text side-by-side                           */
+/* ------------------------------------------------------------------ */
+interface FeatureSectionProps {
+  id: string;
+  heading: string;
+  body: React.ReactNode;
+  imageSrc: string;
+  imageAlt: string;
+  imageWidth: number;
+  imageHeight: number;
+  imageFirst?: boolean; // true = image left, text right
+  imageClassName?: string; // extra classes on the image container
+  mobile?: boolean;
+}
 
-const OUTCOMES = [
-  {
-    icon: <RSSIcon s={20} />,
-    title: "AI-Curated Daily Reading List",
-    desc: "Every morning, receive only the articles worth your time from all your feeds.",
-    colorClass: "text-cyan-400",
-    borderClass: "border-l-cyan-400",
-  },
-  {
-    icon: <ChartIcon s={20} />,
-    title: "Instant Quality Scores",
-    desc: "See quality, originality, and credibility scores at a glance. Skip the clickbait.",
-    colorClass: "text-purple-400",
-    borderClass: "border-l-purple-400",
-  },
-  {
-    icon: <ShareIcon s={20} />,
-    title: "Share Quality Signals on Nostr",
-    desc: "Publish \u201cworth reading\u201d signals to Nostr with your evaluation attached.",
-    colorClass: "text-emerald-400",
-    borderClass: "border-l-emerald-400",
-  },
-  {
-    icon: <FireIcon s={20} />,
-    title: "Peer-to-Peer Content Exchange",
-    desc: "Your agent trades high-quality content with other agents. Encrypted, no middleman.",
-    colorClass: "text-orange-400",
-    borderClass: "border-l-orange-400",
-  },
-];
+const FeatureSection: React.FC<FeatureSectionProps> = ({
+  id,
+  heading,
+  body,
+  imageSrc,
+  imageAlt,
+  imageWidth,
+  imageHeight,
+  imageFirst = false,
+  imageClassName,
+  mobile,
+}) => (
+  <section
+    id={id}
+    className={cn(
+      "w-full max-w-[1080px] mx-auto",
+      mobile ? "px-5 py-10" : "px-8 py-20"
+    )}
+  >
+    <div
+      className={cn(
+        "flex items-center gap-10",
+        mobile ? "flex-col" : imageFirst ? "flex-row" : "flex-row-reverse"
+      )}
+    >
+      {/* Image */}
+      <div className={cn("flex-1 min-w-0", mobile && "w-full", imageClassName)}>
+        <Image
+          src={imageSrc}
+          alt={imageAlt}
+          width={imageWidth}
+          height={imageHeight}
+          className="w-full h-auto rounded-xl border border-border shadow-lg"
+        />
+      </div>
+      {/* Text */}
+      <div className={cn("flex-1 min-w-0", mobile && "w-full text-center")}>
+        <h2
+          className={cn(
+            "font-[700] leading-[1.15] tracking-tight text-foreground m-0",
+            mobile ? "text-[22px]" : "text-[30px]"
+          )}
+        >
+          {heading}
+        </h2>
+        <div
+          className={cn(
+            "mt-4 text-muted-foreground leading-relaxed",
+            mobile ? "text-body-sm" : "text-body"
+          )}
+        >
+          {body}
+        </div>
+      </div>
+    </div>
+  </section>
+);
 
-const FEATURES = [
-  {
-    icon: <ShieldIcon s={22} />,
-    title: "Quality Filter",
-    desc: "Automatically removes clickbait and thin aggregator posts. Only deep analysis and primary sources remain.",
-    colorClass: "text-cyan-400",
-    bgClass: "bg-gradient-to-br from-cyan-500/[0.09] to-blue-600/[0.04] border-cyan-500/[0.15]",
-  },
-  {
-    icon: <ZapIcon s={22} />,
-    title: "Nostr Publishing",
-    desc: "Broadcast your curated picks to Nostr with quality scores attached. Build reputation as a trusted curator.",
-    colorClass: "text-purple-400",
-    bgClass: "bg-gradient-to-br from-purple-500/[0.09] to-blue-600/[0.04] border-purple-500/[0.15]",
-  },
-  {
-    icon: <ChartIcon s={22} />,
-    title: "Web of Trust",
-    desc: "Content endorsed by people you follow on Nostr ranks higher. Your trust graph shapes your feed.",
-    colorClass: "text-emerald-400",
-    bgClass: "bg-gradient-to-br from-emerald-500/[0.09] to-cyan-500/[0.04] border-emerald-500/[0.15]",
-  },
-  {
-    icon: <FireIcon s={22} />,
-    title: "D2A Agents",
-    desc: "Your personal agent discovers, evaluates, and exchanges quality content with other agents. Fully encrypted.",
-    colorClass: "text-orange-400",
-    bgClass: "bg-gradient-to-br from-orange-500/[0.09] to-amber-500/[0.04] border-orange-500/[0.15]",
-  },
-] as const;
-
+/* ------------------------------------------------------------------ */
+/*  Persona data                                                       */
+/* ------------------------------------------------------------------ */
 const PERSONAS = [
   {
-    role: "Crypto Trader",
-    icon: <ChartIcon s={18} />,
-    quote: "Instead of skimming 500 news articles a day, I read the 20 that actually move markets.",
-    colorClass: "text-cyan-400",
-    borderClass: "border-t-cyan-400",
+    role: "Crypto traders",
+    quote:
+      "\u201CI don\u2019t skim 500 headlines a day anymore. I just read the 20 stories that actually move the market.\u201D",
+    accent: "border-t-cyan-400",
   },
   {
-    role: "Researcher",
-    icon: <SearchIcon s={18} />,
-    quote: "Papers and technical posts are auto-scored for depth. I spend my time reading, not triaging.",
-    colorClass: "text-purple-400",
-    borderClass: "border-t-purple-400",
+    role: "Researchers",
+    quote:
+      "\u201CPapers and technical posts are scored on depth automatically. I spend my time reading, not triaging.\u201D",
+    accent: "border-t-purple-400",
   },
   {
-    role: "Newsletter Writer",
-    icon: <GlobeIcon s={18} />,
-    quote: "My agent surfaces original analysis across 50 feeds. The curated picks go straight into my weekly digest.",
-    colorClass: "text-emerald-400",
-    borderClass: "border-t-emerald-400",
+    role: "Newsletter writers",
+    quote:
+      "\u201CMy agent surfaces original analysis from 50+ feeds. The curated list becomes the backbone of my weekly digest.\u201D",
+    accent: "border-t-emerald-400",
   },
 ];
 
-const TRUST_PILLS = ["Open Source", "Self-Custodial", "No Tracking"];
+/* ------------------------------------------------------------------ */
+/*  Main component                                                     */
+/* ------------------------------------------------------------------ */
+export const LandingHero: React.FC<LandingHeroProps> = ({
+  onTryDemo,
+  onLogin,
+  mobile,
+}) => (
+  <div
+    data-testid="aegis-landing-hero"
+    className="flex flex-col items-center animate-fade-in"
+  >
+    {/* ============================================================ */}
+    {/* 1. HERO                                                       */}
+    {/* ============================================================ */}
+    <header
+      className={cn(
+        "w-full max-w-[1080px] mx-auto flex items-center",
+        mobile
+          ? "flex-col text-center px-5 pt-10 pb-8 gap-8"
+          : "flex-row px-8 pt-16 pb-12 gap-12"
+      )}
+    >
+      {/* Copy side */}
+      <div className={cn("flex-1 min-w-0", mobile && "w-full")}>
+        {/* Logo */}
+        <div
+          className={cn(
+            "size-12 rounded-md bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mb-5 shadow-glow-cyan",
+            mobile && "mx-auto"
+          )}
+        >
+          <ShieldIcon s={24} />
+        </div>
 
-export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mobile }) => (
-  <div data-testid="aegis-landing-hero" className={cn(
-    "flex flex-col items-center justify-center text-center animate-fade-in",
-    mobile
-      ? "min-h-auto px-4 pt-8 pb-16"
-      : "min-h-[calc(100vh-120px)] px-6 py-12"
-  )}>
-    {/* Logo */}
-    <div className="size-14 rounded-md bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mb-6 shadow-glow-cyan">
-      <ShieldIcon s={28} />
-    </div>
+        <h1
+          data-testid="aegis-landing-heading"
+          className={cn(
+            "font-[800] leading-[1.08] tracking-tight text-foreground m-0",
+            mobile ? "text-[30px]" : "text-[44px] max-w-[520px]"
+          )}
+        >
+          Cut Through the Noise in Your Feeds
+        </h1>
 
-    {/* Hero heading */}
-    <h1 data-testid="aegis-landing-heading" className={cn(
-      "font-[800] leading-[1.1] tracking-tight text-foreground m-0 max-w-[600px]",
-      mobile ? "text-[28px]" : "text-[40px]"
-    )}>
-      Cut Through the Noise in Your Feeds
-    </h1>
+        <p className="text-body font-semibold text-cyan-400 tracking-wide mt-3 mb-0">
+          AI-powered quality filter for RSS and social feeds. Free and open
+          source.
+        </p>
 
-    <p className="text-body font-semibold text-cyan-400 tracking-wide mt-2 mb-0">
-      AI-powered quality filter for RSS and social feeds. Free and open source.
-    </p>
+        <p
+          className={cn(
+            "leading-relaxed text-muted-foreground mt-3 mb-0",
+            mobile ? "text-body-sm" : "text-body",
+            !mobile && "max-w-[480px]"
+          )}
+        >
+          Your personal AI agent learns what you care about, and aggressively
+          blocks slop from your timelines.
+          <br />
+          Every day, you only see high-signal content that&rsquo;s actually
+          worth your time.
+        </p>
 
-    <p className={cn(
-      "leading-relaxed text-tertiary mt-2 mb-0 max-w-[480px]",
-      mobile ? "text-body-sm" : "text-body"
-    )}>
-      Built for researchers, analysts, and anyone whose work depends on finding signal.
-    </p>
+        {/* CTAs */}
+        <div
+          className={cn(
+            "flex gap-3 mt-7",
+            mobile ? "flex-col w-full" : "flex-row items-center"
+          )}
+        >
+          <button
+            type="button"
+            data-testid="aegis-landing-try-demo"
+            onClick={onTryDemo}
+            className={cn(
+              "px-7 py-3 bg-gradient-to-br from-blue-600 to-cyan-500 border-none rounded-md text-white text-body font-bold cursor-pointer font-sans shadow-glow-cyan transition-normal",
+              mobile && "w-full"
+            )}
+          >
+            Try the Demo
+          </button>
+          <button
+            type="button"
+            data-testid="aegis-landing-login"
+            onClick={onLogin}
+            className={cn(
+              "px-5 py-3 bg-card border border-border rounded-md text-secondary-foreground text-body font-semibold cursor-pointer font-sans transition-normal",
+              mobile && "w-full"
+            )}
+          >
+            Sign in with Internet Identity
+          </button>
+        </div>
+      </div>
 
-    {/* CTA */}
-    <div className={cn(
-      "flex flex-col items-center gap-2",
-      mobile ? "mt-6 w-full" : "mt-8 w-auto"
-    )}>
-      <button
-        data-testid="aegis-landing-try-demo"
-        onClick={onTryDemo}
+      {/* Hero image */}
+      <div className={cn("flex-1 min-w-0", mobile && "w-full")}>
+        <Image
+          src="/images/home-feed.png"
+          alt="Aegis home feed showing filtered, high-signal content"
+          width={900}
+          height={459}
+          priority
+          className="w-full h-auto rounded-xl border border-border shadow-lg"
+        />
+      </div>
+    </header>
+
+    {/* ============================================================ */}
+    {/* 2. HOW IT WORKS                                               */}
+    {/* ============================================================ */}
+    <section
+      className={cn(
+        "w-full max-w-[1080px] mx-auto",
+        mobile ? "px-5 py-10" : "px-8 py-16"
+      )}
+    >
+      <h2
         className={cn(
-          "px-8 py-3 bg-gradient-to-br from-blue-600 to-cyan-500 border-none rounded-md text-white text-body font-bold cursor-pointer font-sans shadow-glow-cyan transition-normal",
-          mobile && "w-full"
+          "text-center font-[700] tracking-tight text-foreground m-0 mb-8",
+          mobile ? "text-[20px]" : "text-[26px]"
         )}
       >
-        Try the Demo
-      </button>
-      <button
-        data-testid="aegis-landing-login"
-        onClick={onLogin}
-        className="px-4 py-1 bg-transparent border-none rounded-sm text-tertiary text-body-sm font-medium cursor-pointer font-sans underline decoration-emphasis underline-offset-[3px] transition-normal"
-      >
-        or sign in with Internet Identity
-      </button>
-    </div>
+        How it works
+      </h2>
 
-    {/* HOW IT WORKS */}
-    <div className={cn("w-full max-w-[640px]", mobile ? "mt-10" : "mt-12")}>
-      <div className="text-caption font-bold text-disabled tracking-[2px] uppercase mb-3 text-center">How It Works</div>
-      <div className={cn("grid gap-4", mobile ? "grid-cols-1 gap-3" : "grid-cols-3")}>
-        {HOW_IT_WORKS.map(s => (
-          <div key={s.step} className={cn(
-            "bg-card border border-border rounded-lg text-center relative overflow-hidden",
-            mobile ? "p-4" : "p-5"
-          )}>
-            <div className={cn("text-[48px] font-[800] opacity-[0.12] absolute leading-none pointer-events-none", s.colorClass, mobile ? "-top-1 right-2" : "-top-0.5 right-3")}>
-              {s.step}
+      <div
+        className={cn("grid gap-6", mobile ? "grid-cols-1" : "grid-cols-3")}
+      >
+        {[
+          {
+            n: "1",
+            title: "Add your feeds",
+            desc: "Connect the RSS feeds and social sources you already follow.",
+            color: "text-cyan-400",
+          },
+          {
+            n: "2",
+            title: "AI filters out the slop",
+            desc: "Every item is scored for quality, originality, and trust, and low-effort content gets filtered out.",
+            color: "text-blue-400",
+          },
+          {
+            n: "3",
+            title: "Read only what matters",
+            desc: "Get a daily reading list with the few pieces that are truly worth your time.",
+            color: "text-emerald-400",
+          },
+        ].map((s) => (
+          <div
+            key={s.n}
+            className={cn(
+              "bg-card border border-border rounded-lg text-center relative overflow-hidden",
+              mobile ? "p-5" : "p-6"
+            )}
+          >
+            <div
+              className={cn(
+                "text-[52px] font-[800] opacity-[0.10] absolute leading-none pointer-events-none -top-0.5 right-3",
+                s.color
+              )}
+            >
+              {s.n}
             </div>
-            <div className={cn("mb-2", s.colorClass)}>{s.icon}</div>
-            <div className="text-h3 font-semibold text-secondary-foreground mb-1">
+            <div
+              className={cn(
+                "text-h3 font-semibold text-foreground mb-1",
+                mobile ? "text-[16px]" : "text-[17px]"
+              )}
+            >
               {s.title}
             </div>
             <p className="text-body-sm text-muted-foreground leading-normal m-0">
@@ -198,128 +290,365 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onTryDemo, onLogin, mo
           </div>
         ))}
       </div>
-    </div>
+    </section>
 
-    {/* WHAT YOU GET */}
-    <div className={cn("w-full max-w-[640px]", mobile ? "mt-8" : "mt-10")}>
-      <div className="text-caption font-bold text-disabled tracking-[2px] uppercase mb-3 text-center">What You Get</div>
-      <div className={cn("grid gap-4", mobile ? "grid-cols-1 gap-3" : "grid-cols-2")}>
-        {OUTCOMES.map(o => (
-          <div key={o.title} className={cn(
-            "bg-card border border-border border-l-[3px] rounded-lg text-left transition-normal",
-            o.borderClass,
-            mobile ? "p-4" : "p-5"
-          )}>
-            <div className={cn("flex items-center gap-2 mb-2", o.colorClass)}>
-              {o.icon}
-              <span className={cn("text-h3 font-semibold", o.colorClass)}>{o.title}</span>
-            </div>
-            <p className="text-body-sm text-muted-foreground leading-normal m-0">
-              {o.desc}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
+    {/* Divider */}
+    <hr className="w-full max-w-[1080px] border-t border-border m-0" />
 
-    {/* FEATURES */}
-    <div className={cn("w-full max-w-[640px]", mobile ? "mt-8" : "mt-10")}>
-      <div className="text-caption font-bold text-disabled tracking-[2px] uppercase mb-3 text-center">Features</div>
-      <div className={cn("grid gap-4", mobile ? "grid-cols-1 gap-3" : "grid-cols-2")}>
-        {FEATURES.map(f => (
-          <div key={f.title} className={cn(
-            "border rounded-lg text-left transition-normal",
-            f.bgClass,
-            mobile ? "p-4" : "p-5"
-          )}>
-            <div className={cn("flex items-center gap-2 mb-2", f.colorClass)}>
-              {f.icon}
-              <span className={cn("text-h3 font-semibold", f.colorClass)}>{f.title}</span>
-            </div>
-            <p className="text-body-sm text-muted-foreground leading-normal m-0">
-              {f.desc}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
+    {/* ============================================================ */}
+    {/* 3. CONTENT SOURCES                                            */}
+    {/* ============================================================ */}
+    <FeatureSection
+      id="sources"
+      heading="Add RSS and social sources in one place"
+      body={
+        <>
+          <p className="m-0">
+            Add all your feeds from the Sources tab.
+          </p>
+          <p className="m-0 mt-2">
+            Use quick-add presets for YouTube, Topic, GitHub, Bluesky, Reddit,
+            Mastodon, Farcaster — or paste any RSS/Atom feed URL you already
+            follow.
+          </p>
+        </>
+      }
+      imageSrc="/images/sources.png"
+      imageAlt="Sources tab with quick-add presets"
+      imageWidth={640}
+      imageHeight={640}
+      imageFirst
+      mobile={mobile}
+    />
 
-    {/* Browser Extension */}
-    <div className={cn(
-      "w-full max-w-[640px] bg-gradient-to-br from-cyan-500/[0.06] to-blue-600/[0.03] border border-cyan-500/[0.19] rounded-xl text-center",
-      mobile ? "mt-8 px-5 py-6" : "mt-10 px-6 py-8"
-    )}>
-      <div className="flex justify-center text-cyan-400 mb-3">
-        <ChromeIcon s={32} />
-      </div>
-      <div className="text-h2 font-bold text-foreground mb-2">
-        Aegis Score for Chrome
-      </div>
-      <p className="text-body-sm text-muted-foreground leading-relaxed m-0 max-w-[420px] mx-auto">
-        Any page, one click. See V/C/L quality scores instantly and send articles to Aegis without leaving your browser.
-      </p>
-      <a
-        href="https://chromewebstore.google.com/detail/aegis-score/pnnpkepiojfpkppjpoimolkamflhbjhh"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 mt-5 px-6 py-3 bg-gradient-to-br from-cyan-500 to-blue-600 border-none rounded-md text-white text-body font-bold no-underline font-sans shadow-glow-cyan transition-normal"
+    <hr className="w-full max-w-[1080px] border-t border-border m-0" />
+
+    {/* ============================================================ */}
+    {/* 4. AI SCORING (V/C/L)                                         */}
+    {/* ============================================================ */}
+    <FeatureSection
+      id="scoring"
+      heading="AI that knows what's real — and what's slop"
+      body={
+        <>
+          <p className="m-0">
+            Aegis scores every item across three dimensions: novelty of the
+            signal, personal relevance, and slop.
+          </p>
+          <p className="m-0 mt-2">
+            By watching what you Validate and what you Flag, your agent keeps
+            refining the filter, turning your feeds into a high-signal,
+            low-noise stream.
+          </p>
+        </>
+      }
+      imageSrc="/images/wot.png"
+      imageAlt="V/C/L scoring visualization"
+      imageWidth={640}
+      imageHeight={640}
+      imageFirst={false}
+      mobile={mobile}
+    />
+
+    <hr className="w-full max-w-[1080px] border-t border-border m-0" />
+
+    {/* ============================================================ */}
+    {/* 5. HOME DASHBOARD                                             */}
+    {/* ============================================================ */}
+    <FeatureSection
+      id="dashboard"
+      heading="Escape the infinite scroll"
+      body={
+        <>
+          <p className="m-0 font-semibold text-secondary-foreground">
+            Today&rsquo;s Top&nbsp;3, Topic Spotlight, Discoveries, Needs
+            Review, Saved.
+          </p>
+          <p className="m-0 mt-2">
+            Instead of an endless firehose, your home dashboard shows a concise
+            overview of what actually matters right now.
+          </p>
+        </>
+      }
+      imageSrc="/images/home-dashboard.png"
+      imageAlt="Aegis home dashboard with curated sections"
+      imageWidth={778}
+      imageHeight={778}
+      imageFirst
+      mobile={mobile}
+    />
+
+    <hr className="w-full max-w-[1080px] border-t border-border m-0" />
+
+    {/* ============================================================ */}
+    {/* 6. BRIEFINGS                                                  */}
+    {/* ============================================================ */}
+    <FeatureSection
+      id="briefings"
+      heading="The luxury of only reading what matters"
+      body={
+        <>
+          <p className="m-0">
+            Aegis scans all your feeds every day and assembles a curated reading
+            list.
+          </p>
+          <p className="m-0 mt-2">
+            A quick morning briefing is enough to cover the day&rsquo;s most
+            important stories in your universe.
+          </p>
+        </>
+      }
+      imageSrc="/images/Briefing.png"
+      imageAlt="Morning briefing with curated reading list"
+      imageWidth={733}
+      imageHeight={727}
+      imageFirst={false}
+      mobile={mobile}
+    />
+
+    <hr className="w-full max-w-[1080px] border-t border-border m-0" />
+
+    {/* ============================================================ */}
+    {/* 7. AGENT NETWORK (D2A)                                        */}
+    {/* ============================================================ */}
+    <FeatureSection
+      id="d2a"
+      heading="A new layer of signal, beyond big social"
+      body={
+        <>
+          <p className="m-0">
+            Your personal agent discovers and scores high-quality content, then
+            connects directly to other agents via D2A.
+          </p>
+          <p className="m-0 mt-2">
+            Content is exchanged end-to-end encrypted, and your Web of Trust
+            ensures that signals from curators you trust are ranked higher in
+            your feed.
+          </p>
+        </>
+      }
+      imageSrc="/images/d2a.png"
+      imageAlt="D2A agent network exchanging content"
+      imageWidth={502}
+      imageHeight={502}
+      imageFirst
+      mobile={mobile}
+    />
+
+    <hr className="w-full max-w-[1080px] border-t border-border m-0" />
+
+    {/* ============================================================ */}
+    {/* 8. MOBILE & PWA                                               */}
+    {/* ============================================================ */}
+    <FeatureSection
+      id="mobile"
+      heading="Read anywhere, like a native app"
+      body={
+        <>
+          <p className="m-0">
+            On your commute or over your first coffee, Aegis keeps you close to
+            the latest high-signal stories.
+          </p>
+          <p className="m-0 mt-2">
+            Add Aegis to your home screen as a Progressive Web App and enjoy an
+            app-like reading experience anywhere.
+          </p>
+          <p className="m-0 mt-3 text-body-sm text-tertiary">
+            Works great on mobile browsers — just &ldquo;Add to Home
+            Screen&rdquo; to install Aegis as a PWA.
+          </p>
+        </>
+      }
+      imageSrc="/images/mobile.png"
+      imageAlt="Aegis on a mobile device"
+      imageWidth={535}
+      imageHeight={969}
+      imageClassName={mobile ? undefined : "max-w-[280px]"}
+      imageFirst={false}
+      mobile={mobile}
+    />
+
+    <hr className="w-full max-w-[1080px] border-t border-border m-0" />
+
+    {/* ============================================================ */}
+    {/* 9. CHROME EXTENSION & OPENNESS                                */}
+    {/* ============================================================ */}
+    <section
+      className={cn(
+        "w-full max-w-[1080px] mx-auto",
+        mobile ? "px-5 py-10" : "px-8 py-20"
+      )}
+    >
+      <div
+        className={cn(
+          "grid gap-6",
+          mobile ? "grid-cols-1" : "grid-cols-2"
+        )}
       >
-        <ChromeIcon s={18} />
-        Install Extension
-      </a>
-    </div>
+        {/* Chrome Extension */}
+        <div
+          className={cn(
+            "bg-gradient-to-br from-cyan-500/[0.06] to-blue-600/[0.03] border border-cyan-500/[0.19] rounded-xl",
+            mobile ? "p-6" : "p-8"
+          )}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="text-cyan-400">
+              <ChromeIcon s={28} />
+            </div>
+            <h3 className="text-h2 font-bold text-foreground m-0">
+              Aegis Score for Chrome
+            </h3>
+          </div>
+          <ul className="list-none p-0 m-0 space-y-2 text-muted-foreground text-body-sm leading-relaxed">
+            <li>
+              See V/C/L quality scores for any page in a single click.
+            </li>
+            <li>
+              Send interesting articles into Aegis without ever leaving your
+              browser.
+            </li>
+          </ul>
+          <a
+            href="https://chromewebstore.google.com/detail/aegis-score/pnnpkepiojfpkppjpoimolkamflhbjhh"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 bg-gradient-to-br from-cyan-500 to-blue-600 border-none rounded-md text-white text-body-sm font-bold no-underline font-sans shadow-glow-cyan transition-normal"
+          >
+            <ChromeIcon s={16} />
+            Install Extension
+          </a>
+        </div>
 
-    {/* Trust & Safety */}
-    <div className={cn(
-      "w-full max-w-[640px] bg-card border border-border rounded-xl text-center",
-      mobile ? "mt-8 p-5" : "mt-10 p-6"
-    )}>
-      <div className="flex justify-center text-tertiary mb-3">
-        <GitHubIcon s={24} />
-      </div>
-      <div className="text-h2 font-bold text-foreground mb-2">
-        Open Source &amp; Non-Custodial
-      </div>
-      <p className="text-body-sm text-muted-foreground leading-relaxed m-0 max-w-[480px] mx-auto">
-        Fully open source on GitHub. Your data stays in your browser or your own Internet Computer canister. No accounts, no tracking, no vendor lock-in.
-      </p>
-      <div className="flex justify-center gap-2 mt-4 flex-wrap">
-        {TRUST_PILLS.map(label => (
-          <span key={label} className="border border-emphasis rounded-full px-3 py-1 text-tiny font-semibold text-tertiary">
-            {label}
-          </span>
-        ))}
-      </div>
-    </div>
-
-    {/* WHO IT'S FOR */}
-    <div className={cn("w-full max-w-[640px]", mobile ? "mt-8" : "mt-10")}>
-      <div className="text-caption font-bold text-disabled tracking-[2px] uppercase mb-3 text-center">Who It&rsquo;s For</div>
-      <div className={cn("grid gap-4", mobile ? "grid-cols-1 gap-3" : "grid-cols-3")}>
-        {PERSONAS.map(p => (
-          <div key={p.role} className={cn(
-            "bg-navy-lighter border border-subtle border-t-2 rounded-lg",
-            p.borderClass,
-            mobile ? "p-4" : "p-5"
-          )}>
-            <div className={cn("flex items-center gap-1 mb-2", p.colorClass)}>
-              {p.icon}
-              <span className={cn("text-caption font-bold uppercase tracking-[1.5px]", p.colorClass)}>
-                {p.role}
+        {/* Open Source */}
+        <div
+          className={cn(
+            "bg-card border border-border rounded-xl",
+            mobile ? "p-6" : "p-8"
+          )}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="text-tertiary">
+              <GitHubIcon s={28} />
+            </div>
+            <h3 className="text-h2 font-bold text-foreground m-0">
+              Open Source &amp; Non-Custodial
+            </h3>
+          </div>
+          <ul className="list-none p-0 m-0 space-y-2 text-muted-foreground text-body-sm leading-relaxed">
+            <li>Aegis is fully open source and non-custodial.</li>
+            <li>
+              Your data lives in your browser or your own Internet Computer —
+              with no accounts, no tracking, and no vendor lock-in.
+            </li>
+          </ul>
+          <div className="flex gap-2 mt-5 flex-wrap">
+            {["Open Source", "Self-Custodial", "No Tracking"].map((label) => (
+              <span
+                key={label}
+                className="border border-emphasis rounded-full px-3 py-1 text-tiny font-semibold text-tertiary"
+              >
+                {label}
               </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr className="w-full max-w-[1080px] border-t border-border m-0" />
+
+    {/* ============================================================ */}
+    {/* 10. WHO IT'S FOR                                              */}
+    {/* ============================================================ */}
+    <section
+      className={cn(
+        "w-full max-w-[1080px] mx-auto text-center",
+        mobile ? "px-5 py-10" : "px-8 py-20"
+      )}
+    >
+      <h2
+        className={cn(
+          "font-[700] tracking-tight text-foreground m-0 mb-8",
+          mobile ? "text-[20px]" : "text-[26px]"
+        )}
+      >
+        Built for people who live on signal
+      </h2>
+
+      <div
+        className={cn("grid gap-6", mobile ? "grid-cols-1" : "grid-cols-3")}
+      >
+        {PERSONAS.map((p) => (
+          <div
+            key={p.role}
+            className={cn(
+              "bg-card border border-border border-t-2 rounded-lg text-left",
+              p.accent,
+              mobile ? "p-5" : "p-6"
+            )}
+          >
+            <div className="text-caption font-bold uppercase tracking-[1.5px] text-secondary-foreground mb-3">
+              {p.role}
             </div>
             <p className="text-body-sm text-muted-foreground leading-relaxed italic m-0">
-              &ldquo;{p.quote}&rdquo;
+              {p.quote}
             </p>
           </div>
         ))}
       </div>
-    </div>
+    </section>
+
+    {/* ============================================================ */}
+    {/* 11. CLOSING CTA                                               */}
+    {/* ============================================================ */}
+    <section
+      className={cn(
+        "w-full max-w-[1080px] mx-auto text-center",
+        mobile ? "px-5 pt-10 pb-6" : "px-8 pt-20 pb-10"
+      )}
+    >
+      <h2
+        className={cn(
+          "font-[700] tracking-tight text-foreground m-0",
+          mobile ? "text-[22px]" : "text-[30px]"
+        )}
+      >
+        Start collecting information for the next era
+      </h2>
+
+      <p
+        className={cn(
+          "text-muted-foreground leading-relaxed mt-4 mb-0 max-w-[520px] mx-auto",
+          mobile ? "text-body-sm" : "text-body"
+        )}
+      >
+        It&rsquo;s time to stop wasting hours inside engagement-optimized
+        feeds.
+        <br />
+        Join the high-IQ researchers and signal-hunters who read with zero slop.
+      </p>
+
+      <button
+        type="button"
+        onClick={onTryDemo}
+        className={cn(
+          "mt-7 px-8 py-3 bg-gradient-to-br from-blue-600 to-cyan-500 border-none rounded-md text-white text-body font-bold cursor-pointer font-sans shadow-glow-cyan transition-normal",
+          mobile && "w-full"
+        )}
+      >
+        Try the Demo for Free
+      </button>
+    </section>
 
     {/* Footer */}
-    <div className="mt-8 text-caption text-disabled text-center">
-      <span className="font-mono">v3.0</span>
-      <span> &middot; Use your browser&rsquo;s translate feature to read in your language.</span>
-    </div>
+    <footer className="w-full text-center py-8 text-caption text-disabled">
+      <span className="font-mono">Aegis v3.0</span>
+      <span>
+        {" "}
+        &middot; Use your browser&rsquo;s translate feature to read in your
+        language.
+      </span>
+    </footer>
   </div>
 );

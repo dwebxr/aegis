@@ -267,7 +267,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
       </div>
 
       {/* Body + grade */}
-      <div className={cn("flex gap-4 items-start", mobile && "gap-3")}>
+      <div className={cn(item.imageUrl && "flex gap-3 items-start")}>
         {item.imageUrl && (
           /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */
           <img
@@ -280,12 +280,30 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
         )}
-        <div className="flex-1 min-w-0" style={{ paddingRight: variant === "serendipity" ? 90 : (variant === "priority" ? 36 : 0) }}>
+        <div className="min-w-0 flow-root">
+          {/* Grade badge floated right — flow-root on parent establishes BFC to contain the float without clipping box-shadow */}
+          {!isLarge && (
+            <div className="float-right ml-3 mb-1 text-center">
+              <GradeBadge composite={item.scores.composite} />
+              <div className={cn(
+                "mt-1 text-tiny font-bold uppercase tracking-[1px]",
+                isSlop ? "text-red-400" : "text-emerald-400"
+              )}>
+                {item.verdict}
+              </div>
+            </div>
+          )}
+          {isLarge && (
+            <div className="float-right ml-3 mb-1">
+              <GradeBadge composite={item.scores.composite} />
+            </div>
+          )}
+
           <p className={cn(
             "m-0 break-words",
             isSlop && !isLarge && "line-through opacity-50",
             variant === "serendipity" ? "text-purple-300" : "text-tertiary",
-            mobile ? "text-[13px]" : (isLarge ? "text-body-lg leading-body-lg" : "text-body leading-body"),
+            isLarge ? "text-[16px] leading-[1.35]" : "text-body-lg leading-body-lg",
           )}>
             {item.text}
           </p>
@@ -295,24 +313,6 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
             </div>
           )}
         </div>
-
-        {!isLarge && (
-          <div className="text-center shrink-0">
-            <GradeBadge composite={item.scores.composite} />
-            <div className={cn(
-              "mt-1 text-tiny font-bold uppercase tracking-[1px]",
-              isSlop ? "text-red-400" : "text-emerald-400"
-            )}>
-              {item.verdict}
-            </div>
-          </div>
-        )}
-
-        {isLarge && (
-          <div className="shrink-0 mt-1">
-            <GradeBadge composite={item.scores.composite} />
-          </div>
-        )}
       </div>
 
       <YouTubePreview sourceUrl={item.sourceUrl} />
