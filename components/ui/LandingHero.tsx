@@ -168,11 +168,8 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
             !mobile && "max-w-[480px]"
           )}
         >
-          Your personal AI agent learns what you care about, and aggressively
-          blocks slop from your timelines.
-          <br />
-          Every day, you only see high-signal content that&rsquo;s actually
-          worth your time.
+          Your AI agent learns what matters to you and filters out the slop
+          — so you only see content worth your time.
         </p>
 
         {/* CTAs */}
@@ -304,12 +301,10 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
       body={
         <>
           <p className="m-0">
-            Add all your feeds from the Sources tab.
+            Add RSS, YouTube, Reddit, Bluesky, Mastodon, and more from one tab.
           </p>
           <p className="m-0 mt-2">
-            Use quick-add presets for YouTube, Topic, GitHub, Bluesky, Reddit,
-            Mastodon, Farcaster — or paste any RSS/Atom feed URL you already
-            follow.
+            Paste any feed URL or use quick-add presets.
           </p>
         </>
       }
@@ -332,13 +327,11 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
       body={
         <>
           <p className="m-0">
-            Aegis scores every item across three dimensions: novelty of the
-            signal, personal relevance, and slop.
+            Every item is scored on novelty, relevance, and slop.
           </p>
           <p className="m-0 mt-2">
-            By watching what you Validate and what you Flag, your agent keeps
-            refining the filter, turning your feeds into a high-signal,
-            low-noise stream.
+            Validate or Flag to keep refining — your feed gets sharper
+            with every click.
           </p>
         </>
       }
@@ -361,12 +354,12 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
       body={
         <>
           <p className="m-0 font-semibold text-secondary-foreground">
-            Today&rsquo;s Top&nbsp;3, Topic Spotlight, Discoveries, Needs
-            Review, Saved.
+            Top&nbsp;3, Spotlight, Discoveries, Needs Review — all on one
+            screen.
           </p>
           <p className="m-0 mt-2">
-            Instead of an endless firehose, your home dashboard shows a concise
-            overview of what actually matters right now.
+            No infinite scroll, just a concise overview of what matters right
+            now.
           </p>
         </>
       }
@@ -389,12 +382,10 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
       body={
         <>
           <p className="m-0">
-            Aegis scans all your feeds every day and assembles a curated reading
-            list.
+            A daily curated reading list from all your feeds.
           </p>
           <p className="m-0 mt-2">
-            A quick morning briefing is enough to cover the day&rsquo;s most
-            important stories in your universe.
+            One morning briefing covers everything that matters.
           </p>
         </>
       }
@@ -417,13 +408,11 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
       body={
         <>
           <p className="m-0">
-            Your personal agent discovers and scores high-quality content, then
-            connects directly to other agents via D2A.
+            Your agent discovers quality content and exchanges it with other
+            agents, end-to-end encrypted.
           </p>
           <p className="m-0 mt-2">
-            Content is exchanged end-to-end encrypted, and your Web of Trust
-            ensures that signals from curators you trust are ranked higher in
-            your feed.
+            Curators you trust rank higher through your Web of Trust.
           </p>
         </>
       }
@@ -446,16 +435,11 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
       body={
         <>
           <p className="m-0">
-            On your commute or over your first coffee, Aegis keeps you close to
-            the latest high-signal stories.
+            Add to your home screen for a native-app reading experience.
           </p>
           <p className="m-0 mt-2">
-            Add Aegis to your home screen as a Progressive Web App and enjoy an
-            app-like reading experience anywhere.
-          </p>
-          <p className="m-0 mt-3 text-body-sm text-tertiary">
-            Works great on mobile browsers — just &ldquo;Add to Home
-            Screen&rdquo; to install Aegis as a PWA.
+            Works on any mobile browser — just tap &ldquo;Add to Home
+            Screen.&rdquo;
           </p>
         </>
       }
@@ -500,15 +484,10 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
               Aegis Score for Chrome
             </h3>
           </div>
-          <ul className="list-none p-0 m-0 space-y-2 text-muted-foreground text-body-sm leading-relaxed">
-            <li>
-              See V/C/L quality scores for any page in a single click.
-            </li>
-            <li>
-              Send interesting articles into Aegis without ever leaving your
-              browser.
-            </li>
-          </ul>
+          <p className="m-0 text-muted-foreground text-body-sm leading-relaxed">
+            One-click quality scores on any page — send articles to Aegis
+            without leaving your browser.
+          </p>
           <a
             href="https://chromewebstore.google.com/detail/aegis-score/pnnpkepiojfpkppjpoimolkamflhbjhh"
             target="_blank"
@@ -535,13 +514,10 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
               Open Source &amp; Non-Custodial
             </h3>
           </div>
-          <ul className="list-none p-0 m-0 space-y-2 text-muted-foreground text-body-sm leading-relaxed">
-            <li>Aegis is fully open source and non-custodial.</li>
-            <li>
-              Your data lives in your browser or your own Internet Computer —
-              with no accounts, no tracking, and no vendor lock-in.
-            </li>
-          </ul>
+          <p className="m-0 text-muted-foreground text-body-sm leading-relaxed">
+            Fully open source. Your data stays in your browser or your own
+            Internet Computer — no accounts, no tracking.
+          </p>
           <div className="flex gap-2 mt-5 flex-wrap">
             {["Open Source", "Self-Custodial", "No Tracking"].map((label) => (
               <span
@@ -623,10 +599,8 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
           mobile ? "text-body-sm" : "text-body"
         )}
       >
-        It&rsquo;s time to stop wasting hours inside engagement-optimized
-        feeds.
-        <br />
-        Join the high-IQ researchers and signal-hunters who read with zero slop.
+        Stop scrolling engagement-optimized feeds — start reading with zero
+        slop.
       </p>
 
       <button
