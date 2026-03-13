@@ -74,11 +74,16 @@ export class IngestionScheduler {
       try {
         await this.dedup.init();
       } catch (err) {
-        console.error("[scheduler] Dedup init failed:", errMsg(err));
+        console.error("[scheduler] Dedup init failed, first cycle may have reduced dedup coverage:", errMsg(err));
       }
-      safeCycle();
+      await safeCycle();
     };
-    this.initialTimeoutId = setTimeout(() => { void initAndStart(); }, 5000);
+    this.initialTimeoutId = setTimeout(() => {
+      initAndStart().catch(err => {
+        console.error("[scheduler] initAndStart failed:", errMsg(err));
+        this.running = false;
+      });
+    }, 5000);
     this.intervalId = setInterval(safeCycle, BASE_CYCLE_MS);
   }
 
@@ -204,9 +209,9 @@ export class IngestionScheduler {
       const cycleItems: ContentItem[] = [];
 
       const activeKeys = new Set(sources.map(s => getSourceKey(s.type, s.config)));
-      this.httpCacheHeaders.forEach((_, key) => {
+      for (const key of Array.from(this.httpCacheHeaders.keys())) {
         if (!activeKeys.has(key)) this.httpCacheHeaders.delete(key);
-      });
+      }
       if (this.httpCacheHeaders.size > 200) this.httpCacheHeaders.clear();
 
       for (const source of sources) {

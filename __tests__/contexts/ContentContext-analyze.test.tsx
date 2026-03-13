@@ -116,7 +116,14 @@ describe("ContentContext analyze", () => {
 
     expect(analyzeResult).toBeDefined();
     expect(analyzeResult!.scoringEngine).toBe("heuristic");
+    // Verify heuristic produces real scores, not stub values
+    expect(typeof analyzeResult!.originality).toBe("number");
+    expect(typeof analyzeResult!.insight).toBe("number");
+    expect(typeof analyzeResult!.credibility).toBe("number");
+    expect(typeof analyzeResult!.composite).toBe("number");
+    expect(analyzeResult!.verdict).toMatch(/^(quality|slop)$/);
     expect(result.current.content).toHaveLength(1);
+    expect(result.current.content[0].scoredByAI).toBe(false);
   });
 
   it("shows 'AI unavailable' notification on heuristic fallback", async () => {

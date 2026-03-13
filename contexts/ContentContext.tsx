@@ -286,9 +286,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     setPendingCount(pendingItemsRef.current.length);
 
     if (pendingItemsRef.current.length >= MAX_PENDING_BUFFER) {
-      const items = deduplicateItems(pendingItemsRef.current);
+      const snapshot = pendingItemsRef.current;
       pendingItemsRef.current = [];
       setPendingCount(0);
+      const items = deduplicateItems(snapshot);
       setContent(prev => {
         const fresh = filterNewItems(items, prev);
         return truncatePreservingActioned([...fresh, ...prev]);
@@ -311,7 +312,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const backfillImageUrls = useCallback((): (() => void) => {
     const items = contentRef.current
-      .filter(c => c.sourceUrl && !c.imageUrl && /^https?:\/\//i.test(c.sourceUrl))
+      .filter((c): c is ContentItem & { sourceUrl: string } => !!c.sourceUrl && !c.imageUrl && /^https?:\/\//i.test(c.sourceUrl))
       .slice(0, 30);
     if (items.length === 0) return () => {};
 
@@ -320,7 +321,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
     (async () => {
       try {
-        const urls = items.map(item => item.sourceUrl!);
+        const urls = items.map(item => item.sourceUrl);
         const res = await fetch("/api/fetch/ogimage", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -345,7 +346,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
         if (actorRef.current && isAuthenticated && principal) {
           for (const item of items) {
-            const img = urlToImage.get(item.sourceUrl!);
+            const img = urlToImage.get(item.sourceUrl);
             if (!img) continue;
             void actorRef.current.saveEvaluation(toICEvaluation({ ...item, imageUrl: img }, principal)).catch((err: unknown) => {
               console.warn("[content] IC imageUrl backfill save failed:", errMsg(err));

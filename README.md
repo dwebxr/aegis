@@ -9,6 +9,18 @@
 
 ## Latest Updates (March 2026)
 
+### Code Integrity Audit & Bug Fixes
+- **5628 tests, 324 suites** — zero failures, zero skipped
+- **LARP audit (7 categories)**: Stubs, hardcoded values, mock-self tests, silent error handling, unwaited async, unvalidated validation, dead code paths — all verified genuine
+- **Scoring cache hardened**: `flushCache()` now properly `await`s IDB writes (was fire-and-forget void); `clearScoringCache()` returns `Promise<void>`; `isValidEntry()` validates full `AnalyzeResponse` structure (originality/insight/credibility/composite/verdict/reason)
+- **Scheduler Map iteration fix**: `httpCacheHeaders` cleanup now copies keys to array before deleting — eliminates undefined behavior from `Map.forEach` + `delete` during iteration
+- **Stale closure fix (PreferenceContext)**: Cleanup function uses `identityRef.current` instead of captured `identity` state — prevents preference data loss on logout
+- **Offline queue robustness**: Missing items logged and explicitly dropped (was silent skip); `action.id` null-guarded before use (removes all `!` non-null assertions in drain loop)
+- **Buffer flush race condition fix**: `addContentBuffered` takes snapshot of pending array before clearing — prevents item loss during concurrent calls
+- **Type-safe OG image backfill**: Type predicate filter `(c): c is ContentItem & { sourceUrl: string }` replaces `sourceUrl!` non-null assertions
+- **`incrementRetries` rewritten**: Direct transaction management with explicit `tx.oncomplete/onerror` (was indirect via `withDB` with void return)
+- **Mobile button layout**: Briefing cards show full-text buttons on mobile when only 3 actions present (Read more, Validate, Flag Slop); compact icon-only mode reserved for Dashboard cards with 5+ buttons
+
 ### Social Links & Logout UX Refinement
 - **5627 tests, 324 suites** — zero failures, zero skipped
 - **Social link icons**: Discord, Medium, X icon buttons added to landing page footer, desktop sidebar, mobile nav footer, and Settings > About card
@@ -933,7 +945,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (5382 unit/integration tests, 310 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
+| Test | Jest + ts-jest (5628 unit/integration tests, 324 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
 
 ## Project Structure
 
@@ -1093,7 +1105,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 5382 Jest tests across 310 suites
+├── __tests__/                           # 5628 Jest tests across 324 suites
 ├── e2e/                                 # Playwright E2E tests (299 tests, 12 specs)
 ├── canisters/
 │   └── aegis_backend/
@@ -1130,7 +1142,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Jest unit + integration tests (5382 tests)
+npm test              # Jest unit + integration tests (5628 tests)
 npm run test:watch    # Watch mode
 npx playwright test   # E2E tests — requires dev server (npm run dev)
 ```

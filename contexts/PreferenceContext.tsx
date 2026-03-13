@@ -92,10 +92,11 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
 
     return () => {
       cancelled = true;
-      if (icSyncTimeoutRef.current && identity) {
+      const ident = identityRef.current;
+      if (icSyncTimeoutRef.current && ident) {
         clearTimeout(icSyncTimeoutRef.current);
         icSyncTimeoutRef.current = null;
-        void syncPreferencesToIC(identity, profileRef.current).catch(err => {
+        void syncPreferencesToIC(ident, profileRef.current).catch(err => {
           console.warn("[prefs] IC flush-on-auth-change failed:", errMsg(err));
         });
       }

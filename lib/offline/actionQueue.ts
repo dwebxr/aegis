@@ -61,7 +61,9 @@ export function removeAction(id: number): Promise<void> {
 }
 
 export function incrementRetries(id: number): Promise<void> {
-  return withDB("readwrite", store => {
+  return openDB().then(db => new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
     const getReq = store.get(id);
     getReq.onsuccess = () => {
       const action = getReq.result as QueuedAction | undefined;
@@ -70,7 +72,9 @@ export function incrementRetries(id: number): Promise<void> {
         store.put(action);
       }
     };
-  });
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  }));
 }
 
 export function clearQueue(): Promise<void> {

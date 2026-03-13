@@ -135,9 +135,14 @@ export async function drainOfflineQueue(
   console.info(`[offline-queue] Draining ${actions.length} pending action(s)`);
   const MAX_RETRIES = 5;
   for (const action of actions) {
+    const actionId = action.id;
+    if (actionId == null) {
+      console.error("[offline-queue] Action missing ID, skipping:", action.type);
+      continue;
+    }
     if (action.retries >= MAX_RETRIES) {
-      console.warn(`[offline-queue] Dropping action ${action.id} after ${MAX_RETRIES} retries`);
-      await removeAction(action.id!);
+      console.warn(`[offline-queue] Dropping action ${actionId} after ${MAX_RETRIES} retries`);
+      await removeAction(actionId);
       continue;
     }
     try {
@@ -147,14 +152,17 @@ export async function drainOfflineQueue(
       } else if (action.type === "saveEvaluation") {
         const { itemId } = action.payload as { itemId: string };
         const item = contentRef.current.find(c => c.id === itemId);
-        if (item) {
-          await actor.saveEvaluation(toICEvaluation(item, principal));
+        if (!item) {
+          console.warn(`[offline-queue] Referenced item ${itemId} no longer in local content, dropping action ${actionId}`);
+          await removeAction(actionId);
+          continue;
         }
+        await actor.saveEvaluation(toICEvaluation(item, principal));
       }
-      await removeAction(action.id!);
+      await removeAction(actionId);
     } catch (err) {
-      console.warn(`[offline-queue] Replay failed for action ${action.id}:`, errMsg(err));
-      await incrementRetries(action.id!);
+      console.warn(`[offline-queue] Replay failed for action ${actionId}:`, errMsg(err));
+      await incrementRetries(actionId);
     }
   }
   const remaining = await dequeueAll();

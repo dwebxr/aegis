@@ -193,8 +193,8 @@ describe("scoring cache — entry-level corruption recovery (cold load)", () => 
   it("drops entries missing storedAt field, keeps valid ones", () => {
     const spy = jest.spyOn(console, "warn").mockImplementation();
     const mod = freshCache({
-      "good:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 7 } },
-      "bad:h": { profileHash: "h", result: { composite: 5 } },
+      "good:h": { storedAt: Date.now(), profileHash: "h", result: { originality: 7, insight: 7, credibility: 7, composite: 7, verdict: "quality", reason: "test" } },
+      "bad:h": { profileHash: "h", result: { originality: 5, insight: 5, credibility: 5, composite: 5, verdict: "slop", reason: "test" } },
     });
 
     expect(mod.lookupScoringCache("good:h", "h")).not.toBeNull();
@@ -206,8 +206,8 @@ describe("scoring cache — entry-level corruption recovery (cold load)", () => 
   it("drops entries missing profileHash field", () => {
     const spy = jest.spyOn(console, "warn").mockImplementation();
     const mod = freshCache({
-      "good:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 7 } },
-      "bad:h": { storedAt: Date.now(), result: { composite: 5 } },
+      "good:h": { storedAt: Date.now(), profileHash: "h", result: { originality: 7, insight: 7, credibility: 7, composite: 7, verdict: "quality", reason: "test" } },
+      "bad:h": { storedAt: Date.now(), result: { originality: 5, insight: 5, credibility: 5, composite: 5, verdict: "slop", reason: "test" } },
     });
 
     mod.lookupScoringCache("good:h", "h"); // triggers getCache
@@ -229,7 +229,7 @@ describe("scoring cache — entry-level corruption recovery (cold load)", () => 
   it("drops entries that are plain strings instead of objects", () => {
     const spy = jest.spyOn(console, "warn").mockImplementation();
     const mod = freshCache({
-      "good:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 7 } },
+      "good:h": { storedAt: Date.now(), profileHash: "h", result: { originality: 7, insight: 7, credibility: 7, composite: 7, verdict: "quality", reason: "test" } },
       "bad:h": "not an object",
     });
 
@@ -241,11 +241,11 @@ describe("scoring cache — entry-level corruption recovery (cold load)", () => 
   it("drops multiple corrupt entries in a single load", () => {
     const spy = jest.spyOn(console, "warn").mockImplementation();
     const mod = freshCache({
-      "valid-1:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 1 } },
+      "valid-1:h": { storedAt: Date.now(), profileHash: "h", result: { originality: 1, insight: 1, credibility: 1, composite: 1, verdict: "slop", reason: "test" } },
       "corrupt-1:h": { storedAt: "not-a-number", profileHash: "h", result: {} },
       "corrupt-2:h": null,
       "corrupt-3:h": 42,
-      "valid-2:h": { storedAt: Date.now(), profileHash: "h", result: { verdict: "ok" } },
+      "valid-2:h": { storedAt: Date.now(), profileHash: "h", result: { originality: 2, insight: 2, credibility: 2, composite: 2, verdict: "quality", reason: "test" } },
     });
 
     expect(mod.lookupScoringCache("valid-1:h", "h")).not.toBeNull();
@@ -257,8 +257,8 @@ describe("scoring cache — entry-level corruption recovery (cold load)", () => 
   it("keeps all entries when none are corrupt (no warning logged)", () => {
     const spy = jest.spyOn(console, "warn").mockImplementation();
     const mod = freshCache({
-      "a:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 1 } },
-      "b:h": { storedAt: Date.now(), profileHash: "h", result: { composite: 2 } },
+      "a:h": { storedAt: Date.now(), profileHash: "h", result: { originality: 1, insight: 1, credibility: 1, composite: 1, verdict: "slop", reason: "test" } },
+      "b:h": { storedAt: Date.now(), profileHash: "h", result: { originality: 2, insight: 2, credibility: 2, composite: 2, verdict: "slop", reason: "test" } },
     });
 
     expect(mod.lookupScoringCache("a:h", "h")).not.toBeNull();

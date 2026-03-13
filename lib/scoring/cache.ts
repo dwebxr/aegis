@@ -53,9 +53,15 @@ let _useIDB = false;
 function isValidEntry(v: unknown): v is ScoringCacheEntry {
   if (!v || typeof v !== "object") return false;
   const e = v as Record<string, unknown>;
-  return typeof e.storedAt === "number"
-    && typeof e.profileHash === "string"
-    && e.result != null && typeof e.result === "object";
+  if (typeof e.storedAt !== "number" || typeof e.profileHash !== "string") return false;
+  if (!e.result || typeof e.result !== "object") return false;
+  const r = e.result as Record<string, unknown>;
+  return typeof r.originality === "number"
+    && typeof r.insight === "number"
+    && typeof r.credibility === "number"
+    && typeof r.composite === "number"
+    && (r.verdict === "quality" || r.verdict === "slop")
+    && typeof r.reason === "string";
 }
 
 function parseEntries(parsed: unknown): Map<string, ScoringCacheEntry> {
@@ -124,18 +130,22 @@ function scheduleFlush(): void {
   if (_flushTimer) return;
   _flushTimer = setTimeout(() => {
     _flushTimer = null;
-    flushCacheAsync();
+    flushCache().catch(err => {
+      console.warn("[scoring-cache] Scheduled flush failed:", err);
+    });
   }, FLUSH_DEBOUNCE_MS);
 }
 
-function flushCacheAsync(): void {
+async function flushCache(): Promise<void> {
   if (!_memCache) return;
   const data = Object.fromEntries(_memCache);
 
   if (_useIDB) {
-    idbPut(STORE_SCORE_CACHE, IDB_KEY, data).catch(err => {
+    try {
+      await idbPut(STORE_SCORE_CACHE, IDB_KEY, data);
+    } catch (err) {
       console.warn("[scoring-cache] IDB flush failed:", err);
-    });
+    }
   } else if (typeof globalThis.localStorage !== "undefined") {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -182,11 +192,15 @@ export function getScoringCacheStats(): { hits: number; misses: number; size: nu
   return { hits: cacheHits, misses: cacheMisses, size: getCache().size };
 }
 
-export function clearScoringCache(): void {
+export async function clearScoringCache(): Promise<void> {
   _memCache = new Map();
   if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
   if (_useIDB) {
-    idbPut(STORE_SCORE_CACHE, IDB_KEY, {}).catch(err => console.warn("[scoring-cache] IDB clear failed:", err));
+    try {
+      await idbPut(STORE_SCORE_CACHE, IDB_KEY, {});
+    } catch (err) {
+      console.warn("[scoring-cache] IDB clear failed:", err);
+    }
   }
   if (typeof globalThis.localStorage !== "undefined") {
     try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.warn("[scoring-cache] Failed to clear localStorage:", err); }

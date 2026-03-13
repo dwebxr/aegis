@@ -120,7 +120,7 @@ describe("ContentCard — expanded state actions", () => {
 });
 
 describe("ContentCard — mobile rendering", () => {
-  it("shows icon-only buttons on mobile", () => {
+  it("shows full-text buttons on mobile when few buttons (no bookmark/filter)", () => {
     const html = renderToStaticMarkup(
       <ContentCard
         item={makeItem({ sourceUrl: "https://example.com/article" })}
@@ -128,15 +128,24 @@ describe("ContentCard — mobile rendering", () => {
         mobile={true}
       />
     );
-    // Mobile: icon-only (no visible text labels after icons)
+    // Only 3 buttons (Read more, Validate, Flag Slop) — full text fits on mobile
+    expect(html).toContain("Read more");
+    expect(html).toContain("Validate");
+    expect(html).toContain("Flag Slop");
+  });
+
+  it("shows icon-only buttons on mobile when many buttons (bookmark present)", () => {
+    const html = renderToStaticMarkup(
+      <ContentCard
+        item={makeItem({ sourceUrl: "https://example.com/article" })}
+        expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
+        mobile={true}
+        onBookmark={noop}
+      />
+    );
     expect(html).not.toContain("Read more");
-    // "Validate" appears in aria-label but NOT as visible button text
-    // The visible text " Validate" / " Flag Slop" is hidden on mobile
     expect(html).not.toContain("Flag Slop");
-    // Verify icon-only mode: ↗ for Read more, SVG icons for validate/flag
     expect(html).toContain("\u2197"); // ↗
-    // Validate button does not use flex-1 on mobile
-    expect(html).not.toMatch(/aegis-card-validate[^"]*flex-1/);
   });
 
   it("shows icon-only Save button on mobile", () => {

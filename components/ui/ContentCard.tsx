@@ -187,6 +187,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
   const gr = scoreGrade(item.scores.composite);
 
   const isLarge = variant === "priority" || variant === "serendipity";
+  const compactBtns = mobile && !!(onBookmark || onAddFilterRule);
   const padCls = isLarge
     ? (mobile ? "p-4" : "px-6 py-5")
     : (mobile ? "p-4" : "px-5 py-4");
@@ -352,10 +353,10 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                 className={cn(
                   actionBtnBase,
                   "bg-blue-400/[0.06] border border-blue-400/[0.19] text-blue-400 no-underline whitespace-nowrap",
-                  mobile ? "p-2" : "px-3 py-2"
+                  compactBtns ? "p-2" : "px-3 py-2"
                 )}
               >
-                {mobile ? "\u2197" : <>Read more &rarr;</>}
+                {compactBtns ? "\u2197" : <>Read more &rarr;</>}
               </a>
             )}
             {onBookmark && (
@@ -367,10 +368,10 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                   isBookmarked
                     ? "bg-amber-400/[0.09] border border-amber-400/[0.19] text-amber-400"
                     : "bg-transparent border border-border text-muted-foreground",
-                  mobile ? "p-2" : "px-3 py-2"
+                  compactBtns ? "p-2" : "px-3 py-2"
                 )}
               >
-                {mobile ? "\uD83D\uDD16" : (isBookmarked ? "\uD83D\uDD16 Saved" : "\uD83D\uDD16 Save")}
+                {compactBtns ? "\uD83D\uDD16" : (isBookmarked ? "\uD83D\uDD16 Saved" : "\uD83D\uDD16 Save")}
               </button>
             )}
             <button
@@ -382,11 +383,11 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                 actionBtnBase,
                 "bg-emerald-dim border border-emerald-border text-emerald-400",
                 item.validated && "opacity-60 cursor-default",
-                !mobile && "flex-1",
-                mobile ? "p-2" : "px-3 py-2"
+                !compactBtns && "flex-1",
+                compactBtns ? "p-2" : "px-3 py-2"
               )}
             >
-              <CheckIcon />{!mobile && (item.validated ? " Validated" : isSlop && !isLarge ? " Not Slop" : " Validate")}
+              <CheckIcon />{!compactBtns && (item.validated ? " Validated" : isSlop && !isLarge ? " Not Slop" : " Validate")}
             </button>
             {(!isSlop || isLarge) && (
               <button
@@ -398,11 +399,11 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                   actionBtnBase,
                   "bg-red-dim border border-red-border text-red-400",
                   item.flagged && "opacity-60 cursor-default",
-                  !mobile && "flex-1",
-                  mobile ? "p-2" : "px-3 py-2"
+                  !compactBtns && "flex-1",
+                  compactBtns ? "p-2" : "px-3 py-2"
                 )}
               >
-                <XCloseIcon />{!mobile && (item.flagged ? " Flagged" : " Flag Slop")}
+                <XCloseIcon />{!compactBtns && (item.flagged ? " Flagged" : " Flag Slop")}
               </button>
             )}
             {onAddFilterRule && (
