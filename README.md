@@ -9,9 +9,21 @@
 
 ## Latest Updates (March 2026)
 
+### Production Readiness Audit & Hardening
+- **5760 tests, 332 suites** — zero failures, zero skipped, zero TypeScript errors
+- **Sentry client-side monitoring**: New `sentry.client.config.ts` — browser errors now captured (was server/edge only); query strings stripped from URLs before send; 10% error replay sampling
+- **IC sync safety net**: `syncToIC` rewritten from `void promise.catch(async...)` (floating unhandled rejection risk) to `.then(undefined, handler).catch(safetyNet)` pattern
+- **Scoring cache concurrent flush guard**: `_flushing` flag prevents overlapping IDB writes; re-schedules flush if new data arrives during write
+- **Offline queue dropped-action reporting**: Actions exceeding 5 retries now report to Sentry (`captureMessage`) and notify the user (was silent `console.warn` only)
+- **IDB cache fallback**: `saveCachedContent` falls back to localStorage when IDB write fails (was silent discard)
+- **Preference sync failure escalation**: `debouncedICSync` tracks consecutive failures; surfaces user notification after 3 consecutive IC sync errors
+- **`isValidState` validation gap fixed**: `rateLimitedUntil` field now validated in type guard (was silently skipped, relying on backfill)
+- **132 new edge/boundary tests**: dedup edge cases, custom filter rules, manifest decode/encode, peer stats, reputation concurrency, content serendipity detection, PreferenceContext lifecycle
+- **LARP audit (7 categories)**: Stubs, hardcoded values, mock-self tests, silent error handling, unwaited async, unvalidated validation, dead code paths — all verified genuine; 5 issues fixed
+- **Redundant code cleanup**: Removed restating JSDoc (6), unnecessary `@internal` tags (2), stale comment (1); simplified `topics?.length` check
+
 ### Code Integrity Audit & Bug Fixes
 - **5628 tests, 324 suites** — zero failures, zero skipped
-- **LARP audit (7 categories)**: Stubs, hardcoded values, mock-self tests, silent error handling, unwaited async, unvalidated validation, dead code paths — all verified genuine
 - **Scoring cache hardened**: `flushCache()` now properly `await`s IDB writes (was fire-and-forget void); `clearScoringCache()` returns `Promise<void>`; `isValidEntry()` validates full `AnalyzeResponse` structure (originality/insight/credibility/composite/verdict/reason)
 - **Scheduler Map iteration fix**: `httpCacheHeaders` cleanup now copies keys to array before deleting — eliminates undefined behavior from `Map.forEach` + `delete` during iteration
 - **Stale closure fix (PreferenceContext)**: Cleanup function uses `identityRef.current` instead of captured `identity` state — prevents preference data loss on logout

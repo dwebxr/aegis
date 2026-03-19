@@ -17,13 +17,14 @@ const MAX_MANIFEST_ENTRIES = 50;
 
 export function buildManifest(items: ContentItem[]): ContentManifest {
   const qualified = items
-    .filter(c => c.verdict === "quality" && c.scores.composite >= MIN_OFFER_SCORE && c.topics && c.topics.length > 0)
+    .filter((c): c is ContentItem & { topics: [string, ...string[]] } =>
+      c.verdict === "quality" && c.scores.composite >= MIN_OFFER_SCORE && !!c.topics && c.topics.length > 0)
     .sort((a, b) => b.scores.composite - a.scores.composite)
     .slice(0, MAX_MANIFEST_ENTRIES);
 
   const entries: ManifestEntry[] = qualified.map(c => ({
     hash: hashContent(c.text),
-    topic: c.topics![0],
+    topic: c.topics[0],
     score: Math.round(c.scores.composite * 10) / 10,
   }));
 

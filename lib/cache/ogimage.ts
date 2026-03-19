@@ -16,12 +16,11 @@ export function getOgCached(url: string): string | null | undefined {
 export function setOgCache(url: string, imageUrl: string | null): void {
   if (ogCache.size >= OG_CACHE_MAX) {
     const first = ogCache.keys().next().value;
-    if (first) ogCache.delete(first);
+    if (first !== undefined) ogCache.delete(first);
   }
   ogCache.set(url, { imageUrl, expiresAt: Date.now() + OG_CACHE_TTL });
 }
 
-/** @internal Reset in-memory cache (for tests only). */
 export function _resetOgCache(): void {
   ogCache.clear();
 }

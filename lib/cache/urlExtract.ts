@@ -28,7 +28,6 @@ export function setUrlCache(url: string, result: ExtractionResult): void {
   urlCache.set(url, { data: result, expiresAt: Date.now() + URL_CACHE_TTL });
 }
 
-/** @internal Reset in-memory cache (for tests only). */
 export function _resetUrlCache(): void {
   urlCache.clear();
 }

@@ -294,6 +294,7 @@ describe("syncToIC", () => {
     await new Promise(r => setTimeout(r, 50));
 
     expect(setSyncStatus).not.toHaveBeenCalled();
+    expect(addNotification).not.toHaveBeenCalled();
     const queued = await dequeueAll();
     expect(queued).toHaveLength(0);
   });

@@ -112,13 +112,23 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     }, 500);
   }, []);
 
+  const icSyncFailCountRef = useRef(0);
   const debouncedICSync = useCallback((p: UserPreferenceProfile) => {
     if (icSyncTimeoutRef.current) clearTimeout(icSyncTimeoutRef.current);
     icSyncTimeoutRef.current = setTimeout(() => {
       const ident = identityRef.current;
       if (!isAuthRef.current || !ident) return;
-      void syncPreferencesToIC(ident, p).catch(err => {
+      syncPreferencesToIC(ident, p).then(() => {
+        icSyncFailCountRef.current = 0;
+      }).catch(err => {
+        icSyncFailCountRef.current++;
         console.warn("[prefs] IC debounced sync failed:", errMsg(err));
+        if (icSyncFailCountRef.current >= 3) {
+          window.dispatchEvent(new CustomEvent("aegis:notification", {
+            detail: { message: "Preference sync to IC unavailable", type: "error" },
+          }));
+          icSyncFailCountRef.current = 0; // reset to avoid spamming
+        }
       });
     }, 3_000); // IC sync debounce: 3 seconds
   }, []);
@@ -148,7 +158,6 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
 
   const profileRef = useCurrentRef(profile);
 
-  /** Clone current profile, apply mutation, stamp lastUpdated, persist & sync. */
   const updateProfile = useCallback((mutate: (p: UserPreferenceProfile) => void) => {
     const next = structuredClone(profileRef.current);
     mutate(next);
@@ -158,26 +167,26 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     debouncedICSync(next);
   }, [debouncedSave, debouncedICSync]);
 
-  const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => {
-    let next = learn(profileRef.current, { action: "validate", topics, author, composite, verdict });
+  /** Apply a learn event, remove bookmark if present, persist & sync. */
+  const applyLearnEvent = useCallback((event: Parameters<typeof learn>[1], itemId?: string) => {
+    let next = learn(profileRef.current, event);
     if (itemId && next.bookmarkedIds?.includes(itemId)) {
       next = { ...next, bookmarkedIds: next.bookmarkedIds.filter(bid => bid !== itemId) };
     }
     setProfile(next);
     debouncedSave(next);
     debouncedICSync(next);
-    trackDomainValidation(sourceUrl);
+    return next;
   }, [debouncedSave, debouncedICSync]);
 
+  const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => {
+    applyLearnEvent({ action: "validate", topics, author, composite, verdict }, itemId);
+    trackDomainValidation(sourceUrl);
+  }, [applyLearnEvent]);
+
   const onFlag = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", itemId?: string) => {
-    let next = learn(profileRef.current, { action: "flag", topics, author, composite, verdict });
-    if (itemId && next.bookmarkedIds?.includes(itemId)) {
-      next = { ...next, bookmarkedIds: next.bookmarkedIds.filter(bid => bid !== itemId) };
-    }
-    setProfile(next);
-    debouncedSave(next);
-    debouncedICSync(next);
-  }, [debouncedSave, debouncedICSync]);
+    applyLearnEvent({ action: "flag", topics, author, composite, verdict }, itemId);
+  }, [applyLearnEvent]);
 
   const setTopicAffinity = useCallback((topic: string, value: number) => {
     updateProfile(p => { p.topicAffinities[topic] = clamp(value, TOPIC_AFFINITY_FLOOR, TOPIC_AFFINITY_CAP); });

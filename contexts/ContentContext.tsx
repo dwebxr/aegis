@@ -122,8 +122,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const doDrainQueue = useCallback(async () => {
     const actor = actorRef.current;
     if (!actor || !isAuthenticated || !principal) return;
-    await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus);
-  }, [isAuthenticated, principal]);
+    await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus, addNotification);
+  }, [isAuthenticated, principal, addNotification]);
   drainQueueRef.current = doDrainQueue;
 
   const isOnline = useOnlineStatus(doDrainQueue);
@@ -356,7 +356,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         }
       } catch (err) {
         if (!controller.signal.aborted) {
-          console.debug("[content] Image backfill batch failed:", errMsg(err));
+          console.warn("[content] Image backfill batch failed:", errMsg(err));
         }
       } finally {
         clearTimeout(timeout);

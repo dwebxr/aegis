@@ -100,7 +100,7 @@ export function mergePageIntoContent(
   return [...merged, ...nonDuplicates];
 }
 
-/** Fire-and-forget IC call with offline queue fallback. */
+/** IC call with offline queue fallback on failure. */
 export function syncToIC(
   promise: Promise<unknown>,
   actionType: "saveEvaluation" | "updateEvaluation",
@@ -109,7 +109,7 @@ export function syncToIC(
   setPendingActions: React.Dispatch<React.SetStateAction<number>>,
   addNotification: (msg: string, type: "error" | "info" | "success") => void,
 ) {
-  void promise.catch(async (err: unknown) => {
+  promise.then(undefined, async (err: unknown) => {
     console.warn("[content] IC sync failed:", errMsg(err));
     setSyncStatus("offline");
     try {
@@ -120,6 +120,9 @@ export function syncToIC(
       console.error("[content] Failed to enqueue offline action:", errMsg(qErr));
       addNotification("Failed to save \u2014 changes may be lost", "error");
     }
+  }).catch((unexpectedErr: unknown) => {
+    // Safety net: catch any unexpected error in the rejection handler itself
+    console.error("[content] Unexpected error in syncToIC handler:", errMsg(unexpectedErr));
   });
 }
 
@@ -129,11 +132,13 @@ export async function drainOfflineQueue(
   contentRef: React.MutableRefObject<ContentItem[]>,
   setPendingActions: React.Dispatch<React.SetStateAction<number>>,
   setSyncStatus: (s: "idle" | "syncing" | "synced" | "offline") => void,
+  addNotification?: (msg: string, type: "error" | "info" | "success") => void,
 ) {
   const actions = await dequeueAll();
   if (actions.length === 0) return;
   console.info(`[offline-queue] Draining ${actions.length} pending action(s)`);
   const MAX_RETRIES = 5;
+  let droppedCount = 0;
   for (const action of actions) {
     const actionId = action.id;
     if (actionId == null) {
@@ -142,6 +147,8 @@ export async function drainOfflineQueue(
     }
     if (action.retries >= MAX_RETRIES) {
       console.warn(`[offline-queue] Dropping action ${actionId} after ${MAX_RETRIES} retries`);
+      Sentry.captureMessage(`Offline action dropped after ${MAX_RETRIES} retries`, { level: "warning", extra: { actionId, type: action.type } });
+      droppedCount++;
       await removeAction(actionId);
       continue;
     }
@@ -164,6 +171,9 @@ export async function drainOfflineQueue(
       console.warn(`[offline-queue] Replay failed for action ${actionId}:`, errMsg(err));
       await incrementRetries(actionId);
     }
+  }
+  if (droppedCount > 0) {
+    addNotification?.(`${droppedCount} offline change(s) could not be synced and were discarded`, "error");
   }
   const remaining = await dequeueAll();
   setPendingActions(remaining.length);

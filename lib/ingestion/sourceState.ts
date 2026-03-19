@@ -71,7 +71,8 @@ function isValidState(v: unknown): v is SourceRuntimeState {
     typeof s.consecutiveEmpty === "number" &&
     typeof s.nextFetchAt === "number" &&
     typeof s.averageScore === "number" &&
-    typeof s.totalItemsScored === "number"
+    typeof s.totalItemsScored === "number" &&
+    (s.rateLimitedUntil === undefined || typeof s.rateLimitedUntil === "number")
   );
 }
 

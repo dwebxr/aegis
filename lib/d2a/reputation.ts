@@ -98,8 +98,7 @@ export function isBlocked(pubkey: string): boolean {
 }
 
 export function getReputation(pubkey: string): PeerReputation | undefined {
-  const map = loadReputations();
-  return map.get(pubkey);
+  return loadReputations().get(pubkey);
 }
 
 function normalizeRepScore(score: number): number {

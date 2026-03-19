@@ -32,8 +32,7 @@ export function runFilterPipeline(
   const customRules = config.customRules ?? [];
 
   for (const item of content) {
-    // Count AI/paid scoring across all items (including below-threshold) for cost stats
-    const isAI = item.scoredByAI === true || (item.scoredByAI == null && !item.reason?.startsWith("Heuristic"));
+    const isAI = item.scoredByAI ?? !item.reason?.startsWith("Heuristic");
     if (isAI) stats.aiScoredCount++;
     if (item.scoringEngine ? PAID_ENGINES.has(item.scoringEngine) : isAI) paidCount++;
 

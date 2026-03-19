@@ -89,13 +89,21 @@ export function saveCachedContent(items: ContentItem[]): void {
     const truncated = truncatePreservingActioned(items);
     if (useIDB) {
       idbPut(STORE_CONTENT_CACHE, IDB_CONTENT_KEY, truncated).catch(err => {
-        console.warn("[content] IDB save failed:", errMsg(err));
+        console.warn("[content] IDB save failed, falling back to localStorage:", errMsg(err));
+        // Fallback: attempt localStorage write when IDB fails
+        if (typeof globalThis.localStorage !== "undefined") {
+          try {
+            localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncated));
+          } catch (lsErr) {
+            console.error("[content] Both IDB and localStorage save failed:", errMsg(lsErr));
+          }
+        }
       });
     } else if (typeof globalThis.localStorage !== "undefined") {
       try {
         localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncated));
       } catch (err) {
-        console.warn("[content] localStorage save failed (quota?):", errMsg(err));
+        console.error("[content] localStorage save failed (quota?):", errMsg(err));
       }
     }
   }, SAVE_DEBOUNCE_MS);

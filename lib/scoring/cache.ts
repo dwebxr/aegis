@@ -79,7 +79,6 @@ function parseEntries(parsed: unknown): Map<string, ScoringCacheEntry> {
   return validated;
 }
 
-/** Initialize the scoring cache from IDB (preferred) or localStorage (fallback). */
 export async function initScoringCache(): Promise<void> {
   if (_memCache) return;
 
@@ -126,13 +125,21 @@ function getCache(): Map<string, ScoringCacheEntry> {
   return (_memCache = new Map());
 }
 
+let _flushing = false;
+
 function scheduleFlush(): void {
   if (_flushTimer) return;
   _flushTimer = setTimeout(() => {
     _flushTimer = null;
-    flushCache().catch(err => {
-      console.warn("[scoring-cache] Scheduled flush failed:", err);
-    });
+    if (_flushing) {
+      // A flush is already in progress; re-schedule so the latest data is persisted
+      scheduleFlush();
+      return;
+    }
+    _flushing = true;
+    flushCache()
+      .catch(err => { console.warn("[scoring-cache] Scheduled flush failed:", err); })
+      .finally(() => { _flushing = false; });
   }, FLUSH_DEBOUNCE_MS);
 }
 
@@ -212,6 +219,7 @@ export async function clearScoringCache(): Promise<void> {
 export function _resetScoringCache(): void {
   _memCache = null;
   _useIDB = false;
+  _flushing = false;
   if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
   cacheHits = 0;
   cacheMisses = 0;

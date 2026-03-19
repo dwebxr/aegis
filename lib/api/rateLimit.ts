@@ -64,7 +64,6 @@ interface WindowEntry {
 const MAX_WINDOW_ENTRIES = 10_000;
 const windows = new Map<string, WindowEntry>();
 
-// Cleanup stale entries to prevent unbounded memory growth
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 if (typeof setInterval !== "undefined") {
   cleanupTimer = setInterval(() => {
@@ -136,7 +135,7 @@ export function rateLimit(request: NextRequest, limit = 30, windowMs = 60_000): 
   if (!entry || now >= entry.resetAt) {
     if (windows.size >= MAX_WINDOW_ENTRIES) {
       const oldest = windows.keys().next().value;
-      if (oldest) windows.delete(oldest);
+      if (oldest !== undefined) windows.delete(oldest);
     }
     windows.set(ip, { count: 1, resetAt: now + windowMs });
     return null;

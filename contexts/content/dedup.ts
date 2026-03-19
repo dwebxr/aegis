@@ -21,7 +21,6 @@ export function normalizeUrl(raw: string): string {
   }
 }
 
-/** Build a dedup index (Set of normalized URLs + Set of texts) from an array of items. */
 function buildDedupIndex(items: ContentItem[]): { urls: Set<string>; texts: Set<string> } {
   const urls = new Set<string>();
   const texts = new Set<string>();
@@ -36,15 +35,10 @@ function buildDedupIndex(items: ContentItem[]): { urls: Set<string>; texts: Set<
 export function isDuplicateItem(item: ContentItem, existing: ContentItem[]): boolean {
   const normUrl = item.sourceUrl ? normalizeUrl(item.sourceUrl) : null;
 
-  return existing.some(c => {
-    if (normUrl && c.sourceUrl && normUrl === normalizeUrl(c.sourceUrl)) {
-      return true;
-    }
-    if (c.text === item.text) {
-      return true;
-    }
-    return false;
-  });
+  return existing.some(c =>
+    (normUrl && c.sourceUrl && normUrl === normalizeUrl(c.sourceUrl)) ||
+    c.text === item.text,
+  );
 }
 
 /** Filter `candidates` to only those not already present in `existing`. O(n+m) via pre-built index. */

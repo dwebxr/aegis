@@ -37,7 +37,7 @@ export function isContentSerendipity(
 
   // Topic novelty: average affinity for item's topics is below threshold
   const topics = item.topics;
-  if (topics && topics.length > 0) {
+  if (topics?.length) {
     const affinities = topics.map(t => Math.abs(profile.topicAffinities[t] ?? 0));
     const avgAffinity = affinities.reduce((a, b) => a + b, 0) / affinities.length;
     if (avgAffinity < TOPIC_NOVELTY_THRESHOLD) return true;

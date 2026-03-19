@@ -88,18 +88,14 @@ export function computePeerStats(
   return stats;
 }
 
+const SORT_ACCESSORS: Record<PeerSortKey, (s: PeerStat) => number> = {
+  effectiveTrust: s => s.effectiveTrust,
+  itemsReceived: s => s.itemsReceived,
+  qualityRate: s => s.qualityRate,
+  reputation: s => s.reputation.score,
+};
+
 export function sortPeerStats(stats: PeerStat[], key: PeerSortKey, desc = true): PeerStat[] {
-  const sorted = [...stats];
-  sorted.sort((a, b) => {
-    let va: number;
-    let vb: number;
-    switch (key) {
-      case "effectiveTrust": va = a.effectiveTrust; vb = b.effectiveTrust; break;
-      case "itemsReceived": va = a.itemsReceived; vb = b.itemsReceived; break;
-      case "qualityRate": va = a.qualityRate; vb = b.qualityRate; break;
-      case "reputation": va = a.reputation.score; vb = b.reputation.score; break;
-    }
-    return desc ? vb - va : va - vb;
-  });
-  return sorted;
+  const accessor = SORT_ACCESSORS[key];
+  return [...stats].sort((a, b) => desc ? accessor(b) - accessor(a) : accessor(a) - accessor(b));
 }

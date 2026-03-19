@@ -15,6 +15,7 @@ import { Principal } from "@dfinity/principal";
 jest.mock("@sentry/nextjs", () => ({
   startSpan: jest.fn((_opts: unknown, fn: () => unknown) => fn()),
   setTag: jest.fn(),
+  captureMessage: jest.fn(),
 }));
 
 beforeEach(async () => {
