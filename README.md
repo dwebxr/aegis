@@ -9,6 +9,16 @@
 
 ## Latest Updates (March 2026)
 
+### A2A Diff Sync API & Filtering
+- **5900 tests, 338 suites** — zero failures, zero skipped
+- **Pagination & filtering on `/api/d2a/briefing`**: New query params `since` (ISO 8601), `limit` (default 50, max 100), `offset`, `topics` (comma-separated, case-insensitive OR) — works on both individual (`?principal=`) and global paths; response now includes `pagination: { offset, limit, total, hasMore }`
+- **`/api/d2a/briefing/changes` endpoint**: Lightweight diff sync for A2A consumers — returns `itemHash` (SHA-256 of title+sourceUrl), `title`, `sourceUrl`, `composite` score, `generatedAt` for all briefing items newer than `?since=`; no x402 payment required
+- **x402 free-tier preview**: `?preview=true` (with `X402_FREE_TIER_ENABLED=true`) bypasses x402 paywall and truncates item content to 200 chars — full content requires payment
+- **`AEGIS_A2A_ALLOWED_ORIGINS` env var**: Comma-separated CORS origins for A2A consumers, merged with existing `D2A_CORS_ORIGINS`; validates HTTPS (+ `http://localhost` for dev)
+- **`/api/d2a/info` updated**: Service discovery now documents all new query params and the `/changes` endpoint
+- **Global path filtering**: `since` filters contributors by `generatedAt`, `topics` filters by contributor `topItems` topics — fetches larger batch from canister when filters active, paginates in-memory
+- **LARP audit**: Narrowed `BriefingChange.action` to `"added"` only (no dead `"updated"`/`"removed"` types); fixed `getRawGlobalBriefings` timestamp fallback ordering bug (fallback now computed before filter); extracted `applyPreview()` to eliminate in-place mutation
+
 ### Production Readiness Audit & Hardening
 - **5760 tests, 332 suites** — zero failures, zero skipped, zero TypeScript errors
 - **Sentry client-side monitoring**: New `sentry.client.config.ts` — browser errors now captured (was server/edge only); query strings stripped from URLs before send; 10% error replay sampling
@@ -698,8 +708,20 @@ Aegis exposes a paid API for AI agents (like [Coo](https://x.com/Coo_aiagent)) t
 |----------|------|-------------|
 | `GET /api/d2a/briefing?principal=<id>` | x402 ($0.01 USDC) | Individual curated briefing with V/C/L scored items |
 | `GET /api/d2a/briefing` | x402 ($0.01 USDC) | Global aggregated briefings from all D2A opt-in users |
+| `GET /api/d2a/briefing/changes?since=<ISO8601>` | None | Lightweight diff — item hashes for briefings newer than `since` |
 | `GET /api/d2a/info` | None | Service metadata, pricing, scoring model |
 | `GET /api/d2a/health` | None | Health check (IC canister + x402 config) |
+
+### Query Parameters (Briefing)
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `principal` | string | — | IC principal for user-specific briefing |
+| `since` | ISO 8601 | — | Exclude briefings generated before this timestamp |
+| `limit` | number | 50 (individual) / 5 (global) | Max items (max 100 / 10) |
+| `offset` | number | 0 | Pagination offset |
+| `topics` | string | — | Comma-separated topic filter (case-insensitive OR) |
+| `preview` | `"true"` | — | Truncate content to 200 chars (requires `X402_FREE_TIER_ENABLED`) |
 
 ### Payment Flow
 
@@ -726,6 +748,7 @@ AI Agent                        Aegis                        x402 Facilitator
   "generatedAt": "2025-01-15T12:00:00Z",
   "source": "aegis",
   "summary": { "totalEvaluated": 42, "totalBurned": 15, "qualityRate": 0.64 },
+  "pagination": { "offset": 0, "limit": 50, "total": 5, "hasMore": false },
   "items": [{
     "title": "...",
     "content": "...",
@@ -748,7 +771,7 @@ When `?principal=` is omitted, returns aggregated summaries from all D2A opt-in 
   "version": "1.0",
   "type": "global",
   "generatedAt": "2025-01-15T12:00:00Z",
-  "pagination": { "offset": 0, "limit": 5, "total": 42 },
+  "pagination": { "offset": 0, "limit": 5, "total": 42, "hasMore": true },
   "contributors": [{
     "principal": "rluf3-eiaaa-...",
     "generatedAt": "2025-01-15T11:00:00Z",
@@ -763,13 +786,34 @@ When `?principal=` is omitted, returns aggregated summaries from all D2A opt-in 
 }
 ```
 
+### Response Format (Changes — `/api/d2a/briefing/changes?since=<ISO8601>`)
+
+Lightweight diff endpoint for A2A cost optimization — check for new items before fetching full briefings.
+
+```json
+{
+  "since": "2025-01-15T00:00:00.000Z",
+  "checkedAt": "2025-01-15T12:00:00.000Z",
+  "changes": [{
+    "action": "added",
+    "itemHash": "a1b2c3...",
+    "title": "Breaking: New ML Paper",
+    "sourceUrl": "https://arxiv.org/abs/...",
+    "composite": 8.5,
+    "generatedAt": "2025-01-15T11:30:00.000Z"
+  }]
+}
+```
+
 ### Configuration
 
 ```bash
-X402_RECEIVER_ADDRESS=0x...    # EVM address to receive USDC payments
-X402_NETWORK=eip155:84532      # Base Sepolia (testnet) or eip155:8453 (mainnet)
-X402_PRICE=$0.01               # Price per briefing in USD
+X402_RECEIVER_ADDRESS=0x...           # EVM address to receive USDC payments
+X402_NETWORK=eip155:84532             # Base Sepolia (testnet) or eip155:8453 (mainnet)
+X402_PRICE=$0.01                      # Price per briefing in USD
 X402_FACILITATOR_URL=https://x402.org/facilitator
+X402_FREE_TIER_ENABLED=true           # Enable ?preview=true (truncated content, no payment)
+AEGIS_A2A_ALLOWED_ORIGINS=https://a2a.example.com  # Additional CORS origins for A2A consumers
 ```
 
 When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (free) — useful for development.

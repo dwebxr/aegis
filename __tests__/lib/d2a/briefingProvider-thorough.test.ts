@@ -157,7 +157,7 @@ describe("getGlobalBriefingSummaries", () => {
     expect(result!.version).toBe("1.0");
     expect(result!.type).toBe("global");
     expect(result!.contributors).toHaveLength(1);
-    expect(result!.pagination).toEqual({ offset: 0, limit: 5, total: 1 });
+    expect(result!.pagination).toEqual({ offset: 0, limit: 5, total: 1, hasMore: false });
   });
 
   it("aggregates topics across multiple contributors", async () => {

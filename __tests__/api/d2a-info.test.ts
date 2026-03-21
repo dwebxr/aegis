@@ -119,6 +119,50 @@ describe("GET /api/d2a/info", () => {
     const data = await res.json();
     expect(data.endpoints.briefing.params.principal).toContain("optional");
   });
+
+  it("briefing endpoint documents since param", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.briefing.params.since).toContain("ISO 8601");
+  });
+
+  it("briefing endpoint documents limit param", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.briefing.params.limit).toContain("max");
+  });
+
+  it("briefing endpoint documents offset param", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.briefing.params.offset).toContain("pagination");
+  });
+
+  it("briefing endpoint documents topics param", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.briefing.params.topics).toContain("comma-separated");
+  });
+
+  it("briefing endpoint documents preview param", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.briefing.params.preview).toContain("truncated");
+  });
+
+  it("lists changes endpoint", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.changes.url).toBe("/api/d2a/briefing/changes");
+    expect(data.endpoints.changes.method).toBe("GET");
+    expect(data.endpoints.changes.auth).toBe("none");
+  });
+
+  it("changes endpoint documents required since param", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.changes.params.since).toContain("required");
+  });
 });
 
 describe("OPTIONS /api/d2a/info", () => {

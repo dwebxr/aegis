@@ -56,7 +56,7 @@ const sampleGlobalBriefing = {
   version: "1.0" as const,
   type: "global" as const,
   generatedAt: "2025-01-01T00:00:00.000Z",
-  pagination: { offset: 0, limit: 5, total: 2 },
+  pagination: { offset: 0, limit: 5, total: 2, hasMore: false },
   contributors: [{
     principal: "rrkah-fqaaa-aaaaa-aaaaq-cai",
     generatedAt: "2025-01-01T00:00:00.000Z",
@@ -216,7 +216,7 @@ describe("GET /api/d2a/briefing — global path", () => {
     mockGetGlobalBriefingSummaries.mockResolvedValue(sampleGlobalBriefing);
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.pagination).toEqual({ offset: 0, limit: 5, total: 2 });
+    expect(data.pagination).toEqual({ offset: 0, limit: 5, total: 2, hasMore: false });
   });
 
   it("applies CORS for allowed origins", async () => {
@@ -229,6 +229,151 @@ describe("GET /api/d2a/briefing — global path", () => {
     mockGetGlobalBriefingSummaries.mockResolvedValue(null);
     const res = await GET(makeRequest());
     expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+});
+
+describe("GET /api/d2a/briefing — global path filtering", () => {
+  const multiContributorBriefing = {
+    version: "1.0" as const,
+    type: "global" as const,
+    generatedAt: "2026-03-21T00:00:00.000Z",
+    pagination: { offset: 0, limit: 100, total: 4, hasMore: false },
+    contributors: [
+      {
+        principal: "user-1",
+        generatedAt: "2026-03-20T10:00:00.000Z",
+        summary: { totalEvaluated: 10, totalBurned: 2, qualityRate: 0.8 },
+        topItems: [
+          { title: "AI News", topics: ["AI", "Tech"], briefingScore: 85, verdict: "quality" as const },
+        ],
+      },
+      {
+        principal: "user-2",
+        generatedAt: "2026-03-20T15:00:00.000Z",
+        summary: { totalEvaluated: 5, totalBurned: 1, qualityRate: 0.8 },
+        topItems: [
+          { title: "DeFi Update", topics: ["DeFi", "Crypto"], briefingScore: 75, verdict: "quality" as const },
+        ],
+      },
+      {
+        principal: "user-3",
+        generatedAt: "2026-03-19T08:00:00.000Z",
+        summary: { totalEvaluated: 8, totalBurned: 3, qualityRate: 0.625 },
+        topItems: [
+          { title: "Old AI Post", topics: ["AI"], briefingScore: 60, verdict: "quality" as const },
+        ],
+      },
+      {
+        principal: "user-4",
+        generatedAt: "2026-03-21T00:00:00.000Z",
+        summary: { totalEvaluated: 12, totalBurned: 0, qualityRate: 1 },
+        topItems: [
+          { title: "Mixed Topics", topics: ["AI", "DeFi"], briefingScore: 90, verdict: "quality" as const },
+        ],
+      },
+    ],
+    aggregatedTopics: ["AI", "DeFi", "Tech", "Crypto"],
+    totalEvaluated: 35,
+    totalQualityRate: 0.83,
+  };
+
+  beforeEach(() => {
+    _resetRateLimits();
+    mockGetLatestBriefing.mockReset();
+    mockGetGlobalBriefingSummaries.mockReset();
+  });
+
+  it("filters contributors by since timestamp", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
+    const res = await GET(makeRequest({ since: "2026-03-20T12:00:00Z" }));
+    const data = await res.json();
+    expect(data.contributors).toHaveLength(2);
+    expect(data.contributors.map((c: any) => c.principal)).toEqual(["user-2", "user-4"]);
+    expect(data.pagination.total).toBe(2);
+    expect(data.pagination.hasMore).toBe(false);
+  });
+
+  it("filters contributors by topics", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
+    const res = await GET(makeRequest({ topics: "DeFi" }));
+    const data = await res.json();
+    // user-2 (DeFi,Crypto), user-4 (AI,DeFi)
+    expect(data.contributors).toHaveLength(2);
+    expect(data.contributors.map((c: any) => c.principal)).toEqual(["user-2", "user-4"]);
+  });
+
+  it("combines since and topics filters", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
+    const res = await GET(makeRequest({ since: "2026-03-20T12:00:00Z", topics: "AI" }));
+    const data = await res.json();
+    // After since: user-2, user-4. After topics(AI): only user-4
+    expect(data.contributors).toHaveLength(1);
+    expect(data.contributors[0].principal).toBe("user-4");
+  });
+
+  it("paginates filtered results", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
+    const res = await GET(makeRequest({ topics: "AI", limit: "1", offset: "0" }));
+    const data = await res.json();
+    // 3 AI contributors (user-1, user-3, user-4), limit 1
+    expect(data.contributors).toHaveLength(1);
+    expect(data.contributors[0].principal).toBe("user-1");
+    expect(data.pagination.total).toBe(3);
+    expect(data.pagination.hasMore).toBe(true);
+  });
+
+  it("returns page 2 of filtered results", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
+    const res = await GET(makeRequest({ topics: "AI", limit: "1", offset: "1" }));
+    const data = await res.json();
+    expect(data.contributors).toHaveLength(1);
+    expect(data.contributors[0].principal).toBe("user-3");
+    expect(data.pagination.hasMore).toBe(true);
+  });
+
+  it("returns empty when no contributors match filters", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
+    const res = await GET(makeRequest({ topics: "Gaming" }));
+    const data = await res.json();
+    expect(data.contributors).toHaveLength(0);
+    expect(data.pagination.total).toBe(0);
+  });
+
+  it("topic filter is case-insensitive", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
+    const res = await GET(makeRequest({ topics: "defi" }));
+    const data = await res.json();
+    expect(data.contributors).toHaveLength(2);
+  });
+
+  it("ignores invalid since (returns all contributors)", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
+    const res = await GET(makeRequest({ since: "not-a-date" }));
+    const data = await res.json();
+    // Invalid since is ignored, but hasFilters is true so it fetches 100 and applies no filter
+    expect(data.contributors).toHaveLength(4);
+  });
+
+  it("preserves non-contributor fields when filtering", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
+    const res = await GET(makeRequest({ topics: "AI" }));
+    const data = await res.json();
+    expect(data.version).toBe("1.0");
+    expect(data.type).toBe("global");
+    expect(data.aggregatedTopics).toEqual(["AI", "DeFi", "Tech", "Crypto"]);
+    expect(data.totalEvaluated).toBe(35);
+  });
+
+  it("without filters, uses offset/limit directly (no fetch-100)", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(sampleGlobalBriefing);
+    await GET(makeRequest({ offset: "2", limit: "3" }));
+    expect(mockGetGlobalBriefingSummaries).toHaveBeenCalledWith(2, 3);
+  });
+
+  it("with filters, fetches 100 for in-memory filtering", async () => {
+    mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
+    await GET(makeRequest({ topics: "AI" }));
+    expect(mockGetGlobalBriefingSummaries).toHaveBeenCalledWith(0, 100);
   });
 });
 

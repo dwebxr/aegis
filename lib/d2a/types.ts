@@ -37,4 +37,20 @@ export interface D2ABriefingResponse {
   };
 }
 
+/** Only "added" — true diff (updated/removed) requires server-side snapshot storage. */
+export interface BriefingChange {
+  action: "added";
+  itemHash: string;
+  title: string;
+  sourceUrl: string;
+  composite: number;
+  generatedAt: string;
+}
+
+export interface ChangesResponse {
+  since: string;
+  checkedAt: string;
+  changes: BriefingChange[];
+}
+
 export type { GlobalBriefingResponse, GlobalBriefingContributor } from "./briefingProvider";

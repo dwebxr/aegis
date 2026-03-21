@@ -10,11 +10,17 @@ function isValidOrigin(o: string): boolean {
   } catch { return false; }
 }
 
-const ALLOWED_ORIGINS: string[] = (
-  process.env.D2A_CORS_ORIGINS
-    ? process.env.D2A_CORS_ORIGINS.split(",").map(o => o.trim()).filter(Boolean)
-    : ["https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io", APP_URL]
-).filter(isValidOrigin);
+function csvEnv(key: string): string[] {
+  const val = process.env[key];
+  return val ? val.split(",").map(o => o.trim()).filter(Boolean) : [];
+}
+
+const ALLOWED_ORIGINS: string[] = [
+  ...(process.env.D2A_CORS_ORIGINS
+    ? csvEnv("D2A_CORS_ORIGINS")
+    : ["https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io", APP_URL]),
+  ...csvEnv("AEGIS_A2A_ALLOWED_ORIGINS"),
+].filter(isValidOrigin);
 
 const STATIC_CORS: Record<string, string> = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",

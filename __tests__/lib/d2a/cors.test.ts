@@ -227,3 +227,68 @@ describe("D2A_CORS_ORIGINS env var", () => {
     });
   });
 });
+
+describe("AEGIS_A2A_ALLOWED_ORIGINS env var", () => {
+  const origEnv = process.env;
+
+  afterEach(() => {
+    process.env = origEnv;
+    jest.resetModules();
+  });
+
+  it("allows origins from AEGIS_A2A_ALLOWED_ORIGINS", () => {
+    process.env = { ...origEnv, AEGIS_A2A_ALLOWED_ORIGINS: "https://a2a.example.com" };
+    jest.isolateModules(() => {
+      const { withCors: corsFn } = require("@/lib/d2a/cors");
+      const res = corsFn(NextResponse.json({}), "https://a2a.example.com");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://a2a.example.com");
+    });
+  });
+
+  it("allows http://localhost from AEGIS_A2A_ALLOWED_ORIGINS for A2A dev", () => {
+    process.env = { ...origEnv, AEGIS_A2A_ALLOWED_ORIGINS: "http://localhost:3000" };
+    jest.isolateModules(() => {
+      const { withCors: corsFn } = require("@/lib/d2a/cors");
+      const res = corsFn(NextResponse.json({}), "http://localhost:3000");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3000");
+    });
+  });
+
+  it("merges D2A_CORS_ORIGINS and AEGIS_A2A_ALLOWED_ORIGINS", () => {
+    process.env = {
+      ...origEnv,
+      D2A_CORS_ORIGINS: "https://custom.example.com",
+      AEGIS_A2A_ALLOWED_ORIGINS: "https://a2a.example.com",
+    };
+    jest.isolateModules(() => {
+      const { withCors: corsFn } = require("@/lib/d2a/cors");
+      const res1 = corsFn(NextResponse.json({}), "https://custom.example.com");
+      expect(res1.headers.get("Access-Control-Allow-Origin")).toBe("https://custom.example.com");
+      const res2 = corsFn(NextResponse.json({}), "https://a2a.example.com");
+      expect(res2.headers.get("Access-Control-Allow-Origin")).toBe("https://a2a.example.com");
+    });
+  });
+
+  it("rejects non-HTTPS non-localhost A2A origins", () => {
+    process.env = { ...origEnv, AEGIS_A2A_ALLOWED_ORIGINS: "http://remote.example.com" };
+    jest.isolateModules(() => {
+      const { withCors: corsFn } = require("@/lib/d2a/cors");
+      const res = corsFn(NextResponse.json({}), "http://remote.example.com");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    });
+  });
+
+  it("handles multiple A2A origins", () => {
+    process.env = {
+      ...origEnv,
+      AEGIS_A2A_ALLOWED_ORIGINS: "https://a2a-prod.example.com,https://a2a-staging.example.com",
+    };
+    jest.isolateModules(() => {
+      const { withCors: corsFn } = require("@/lib/d2a/cors");
+      const res1 = corsFn(NextResponse.json({}), "https://a2a-prod.example.com");
+      expect(res1.headers.get("Access-Control-Allow-Origin")).toBe("https://a2a-prod.example.com");
+      const res2 = corsFn(NextResponse.json({}), "https://a2a-staging.example.com");
+      expect(res2.headers.get("Access-Control-Allow-Origin")).toBe("https://a2a-staging.example.com");
+    });
+  });
+});

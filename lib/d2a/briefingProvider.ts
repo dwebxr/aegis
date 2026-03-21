@@ -6,11 +6,15 @@ import type { _SERVICE } from "@/lib/ic/declarations/aegis_backend.did";
 import type { D2ABriefingResponse } from "./types";
 import { withTimeout } from "@/lib/utils/timeout";
 
+async function createActor(): Promise<_SERVICE> {
+  const agent = await HttpAgent.create({ host: getHost() });
+  return Actor.createActor<_SERVICE>(idlFactory, { agent, canisterId: getCanisterId() });
+}
+
 export async function getLatestBriefing(principalText?: string): Promise<D2ABriefingResponse | null> {
   if (!principalText) return null;
 
-  const agent = await HttpAgent.create({ host: getHost() });
-  const actor = Actor.createActor<_SERVICE>(idlFactory, { agent, canisterId: getCanisterId() });
+  const actor = await createActor();
   const p = Principal.fromText(principalText);
   const result = await withTimeout(actor.getLatestBriefing(p), 15_000, "getLatestBriefing");
 
@@ -54,7 +58,7 @@ export interface GlobalBriefingResponse {
   version: "1.0";
   type: "global";
   generatedAt: string;
-  pagination: { offset: number; limit: number; total: number };
+  pagination: { offset: number; limit: number; total: number; hasMore: boolean };
   contributors: GlobalBriefingContributor[];
   aggregatedTopics: string[];
   totalEvaluated: number;
@@ -67,8 +71,7 @@ export async function getGlobalBriefingSummaries(
   offset = 0,
   limit = 5,
 ): Promise<GlobalBriefingResponse | null> {
-  const agent = await HttpAgent.create({ host: getHost() });
-  const actor = Actor.createActor<_SERVICE>(idlFactory, { agent, canisterId: getCanisterId() });
+  const actor = await createActor();
 
   const result = await withTimeout(actor.getGlobalBriefingSummaries(BigInt(offset), BigInt(limit)), 20_000, "getGlobalBriefingSummaries");
 
@@ -137,10 +140,47 @@ export async function getGlobalBriefingSummaries(
     version: "1.0",
     type: "global",
     generatedAt: new Date().toISOString(),
-    pagination: { offset, limit, total: Number(result.total) },
+    pagination: { offset, limit, total: Number(result.total), hasMore: offset + limit < Number(result.total) },
     contributors,
     aggregatedTopics,
     totalEvaluated,
     totalQualityRate: Math.round(totalQualityRate * 100) / 100,
   };
+}
+
+export interface RawBriefingEntry {
+  briefing: D2ABriefingResponse;
+  generatedAtMs: number;
+}
+
+export async function getRawGlobalBriefings(sinceMs: number): Promise<RawBriefingEntry[]> {
+  const actor = await createActor();
+  const result = await withTimeout(
+    actor.getGlobalBriefingSummaries(BigInt(0), BigInt(100)),
+    20_000,
+    "getGlobalBriefingSummaries",
+  );
+
+  const entries: RawBriefingEntry[] = [];
+  for (const [, json, generatedAtNs] of result.items) {
+    try {
+      const parsed = JSON.parse(json) as D2ABriefingResponse;
+      if (!parsed || !Array.isArray(parsed.items)) continue;
+
+      // Compute timestamp: prefer bigint nanosecond IC timestamp, fall back to parsed generatedAt
+      const fromBigint = typeof generatedAtNs === "bigint"
+        ? Number(generatedAtNs / BigInt(1_000_000))
+        : 0;
+      const generatedAtMs = fromBigint > 0
+        ? fromBigint
+        : new Date(parsed.generatedAt).getTime();
+
+      if (generatedAtMs <= sinceMs) continue;
+
+      entries.push({ briefing: parsed, generatedAtMs });
+    } catch (err) {
+      console.warn("[briefingProvider] Skipped malformed raw briefing:", err);
+    }
+  }
+  return entries;
 }
