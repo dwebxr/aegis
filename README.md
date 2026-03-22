@@ -9,6 +9,14 @@
 
 ## Latest Updates (March 2026)
 
+### A2A On-Chain Storage (OfferStore + ReceiptStore)
+- **IC canister extended** with `Offer` and `Receipt` types — agents can publish information catalogs and submit multi-chain USDC payment proofs without a server-side DB
+- **7 canister functions**: `put_offer` (10KB size guard), `get_offers` (paginated, limit-clamped, newest-first), `submit_receipt` (verified re-submission protected), `get_receipt`, `verify_payment_manual` (controller-only), `get_a2a_stats` (monitoring)
+- **Upgrade-safe**: `preupgrade`/`postupgrade` serialize both stores; new stable vars init to `[]` — backward-compatible with existing canister state
+- **TypeScript declarations synced**: `Offer`/`Receipt` interfaces, IDL factory, `_SERVICE` methods updated in `lib/ic/declarations/`
+- **Security hardening**: `submit_receipt` skips overwrite when receipt already verified (grief prevention); `verify_payment_manual` restricted to `Principal.isController(caller)`; `get_offers` limit clamped to max 100
+- **29 Jest tests** (IDL factory execution, Candid field verification, size guard boundary, existing method regression) + **20 dfx integration tests** (`scripts/test-a2a-storage.sh`)
+
 ### A2A Diff Sync API & Filtering
 - **5900 tests, 338 suites** — zero failures, zero skipped
 - **Pagination & filtering on `/api/d2a/briefing`**: New query params `since` (ISO 8601), `limit` (default 50, max 100), `offset`, `topics` (comma-separated, case-insensitive OR) — works on both individual (`?principal=`) and global paths; response now includes `pagination: { offset, limit, total, hasMore }`

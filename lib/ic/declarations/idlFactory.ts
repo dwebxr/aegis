@@ -136,6 +136,25 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     items: IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Text, IDL.Int)),
     total: IDL.Nat,
   });
+  const Offer = IDL.Record({
+    id: IDL.Text,
+    contentHash: IDL.Text,
+    publisher: IDL.Text,
+    priceUSDC: IDL.Nat,
+    chain: IDL.Text,
+    vclScore: IDL.Float64,
+    title: IDL.Text,
+    description: IDL.Text,
+    createdAt: IDL.Int,
+  });
+  const Receipt = IDL.Record({
+    txHash: IDL.Text,
+    chain: IDL.Text,
+    contentHash: IDL.Text,
+    payer: IDL.Text,
+    amount: IDL.Nat,
+    verified: IDL.Bool,
+  });
   return IDL.Service({
     getProfile: IDL.Func([IDL.Principal], [IDL.Opt(UserProfile)], ["query"]),
     getEvaluation: IDL.Func([IDL.Text], [IDL.Opt(ContentEvaluation)], ["query"]),
@@ -174,5 +193,11 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     saveUserSettings: IDL.Func([UserSettings], [IDL.Bool], []),
     getUserPreferences: IDL.Func([IDL.Principal], [IDL.Opt(UserPreferences)], ["query"]),
     saveUserPreferences: IDL.Func([IDL.Text, IDL.Int], [IDL.Bool], []),
+    put_offer: IDL.Func([Offer], [], []),
+    get_offers: IDL.Func([IDL.Nat, IDL.Nat], [IDL.Vec(Offer)], ["query"]),
+    submit_receipt: IDL.Func([Receipt], [], []),
+    get_receipt: IDL.Func([IDL.Text], [IDL.Opt(Receipt)], ["query"]),
+    verify_payment_manual: IDL.Func([IDL.Text], [IDL.Bool], []),
+    get_a2a_stats: IDL.Func([], [IDL.Record({ offerCount: IDL.Nat, receiptCount: IDL.Nat })], ["query"]),
   });
 };

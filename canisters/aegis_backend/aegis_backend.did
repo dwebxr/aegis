@@ -66,6 +66,27 @@ type UserPreferences = record {
   savedAt : int;
 };
 
+type Offer = record {
+  id : text;
+  contentHash : text;
+  publisher : text;
+  priceUSDC : nat;
+  chain : text;
+  vclScore : float64;
+  title : text;
+  description : text;
+  createdAt : int;
+};
+
+type Receipt = record {
+  txHash : text;
+  chain : text;
+  contentHash : text;
+  payer : text;
+  amount : nat;
+  verified : bool;
+};
+
 service : {
   getProfile : (principal) -> (opt UserProfile) query;
   getEvaluation : (text) -> (opt ContentEvaluation) query;
@@ -90,4 +111,11 @@ service : {
     items : vec record { principal; text; int };
     total : nat;
   }) query;
+
+  put_offer : (Offer) -> ();
+  get_offers : (nat, nat) -> (vec Offer) query;
+  submit_receipt : (Receipt) -> ();
+  get_receipt : (text) -> (opt Receipt) query;
+  verify_payment_manual : (text) -> (bool);
+  get_a2a_stats : () -> (record { offerCount : nat; receiptCount : nat }) query;
 };

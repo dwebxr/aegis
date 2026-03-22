@@ -97,6 +97,10 @@ persistent actor AegisBackend {
   var stableD2AMatches : [(Text, Types.D2AMatchRecord)] = [];
   var stableSignalVoters : [(Text, [Principal])] = [];
 
+  // A2A Offer / Receipt storage
+  var stableOffers : [(Text, Types.Offer)] = [];
+  var stableReceipts : [(Text, Types.Receipt)] = [];
+
   // ──────────────────────────────────────
   // Runtime state (rebuilt from stable on upgrade)
   // ──────────────────────────────────────
@@ -135,6 +139,10 @@ persistent actor AegisBackend {
   // User preferences (cross-device preference profile sync, JSON blob)
   var stableUserPreferences : [(Principal, Types.UserPreferences)] = [];
   transient var userPreferences = HashMap.HashMap<Principal, Types.UserPreferences>(16, Principal.equal, Principal.hash);
+
+  // A2A Offer / Receipt runtime state
+  transient var offers = HashMap.HashMap<Text, Types.Offer>(16, Text.equal, Text.hash);
+  transient var receipts = HashMap.HashMap<Text, Types.Receipt>(16, Text.equal, Text.hash);
 
   // Owner -> evaluation IDs index for fast user queries
   transient var ownerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
@@ -184,6 +192,8 @@ persistent actor AegisBackend {
     stableBriefings := Iter.toArray(briefings.entries());
     stableUserSettings := Iter.toArray(userSettings.entries());
     stableUserPreferences := Iter.toArray(userPreferences.entries());
+    stableOffers := Iter.toArray(offers.entries());
+    stableReceipts := Iter.toArray(receipts.entries());
   };
 
   system func postupgrade() {
@@ -278,6 +288,14 @@ persistent actor AegisBackend {
     stableUserSettings := [];
     for ((p, prefs) in stableUserPreferences.vals()) { userPreferences.put(p, prefs) };
     stableUserPreferences := [];
+    for ((id, offer) in stableOffers.vals()) {
+      offers.put(id, offer);
+    };
+    stableOffers := [];
+    for ((hash, receipt) in stableReceipts.vals()) {
+      receipts.put(hash, receipt);
+    };
+    stableReceipts := [];
     initCertCache();
   };
 
@@ -1701,6 +1719,74 @@ persistent actor AegisBackend {
       savedAt = Time.now();
     });
     true;
+  };
+
+  // ──────────────────────────────────────
+  // A2A OfferStore / ReceiptStore
+  // ──────────────────────────────────────
+
+  let MAX_OFFER_TEXT : Nat = 10_000; // title + description size cap
+
+  public shared func put_offer(offer : Types.Offer) : async () {
+    if (Text.size(offer.title) + Text.size(offer.description) > MAX_OFFER_TEXT) {
+      Debug.trap("offer title + description exceeds 10KB");
+    };
+    offers.put(offer.id, offer);
+  };
+
+  public query func get_offers(limit : Nat, offset : Nat) : async [Types.Offer] {
+    let clampedLimit = if (limit > 100) { 100 } else if (limit == 0) { 20 } else { limit };
+    let all = Iter.toArray(offers.vals());
+    let sorted = Array.sort<Types.Offer>(all, func(a, b) {
+      Int.compare(b.createdAt, a.createdAt)
+    });
+    let total = sorted.size();
+    if (offset >= total) { return [] };
+    let end = Nat.min(offset + clampedLimit, total);
+    Array.tabulate<Types.Offer>(end - offset, func(i) { sorted[offset + i] });
+  };
+
+  // Skip if already verified — prevents grief by re-submission
+  public shared func submit_receipt(receipt : Types.Receipt) : async () {
+    switch (receipts.get(receipt.txHash)) {
+      case (?existing) { if (existing.verified) { return } };
+      case null {};
+    };
+    receipts.put(receipt.txHash, {
+      txHash = receipt.txHash;
+      chain = receipt.chain;
+      contentHash = receipt.contentHash;
+      payer = receipt.payer;
+      amount = receipt.amount;
+      verified = false;
+    });
+  };
+
+  public query func get_a2a_stats() : async { offerCount : Nat; receiptCount : Nat } {
+    { offerCount = offers.size(); receiptCount = receipts.size() };
+  };
+
+  public query func get_receipt(txHash : Text) : async ?Types.Receipt {
+    receipts.get(txHash);
+  };
+
+  // Restricted to canister controllers
+  public shared ({ caller }) func verify_payment_manual(txHash : Text) : async Bool {
+    if (not Principal.isController(caller)) { return false };
+    switch (receipts.get(txHash)) {
+      case (?r) {
+        receipts.put(txHash, {
+          txHash = r.txHash;
+          chain = r.chain;
+          contentHash = r.contentHash;
+          payer = r.payer;
+          amount = r.amount;
+          verified = true;
+        });
+        true;
+      };
+      case null { false };
+    };
   };
 
   // ──────────────────────────────────────

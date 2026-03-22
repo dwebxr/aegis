@@ -163,4 +163,27 @@ module {
     cContext : ?Nat8;
     lSlop : ?Nat8;
   };
+
+  // ── A2A Offer / Receipt types ──
+
+  public type Offer = {
+    id : Text;
+    contentHash : Text;
+    publisher : Text;
+    priceUSDC : Nat;
+    chain : Text;
+    vclScore : Float;
+    title : Text;
+    description : Text;
+    createdAt : Int;
+  };
+
+  public type Receipt = {
+    txHash : Text;
+    chain : Text;
+    contentHash : Text;
+    payer : Text;
+    amount : Nat;
+    verified : Bool;
+  };
 };
