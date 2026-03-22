@@ -1746,6 +1746,17 @@ persistent actor AegisBackend {
     Array.tabulate<Types.Offer>(end - offset, func(i) { sorted[offset + i] });
   };
 
+  public query func get_offer(id : Text) : async ?Types.Offer {
+    offers.get(id);
+  };
+
+  public shared func delete_offer(id : Text) : async Bool {
+    switch (offers.get(id)) {
+      case (?_) { offers.delete(id); true };
+      case null { false };
+    };
+  };
+
   // Skip if already verified — prevents grief by re-submission
   public shared func submit_receipt(receipt : Types.Receipt) : async () {
     switch (receipts.get(receipt.txHash)) {

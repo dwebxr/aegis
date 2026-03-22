@@ -218,7 +218,9 @@ export interface _SERVICE {
   getUserPreferences: ActorMethod<[Principal], [] | [UserPreferences]>;
   saveUserPreferences: ActorMethod<[string, bigint], boolean>;
   put_offer: ActorMethod<[Offer], void>;
+  get_offer: ActorMethod<[string], [] | [Offer]>;
   get_offers: ActorMethod<[bigint, bigint], Offer[]>;
+  delete_offer: ActorMethod<[string], boolean>;
   submit_receipt: ActorMethod<[Receipt], void>;
   get_receipt: ActorMethod<[string], [] | [Receipt]>;
   verify_payment_manual: ActorMethod<[string], boolean>;

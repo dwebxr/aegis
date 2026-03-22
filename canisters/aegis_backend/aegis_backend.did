@@ -113,7 +113,9 @@ service : {
   }) query;
 
   put_offer : (Offer) -> ();
+  get_offer : (text) -> (opt Offer) query;
   get_offers : (nat, nat) -> (vec Offer) query;
+  delete_offer : (text) -> (bool);
   submit_receipt : (Receipt) -> ();
   get_receipt : (text) -> (opt Receipt) query;
   verify_payment_manual : (text) -> (bool);
