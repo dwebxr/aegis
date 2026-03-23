@@ -4,7 +4,10 @@
 import React from "react";
 import { render, fireEvent } from "@testing-library/react";
 import { ContentCard } from "@/components/ui/ContentCard";
+import { WithTooltip } from "../../helpers/withTooltip";
 import type { ContentItem } from "@/lib/types/content";
+
+const renderCard = (ui: React.ReactElement) => render(<WithTooltip>{ui}</WithTooltip>);
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
@@ -27,7 +30,7 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 
 describe("ContentCard — YouTube integration", () => {
   it("renders YouTubePreview for YouTube watch URL", () => {
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard
         item={makeItem({ sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", platform: "youtube" })}
         expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()}
@@ -40,7 +43,7 @@ describe("ContentCard — YouTube integration", () => {
   });
 
   it("does NOT render YouTubePreview for non-YouTube URL", () => {
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard
         item={makeItem({ sourceUrl: "https://example.com/article" })}
         expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()}
@@ -50,7 +53,7 @@ describe("ContentCard — YouTube integration", () => {
   });
 
   it("does NOT render YouTubePreview when sourceUrl is absent", () => {
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard
         item={makeItem()}
         expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()}
@@ -60,7 +63,7 @@ describe("ContentCard — YouTube integration", () => {
   });
 
   it("renders both imageUrl and YouTubePreview when both present", () => {
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard
         item={makeItem({
           sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -76,7 +79,7 @@ describe("ContentCard — YouTube integration", () => {
   });
 
   it.each(["priority", "serendipity"] as const)("renders YouTubePreview in %s variant", (variant) => {
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard
         item={makeItem({ sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", platform: "youtube" })}
         expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()}
@@ -87,7 +90,7 @@ describe("ContentCard — YouTube integration", () => {
   });
 
   it("clicking play inside ContentCard shows iframe with correct embed URL", () => {
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard
         item={makeItem({ sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", platform: "youtube" })}
         expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()}
@@ -103,7 +106,7 @@ describe("ContentCard — YouTube integration", () => {
   // stopPropagation: playing video must not toggle the card
   it("clicking YouTubePreview does NOT call onToggle", () => {
     const onToggle = jest.fn();
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard
         item={makeItem({ sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", platform: "youtube" })}
         expanded={false} onToggle={onToggle} onValidate={jest.fn()} onFlag={jest.fn()}

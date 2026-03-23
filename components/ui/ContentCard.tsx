@@ -12,7 +12,7 @@ import { GLOSSARY } from "@/lib/glossary";
 import { CheckIcon } from "@/components/icons";
 import { BookmarkIcon, ExternalLinkIcon, FlagIcon } from "@/components/icons/signal";
 import { D2ABadge } from "@/components/ui/D2ABadge";
-import { SignalBadge, labelToSignalType } from "@/components/ui/SignalBadge";
+import { SignalBadge, deriveSignalTypes } from "@/components/ui/SignalBadge";
 import { isD2AContent } from "@/lib/d2a/activity";
 import { extractYouTubeVideoId } from "@/lib/utils/youtube";
 import type { ContentItem } from "@/lib/types/content";
@@ -68,9 +68,18 @@ export function ScoreGrid({ item }: { item: ContentItem }) {
     <div data-testid="aegis-card-score-grid" className="grid grid-cols-3 gap-3 mb-4">
       {hasVCL(item) ? (
         <>
-          <ShadTooltip><TooltipTrigger asChild><div><ScoreBar label="V" score={item.vSignal!} color={colors.purple[400]} /></div></TooltipTrigger><TooltipContent side="bottom">{GLOSSARY["V-Signal"]}</TooltipContent></ShadTooltip>
-          <ShadTooltip><TooltipTrigger asChild><div><ScoreBar label="C" score={item.cContext!} color={colors.sky[400]} /></div></TooltipTrigger><TooltipContent side="bottom">{GLOSSARY["C-Context"]}</TooltipContent></ShadTooltip>
-          <ShadTooltip><TooltipTrigger asChild><div><ScoreBar label="L" score={item.lSlop!} color={colors.red[400]} /></div></TooltipTrigger><TooltipContent side="bottom">{GLOSSARY["L-Slop"]}</TooltipContent></ShadTooltip>
+          <ShadTooltip>
+            <TooltipTrigger asChild><div><ScoreBar label="V" score={item.vSignal!} color={colors.purple[400]} /></div></TooltipTrigger>
+            <TooltipContent side="bottom">{GLOSSARY["V-Signal"]}</TooltipContent>
+          </ShadTooltip>
+          <ShadTooltip>
+            <TooltipTrigger asChild><div><ScoreBar label="C" score={item.cContext!} color={colors.sky[400]} /></div></TooltipTrigger>
+            <TooltipContent side="bottom">{GLOSSARY["C-Context"]}</TooltipContent>
+          </ShadTooltip>
+          <ShadTooltip>
+            <TooltipTrigger asChild><div><ScoreBar label="L" score={item.lSlop!} color={colors.red[400]} /></div></TooltipTrigger>
+            <TooltipContent side="bottom">{GLOSSARY["L-Slop"]}</TooltipContent>
+          </ShadTooltip>
         </>
       ) : (
         <>
@@ -113,6 +122,7 @@ export function TopicTags({ topics, max = 3 }: { topics: string[]; max?: number 
   );
 }
 
+/** @deprecated Use deriveSignalTypes from SignalBadge.tsx for icon-based display */
 export function deriveScoreTags(item: ContentItem): Array<{ label: string; color: string }> {
   const tags: Array<{ label: string; color: string }> = [];
 
@@ -132,17 +142,12 @@ export function deriveScoreTags(item: ContentItem): Array<{ label: string; color
   return tags.slice(0, 3);
 }
 
-/** Icon-based signal badges replacing text ScoreTags */
 function SignalBadges({ item }: { item: ContentItem }) {
-  const tags = deriveScoreTags(item);
-  if (tags.length === 0) return null;
+  const types = deriveSignalTypes(item);
+  if (types.length === 0) return null;
   return (
     <div className="flex gap-1 flex-wrap mt-2">
-      {tags.map(tag => {
-        const signalType = labelToSignalType(tag.label);
-        if (!signalType) return null;
-        return <SignalBadge key={tag.label} type={signalType} />;
-      })}
+      {types.map(t => <SignalBadge key={t} type={t} />)}
     </div>
   );
 }
@@ -192,7 +197,7 @@ export function YouTubePreview({ sourceUrl }: { sourceUrl?: string }) {
 
 const actionBtnBase = "flex items-center justify-center gap-[5px] rounded-md text-body-sm font-semibold cursor-pointer transition-all duration-150 font-[inherit] min-w-8";
 
-/** Tooltip-wrapped action button */
+/** Icon-first action button; shows tooltip when text is hidden */
 function ActionBtn({
   label,
   icon,
@@ -234,6 +239,45 @@ function ActionBtn({
   );
 }
 
+/** Anchor variant of ActionBtn for external links */
+function ActionLink({
+  label,
+  icon,
+  showText,
+  text,
+  href,
+  className,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  showText: boolean;
+  text: string;
+  href: string;
+  className: string;
+}) {
+  const link = (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      aria-label={label}
+      className={className}
+    >
+      {icon}{showText && ` ${text}`}
+    </a>
+  );
+
+  if (showText) return link;
+
+  return (
+    <ShadTooltip>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </ShadTooltip>
+  );
+}
+
 const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, isBookmarked, mobile, variant = "default", rank, focused, clusterCount }) => {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -266,7 +310,6 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         variant !== "default" && "relative",
         variant === "serendipity" && "overflow-hidden",
         focused && "outline-2 outline-cyan-400 outline-offset-1",
-        /* Variant backgrounds */
         variant === "serendipity" && "bg-gradient-to-br from-purple-600/[0.06] to-blue-600/[0.04] border border-purple-600/20",
         variant === "priority" && "bg-blue-600/[0.04] border border-blue-600/[0.12]",
         variant === "default" && (isSlop ? "bg-red-dim border border-red-border" : "bg-emerald-dim border border-emerald-border"),
@@ -340,7 +383,6 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
           />
         )}
         <div className="min-w-0 flow-root">
-          {/* Grade badge floated right — flow-root on parent establishes BFC to contain the float without clipping box-shadow */}
           <div className="float-right ml-3 mb-1 text-center">
             <GradeBadge composite={item.scores.composite} />
           </div>
@@ -362,15 +404,12 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
       </div>
 
       <YouTubePreview sourceUrl={item.sourceUrl} />
-
-      {/* Signal badges (icon-only, tooltip on hover) + topic tags */}
       <SignalBadges item={item} />
 
       {item.topics && item.topics.length > 0 && (
         <TopicTags topics={item.topics} />
       )}
 
-      {/* Cluster count */}
       {clusterCount !== undefined && clusterCount > 0 && !expanded && (
         <div className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full bg-blue-400/[0.07] text-blue-400 text-caption font-semibold border border-blue-400/[0.12]">
           +{clusterCount} related
@@ -391,25 +430,18 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
           )}
           <div className="flex gap-2 flex-wrap">
             {item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) && (
-              <ShadTooltip>
-                <TooltipTrigger asChild>
-                  <a
-                    href={item.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    aria-label="Read source article"
-                    className={cn(
-                      actionBtnBase,
-                      "bg-blue-400/[0.06] border border-blue-400/[0.19] text-blue-400 no-underline whitespace-nowrap",
-                      compactBtns ? "p-2" : "px-3 py-2"
-                    )}
-                  >
-                    <ExternalLinkIcon s={14} />{showActionText && " Read"}
-                  </a>
-                </TooltipTrigger>
-                {!showActionText && <TooltipContent side="bottom">Read source article</TooltipContent>}
-              </ShadTooltip>
+              <ActionLink
+                label="Read source article"
+                icon={<ExternalLinkIcon s={14} />}
+                showText={showActionText}
+                text="Read"
+                href={item.sourceUrl}
+                className={cn(
+                  actionBtnBase,
+                  "bg-blue-400/[0.06] border border-blue-400/[0.19] text-blue-400 no-underline whitespace-nowrap",
+                  compactBtns ? "p-2" : "px-3 py-2"
+                )}
+              />
             )}
             {onBookmark && (
               <ActionBtn

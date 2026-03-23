@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { SignalBadge } from "./SignalBadge";
 import type { SignalType } from "./SignalBadge";
@@ -129,9 +128,6 @@ export const GlossaryModal: React.FC<GlossaryModalProps> = ({ open, onClose }) =
         </div>
       </section>
 
-      <DialogClose className="absolute top-3 right-3 size-7 rounded-sm flex items-center justify-center text-disabled hover:text-tertiary transition-colors cursor-pointer bg-transparent border-none font-[inherit]">
-        &times;
-      </DialogClose>
     </DialogContent>
   </Dialog>
 );

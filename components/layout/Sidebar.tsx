@@ -61,7 +61,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         const active = activeTab === it.id;
         const btn = (
           <button
-            key={it.id}
             data-testid={`aegis-nav-${it.id}`}
             onClick={() => onTabChange(it.id)}
             aria-label={it.label}
@@ -111,7 +110,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         const active = activeTab === n.id;
         const btn = (
           <button
-            key={n.id}
             data-testid={`aegis-nav-${n.id}`}
             onClick={() => onTabChange(n.id)}
             aria-label={n.label}

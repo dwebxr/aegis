@@ -1,8 +1,5 @@
 import React from "react";
-
-interface IconProps {
-  s?: number;
-}
+import type { IconProps } from "./types";
 
 /** Antenna icon — represents HIGH SIGNAL / Value signal */
 export const SignalIcon: React.FC<IconProps> = ({ s = 14 }) => (
@@ -24,7 +21,7 @@ export const ContextIcon: React.FC<IconProps> = ({ s = 14 }) => (
   </svg>
 );
 
-/** Funnel/mute icon — represents LOW NOISE */
+/** Funnel icon — represents LOW NOISE */
 export const NoiseIcon: React.FC<IconProps> = ({ s = 14 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -40,7 +37,7 @@ export const SlopRiskIcon: React.FC<IconProps> = ({ s = 14 }) => (
   </svg>
 );
 
-/** Sparkle/star — represents ORIGINAL */
+/** Star — represents ORIGINAL */
 export const OriginalIcon: React.FC<IconProps> = ({ s = 14 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
@@ -64,7 +61,7 @@ export const CredibleIcon: React.FC<IconProps> = ({ s = 14 }) => (
   </svg>
 );
 
-/** Copy icon — represents DERIVATIVE */
+/** Copy — represents DERIVATIVE */
 export const DerivativeIcon: React.FC<IconProps> = ({ s = 14 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -72,14 +69,14 @@ export const DerivativeIcon: React.FC<IconProps> = ({ s = 14 }) => (
   </svg>
 );
 
-/** Bookmark icon — for Save action */
+/** Bookmark — Save action */
 export const BookmarkIcon: React.FC<IconProps> = ({ s = 14 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
   </svg>
 );
 
-/** Flag icon — for Flag action */
+/** Flag — Flag action */
 export const FlagIcon: React.FC<IconProps> = ({ s = 14 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
@@ -87,7 +84,7 @@ export const FlagIcon: React.FC<IconProps> = ({ s = 14 }) => (
   </svg>
 );
 
-/** External link — for Read more action */
+/** External link — Read more action */
 export const ExternalLinkIcon: React.FC<IconProps> = ({ s = 14 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
@@ -96,7 +93,7 @@ export const ExternalLinkIcon: React.FC<IconProps> = ({ s = 14 }) => (
   </svg>
 );
 
-/** Question mark circle — for Help/Glossary */
+/** Help circle — Glossary trigger */
 export const HelpCircleIcon: React.FC<IconProps> = ({ s = 16 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />

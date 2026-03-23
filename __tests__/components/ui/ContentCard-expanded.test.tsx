@@ -1,7 +1,10 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ContentCard } from "@/components/ui/ContentCard";
+import { WithTooltip } from "../../helpers/withTooltip";
 import type { ContentItem } from "@/lib/types/content";
+
+const wrap = (el: React.ReactElement) => renderToStaticMarkup(<WithTooltip>{el}</WithTooltip>);
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
@@ -26,36 +29,36 @@ const noop = jest.fn();
 
 describe("ContentCard — expanded state actions", () => {
   it("shows Validate and Flag Slop buttons when expanded", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard item={makeItem()} expanded={true} onToggle={noop} onValidate={noop} onFlag={noop} />
     );
     expect(html).toContain("Validate");
-    expect(html).toContain("Flag Slop");
+    expect(html).toContain("Flag");
   });
 
   it("shows Read more link when sourceUrl is http", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ sourceUrl: "https://example.com/article" })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
       />
     );
-    expect(html).toContain("Read more");
+    expect(html).toContain("Read");
     expect(html).toContain("https://example.com/article");
   });
 
   it("hides Read more link for non-http sourceUrl", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ sourceUrl: "nostr:nevent1abc" })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
       />
     );
-    expect(html).not.toContain("Read more");
+    expect(html).not.toContain("Read");
   });
 
   it("shows reason text when expanded", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ reason: "Excellent sourcing" })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -65,7 +68,7 @@ describe("ContentCard — expanded state actions", () => {
   });
 
   it("hides reason when not present", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ reason: "" })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -76,7 +79,7 @@ describe("ContentCard — expanded state actions", () => {
   });
 
   it("shows disabled Validate button when already validated", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ validated: true })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -87,7 +90,7 @@ describe("ContentCard — expanded state actions", () => {
   });
 
   it("shows disabled Flag button when already flagged", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ flagged: true })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -97,19 +100,19 @@ describe("ContentCard — expanded state actions", () => {
   });
 
   it("does not show Flag Slop button for slop verdict (compact mode)", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ verdict: "slop" })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
       />
     );
     // Slop items don't show Flag Slop button (only Not Slop / Validate)
-    expect(html).not.toContain("Flag Slop");
+    expect(html).not.toContain("Flag");
     expect(html).toContain("Not Slop");
   });
 
   it("shows 'Not Slop' for slop items in compact expanded mode", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ verdict: "slop" })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -121,7 +124,7 @@ describe("ContentCard — expanded state actions", () => {
 
 describe("ContentCard — mobile rendering", () => {
   it("shows full-text buttons on mobile when few buttons (no bookmark/filter)", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ sourceUrl: "https://example.com/article" })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -129,13 +132,13 @@ describe("ContentCard — mobile rendering", () => {
       />
     );
     // Only 3 buttons (Read more, Validate, Flag Slop) — full text fits on mobile
-    expect(html).toContain("Read more");
+    expect(html).toContain("Read");
     expect(html).toContain("Validate");
-    expect(html).toContain("Flag Slop");
+    expect(html).toContain("Flag");
   });
 
   it("shows icon-only buttons on mobile when many buttons (bookmark present)", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ sourceUrl: "https://example.com/article" })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -143,13 +146,13 @@ describe("ContentCard — mobile rendering", () => {
         onBookmark={noop}
       />
     );
-    expect(html).not.toContain("Read more");
-    expect(html).not.toContain("Flag Slop");
-    expect(html).toContain("\u2197"); // ↗
+    // In mobile compact mode, buttons show icon-only (no text labels)
+    expect(html).toContain('aria-label="Read source article"');
+    expect(html).not.toContain(" Read<"); // no text label next to icon
   });
 
   it("shows icon-only Save button on mobile", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem()}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -157,13 +160,13 @@ describe("ContentCard — mobile rendering", () => {
         onBookmark={noop}
       />
     );
-    // Mobile: only icon, no "Save" text
-    expect(html).not.toContain("Save");
-    expect(html).toContain("\uD83D\uDD16"); // 🔖
+    // Mobile compact: only icon, no "Save" text
+    expect(html).toContain('aria-label="Bookmark for later"');
+    expect(html).not.toContain(" Save<");
   });
 
   it("shows full text labels on desktop", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ sourceUrl: "https://example.com/article" })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -171,16 +174,16 @@ describe("ContentCard — mobile rendering", () => {
         onBookmark={noop}
       />
     );
-    expect(html).toContain("Read more");
+    expect(html).toContain("Read");
     expect(html).toContain("Validate");
-    expect(html).toContain("Flag Slop");
+    expect(html).toContain("Flag");
     expect(html).toContain("Save");
   });
 });
 
 describe("ContentCard — bookmark button", () => {
   it("shows Save button when onBookmark is provided", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem()}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -192,7 +195,7 @@ describe("ContentCard — bookmark button", () => {
   });
 
   it("shows Saved state when isBookmarked is true", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem()}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -205,7 +208,7 @@ describe("ContentCard — bookmark button", () => {
   });
 
   it("does not show bookmark button when onBookmark is not provided", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem()}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -218,7 +221,7 @@ describe("ContentCard — bookmark button", () => {
 
 describe("ContentCard — cluster count badge", () => {
   it("shows related cluster count when collapsed", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem()}
         expanded={false} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -229,7 +232,7 @@ describe("ContentCard — cluster count badge", () => {
   });
 
   it("hides cluster count when expanded", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem()}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -240,7 +243,7 @@ describe("ContentCard — cluster count badge", () => {
   });
 
   it("hides cluster count when 0", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem()}
         expanded={false} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -253,7 +256,7 @@ describe("ContentCard — cluster count badge", () => {
 
 describe("ContentCard — serendipity variant", () => {
   it("renders serendipity border color when variant is serendipity", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem()}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -266,33 +269,33 @@ describe("ContentCard — serendipity variant", () => {
 
 describe("ContentCard — ScoreGrid rendering in expanded state", () => {
   it("shows score labels when expanded", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ scores: { originality: 8, insight: 6, credibility: 9, composite: 7.5 } })}
         expanded={true} onToggle={noop} onValidate={noop} onFlag={noop}
       />
     );
-    expect(html).toContain("Originality");
-    expect(html).toContain("Insight");
-    expect(html).toContain("Credibility");
+    expect(html).toContain("Orig");
+    expect(html).toContain("Ins");
+    expect(html).toContain("Cred");
   });
 
   it("does not show ScoreGrid when collapsed", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem()}
         expanded={false} onToggle={noop} onValidate={noop} onFlag={noop}
       />
     );
-    expect(html).not.toContain("Originality");
-    expect(html).not.toContain("Insight");
-    expect(html).not.toContain("Credibility");
+    expect(html).not.toContain("Orig");
+    expect(html).not.toContain("Ins<");
+    expect(html).not.toContain("Cred");
   });
 });
 
 describe("ContentCard — topics display", () => {
   it("shows topic tags", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ topics: ["ai", "crypto", "defi"] })}
         expanded={false} onToggle={noop} onValidate={noop} onFlag={noop}
@@ -304,7 +307,7 @@ describe("ContentCard — topics display", () => {
   });
 
   it("handles items with no topics", () => {
-    const html = renderToStaticMarkup(
+    const html = wrap(
       <ContentCard
         item={makeItem({ topics: undefined })}
         expanded={false} onToggle={noop} onValidate={noop} onFlag={noop}

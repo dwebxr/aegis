@@ -4,7 +4,10 @@
 import React from "react";
 import { render, fireEvent } from "@testing-library/react";
 import { ContentCard } from "@/components/ui/ContentCard";
+import { WithTooltip } from "../../helpers/withTooltip";
 import type { ContentItem } from "@/lib/types/content";
+
+const renderCard = (ui: React.ReactElement) => render(<WithTooltip>{ui}</WithTooltip>);
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
@@ -29,7 +32,7 @@ describe("ContentCard — onToggle(id) callback", () => {
   it("calls onToggle with item.id on click", () => {
     const onToggle = jest.fn();
     const item = makeItem({ id: "abc-123" });
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard item={item} expanded={false} onToggle={onToggle} onValidate={jest.fn()} onFlag={jest.fn()} />,
     );
     const card = container.querySelector('[role="button"]')!;
@@ -41,7 +44,7 @@ describe("ContentCard — onToggle(id) callback", () => {
   it("calls onToggle with item.id on Enter key", () => {
     const onToggle = jest.fn();
     const item = makeItem({ id: "key-enter" });
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard item={item} expanded={false} onToggle={onToggle} onValidate={jest.fn()} onFlag={jest.fn()} />,
     );
     const card = container.querySelector('[role="button"]')!;
@@ -53,7 +56,7 @@ describe("ContentCard — onToggle(id) callback", () => {
   it("calls onToggle with item.id on Space key", () => {
     const onToggle = jest.fn();
     const item = makeItem({ id: "key-space" });
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard item={item} expanded={false} onToggle={onToggle} onValidate={jest.fn()} onFlag={jest.fn()} />,
     );
     const card = container.querySelector('[role="button"]')!;
@@ -64,7 +67,7 @@ describe("ContentCard — onToggle(id) callback", () => {
 
   it("does not call onToggle on unrelated keys", () => {
     const onToggle = jest.fn();
-    const { container } = render(
+    const { container } = renderCard(
       <ContentCard item={makeItem()} expanded={false} onToggle={onToggle} onValidate={jest.fn()} onFlag={jest.fn()} />,
     );
     const card = container.querySelector('[role="button"]')!;
@@ -75,12 +78,12 @@ describe("ContentCard — onToggle(id) callback", () => {
 
   it("passes the correct id for different items", () => {
     const onToggle = jest.fn();
-    const { container: c1 } = render(
+    const { container: c1 } = renderCard(
       <ContentCard item={makeItem({ id: "first" })} expanded={false} onToggle={onToggle} onValidate={jest.fn()} onFlag={jest.fn()} />,
     );
     fireEvent.click(c1.querySelector('[role="button"]')!);
 
-    const { container: c2 } = render(
+    const { container: c2 } = renderCard(
       <ContentCard item={makeItem({ id: "second" })} expanded={false} onToggle={onToggle} onValidate={jest.fn()} onFlag={jest.fn()} />,
     );
     fireEvent.click(c2.querySelector('[role="button"]')!);
