@@ -9,8 +9,8 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { GLOSSARY } from "@/lib/glossary";
-import { CheckIcon } from "@/components/icons";
-import { BookmarkIcon, ExternalLinkIcon, FlagIcon } from "@/components/icons/signal";
+import { CheckIcon, XCloseIcon } from "@/components/icons";
+import { BookmarkIcon, ExternalLinkIcon } from "@/components/icons/signal";
 import { D2ABadge } from "@/components/ui/D2ABadge";
 import { SignalBadge, deriveSignalTypes } from "@/components/ui/SignalBadge";
 import { isD2AContent } from "@/lib/d2a/activity";
@@ -479,9 +479,9 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
               <ActionBtn
                 data-testid="aegis-card-flag"
                 label="Flag as slop"
-                icon={<FlagIcon s={14} />}
+                icon={<XCloseIcon />}
                 showText={showActionText}
-                text={item.flagged ? "Flagged" : "Flag"}
+                text={item.flagged ? "Flagged" : "Slop"}
                 disabled={item.flagged}
                 onClick={e => { e.stopPropagation(); onFlag(item.id); }}
                 className={cn(
