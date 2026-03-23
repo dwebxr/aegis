@@ -9,6 +9,21 @@
 
 ## Latest Updates (March 2026)
 
+### Mark-First UI Refactor
+- **6059 tests, 344 suites** — zero failures, zero skipped
+- **Icon-driven signal badges**: Text labels ("HIGH SIGNAL", "RICH CONTEXT", "LOW NOISE") replaced with compact icon badges (`SignalBadge` component) — 9 signal types, each with distinct SVG icon, color, and tooltip on hover
+- **Grade badge with verdict icon**: GradeBadge (A/B/C/D/F + numeric score) now includes ✓/✖ verdict indicator below — green check for quality, red X for slop, tooltip explains meaning
+- **Glossary modal**: Centralized `GlossaryModal` with all grades, signal badges, metric definitions, and keyboard shortcuts — triggered by `?` button in Analytics header
+- **MetricPill component**: Compact icon+number metrics with tooltip; `label` prop shown on touch devices via `@media (hover: none)` where tooltips don't fire
+- **Sidebar collapsed tooltips**: Radix Tooltip on all nav items when sidebar collapses to icon-only mode — label + description visible on hover
+- **Action buttons icon-first**: Validate (✓), Slop (✖), Save (bookmark), Read (external link) — icon-only with tooltip when collapsed, icon+short label when expanded
+- **DashboardTab ScorePill migrated**: Text-label ScorePill replaced with inline `SignalBadge` icon — all production UI now uses mark-first rendering
+- **12 new SVG icons**: Signal, Context, Noise, SlopRisk, Original, Insight, Credible, Derivative, Bookmark, ExternalLink, HelpCircle — shared `IconProps` type with existing icon system
+- **Threshold logic unified**: `deriveSignalTypes()` is single source of truth for score thresholds; `deriveScoreTags()` delegates to it via `signalTypeToTag()` mapper; `hasVCL()` exported from SignalBadge
+- **Global tooltip test mock**: `jest.setup.ts` mocks `@/components/ui/tooltip` — all 344 test suites work without per-file `TooltipProvider` wrapping
+- **LARP audit fixes**: Restored deleted verdict indicator, fixed missing React key props in Sidebar, removed undocumented "S" keyboard shortcut, eliminated threshold logic duplication
+- **Dead code removed**: FlagIcon (replaced by XCloseIcon), 12 restating JSDoc comments, 7 duplicate glossary entries, unused interfaces, nested div wrappers — net -82 lines
+
 ### A2A On-Chain Storage (OfferStore + ReceiptStore)
 - **IC canister extended** with `Offer` and `Receipt` types — agents can publish information catalogs and submit multi-chain USDC payment proofs without a server-side DB
 - **7 canister functions**: `put_offer` (10KB size guard), `get_offers` (paginated, limit-clamped, newest-first), `submit_receipt` (verified re-submission protected), `get_receipt`, `verify_payment_manual` (controller-only), `get_a2a_stats` (monitoring)
