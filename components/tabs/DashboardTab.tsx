@@ -3,7 +3,8 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils";
 import { typography } from "@/lib/design";
 import { MiniChart } from "@/components/ui/MiniChart";
-import { ContentCard, deriveScoreTags } from "@/components/ui/ContentCard";
+import { ContentCard } from "@/components/ui/ContentCard";
+import { SignalBadge, deriveSignalTypes } from "@/components/ui/SignalBadge";
 import { colors, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { exportContentCSV, exportContentJSON } from "@/lib/utils/export";
@@ -36,19 +37,14 @@ import { useAutoReveal } from "@/hooks/useAutoReveal";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { deduplicateItems } from "@/contexts/content/dedup";
 
-function ScorePill({ gr, tag }: { gr: ReturnType<typeof scoreGrade>; tag: { label: string; color: string } | null }) {
+function ScorePill({ gr, signalType }: { gr: ReturnType<typeof scoreGrade>; signalType: string | null }) {
   return (
     <div
       className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-caption font-bold shrink-0"
       style={{ background: `${gr.color}12`, border: `1px solid ${gr.color}25` }}
     >
       <span className="font-mono" style={{ color: gr.color }}>{gr.grade}</span>
-      {tag && (
-        <>
-          <span className="text-disabled">&middot;</span>
-          <span className="uppercase text-tiny tracking-wide whitespace-nowrap" style={{ color: tag.color }}>{tag.label}</span>
-        </>
-      )}
+      {signalType && <SignalBadge type={signalType as import("@/components/ui/SignalBadge").SignalType} />}
     </div>
   );
 }
@@ -131,7 +127,7 @@ function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookm
   className?: string;
 }) {
   const gr = scoreGrade(item.scores.composite);
-  const tag = deriveScoreTags(item)[0] ?? null;
+  const signalType = deriveSignalTypes(item)[0] ?? null;
   return (
     <div className={cn("bg-card border border-border rounded-lg overflow-hidden transition-fast", extraClass)}>
       <ThumbnailArea item={item} gr={gr} gradeSize={gradeSize}
@@ -156,7 +152,7 @@ function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookm
           {item.author} &middot; {showPlatform ? (item.platform || item.source) : item.source} &middot; {item.timestamp}
         </div>
         <div className="flex items-center gap-2">
-          <ScorePill gr={gr} tag={tag} />
+          <ScorePill gr={gr} signalType={signalType} />
           <div className="flex-1" />
           <button onClick={(e) => { e.stopPropagation(); onBookmark(item.id); }}
             className={cn(
