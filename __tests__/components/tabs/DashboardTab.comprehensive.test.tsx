@@ -1047,7 +1047,7 @@ describe("Disabled button behavior", () => {
     const { validate } = findActionButtons(container);
     expect(validate.length).toBeGreaterThan(0);
     // All validate buttons should be disabled since all items are validated
-    validate.forEach(btn => expect(btn.disabled).toBe(true));
+    validate.forEach(btn => expect((btn as HTMLButtonElement).disabled).toBe(true));
     fireEvent.click(validate[0]);
     expect(onValidate).not.toHaveBeenCalled();
   });
