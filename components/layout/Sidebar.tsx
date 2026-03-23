@@ -6,6 +6,11 @@ import { SOCIAL_LINKS } from "@/lib/config";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserBadge } from "@/components/auth/UserBadge";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 
 export interface NavItem {
   id: string;
@@ -22,8 +27,8 @@ interface SidebarProps {
 }
 
 const footerNav = [
-  { id: "settings", icon: <GearIcon s={16} />, label: "Settings", authOnly: true },
-  { id: "analytics", icon: <ChartIcon s={16} />, label: "Stats", authOnly: false },
+  { id: "settings", icon: <GearIcon s={16} />, label: "Settings", tooltip: "Preferences and account", authOnly: true },
+  { id: "analytics", icon: <ChartIcon s={16} />, label: "Stats", tooltip: "Performance metrics", authOnly: false },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChange, collapsed }) => {
@@ -54,11 +59,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
       {/* Main nav */}
       {navItems.map(it => {
         const active = activeTab === it.id;
-        return (
+        const btn = (
           <button
             key={it.id}
             data-testid={`aegis-nav-${it.id}`}
             onClick={() => onTabChange(it.id)}
+            aria-label={it.label}
             className={cn(
               "flex items-center gap-3 mb-1 rounded-sm cursor-pointer transition-all duration-150 w-full font-[inherit] border",
               collapsed ? "py-3 px-0 justify-center" : "py-3 px-4 justify-start",
@@ -71,13 +77,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
             {!collapsed && (
               <div>
                 <div className={cn("text-[13px]", active ? "font-bold" : "font-normal")}>{it.label}</div>
-                {it.description && (
-                  <div className="text-tiny text-disabled font-normal mt-px leading-h1">{it.description}</div>
-                )}
               </div>
             )}
           </button>
         );
+
+        if (collapsed) {
+          return (
+            <Tooltip key={it.id}>
+              <TooltipTrigger asChild>{btn}</TooltipTrigger>
+              <TooltipContent side="right">
+                <div className="font-semibold">{it.label}</div>
+                {it.description && <div className="text-xs opacity-70">{it.description}</div>}
+              </TooltipContent>
+            </Tooltip>
+          );
+        }
+
+        return btn;
       })}
 
       <div className="flex-1" />
@@ -92,11 +109,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
       {/* Footer nav */}
       {footerNav.filter(n => !n.authOnly || isAuthenticated).map(n => {
         const active = activeTab === n.id;
-        return (
+        const btn = (
           <button
             key={n.id}
             data-testid={`aegis-nav-${n.id}`}
             onClick={() => onTabChange(n.id)}
+            aria-label={n.label}
             className={cn(
               "flex items-center gap-2 mb-1 rounded-sm cursor-pointer transition-all duration-150 w-full font-[inherit] border",
               collapsed ? "py-2 px-0 justify-center" : "py-2 px-3 justify-start",
@@ -109,6 +127,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
             {!collapsed && <span className={cn("text-caption", active ? "font-bold" : "font-medium")}>{n.label}</span>}
           </button>
         );
+
+        if (collapsed) {
+          return (
+            <Tooltip key={n.id}>
+              <TooltipTrigger asChild>{btn}</TooltipTrigger>
+              <TooltipContent side="right">{n.tooltip}</TooltipContent>
+            </Tooltip>
+          );
+        }
+
+        return btn;
       })}
 
       {/* GitHub link */}
@@ -156,14 +185,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         collapsed ? "px-1 py-2 text-center" : "px-3 py-2 text-left"
       )}>
         {collapsed ? (
-          <div className="flex justify-center">
-            <div className="size-[7px] rounded-full bg-emerald-400 animate-pulse" />
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex justify-center">
+                <div className="size-[7px] rounded-full bg-emerald-400 animate-pulse" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">Online — Aegis AI</TooltipContent>
+          </Tooltip>
         ) : (
           <div className="flex items-center gap-2">
             <div className="size-[7px] rounded-full bg-emerald-400 animate-pulse shrink-0" />
             <span className="text-caption font-semibold text-emerald-400 uppercase tracking-wider">Online</span>
-            <span className="text-tiny text-disabled">·</span>
+            <span className="text-tiny text-disabled">&middot;</span>
             <span className="text-caption font-bold text-secondary-foreground font-mono">Aegis AI</span>
           </div>
         )}

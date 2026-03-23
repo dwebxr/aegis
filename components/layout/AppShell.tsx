@@ -17,11 +17,11 @@ interface AppShellProps {
 }
 
 const NAV_CONFIG = [
-  { id: "dashboard", Icon: ShieldIcon, label: "Home", description: "Your daily overview" },
-  { id: "briefing", Icon: SearchIcon, label: "Briefing", description: "Top picks for you" },
-  { id: "incinerator", Icon: FireIcon, label: "Burn", description: "Filter and publish" },
-  { id: "d2a", Icon: D2AIcon, label: "D2A", description: "Agent activity" },
-  { id: "sources", Icon: RSSIcon, label: "Sources", description: "Add feeds and sources" },
+  { id: "dashboard", Icon: ShieldIcon, label: "Home", description: "Daily overview" },
+  { id: "briefing", Icon: SearchIcon, label: "Briefing", description: "Scored and filtered content" },
+  { id: "incinerator", Icon: FireIcon, label: "Burn", description: "Analyze and publish signals" },
+  { id: "d2a", Icon: D2AIcon, label: "D2A", description: "Agent peer activity" },
+  { id: "sources", Icon: RSSIcon, label: "Sources", description: "Manage feeds and sources" },
 ] as const;
 
 function buildNavItems(size: number): NavItem[] {

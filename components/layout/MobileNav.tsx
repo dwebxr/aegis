@@ -31,14 +31,14 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
               key={it.id}
               data-testid={`aegis-nav-mobile-${it.id}`}
               onClick={() => onTabChange(it.id)}
-              title={it.description}
+              aria-label={it.description || it.label}
               className={cn(
                 "flex flex-col items-center justify-center gap-[3px] bg-none border-none cursor-pointer px-3 py-1.5 min-h-12 min-w-12 font-[inherit] transition-all duration-150",
                 active ? "text-blue-400" : "text-disabled"
               )}
             >
               {it.icon}
-              <span className={cn("text-caption tracking-wide", active ? "font-bold" : "font-medium")}>{it.label}</span>
+              <span className={cn("text-[9px] tracking-wide leading-tight", active ? "font-bold" : "font-medium")}>{it.label}</span>
               {active && <div className="w-4 h-0.5 rounded-sm bg-blue-400 mt-px" />}
             </button>
           );
@@ -56,7 +56,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
                   key={btn.id}
                   data-testid={`aegis-nav-mobile-${btn.id}`}
                   onClick={() => onTabChange(btn.id)}
-                  title={btn.title}
+                  aria-label={btn.title}
                   className={cn(
                     "flex items-center justify-center size-7 p-0 rounded-sm cursor-pointer transition-all duration-150 border",
                     active
@@ -84,6 +84,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navItems, activeTab, onTab
               href="https://github.com/dwebxr/aegis"
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="GitHub repository"
               className="flex items-center gap-1 px-3 py-1 text-caption text-disabled no-underline rounded-sm"
             >
               <GitHubIcon s={12} />

@@ -6,6 +6,8 @@ import { colors } from "@/styles/theme";
 import { isD2AContent } from "@/lib/d2a/activity";
 import { ShieldIcon, FireIcon, ZapIcon } from "@/components/icons";
 import { StatCard } from "@/components/ui/StatCard";
+import { MetricPill } from "@/components/ui/MetricPill";
+import { GlossaryModal, GlossaryButton } from "@/components/ui/GlossaryModal";
 import { BarChart } from "@/components/ui/BarChart";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { D2ANetworkMini } from "@/components/ui/D2ANetworkMini";
@@ -37,6 +39,7 @@ interface AnalyticsTabProps {
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation, engagementIndex, agentState, mobile, pipelineStats }) => {
   const { isDemoMode } = useDemo();
   const [activityRange, setActivityRange] = useState<"today" | "7d" | "30d">("7d");
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
   const activity = useMemo(() => computeDashboardActivity(content, activityRange), [content, activityRange]);
   const topicDist = useMemo(() => computeTopicDistribution(content), [content]);
   const topicTrends = useMemo(() => computeTopicTrends(content), [content]);
@@ -72,13 +75,17 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
         </div>
       )}
       <div className={mobile ? "mb-8" : "mb-12"}>
-        <h1 data-testid="aegis-analytics-heading" className={cn(typography.display, "text-foreground m-0", mobile && "text-[24px]")}>
-          Analytics
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 data-testid="aegis-analytics-heading" className={cn(typography.display, "text-foreground m-0", mobile && "text-[24px]")}>
+            Analytics
+          </h1>
+          <GlossaryButton onClick={() => setGlossaryOpen(true)} />
+        </div>
         <p data-testid="aegis-analytics-subtitle" className={cn("text-muted-foreground mt-2", mobile ? "text-[13px]" : "text-body")}>
           Performance &amp; content metrics
         </p>
       </div>
+      <GlossaryModal open={glossaryOpen} onClose={() => setGlossaryOpen(false)} />
 
       <div className={cn("grid gap-4 mb-16", mobile ? "grid-cols-1 gap-3 mb-12" : "grid-cols-3")}>
         <StatCard icon={<ShieldIcon s={16} />} label="Accuracy" value={`${accuracy}%`} sub={`${qualCount} quality / ${content.length} total`} color={colors.green[400]} mobile={mobile} />
@@ -118,17 +125,10 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
               })}
             </div>
           </div>
-          <div className="flex gap-4 mb-3">
-            {[
-              { value: activity.qualityCount, label: "quality", colorClass: "text-cyan-400" },
-              { value: activity.slopCount, label: "burned", colorClass: "text-orange-400" },
-              { value: activity.totalEvaluated, label: "total", colorClass: "text-purple-400" },
-            ].map(m => (
-              <span key={m.label} className="text-body-sm text-muted-foreground">
-                <span className={cn("font-bold font-mono", m.colorClass)}>{m.value}</span>
-                {" "}{m.label}
-              </span>
-            ))}
+          <div className="flex gap-2 flex-wrap mb-3">
+            <MetricPill icon={<ShieldIcon s={12} />} value={activity.qualityCount} tooltip="Quality items in this period" color={colors.cyan[400]} />
+            <MetricPill icon={<FireIcon s={12} />} value={activity.slopCount} tooltip="Items burned (filtered as slop)" color={colors.orange[400]} />
+            <MetricPill icon={<ZapIcon s={12} />} value={activity.totalEvaluated} tooltip="Total items evaluated" color={colors.purple[400]} />
           </div>
           {activity.chartQuality.length > 0 && (
             <div className="flex gap-4 mb-3 items-center">

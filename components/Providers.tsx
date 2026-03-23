@@ -9,6 +9,7 @@ import { SourceProvider } from "@/contexts/SourceContext";
 import { DemoProvider } from "@/contexts/DemoContext";
 import { FilterModeProvider } from "@/contexts/FilterModeContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 function ContentWithPreferences({ children }: { children: React.ReactNode }) {
   const { onValidate, onFlag } = usePreferences();
@@ -22,6 +23,7 @@ function ContentWithPreferences({ children }: { children: React.ReactNode }) {
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
+    <TooltipProvider delayDuration={200}>
     <NotificationProvider>
       <AuthProvider>
         <DemoProvider>
@@ -39,6 +41,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         </DemoProvider>
       </AuthProvider>
     </NotificationProvider>
+    </TooltipProvider>
     </ThemeProvider>
   );
 }

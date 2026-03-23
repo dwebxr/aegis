@@ -3,10 +3,16 @@ import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { colors, scoreGrade } from "@/styles/theme";
 import { ScoreBar } from "./ScoreBar";
-import { Tooltip } from "./LegacyTooltip";
+import {
+  Tooltip as ShadTooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import { GLOSSARY } from "@/lib/glossary";
 import { CheckIcon, XCloseIcon } from "@/components/icons";
+import { BookmarkIcon, ExternalLinkIcon, FlagIcon } from "@/components/icons/signal";
 import { D2ABadge } from "@/components/ui/D2ABadge";
+import { SignalBadge, labelToSignalType } from "@/components/ui/SignalBadge";
 import { isD2AContent } from "@/lib/d2a/activity";
 import { extractYouTubeVideoId } from "@/lib/utils/youtube";
 import type { ContentItem } from "@/lib/types/content";
@@ -37,17 +43,23 @@ interface ContentCardProps {
 function GradeBadge({ composite }: { composite: number }) {
   const { grade, color, bg } = scoreGrade(composite);
   return (
-    <div
-      className="w-11 h-[54px] rounded-sm flex items-center justify-center flex-col gap-px shrink-0"
-      style={{
-        background: bg,
-        border: `2px solid ${color}40`,
-        boxShadow: `0 0 12px ${color}30`,
-      }}
-    >
-      <span className="text-lg font-extrabold font-mono leading-none" style={{ color }}>{grade}</span>
-      <span className="text-caption font-semibold font-mono leading-none opacity-85" style={{ color }}>{composite.toFixed(1)}</span>
-    </div>
+    <ShadTooltip>
+      <TooltipTrigger asChild>
+        <div
+          className="w-11 h-[54px] rounded-sm flex items-center justify-center flex-col gap-px shrink-0"
+          style={{
+            background: bg,
+            border: `2px solid ${color}40`,
+            boxShadow: `0 0 12px ${color}30`,
+          }}
+          aria-label={`Grade ${grade}, score ${composite.toFixed(1)}`}
+        >
+          <span className="text-lg font-extrabold font-mono leading-none" style={{ color }}>{grade}</span>
+          <span className="text-caption font-semibold font-mono leading-none opacity-85" style={{ color }}>{composite.toFixed(1)}</span>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="left">Composite score {composite.toFixed(1)} / 10</TooltipContent>
+    </ShadTooltip>
   );
 }
 
@@ -56,15 +68,15 @@ export function ScoreGrid({ item }: { item: ContentItem }) {
     <div data-testid="aegis-card-score-grid" className="grid grid-cols-3 gap-3 mb-4">
       {hasVCL(item) ? (
         <>
-          <Tooltip text={GLOSSARY["V-Signal"]} position="bottom"><ScoreBar label="V Signal" score={item.vSignal!} color={colors.purple[400]} /></Tooltip>
-          <Tooltip text={GLOSSARY["C-Context"]} position="bottom"><ScoreBar label="C Context" score={item.cContext!} color={colors.sky[400]} /></Tooltip>
-          <Tooltip text={GLOSSARY["L-Slop"]} position="bottom"><ScoreBar label="L Slop" score={item.lSlop!} color={colors.red[400]} /></Tooltip>
+          <ShadTooltip><TooltipTrigger asChild><div><ScoreBar label="V" score={item.vSignal!} color={colors.purple[400]} /></div></TooltipTrigger><TooltipContent side="bottom">{GLOSSARY["V-Signal"]}</TooltipContent></ShadTooltip>
+          <ShadTooltip><TooltipTrigger asChild><div><ScoreBar label="C" score={item.cContext!} color={colors.sky[400]} /></div></TooltipTrigger><TooltipContent side="bottom">{GLOSSARY["C-Context"]}</TooltipContent></ShadTooltip>
+          <ShadTooltip><TooltipTrigger asChild><div><ScoreBar label="L" score={item.lSlop!} color={colors.red[400]} /></div></TooltipTrigger><TooltipContent side="bottom">{GLOSSARY["L-Slop"]}</TooltipContent></ShadTooltip>
         </>
       ) : (
         <>
-          <ScoreBar label="Originality" score={item.scores.originality} color={colors.purple[500]} />
-          <ScoreBar label="Insight" score={item.scores.insight} color={colors.sky[400]} />
-          <ScoreBar label="Credibility" score={item.scores.credibility} color={colors.green[400]} />
+          <ScoreBar label="Orig" score={item.scores.originality} color={colors.purple[500]} />
+          <ScoreBar label="Ins" score={item.scores.insight} color={colors.sky[400]} />
+          <ScoreBar label="Cred" score={item.scores.credibility} color={colors.green[400]} />
         </>
       )}
     </div>
@@ -86,9 +98,16 @@ export function TopicTags({ topics, max = 3 }: { topics: string[]; max?: number 
         </span>
       ))}
       {overflow > 0 && (
-        <span className="text-caption px-2.5 py-[3px] rounded-full bg-muted-foreground/5 text-disabled font-semibold">
-          +{overflow}
-        </span>
+        <ShadTooltip>
+          <TooltipTrigger asChild>
+            <span className="text-caption px-2.5 py-[3px] rounded-full bg-muted-foreground/5 text-disabled font-semibold cursor-default">
+              +{overflow}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {topics.slice(max).join(", ")}
+          </TooltipContent>
+        </ShadTooltip>
       )}
     </div>
   );
@@ -110,27 +129,20 @@ export function deriveScoreTags(item: ContentItem): Array<{ label: string; color
     if (item.scores.originality <= 2) tags.push({ label: "Derivative", color: colors.orange[400] });
   }
 
-  return tags.slice(0, 2);
+  return tags.slice(0, 3);
 }
 
-function ScoreTags({ item }: { item: ContentItem }) {
+/** Icon-based signal badges replacing text ScoreTags */
+function SignalBadges({ item }: { item: ContentItem }) {
   const tags = deriveScoreTags(item);
   if (tags.length === 0) return null;
   return (
     <div className="flex gap-1 flex-wrap mt-2">
-      {tags.map(tag => (
-        <span
-          key={tag.label}
-          className="text-tiny font-semibold tracking-wide px-2 py-[2px] rounded-full uppercase"
-          style={{
-            background: `${tag.color}12`,
-            color: tag.color,
-            border: `1px solid ${tag.color}20`,
-          }}
-        >
-          {tag.label}
-        </span>
-      ))}
+      {tags.map(tag => {
+        const signalType = labelToSignalType(tag.label);
+        if (!signalType) return null;
+        return <SignalBadge key={tag.label} type={signalType} />;
+      })}
     </div>
   );
 }
@@ -180,6 +192,48 @@ export function YouTubePreview({ sourceUrl }: { sourceUrl?: string }) {
 
 const actionBtnBase = "flex items-center justify-center gap-[5px] rounded-md text-body-sm font-semibold cursor-pointer transition-all duration-150 font-[inherit] min-w-8";
 
+/** Tooltip-wrapped action button */
+function ActionBtn({
+  label,
+  icon,
+  showText,
+  text,
+  onClick,
+  disabled,
+  className,
+  "data-testid": testId,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  showText: boolean;
+  text: string;
+  onClick: (e: React.MouseEvent) => void;
+  disabled?: boolean;
+  className: string;
+  "data-testid"?: string;
+}) {
+  const btn = (
+    <button
+      data-testid={testId}
+      disabled={disabled}
+      aria-label={label}
+      onClick={onClick}
+      className={className}
+    >
+      {icon}{showText && ` ${text}`}
+    </button>
+  );
+
+  if (showText) return btn;
+
+  return (
+    <ShadTooltip>
+      <TooltipTrigger asChild>{btn}</TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </ShadTooltip>
+  );
+}
+
 const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, isBookmarked, mobile, variant = "default", rank, focused, clusterCount }) => {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -188,6 +242,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
 
   const isLarge = variant === "priority" || variant === "serendipity";
   const compactBtns = mobile && !!(onBookmark || onAddFilterRule);
+  const showActionText = expanded && !compactBtns;
   const padCls = isLarge
     ? (mobile ? "p-4" : "px-6 py-5")
     : (mobile ? "p-4" : "px-5 py-4");
@@ -234,11 +289,14 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
 
       {/* Serendipity ribbon */}
       {variant === "serendipity" && (
-        <Tooltip text={GLOSSARY["Serendipity"]} position="bottom">
-          <div className="absolute top-0 right-0 bg-gradient-to-br from-purple-600 to-blue-600 py-1 pl-[18px] pr-4 rounded-bl-md text-caption font-bold text-white tracking-wide">
-            SERENDIPITY
-          </div>
-        </Tooltip>
+        <ShadTooltip>
+          <TooltipTrigger asChild>
+            <div className="absolute top-0 right-0 bg-gradient-to-br from-purple-600 to-blue-600 py-1 pl-[18px] pr-4 rounded-bl-md text-caption font-bold text-white tracking-wide">
+              {mobile ? "\u2728" : "\u2728 DISCOVERY"}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{GLOSSARY["Serendipity"]}</TooltipContent>
+        </ShadTooltip>
       )}
 
       {/* Header row */}
@@ -283,22 +341,9 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         )}
         <div className="min-w-0 flow-root">
           {/* Grade badge floated right — flow-root on parent establishes BFC to contain the float without clipping box-shadow */}
-          {!isLarge && (
-            <div className="float-right ml-3 mb-1 text-center">
-              <GradeBadge composite={item.scores.composite} />
-              <div className={cn(
-                "mt-1 text-tiny font-bold uppercase tracking-[1px]",
-                isSlop ? "text-red-400" : "text-emerald-400"
-              )}>
-                {item.verdict}
-              </div>
-            </div>
-          )}
-          {isLarge && (
-            <div className="float-right ml-3 mb-1">
-              <GradeBadge composite={item.scores.composite} />
-            </div>
-          )}
+          <div className="float-right ml-3 mb-1 text-center">
+            <GradeBadge composite={item.scores.composite} />
+          </div>
 
           <p className={cn(
             "m-0 break-words",
@@ -318,7 +363,8 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
 
       <YouTubePreview sourceUrl={item.sourceUrl} />
 
-      <ScoreTags item={item} />
+      {/* Signal badges (icon-only, tooltip on hover) + topic tags */}
+      <SignalBadges item={item} />
 
       {item.topics && item.topics.length > 0 && (
         <TopicTags topics={item.topics} />
@@ -345,23 +391,32 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
           )}
           <div className="flex gap-2 flex-wrap">
             {item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) && (
-              <a
-                href={item.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className={cn(
-                  actionBtnBase,
-                  "bg-blue-400/[0.06] border border-blue-400/[0.19] text-blue-400 no-underline whitespace-nowrap",
-                  compactBtns ? "p-2" : "px-3 py-2"
-                )}
-              >
-                {compactBtns ? "\u2197" : <>Read more &rarr;</>}
-              </a>
+              <ShadTooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href={item.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label="Read source article"
+                    className={cn(
+                      actionBtnBase,
+                      "bg-blue-400/[0.06] border border-blue-400/[0.19] text-blue-400 no-underline whitespace-nowrap",
+                      compactBtns ? "p-2" : "px-3 py-2"
+                    )}
+                  >
+                    <ExternalLinkIcon s={14} />{showActionText && " Read"}
+                  </a>
+                </TooltipTrigger>
+                {!showActionText && <TooltipContent side="bottom">Read source article</TooltipContent>}
+              </ShadTooltip>
             )}
             {onBookmark && (
-              <button
-                aria-label={isBookmarked ? "Remove bookmark" : "Bookmark for later"}
+              <ActionBtn
+                label={isBookmarked ? "Remove bookmark" : "Bookmark for later"}
+                icon={<BookmarkIcon s={14} />}
+                showText={showActionText}
+                text={isBookmarked ? "Saved" : "Save"}
                 onClick={e => { e.stopPropagation(); onBookmark(item.id); }}
                 className={cn(
                   actionBtnBase,
@@ -370,14 +425,15 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                     : "bg-transparent border border-border text-muted-foreground",
                   compactBtns ? "p-2" : "px-3 py-2"
                 )}
-              >
-                {compactBtns ? "\uD83D\uDD16" : (isBookmarked ? "\uD83D\uDD16 Saved" : "\uD83D\uDD16 Save")}
-              </button>
+              />
             )}
-            <button
+            <ActionBtn
               data-testid="aegis-card-validate"
+              label="Validate content"
+              icon={<CheckIcon />}
+              showText={showActionText}
+              text={item.validated ? "Validated" : isSlop && !isLarge ? "Not Slop" : "Validate"}
               disabled={item.validated}
-              aria-label="Validate content"
               onClick={e => { e.stopPropagation(); onValidate(item.id); }}
               className={cn(
                 actionBtnBase,
@@ -386,14 +442,15 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                 !compactBtns && "flex-1",
                 compactBtns ? "p-2" : "px-3 py-2"
               )}
-            >
-              <CheckIcon />{!compactBtns && (item.validated ? " Validated" : isSlop && !isLarge ? " Not Slop" : " Validate")}
-            </button>
+            />
             {(!isSlop || isLarge) && (
-              <button
+              <ActionBtn
                 data-testid="aegis-card-flag"
+                label="Flag as slop"
+                icon={<FlagIcon s={14} />}
+                showText={showActionText}
+                text={item.flagged ? "Flagged" : "Flag"}
                 disabled={item.flagged}
-                aria-label="Flag as slop"
                 onClick={e => { e.stopPropagation(); onFlag(item.id); }}
                 className={cn(
                   actionBtnBase,
@@ -402,9 +459,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                   !compactBtns && "flex-1",
                   compactBtns ? "p-2" : "px-3 py-2"
                 )}
-              >
-                <XCloseIcon />{!compactBtns && (item.flagged ? " Flagged" : " Flag Slop")}
-              </button>
+              />
             )}
             {onAddFilterRule && (
               <div className="relative">
