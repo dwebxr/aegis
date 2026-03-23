@@ -9,7 +9,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { GLOSSARY } from "@/lib/glossary";
-import { CheckIcon, XCloseIcon } from "@/components/icons";
+import { CheckIcon } from "@/components/icons";
 import { BookmarkIcon, ExternalLinkIcon, FlagIcon } from "@/components/icons/signal";
 import { D2ABadge } from "@/components/ui/D2ABadge";
 import { SignalBadge, labelToSignalType } from "@/components/ui/SignalBadge";
