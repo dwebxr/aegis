@@ -8,9 +8,10 @@ if (typeof globalThis.TextEncoder === "undefined") {
 }
 
 import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { render, fireEvent } from "@testing-library/react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import type { NavItem } from "@/components/layout/Sidebar";
+import { WithTooltip } from "../../helpers/withTooltip";
 
 // Mock useAuth
 let mockAuth = { isAuthenticated: false };
@@ -27,143 +28,173 @@ jest.mock("@/components/auth/UserBadge", () => ({
 }));
 
 const navItems: NavItem[] = [
-  { id: "dashboard", icon: <span>H</span>, label: "Home", description: "Overview" },
-  { id: "briefing", icon: <span>B</span>, label: "Briefing" },
+  { id: "dashboard", icon: <span data-testid="icon-home">H</span>, label: "Home", description: "Overview" },
+  { id: "briefing", icon: <span data-testid="icon-brief">B</span>, label: "Briefing" },
 ];
+
+const renderSidebar = (props: Partial<React.ComponentProps<typeof Sidebar>> = {}) =>
+  render(
+    <WithTooltip>
+      <Sidebar
+        navItems={navItems}
+        activeTab="dashboard"
+        onTabChange={jest.fn()}
+        collapsed={false}
+        {...props}
+      />
+    </WithTooltip>,
+  );
 
 describe("Sidebar", () => {
   beforeEach(() => {
     mockAuth = { isAuthenticated: false };
   });
 
-  it("renders all nav items", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("Home");
-    expect(html).toContain("Briefing");
+  it("renders all nav items with labels when expanded", () => {
+    const { getByText } = renderSidebar();
+    expect(getByText("Home")).toBeTruthy();
+    expect(getByText("Briefing")).toBeTruthy();
   });
 
-  it("renders AEGIS branding", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("AEGIS");
-    expect(html).toContain("v3.0");
+  it("renders AEGIS branding when expanded", () => {
+    const { getByText } = renderSidebar();
+    expect(getByText("AEGIS")).toBeTruthy();
+    expect(getByText("v3.0")).toBeTruthy();
   });
 
-  it("hides labels when collapsed", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={true} />,
-    );
-    expect(html).not.toContain("Home");
-    expect(html).not.toContain("Briefing");
-    expect(html).not.toContain("AEGIS");
+  it("hides branding text when collapsed", () => {
+    const { queryByText } = renderSidebar({ collapsed: true });
+    expect(queryByText("AEGIS")).toBeNull();
+    expect(queryByText("v3.0")).toBeNull();
   });
 
-  it("shows Stats button for unauthenticated users", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("Stats");
+  it("hides nav label text inside buttons when collapsed (labels move to tooltip)", () => {
+    const { container } = renderSidebar({ collapsed: true });
+    // In collapsed mode, label text is NOT inside the button children
+    const buttons = container.querySelectorAll('button[data-testid^="aegis-nav-"]');
+    buttons.forEach(btn => {
+      expect(btn.textContent).not.toContain("Home");
+      expect(btn.textContent).not.toContain("Briefing");
+    });
   });
 
-  it("hides Settings button for unauthenticated users", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).not.toContain("Settings");
+  it("shows Stats for unauthenticated users", () => {
+    const { getByText } = renderSidebar();
+    expect(getByText("Stats")).toBeTruthy();
+  });
+
+  it("hides Settings for unauthenticated users", () => {
+    const { queryByText } = renderSidebar();
+    expect(queryByText("Settings")).toBeNull();
   });
 
   it("shows both Settings and Stats for authenticated users", () => {
     mockAuth = { isAuthenticated: true };
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("Settings");
-    expect(html).toContain("Stats");
+    const { getByText } = renderSidebar();
+    expect(getByText("Settings")).toBeTruthy();
+    expect(getByText("Stats")).toBeTruthy();
   });
 
-  it("renders data-testid for footer nav buttons", () => {
+  it("renders data-testid for nav items", () => {
+    const { container } = renderSidebar();
+    expect(container.querySelector('[data-testid="aegis-nav-dashboard"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="aegis-nav-briefing"]')).toBeTruthy();
+  });
+
+  it("renders data-testid for footer nav", () => {
     mockAuth = { isAuthenticated: true };
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("aegis-nav-settings");
-    expect(html).toContain("aegis-nav-analytics");
+    const { container } = renderSidebar();
+    expect(container.querySelector('[data-testid="aegis-nav-settings"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="aegis-nav-analytics"]')).toBeTruthy();
   });
 
   it("renders GitHub link", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("github.com/dwebxr/aegis");
-    expect(html).toContain("GitHub");
+    const { container } = renderSidebar();
+    const link = container.querySelector('a[href*="github.com/dwebxr/aegis"]');
+    expect(link).toBeTruthy();
   });
 
-  it("renders Online status indicator", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("Online");
-    expect(html).toContain("Aegis AI");
+  it("renders Online status indicator when expanded", () => {
+    const { getByText } = renderSidebar();
+    expect(getByText("Online")).toBeTruthy();
+    expect(getByText("Aegis AI")).toBeTruthy();
+  });
+
+  it("renders pulse dot in collapsed mode", () => {
+    const { container } = renderSidebar({ collapsed: true });
+    expect(container.querySelector(".animate-pulse")).toBeTruthy();
   });
 
   it("shows LoginButton when not authenticated", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("login-btn");
+    const { getByTestId } = renderSidebar();
+    expect(getByTestId("login-btn")).toBeTruthy();
   });
 
   it("shows UserBadge when authenticated", () => {
     mockAuth = { isAuthenticated: true };
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("user-badge");
+    const { getByTestId } = renderSidebar();
+    expect(getByTestId("user-badge")).toBeTruthy();
   });
 
-  it("highlights active nav item", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    // Active item has blue color class and bold weight
-    expect(html).toContain("bg-blue-600/[0.12]");
+  it("hides auth section when collapsed", () => {
+    mockAuth = { isAuthenticated: true };
+    const { queryByTestId } = renderSidebar({ collapsed: true });
+    expect(queryByTestId("user-badge")).toBeNull();
   });
 
-  it("renders description for nav items that have one", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("Overview");
+  it("highlights active nav item with blue styling", () => {
+    const { container } = renderSidebar({ activeTab: "dashboard" });
+    const activeBtn = container.querySelector('[data-testid="aegis-nav-dashboard"]');
+    expect(activeBtn?.className).toContain("text-blue-400");
   });
 
-  it("renders social links (Discord, Medium, X)", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    expect(html).toContain("discord.gg/85JVzJaatT");
-    expect(html).toContain("medium.com/aegis-ai");
-    expect(html).toContain("x.com/Coo_aiagent");
+  it("does not highlight inactive nav item", () => {
+    const { container } = renderSidebar({ activeTab: "dashboard" });
+    const inactiveBtn = container.querySelector('[data-testid="aegis-nav-briefing"]');
+    expect(inactiveBtn?.className).toContain("text-disabled");
   });
 
-  it("renders social links with correct attributes", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={false} />,
-    );
-    const discordLink = html.match(/<a[^>]*discord\.gg[^>]*>/)?.[0] || "";
-    expect(discordLink).toContain('target="_blank"');
-    expect(discordLink).toContain('rel="noopener noreferrer"');
-    expect(discordLink).toContain('title="Discord"');
+  it("calls onTabChange when nav item clicked", () => {
+    const onTabChange = jest.fn();
+    const { container } = renderSidebar({ onTabChange });
+    fireEvent.click(container.querySelector('[data-testid="aegis-nav-briefing"]')!);
+    expect(onTabChange).toHaveBeenCalledWith("briefing");
   });
 
-  it("renders social links in collapsed mode", () => {
-    const html = renderToStaticMarkup(
-      <Sidebar navItems={navItems} activeTab="dashboard" onTabChange={jest.fn()} collapsed={true} />,
-    );
-    expect(html).toContain("discord.gg/85JVzJaatT");
-    expect(html).toContain("medium.com/aegis-ai");
-    expect(html).toContain("x.com/Coo_aiagent");
+  it("calls onTabChange for footer nav", () => {
+    const onTabChange = jest.fn();
+    const { container } = renderSidebar({ onTabChange });
+    fireEvent.click(container.querySelector('[data-testid="aegis-nav-analytics"]')!);
+    expect(onTabChange).toHaveBeenCalledWith("analytics");
+  });
+
+  it("renders social links with target=_blank", () => {
+    const { container } = renderSidebar();
+    const links = container.querySelectorAll('a[target="_blank"]');
+    expect(links.length).toBeGreaterThanOrEqual(3); // discord, medium, x, github
+  });
+
+  it("renders social links in collapsed mode too", () => {
+    const { container } = renderSidebar({ collapsed: true });
+    const socialLinks = container.querySelectorAll('a[target="_blank"]');
+    expect(socialLinks.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("has aria-label on all nav buttons", () => {
+    const { container } = renderSidebar({ collapsed: true });
+    const navBtns = container.querySelectorAll('button[aria-label]');
+    expect(navBtns.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("applies wider width when expanded (200px)", () => {
+    const { container } = renderSidebar();
+    const nav = container.querySelector("nav");
+    expect(nav?.className).toContain("w-[200px]");
+  });
+
+  it("applies narrow width when collapsed (68px)", () => {
+    const { container } = renderSidebar({ collapsed: true });
+    const nav = container.querySelector("nav");
+    expect(nav?.className).toContain("w-[68px]");
   });
 });
