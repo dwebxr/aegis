@@ -1,6 +1,5 @@
 "use client";
 import React from "react";
-import { cn } from "@/lib/utils";
 import { colors } from "@/styles/theme";
 import {
   Tooltip,
@@ -31,14 +30,7 @@ export type SignalType =
   | "low-credibility"
   | "derivative";
 
-interface SignalConfig {
-  icon: React.FC<IconProps>;
-  label: string;
-  tooltip: string;
-  color: string;
-}
-
-const SIGNAL_CONFIG: Record<SignalType, SignalConfig> = {
+const SIGNAL_CONFIG: Record<SignalType, { icon: React.FC<IconProps>; label: string; tooltip: string; color: string }> = {
   "high-signal": {
     icon: SignalIcon,
     label: "Signal",
@@ -101,31 +93,20 @@ interface SignalBadgeProps {
 }
 
 export const SignalBadge: React.FC<SignalBadgeProps> = ({ type, showLabel = false }) => {
-  const config = SIGNAL_CONFIG[type];
-  const Icon = config.icon;
-
+  const { icon: Icon, tooltip, color, label } = SIGNAL_CONFIG[type];
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-1.5 py-[2px] text-tiny font-semibold transition-colors duration-150",
-            showLabel && "px-2",
-          )}
-          style={{
-            background: `${config.color}12`,
-            color: config.color,
-            border: `1px solid ${config.color}20`,
-          }}
-          aria-label={config.tooltip}
+          className={`inline-flex items-center gap-1 rounded-full ${showLabel ? "px-2" : "px-1.5"} py-[2px] text-tiny font-semibold`}
+          style={{ background: `${color}12`, color, border: `1px solid ${color}20` }}
+          aria-label={tooltip}
         >
           <Icon s={12} />
-          {showLabel && <span className="tracking-wide">{config.label}</span>}
+          {showLabel && <span className="tracking-wide">{label}</span>}
         </span>
       </TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-[220px]">
-        {config.tooltip}
-      </TooltipContent>
+      <TooltipContent side="bottom" className="max-w-[220px]">{tooltip}</TooltipContent>
     </Tooltip>
   );
 };
@@ -134,19 +115,13 @@ export function hasVCL(item: ContentItem): boolean {
   return item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
 }
 
-/** Get the display label and color for a SignalType (used by deriveScoreTags) */
+const TAG_LABELS: Record<SignalType, string> = {
+  "high-signal": "High signal", "rich-context": "Rich context", "low-noise": "Low noise",
+  "high-slop": "High slop risk", "original": "Original", "insightful": "Insightful",
+  "credible": "Credible", "low-credibility": "Low credibility", "derivative": "Derivative",
+};
+
 export function signalTypeToTag(type: SignalType): { label: string; color: string } {
-  const TAG_LABELS: Record<SignalType, string> = {
-    "high-signal": "High signal",
-    "rich-context": "Rich context",
-    "low-noise": "Low noise",
-    "high-slop": "High slop risk",
-    "original": "Original",
-    "insightful": "Insightful",
-    "credible": "Credible",
-    "low-credibility": "Low credibility",
-    "derivative": "Derivative",
-  };
   return { label: TAG_LABELS[type], color: SIGNAL_CONFIG[type].color };
 }
 

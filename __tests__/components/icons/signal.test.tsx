@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   SignalIcon, ContextIcon, NoiseIcon, SlopRiskIcon,
   OriginalIcon, InsightIcon, CredibleIcon, DerivativeIcon,
-  BookmarkIcon, FlagIcon, ExternalLinkIcon, HelpCircleIcon,
+  BookmarkIcon, ExternalLinkIcon, HelpCircleIcon,
 } from "@/components/icons/signal";
 
 const allIcons = [
@@ -16,7 +16,6 @@ const allIcons = [
   { name: "CredibleIcon", Icon: CredibleIcon },
   { name: "DerivativeIcon", Icon: DerivativeIcon },
   { name: "BookmarkIcon", Icon: BookmarkIcon },
-  { name: "FlagIcon", Icon: FlagIcon },
   { name: "ExternalLinkIcon", Icon: ExternalLinkIcon },
   { name: "HelpCircleIcon", Icon: HelpCircleIcon },
 ];

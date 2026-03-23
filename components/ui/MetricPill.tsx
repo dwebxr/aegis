@@ -17,7 +17,7 @@ export const MetricPill: React.FC<MetricPillProps> = ({ icon, value, tooltip, co
   <Tooltip>
     <TooltipTrigger asChild>
       <div
-        className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-body-sm font-bold font-mono transition-colors duration-150 cursor-default"
+        className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-body-sm font-bold font-mono cursor-default"
         style={{
           background: `${color}10`,
           border: `1px solid ${color}18`,

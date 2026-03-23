@@ -118,7 +118,6 @@ export function TopicTags({ topics, max = 3 }: { topics: string[]; max?: number 
   );
 }
 
-/** Returns text-label + color tags from content scores. Delegates to deriveSignalTypes for threshold logic. */
 export function deriveScoreTags(item: ContentItem): Array<{ label: string; color: string }> {
   return deriveSignalTypes(item).map(signalTypeToTag);
 }
@@ -178,7 +177,6 @@ export function YouTubePreview({ sourceUrl }: { sourceUrl?: string }) {
 
 const actionBtnBase = "flex items-center justify-center gap-[5px] rounded-md text-body-sm font-semibold cursor-pointer transition-all duration-150 font-[inherit] min-w-8";
 
-/** Icon-first action button; shows tooltip when text is hidden */
 function ActionBtn({
   label,
   icon,
@@ -220,7 +218,6 @@ function ActionBtn({
   );
 }
 
-/** Anchor variant of ActionBtn for external links */
 function ActionLink({
   label,
   icon,
@@ -301,7 +298,6 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         boxShadow: hovered ? (isSlop ? "0 0 20px rgba(249,115,22,0.2)" : "0 4px 12px rgba(0,0,0,0.4)") : "none",
       }}
     >
-      {/* Priority rank badge */}
       {variant === "priority" && rank !== undefined && (
         <div className={cn(
           "absolute size-7 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-body-sm font-extrabold text-white",
@@ -311,7 +307,6 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         </div>
       )}
 
-      {/* Serendipity ribbon */}
       {variant === "serendipity" && (
         <ShadTooltip>
           <TooltipTrigger asChild>
@@ -323,7 +318,6 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         </ShadTooltip>
       )}
 
-      {/* Header row */}
       <div className={cn(
         "flex items-center gap-2 flex-wrap pb-2 border-b border-subtle mb-2",
         variant === "serendipity" && "mt-1"
@@ -349,7 +343,6 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         {variant === "priority" && <div className="flex-1" />}
       </div>
 
-      {/* Body + grade */}
       <div className={cn(item.imageUrl && "flex gap-3 items-start")}>
         {item.imageUrl && (
           /* eslint-disable-next-line @next/next/no-img-element -- external user-content URLs */

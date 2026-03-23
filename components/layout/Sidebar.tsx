@@ -74,9 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
           >
             {it.icon}
             {!collapsed && (
-              <div>
-                <div className={cn("text-[13px]", active ? "font-bold" : "font-normal")}>{it.label}</div>
-              </div>
+              <span className={cn("text-[13px]", active ? "font-bold" : "font-normal")}>{it.label}</span>
             )}
           </button>
         );

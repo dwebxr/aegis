@@ -11,11 +11,6 @@ import { SignalBadge } from "./SignalBadge";
 import type { SignalType } from "./SignalBadge";
 import { HelpCircleIcon } from "@/components/icons/signal";
 
-interface GlossaryModalProps {
-  open: boolean;
-  onClose: () => void;
-}
-
 const GRADE_ENTRIES: Array<{ grade: string; range: string; color: string; description: string }> = [
   { grade: "A", range: "8.0 - 10", color: "#34d399", description: "Exceptional quality content with high originality and reliable sourcing" },
   { grade: "B", range: "6.0 - 7.9", color: "#22d3ee", description: "Good quality content worth reading" },
@@ -57,7 +52,7 @@ const KEYBOARD_ENTRIES: Array<{ key: string; action: string }> = [
   { key: "\u2318 K", action: "Command palette" },
 ];
 
-export const GlossaryModal: React.FC<GlossaryModalProps> = ({ open, onClose }) => (
+export const GlossaryModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => (
   <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
     <DialogContent className="max-w-[520px] max-h-[80vh] overflow-y-auto bg-card border-emphasis">
       <DialogHeader>
@@ -66,7 +61,6 @@ export const GlossaryModal: React.FC<GlossaryModalProps> = ({ open, onClose }) =
         </DialogTitle>
       </DialogHeader>
 
-      {/* Grades */}
       <section className="mb-5">
         <h3 className="text-body-sm font-bold text-tertiary uppercase tracking-wider mb-2">Quality Grades</h3>
         <div className="flex flex-col gap-1.5">
@@ -85,7 +79,6 @@ export const GlossaryModal: React.FC<GlossaryModalProps> = ({ open, onClose }) =
         </div>
       </section>
 
-      {/* Signal badges */}
       <section className="mb-5">
         <h3 className="text-body-sm font-bold text-tertiary uppercase tracking-wider mb-2">Signal Badges</h3>
         <div className="flex flex-col gap-1.5">
@@ -97,7 +90,6 @@ export const GlossaryModal: React.FC<GlossaryModalProps> = ({ open, onClose }) =
         </div>
       </section>
 
-      {/* Metrics */}
       <section className="mb-5">
         <h3 className="text-body-sm font-bold text-tertiary uppercase tracking-wider mb-2">Metrics</h3>
         <div className="flex flex-col gap-1.5">
@@ -110,7 +102,6 @@ export const GlossaryModal: React.FC<GlossaryModalProps> = ({ open, onClose }) =
         </div>
       </section>
 
-      {/* Keyboard shortcuts */}
       <section>
         <h3 className="text-body-sm font-bold text-tertiary uppercase tracking-wider mb-2">Keyboard Shortcuts</h3>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1">
@@ -132,7 +123,6 @@ export const GlossaryModal: React.FC<GlossaryModalProps> = ({ open, onClose }) =
   </Dialog>
 );
 
-/** Compact glossary trigger button */
 export const GlossaryButton: React.FC<{ onClick: () => void; className?: string }> = ({ onClick, className }) => (
   <button
     onClick={onClick}
