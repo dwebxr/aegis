@@ -5,6 +5,13 @@ import { typography } from "@/lib/design";
 import { MiniChart } from "@/components/ui/MiniChart";
 import { ContentCard } from "@/components/ui/ContentCard";
 import { SignalBadge, deriveSignalTypes } from "@/components/ui/SignalBadge";
+import { CheckIcon, XCloseIcon } from "@/components/icons";
+import { BookmarkIcon } from "@/components/icons/signal";
+import {
+  Tooltip as ShadTooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import { colors, scoreGrade } from "@/styles/theme";
 import type { ContentItem } from "@/lib/types/content";
 import { exportContentCSV, exportContentJSON } from "@/lib/utils/export";
@@ -154,27 +161,42 @@ function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookm
         <div className="flex items-center gap-2">
           <ScorePill gr={gr} signalType={signalType} />
           <div className="flex-1" />
-          <button onClick={(e) => { e.stopPropagation(); onBookmark(item.id); }}
-            className={cn(
-              "px-2 py-0.5 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
-              bookmarkSet.has(item.id)
-                ? "bg-amber-400/[0.09] border border-amber-400/[0.19] text-amber-400"
-                : "bg-transparent border border-border text-muted-foreground"
-            )}>&#x1F516;</button>
-          <button onClick={(e) => { e.stopPropagation(); onValidate(item.id); }}
-            disabled={item.validated}
-            className={cn(
-              "px-2 py-0.5 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
-              "bg-emerald-500/[0.08] border border-emerald-500/20 text-emerald-400",
-              item.validated && "opacity-50 cursor-default"
-            )}>&#x2713;</button>
-          <button onClick={(e) => { e.stopPropagation(); onFlag(item.id); }}
-            disabled={item.flagged}
-            className={cn(
-              "px-2 py-0.5 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] transition-fast",
-              "bg-red-500/[0.08] border border-red-500/20 text-red-400",
-              item.flagged && "opacity-50 cursor-default"
-            )}>&#x2717;</button>
+          <ShadTooltip>
+            <TooltipTrigger asChild>
+              <button aria-label={bookmarkSet.has(item.id) ? "Remove bookmark" : "Save"} onClick={(e) => { e.stopPropagation(); onBookmark(item.id); }}
+                className={cn(
+                  "p-1.5 rounded-sm cursor-pointer font-[inherit] transition-fast flex items-center justify-center",
+                  bookmarkSet.has(item.id)
+                    ? "bg-amber-400/[0.09] border border-amber-400/[0.19] text-amber-400"
+                    : "bg-transparent border border-border text-muted-foreground"
+                )}><BookmarkIcon s={12} /></button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{bookmarkSet.has(item.id) ? "Remove bookmark" : "Save"}</TooltipContent>
+          </ShadTooltip>
+          <ShadTooltip>
+            <TooltipTrigger asChild>
+              <button aria-label="Validate" onClick={(e) => { e.stopPropagation(); onValidate(item.id); }}
+                disabled={item.validated}
+                className={cn(
+                  "p-1.5 rounded-sm cursor-pointer font-[inherit] transition-fast flex items-center justify-center",
+                  "bg-emerald-500/[0.08] border border-emerald-500/20 text-emerald-400",
+                  item.validated && "opacity-50 cursor-default"
+                )}><CheckIcon /></button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{item.validated ? "Validated" : "Validate"}</TooltipContent>
+          </ShadTooltip>
+          <ShadTooltip>
+            <TooltipTrigger asChild>
+              <button aria-label="Flag as slop" onClick={(e) => { e.stopPropagation(); onFlag(item.id); }}
+                disabled={item.flagged}
+                className={cn(
+                  "p-1.5 rounded-sm cursor-pointer font-[inherit] transition-fast flex items-center justify-center",
+                  "bg-red-500/[0.08] border border-red-500/20 text-red-400",
+                  item.flagged && "opacity-50 cursor-default"
+                )}><XCloseIcon /></button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{item.flagged ? "Flagged" : "Slop"}</TooltipContent>
+          </ShadTooltip>
         </div>
       </div>
     </div>
@@ -696,18 +718,23 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               );
             })}
           </div>
-          <button
-            onClick={() => onTabChange?.("settings:feeds")}
-            className={cn(
-              "inline-flex items-center gap-1 px-3 py-1 rounded-full text-caption font-bold cursor-pointer font-[inherit] transition-fast",
-              filterMode === "pro"
-                ? "bg-sky-400/10 border border-sky-400/20 text-sky-400"
-                : "bg-navy-lighter border border-border text-muted-foreground"
-            )}
-            title="Change in Settings > Feeds"
-          >
-            {filterMode === "pro" ? "Pro" : "Lite"}
-          </button>
+          <ShadTooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => onTabChange?.("settings:feeds")}
+                aria-label="Filter mode"
+                className={cn(
+                  "inline-flex items-center gap-1 px-3 py-1 rounded-full text-caption font-bold cursor-pointer font-[inherit] transition-fast",
+                  filterMode === "pro"
+                    ? "bg-sky-400/10 border border-sky-400/20 text-sky-400"
+                    : "bg-navy-lighter border border-border text-muted-foreground"
+                )}
+              >
+                {filterMode === "pro" ? "Pro" : "Lite"}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Change in Settings &gt; Feeds</TooltipContent>
+          </ShadTooltip>
           {wotLoading && (
             <span className="text-caption text-disabled animate-pulse">
               &#x1F310; WoT...
@@ -1033,6 +1060,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-body-sm font-semibold text-tertiary">Needs Review</span>
                     <button
+                      aria-label="Collapse section"
                       onClick={() => toggleSidebarSection("unreviewed")}
                       className="text-tiny text-disabled bg-transparent border-none cursor-pointer font-[inherit]"
                     >&#x25BC;</button>
@@ -1078,6 +1106,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-body-sm font-semibold text-tertiary">Top Sources</span>
                     <button
+                      aria-label="Collapse section"
                       onClick={() => toggleSidebarSection("sources")}
                       className="text-tiny text-disabled bg-transparent border-none cursor-pointer font-[inherit]"
                     >&#x25BC;</button>
@@ -1140,6 +1169,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-body-sm font-semibold text-tertiary">Top Topics</span>
                     <button
+                      aria-label="Collapse section"
                       onClick={() => toggleSidebarSection("topics")}
                       className="text-tiny text-disabled bg-transparent border-none cursor-pointer font-[inherit]"
                     >&#x25BC;</button>

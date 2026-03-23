@@ -230,10 +230,8 @@ describe("DashboardTab — inline Validate/Flag buttons", () => {
     const html = renderToStaticMarkup(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />,
     );
-    // Check mark (✓) = &#x2713; → Unicode character ✓
-    expect(html).toContain("✓");
-    // X mark (✗) = &#x2717; → Unicode character ✗
-    expect(html).toContain("✗");
+    expect(html).toContain('aria-label="Validate"');
+    expect(html).toContain('aria-label="Flag as slop"');
   });
 
   it("disables validate button when item is already validated", () => {

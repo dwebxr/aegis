@@ -207,11 +207,9 @@ describe("DashboardCard — rendered via dashboard sections", () => {
     const { container } = render(
       <DashboardTab content={items} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
-    const buttons = Array.from(container.querySelectorAll("button"));
-    const validateBtns = buttons.filter(b => b.textContent === "\u2713");
+    const validateBtns = Array.from(container.querySelectorAll('button[aria-label="Validate"]'));
     expect(validateBtns.length).toBeGreaterThan(0);
-    // Validated items have disabled buttons with opacity-50 class
-    const disabledBtns = validateBtns.filter(b => b.disabled);
+    const disabledBtns = validateBtns.filter(b => (b as HTMLButtonElement).disabled);
     expect(disabledBtns.length).toBeGreaterThan(0);
     disabledBtns.forEach(btn => {
       expect(btn.className).toContain("opacity-50");
@@ -318,13 +316,10 @@ describe("AgentKnowledgePills — rendering within Your Agent card", () => {
 // 3. Feedback loop — validate/flag → agent learned messages
 // ═══════════════════════════════════════════════════════════
 
-// Helper to find action buttons within the rendered content cards.
-// HTML entities &#x2713; (✓), &#x2717; (✗), &#x1F516; (🔖) render as unicode.
 function findActionButtons(container: HTMLElement) {
-  const buttons = Array.from(container.querySelectorAll("button"));
-  const validate = buttons.filter(b => b.textContent === "\u2713");
-  const flag = buttons.filter(b => b.textContent === "\u2717");
-  const bookmark = buttons.filter(b => b.textContent === "\uD83D\uDD16");
+  const validate = Array.from(container.querySelectorAll('button[aria-label="Validate"]'));
+  const flag = Array.from(container.querySelectorAll('button[aria-label="Flag as slop"]'));
+  const bookmark = Array.from(container.querySelectorAll('button[aria-label="Save"], button[aria-label="Remove bookmark"]'));
   return { validate, flag, bookmark };
 }
 
