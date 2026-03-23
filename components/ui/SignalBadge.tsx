@@ -130,11 +130,27 @@ export const SignalBadge: React.FC<SignalBadgeProps> = ({ type, showLabel = fals
   );
 };
 
-function hasVCL(item: ContentItem): boolean {
+export function hasVCL(item: ContentItem): boolean {
   return item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
 }
 
-/** Derive applicable SignalTypes directly from content scores — no intermediate string mapping */
+/** Get the display label and color for a SignalType (used by deriveScoreTags) */
+export function signalTypeToTag(type: SignalType): { label: string; color: string } {
+  const TAG_LABELS: Record<SignalType, string> = {
+    "high-signal": "High signal",
+    "rich-context": "Rich context",
+    "low-noise": "Low noise",
+    "high-slop": "High slop risk",
+    "original": "Original",
+    "insightful": "Insightful",
+    "credible": "Credible",
+    "low-credibility": "Low credibility",
+    "derivative": "Derivative",
+  };
+  return { label: TAG_LABELS[type], color: SIGNAL_CONFIG[type].color };
+}
+
+/** Derive applicable SignalTypes directly from content scores */
 export function deriveSignalTypes(item: ContentItem): SignalType[] {
   const types: SignalType[] = [];
 

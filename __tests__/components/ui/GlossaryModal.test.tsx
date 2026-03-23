@@ -84,6 +84,7 @@ describe("GlossaryModal", () => {
     const text = el.textContent!;
     expect(text).toContain("J / K");
     expect(text).toContain("Navigate cards");
+    expect(text).toContain("Open source in new tab");
     expect(text).toContain("Command palette");
   });
 

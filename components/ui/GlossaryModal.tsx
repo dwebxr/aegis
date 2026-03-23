@@ -53,7 +53,7 @@ const KEYBOARD_ENTRIES: Array<{ key: string; action: string }> = [
   { key: "Enter", action: "Expand / collapse card" },
   { key: "V", action: "Validate current card" },
   { key: "F", action: "Flag current card" },
-  { key: "S", action: "Save / bookmark" },
+  { key: "O", action: "Open source in new tab" },
   { key: "\u2318 K", action: "Command palette" },
 ];
 

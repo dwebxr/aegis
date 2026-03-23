@@ -215,6 +215,24 @@ describe("TopicTags", () => {
   });
 });
 
+describe("ContentCard — verdict indicator", () => {
+  it("shows check icon for quality verdict", () => {
+    const html = wrap(
+      <ContentCard item={makeItem({ verdict: "quality" })} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("text-emerald-400");
+    expect(html).toContain('aria-label="Quality content"');
+  });
+
+  it("shows X icon for slop verdict", () => {
+    const html = wrap(
+      <ContentCard item={makeItem({ verdict: "slop" })} expanded={false} onToggle={jest.fn()} onValidate={jest.fn()} onFlag={jest.fn()} />
+    );
+    expect(html).toContain("text-red-400");
+    expect(html).toContain('aria-label="Identified as slop"');
+  });
+});
+
 describe("ContentCard — data-source-url attribute", () => {
   it("sets data-source-url for http sourceUrl", () => {
     const item = makeItem({ sourceUrl: "https://example.com/article" });

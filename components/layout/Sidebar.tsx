@@ -93,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
           );
         }
 
-        return btn;
+        return <React.Fragment key={it.id}>{btn}</React.Fragment>;
       })}
 
       <div className="flex-1" />
@@ -135,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
           );
         }
 
-        return btn;
+        return <React.Fragment key={n.id}>{btn}</React.Fragment>;
       })}
 
       {/* GitHub link */}

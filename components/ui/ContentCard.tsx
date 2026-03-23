@@ -12,17 +12,13 @@ import { GLOSSARY } from "@/lib/glossary";
 import { CheckIcon, XCloseIcon } from "@/components/icons";
 import { BookmarkIcon, ExternalLinkIcon } from "@/components/icons/signal";
 import { D2ABadge } from "@/components/ui/D2ABadge";
-import { SignalBadge, deriveSignalTypes } from "@/components/ui/SignalBadge";
+import { SignalBadge, deriveSignalTypes, signalTypeToTag, hasVCL } from "@/components/ui/SignalBadge";
 import { isD2AContent } from "@/lib/d2a/activity";
 import { extractYouTubeVideoId } from "@/lib/utils/youtube";
 import type { ContentItem } from "@/lib/types/content";
 import type { CustomFilterRule } from "@/lib/preferences/types";
 
 type CardVariant = "default" | "priority" | "serendipity";
-
-function hasVCL(item: ContentItem): boolean {
-  return item.vSignal !== undefined && item.cContext !== undefined && item.lSlop !== undefined;
-}
 
 interface ContentCardProps {
   item: ContentItem;
@@ -122,24 +118,9 @@ export function TopicTags({ topics, max = 3 }: { topics: string[]; max?: number 
   );
 }
 
-/** @deprecated Use deriveSignalTypes from SignalBadge.tsx for icon-based display */
+/** Returns text-label + color tags from content scores. Delegates to deriveSignalTypes for threshold logic. */
 export function deriveScoreTags(item: ContentItem): Array<{ label: string; color: string }> {
-  const tags: Array<{ label: string; color: string }> = [];
-
-  if (hasVCL(item)) {
-    if (item.vSignal! >= 7) tags.push({ label: "High signal", color: colors.purple[400] });
-    if (item.cContext! >= 7) tags.push({ label: "Rich context", color: colors.sky[400] });
-    if (item.lSlop! >= 7) tags.push({ label: "High slop risk", color: colors.red[400] });
-    if (item.lSlop! <= 2) tags.push({ label: "Low noise", color: colors.green[400] });
-  } else {
-    if (item.scores.originality >= 8) tags.push({ label: "Original", color: colors.purple[400] });
-    if (item.scores.insight >= 8) tags.push({ label: "Insightful", color: colors.sky[400] });
-    if (item.scores.credibility >= 8) tags.push({ label: "Credible", color: colors.green[400] });
-    if (item.scores.credibility <= 3) tags.push({ label: "Low credibility", color: colors.red[400] });
-    if (item.scores.originality <= 2) tags.push({ label: "Derivative", color: colors.orange[400] });
-  }
-
-  return tags.slice(0, 3);
+  return deriveSignalTypes(item).map(signalTypeToTag);
 }
 
 function SignalBadges({ item }: { item: ContentItem }) {
@@ -385,6 +366,20 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
         <div className="min-w-0 flow-root">
           <div className="float-right ml-3 mb-1 text-center">
             <GradeBadge composite={item.scores.composite} />
+            <ShadTooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    "mt-1 flex items-center justify-center gap-0.5 text-tiny font-bold uppercase tracking-[1px]",
+                    isSlop ? "text-red-400" : "text-emerald-400"
+                  )}
+                  aria-label={isSlop ? "Identified as slop" : "Quality content"}
+                >
+                  {isSlop ? <XCloseIcon /> : <CheckIcon />}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="left">{isSlop ? "Identified as slop" : "Quality content"}</TooltipContent>
+            </ShadTooltip>
           </div>
 
           <p className={cn(
