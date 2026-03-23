@@ -1,10 +1,9 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ContentCard, deriveScoreTags, ScoreGrid, TopicTags } from "@/components/ui/ContentCard";
-import { WithTooltip } from "../../helpers/withTooltip";
 import type { ContentItem } from "@/lib/types/content";
 
-const wrap = (el: React.ReactElement) => renderToStaticMarkup(<WithTooltip>{el}</WithTooltip>);
+const wrap = (el: React.ReactElement) => renderToStaticMarkup(el);
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {

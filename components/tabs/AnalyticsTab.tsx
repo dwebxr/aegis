@@ -126,9 +126,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
             </div>
           </div>
           <div className="flex gap-2 flex-wrap mb-3">
-            <MetricPill icon={<ShieldIcon s={12} />} value={activity.qualityCount} tooltip="Quality items in this period" color={colors.cyan[400]} />
-            <MetricPill icon={<FireIcon s={12} />} value={activity.slopCount} tooltip="Items burned (filtered as slop)" color={colors.orange[400]} />
-            <MetricPill icon={<ZapIcon s={12} />} value={activity.totalEvaluated} tooltip="Total items evaluated" color={colors.purple[400]} />
+            <MetricPill icon={<ShieldIcon s={12} />} value={activity.qualityCount} label="quality" tooltip="Quality items in this period" color={colors.cyan[400]} />
+            <MetricPill icon={<FireIcon s={12} />} value={activity.slopCount} label="burned" tooltip="Items burned (filtered as slop)" color={colors.orange[400]} />
+            <MetricPill icon={<ZapIcon s={12} />} value={activity.totalEvaluated} label="total" tooltip="Total items evaluated" color={colors.purple[400]} />
           </div>
           {activity.chartQuality.length > 0 && (
             <div className="flex gap-4 mb-3 items-center">

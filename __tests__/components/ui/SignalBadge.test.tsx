@@ -2,10 +2,9 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SignalBadge, deriveSignalTypes } from "@/components/ui/SignalBadge";
 import type { SignalType } from "@/components/ui/SignalBadge";
-import { WithTooltip } from "../../helpers/withTooltip";
 import type { ContentItem } from "@/lib/types/content";
 
-const wrap = (el: React.ReactElement) => renderToStaticMarkup(<WithTooltip>{el}</WithTooltip>);
+const wrap = (el: React.ReactElement) => renderToStaticMarkup(el);
 
 function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {

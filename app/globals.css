@@ -372,3 +372,8 @@ a {
     @apply bg-background text-foreground;
   }
 }
+
+/* Show compact labels on touch-only devices where hover tooltips don't fire */
+@media (hover: none) {
+  .touch-label { display: inline !important; }
+}

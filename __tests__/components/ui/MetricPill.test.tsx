@@ -1,9 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MetricPill } from "@/components/ui/MetricPill";
-import { WithTooltip } from "../../helpers/withTooltip";
-
-const wrap = (el: React.ReactElement) => renderToStaticMarkup(<WithTooltip>{el}</WithTooltip>);
+const wrap = (el: React.ReactElement) => renderToStaticMarkup(el);
 
 describe("MetricPill", () => {
   it("renders numeric value", () => {

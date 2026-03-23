@@ -11,8 +11,6 @@ import React from "react";
 import { render, fireEvent } from "@testing-library/react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import type { NavItem } from "@/components/layout/Sidebar";
-import { WithTooltip } from "../../helpers/withTooltip";
-
 // Mock useAuth
 let mockAuth = { isAuthenticated: false };
 jest.mock("@/contexts/AuthContext", () => ({
@@ -34,15 +32,13 @@ const navItems: NavItem[] = [
 
 const renderSidebar = (props: Partial<React.ComponentProps<typeof Sidebar>> = {}) =>
   render(
-    <WithTooltip>
-      <Sidebar
-        navItems={navItems}
-        activeTab="dashboard"
-        onTabChange={jest.fn()}
-        collapsed={false}
-        {...props}
-      />
-    </WithTooltip>,
+    <Sidebar
+      navItems={navItems}
+      activeTab="dashboard"
+      onTabChange={jest.fn()}
+      collapsed={false}
+      {...props}
+    />,
   );
 
 describe("Sidebar", () => {

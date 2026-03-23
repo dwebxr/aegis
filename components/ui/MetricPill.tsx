@@ -9,28 +9,24 @@ import {
 interface MetricPillProps {
   icon: React.ReactNode;
   value: string | number;
+  label?: string;
   tooltip: string;
   color: string;
 }
 
-export const MetricPill: React.FC<MetricPillProps> = ({ icon, value, tooltip, color }) => (
+export const MetricPill: React.FC<MetricPillProps> = ({ icon, value, label, tooltip, color }) => (
   <Tooltip>
     <TooltipTrigger asChild>
       <div
         className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-body-sm font-bold font-mono cursor-default"
-        style={{
-          background: `${color}10`,
-          border: `1px solid ${color}18`,
-          color,
-        }}
+        style={{ background: `${color}10`, border: `1px solid ${color}18`, color }}
         aria-label={tooltip}
       >
         <span className="flex items-center justify-center size-4 shrink-0 opacity-80">{icon}</span>
         <span>{value}</span>
+        {label && <span className="font-sans font-semibold text-caption opacity-70 hidden touch-label">{label}</span>}
       </div>
     </TooltipTrigger>
-    <TooltipContent side="bottom" className="max-w-[240px]">
-      {tooltip}
-    </TooltipContent>
+    <TooltipContent side="bottom" className="max-w-[240px]">{tooltip}</TooltipContent>
   </Tooltip>
 );

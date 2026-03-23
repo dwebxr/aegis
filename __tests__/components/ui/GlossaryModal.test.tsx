@@ -4,13 +4,9 @@
 import React from "react";
 import { render, fireEvent, cleanup } from "@testing-library/react";
 import { GlossaryModal, GlossaryButton } from "@/components/ui/GlossaryModal";
-import { WithTooltip } from "../../helpers/withTooltip";
-
 function renderOpen(onClose = jest.fn()) {
   const result = render(
-    <WithTooltip>
-      <GlossaryModal open={true} onClose={onClose} />
-    </WithTooltip>,
+    <GlossaryModal open={true} onClose={onClose} />,
   );
   // baseElement includes Radix Portal content (rendered outside container)
   return { el: result.baseElement, onClose };
@@ -21,9 +17,7 @@ describe("GlossaryModal", () => {
 
   it("renders nothing when closed", () => {
     const { baseElement } = render(
-      <WithTooltip>
-        <GlossaryModal open={false} onClose={jest.fn()} />
-      </WithTooltip>,
+      <GlossaryModal open={false} onClose={jest.fn()} />,
     );
     expect(baseElement.textContent).not.toContain("Glossary & Shortcuts");
   });
