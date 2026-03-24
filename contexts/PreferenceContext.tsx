@@ -52,6 +52,7 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
 
   const identityRef = useCurrentRef(identity);
   const isAuthRef = useCurrentRef(isAuthenticated);
+  const profileRef = useCurrentRef(profile);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,8 +156,6 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     }, HEARTBEAT_MS);
     return () => clearInterval(interval);
   }, [isAuthenticated, identity]);
-
-  const profileRef = useCurrentRef(profile);
 
   const updateProfile = useCallback((mutate: (p: UserPreferenceProfile) => void) => {
     const next = structuredClone(profileRef.current);

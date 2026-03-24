@@ -40,7 +40,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         collapsed ? "w-[68px] px-2 py-5" : "w-[200px] px-3 py-6"
       )}
     >
-      {/* Logo */}
       <div className={cn(
         "flex items-center gap-3 mb-8",
         collapsed ? "px-1 justify-center" : "px-3 justify-start"
@@ -56,7 +55,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         )}
       </div>
 
-      {/* Main nav */}
       {navItems.map(it => {
         const active = activeTab === it.id;
         const btn = (
@@ -96,14 +94,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
 
       <div className="flex-1" />
 
-      {/* Auth */}
       {!collapsed && (
         <div className="mb-3">
           {isAuthenticated ? <UserBadge /> : <LoginButton />}
         </div>
       )}
 
-      {/* Footer nav */}
       {footerNav.filter(n => !n.authOnly || isAuthenticated).map(n => {
         const active = activeTab === n.id;
         const btn = (
@@ -136,7 +132,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         return <React.Fragment key={n.id}>{btn}</React.Fragment>;
       })}
 
-      {/* GitHub link */}
       <a
         href="https://github.com/dwebxr/aegis"
         target="_blank"
@@ -156,7 +151,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         )}
       </a>
 
-      {/* Social links */}
       <div className={cn(
         "flex items-center gap-1 mb-2",
         collapsed ? "justify-center" : "px-3"
@@ -175,7 +169,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, activeTab, onTabChan
         ))}
       </div>
 
-      {/* Status indicator */}
       <div className={cn(
         "bg-emerald-dim border border-emerald-border rounded-md shadow-glow-green",
         collapsed ? "px-1 py-2 text-center" : "px-3 py-2 text-left"

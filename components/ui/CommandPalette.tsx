@@ -78,7 +78,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, c
         )}
         onClick={e => e.stopPropagation()}
       >
-        {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <SearchIcon s={18} />
           <input
@@ -92,7 +91,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, c
           <span className="text-tiny text-disabled px-1.5 py-0.5 border border-border rounded-sm font-mono">ESC</span>
         </div>
 
-        {/* Command list */}
         <div className="max-h-[320px] overflow-y-auto py-2">
           {filtered.length === 0 ? (
             <div className="p-4 text-center text-disabled text-body-sm">

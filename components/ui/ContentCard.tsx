@@ -17,6 +17,7 @@ import { isD2AContent } from "@/lib/d2a/activity";
 import { extractYouTubeVideoId } from "@/lib/utils/youtube";
 import type { ContentItem } from "@/lib/types/content";
 import type { CustomFilterRule } from "@/lib/preferences/types";
+import { ENGINE_LABELS, type ScoringEngine } from "@/lib/scoring/types";
 
 type CardVariant = "default" | "priority" | "serendipity";
 
@@ -373,6 +374,23 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
               </TooltipTrigger>
               <TooltipContent side="left">{isSlop ? "Identified as slop" : "Quality content"}</TooltipContent>
             </ShadTooltip>
+            {item.scoringEngine && (
+              <ShadTooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className={cn(
+                      "mt-0.5 block text-center text-[9px] font-semibold tracking-wide uppercase leading-tight",
+                      item.scoringEngine === "heuristic" ? "text-amber-400/60" : "text-sky-400/50",
+                    )}
+                  >
+                    {item.scoringEngine === "heuristic" ? "H" : "AI"}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  Scored by {ENGINE_LABELS[item.scoringEngine as ScoringEngine] ?? item.scoringEngine}
+                </TooltipContent>
+              </ShadTooltip>
+            )}
           </div>
 
           <p className={cn(

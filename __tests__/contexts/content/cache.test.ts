@@ -181,28 +181,45 @@ describe("loadCachedContent", () => {
 });
 
 describe("saveCachedContent", () => {
+  beforeEach(() => { jest.useFakeTimers(); });
+  afterEach(() => { jest.useRealTimers(); });
+
   it("does not save immediately (debounced)", () => {
-    // saveCachedContent uses setTimeout internally — we verify it doesn't write synchronously
     saveCachedContent([makeItem({ id: "s1" })]);
-    // localStorage should not have been written synchronously
-    // (the actual write happens after 1000ms debounce, in either IDB or localStorage path)
-    // This test verifies the function doesn't throw and is callable
+    // Before debounce fires, localStorage should be empty
+    expect(localStorage.getItem("aegis-content-cache")).toBeNull();
   });
 
-  it("can be called multiple times without errors (debounce replaces timer)", () => {
-    // Rapid calls should not throw
+  it("writes to localStorage after debounce elapses", () => {
+    const items = [makeItem({ id: "debounce-1" })];
+    saveCachedContent(items);
+    jest.advanceTimersByTime(1000);
+    const stored = localStorage.getItem("aegis-content-cache");
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored!);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].id).toBe("debounce-1");
+  });
+
+  it("rapid calls coalesce — only last batch is persisted", () => {
     saveCachedContent([makeItem({ id: "a" })]);
     saveCachedContent([makeItem({ id: "b" })]);
     saveCachedContent([makeItem({ id: "c" })]);
-    // No error means debounce replacement works
+    jest.advanceTimersByTime(1000);
+    const stored = localStorage.getItem("aegis-content-cache");
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored!);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].id).toBe("c");
   });
 
-  it("truncatePreservingActioned is applied during save", () => {
-    // The save path calls truncatePreservingActioned — tested thoroughly above
-    // We verify the function exists and is used by saveCachedContent by testing
-    // the truncation logic directly (already covered in truncatePreservingActioned tests)
+  it("truncates to 200 items during save", () => {
     const items = Array.from({ length: 250 }, (_, i) => makeItem({ id: `i-${i}` }));
-    const truncated = truncatePreservingActioned(items);
-    expect(truncated.length).toBeLessThanOrEqual(200);
+    saveCachedContent(items);
+    jest.advanceTimersByTime(1000);
+    const stored = localStorage.getItem("aegis-content-cache");
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored!);
+    expect(parsed.length).toBeLessThanOrEqual(200);
   });
 });

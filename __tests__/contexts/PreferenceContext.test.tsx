@@ -584,22 +584,28 @@ describe("debounce coalescing", () => {
     mockIdentity = { getPrincipal: () => "test-principal" };
   });
 
-  it("multiple rapid updates result in single save", () => {
+  it("multiple rapid updates result in single save with last change persisted", () => {
     let state: ReturnType<typeof usePreferences> | null = null;
     renderWithProvider((s) => { state = s; });
 
-    act(() => {
-      state!.setTopicAffinity("a", 0.1);
-      state!.setTopicAffinity("b", 0.2);
-      state!.setTopicAffinity("c", 0.3);
-    });
+    // Separate act() calls to let React flush state between updates
+    act(() => { state!.setTopicAffinity("a", 0.1); });
+    act(() => { state!.setTopicAffinity("b", 0.2); });
+    act(() => { state!.setTopicAffinity("c", 0.3); });
 
     act(() => { jest.advanceTimersByTime(600); });
 
     // saveProfile debounces — only the last timer fires
-    // Each setTopicAffinity call schedules a new timeout (clearing previous)
-    // so only 1 save should fire
     expect(mockSaveProfile).toHaveBeenCalledTimes(1);
+
+    // Verify the saved profile contains ALL three topic affinities (accumulated across renders)
+    const savedProfile = mockSaveProfile.mock.calls[0][0] as UserPreferenceProfile;
+    expect(savedProfile.topicAffinities).toHaveProperty("a");
+    expect(savedProfile.topicAffinities).toHaveProperty("b");
+    expect(savedProfile.topicAffinities).toHaveProperty("c");
+    expect(savedProfile.topicAffinities.a).toBeCloseTo(0.1);
+    expect(savedProfile.topicAffinities.b).toBeCloseTo(0.2);
+    expect(savedProfile.topicAffinities.c).toBeCloseTo(0.3);
   });
 });
 

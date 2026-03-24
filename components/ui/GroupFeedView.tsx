@@ -31,7 +31,6 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
 
   return (
     <div className="mt-2">
-      {/* Header actions */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <button
           onClick={() => setShowMembers(!showMembers)}
@@ -51,7 +50,6 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
         )}
       </div>
 
-      {/* Members panel */}
       {showMembers && (
         <div className="bg-card border border-border rounded-md p-3 mb-3">
           {group.members.map(pk => (
@@ -92,7 +90,6 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
         </div>
       )}
 
-      {/* Feed items */}
       {feed.length > 0 ? (
         feed.map((item, i) => (
           <div key={item.id} style={{ animation: `slideUp .3s ease ${i * 0.04}s both` }}>

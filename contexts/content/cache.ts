@@ -11,7 +11,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let useIDB = false;
 
 function isFiniteInRange(v: unknown): boolean {
-  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 10;
+  return Number.isFinite(v) && (v as number) >= 0 && (v as number) <= 10;
 }
 
 function validateContentItems(parsed: unknown): ContentItem[] {

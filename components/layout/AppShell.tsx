@@ -54,7 +54,6 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
       >
         <PullToRefresh scrollRef={mainRef} enabled={mobile}>
           <div className="max-w-[1200px] mx-auto">
-            {/* Install PWA banner */}
             {showInstallBanner && (
               <div className="flex items-center justify-between px-4 py-2 bg-cyan-500/[0.06] border border-cyan-500/[0.15] rounded-md mb-3">
                 <span className="text-caption text-secondary-foreground font-semibold">

@@ -9,6 +9,15 @@
 
 ## Latest Updates (March 2026)
 
+### Code Quality Audit & Scoring Transparency
+- **6,119 tests, 351 suites** — zero failures, zero skipped
+- **Scoring engine badge**: ContentCard now shows "AI" (sky) or "H" (amber) indicator below grade badge — tooltip reveals exact engine (Ollama / WebLLM / Claude Server / Claude IC / Claude BYOK / Heuristic); users can now tell when scores are AI-powered vs heuristic fallback
+- **Speed Insights throttled**: `sampleRate={0.3}` reduces Vercel data point consumption ~70% while retaining statistically meaningful Web Vitals telemetry
+- **Context refactoring**: PreferenceContext `profileRef` moved before effect cleanup that references it; SourceContext redundant `actorRef.current = null` effect removed (main sync effect covers it); `SchedulerSource` type extracted and exported
+- **Test coverage expanded**: 7 new test files (59 tests) — NotificationContext, DemoContext, FilterModeContext, useWindowSize (boundary ±1px), useCurrentRef, SourceContext CRUD (duplicate rejection, demo-mode blocking, scheduler mapping), ContentCard engine badge
+- **LARP fixes**: Empty `catch(e){}` in layout.tsx theme script replaced with `console.debug`; cache.test.ts assertionless tests replaced with real debounce verification via fake timers; PreferenceContext debounce test now verifies saved profile contains all accumulated changes
+- **Dead code removed**: `isFiniteInRange` redundant `typeof` check; 12 restating JSX comments (`{/* Logo */}`, `{/* Search input */}`, etc.) from Sidebar, AppShell, CommandPalette, GroupFeedView
+
 ### Mark-First UI Refactor
 - **6059 tests, 344 suites** — zero failures, zero skipped
 - **Icon-driven signal badges**: Text labels ("HIGH SIGNAL", "RICH CONTEXT", "LOW NOISE") replaced with compact icon badges (`SignalBadge` component) — 9 signal types, each with distinct SVG icon, color, and tooltip on hover

@@ -14,6 +14,8 @@ import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
 import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
 import { getSourceKey, resetSourceErrors } from "@/lib/ingestion/sourceState";
 
+export type SchedulerSource = { type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform };
+
 interface SourceState {
   sources: SavedSource[];
   syncStatus: "idle" | "syncing" | "synced" | "error";
@@ -22,7 +24,7 @@ interface SourceState {
   removeSource: (id: string) => void;
   toggleSource: (id: string) => void;
   updateSource: (id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => void;
-  getSchedulerSources: () => Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform }>;
+  getSchedulerSources: () => SchedulerSource[];
 }
 
 const SourceContext = createContext<SourceState>({
@@ -49,10 +51,6 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const identityRef = useCurrentRef(identity);
   const isAuthRef = useCurrentRef(isAuthenticated);
   const principalTextRef = useCurrentRef(principalText);
-
-  useEffect(() => {
-    actorRef.current = null;
-  }, [identity]);
 
   function getActor(): _SERVICE | null {
     if (!isAuthRef.current || !identityRef.current) return null;
@@ -285,8 +283,8 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     queueMicrotask(() => { if (updated) saveToIC(updated); });
   }, [persist, isDemoMode, saveToIC]);
 
-  const getSchedulerSources = useCallback((): Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform }> => {
-    const result: Array<{ type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform }> = [];
+  const getSchedulerSources = useCallback((): SchedulerSource[] => {
+    const result: SchedulerSource[] = [];
     for (const s of sources) {
       if (!s.enabled) continue;
       if (s.type === "rss" && s.feedUrl) {
