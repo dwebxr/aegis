@@ -218,7 +218,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         searchResults.length > 0 ? (
           <div data-testid="aegis-briefing-search-results">
             {searchResults.map((item, i) => (
-              <div key={item.id} style={{ animation: `slideUp .3s ease ${i * 0.04}s both` }}>
+              <div key={item.id} style={{ animation: `slideUp .3s ease ${Math.min(i * 0.04, 0.8)}s both` }}>
                 <ContentCard
                   item={item}
                   expanded={expanded === item.id}
@@ -246,8 +246,8 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           </div>
         )
       ) : (
-      <>
-      {isLoading ? (
+        <>
+        {isLoading ? (
         <div data-testid="aegis-briefing-loading" className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
           <div className="text-[32px] mb-3 animate-pulse">&#x1F6E1;</div>
           <div className="text-h3 font-semibold text-tertiary">Loading briefing...</div>
@@ -418,7 +418,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         <div className="mt-5">
           <button
             data-testid="aegis-briefing-filtered-toggle"
-            onClick={() => setShowFiltered(!showFiltered)}
+            onClick={() => setShowFiltered(prev => !prev)}
             aria-expanded={showFiltered}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-card border border-border rounded-md text-muted-foreground text-body-sm font-semibold cursor-pointer transition-all duration-250 font-[inherit] hover:border-emphasis"
           >
@@ -447,7 +447,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         </div>
       )}
 
-      </>
+        </>
       )}
 
       {/* Chrome Extension CTA */}
