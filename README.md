@@ -9,212 +9,73 @@
 
 ## Latest Updates (March 2026)
 
-### Code Quality Audit & Scoring Transparency
-- **6,119 tests, 351 suites** — zero failures, zero skipped
-- **Scoring engine badge**: ContentCard now shows "AI" (sky) or "H" (amber) indicator below grade badge — tooltip reveals exact engine (Ollama / WebLLM / Claude Server / Claude IC / Claude BYOK / Heuristic); users can now tell when scores are AI-powered vs heuristic fallback
-- **Speed Insights throttled**: `sampleRate={0.3}` reduces Vercel data point consumption ~70% while retaining statistically meaningful Web Vitals telemetry
-- **Context refactoring**: PreferenceContext `profileRef` moved before effect cleanup that references it; SourceContext redundant `actorRef.current = null` effect removed (main sync effect covers it); `SchedulerSource` type extracted and exported
-- **Test coverage expanded**: 7 new test files (59 tests) — NotificationContext, DemoContext, FilterModeContext, useWindowSize (boundary ±1px), useCurrentRef, SourceContext CRUD (duplicate rejection, demo-mode blocking, scheduler mapping), ContentCard engine badge
-- **LARP fixes**: Empty `catch(e){}` in layout.tsx theme script replaced with `console.debug`; cache.test.ts assertionless tests replaced with real debounce verification via fake timers; PreferenceContext debounce test now verifies saved profile contains all accumulated changes
-- **Dead code removed**: `isFiniteInRange` redundant `typeof` check; 12 restating JSX comments (`{/* Logo */}`, `{/* Search input */}`, etc.) from Sidebar, AppShell, CommandPalette, GroupFeedView
+### Briefing Search & Scoring Transparency
+- **6,146 tests, 352 suites** — zero failures, zero skipped
+- **Briefing content search**: Full-text search in BriefingTab across text, author, and topics — desktop always-visible, mobile collapsible via toggle; results sorted by composite score; Escape clears; 27 tests covering filtering, sort, edge cases, mobile toggle
+- **Scoring engine badge**: ContentCard shows "AI" (sky) or "H" (amber) indicator with tooltip for exact engine (Ollama / WebLLM / Claude Server / IC / BYOK / Heuristic)
+- **Speed Insights throttled**: `sampleRate={0.3}` reduces Vercel data point consumption ~70%
+- **8 new test files (86 tests)**: BriefingTab search, NotificationContext, DemoContext, FilterModeContext, useWindowSize, useCurrentRef, SourceContext CRUD, ContentCard engine badge
 
 ### Mark-First UI Refactor
-- **6059 tests, 344 suites** — zero failures, zero skipped
-- **Icon-driven signal badges**: Text labels ("HIGH SIGNAL", "RICH CONTEXT", "LOW NOISE") replaced with compact icon badges (`SignalBadge` component) — 9 signal types, each with distinct SVG icon, color, and tooltip on hover
-- **Grade badge with verdict icon**: GradeBadge (A/B/C/D/F + numeric score) now includes ✓/✖ verdict indicator below — green check for quality, red X for slop, tooltip explains meaning
-- **Glossary modal**: Centralized `GlossaryModal` with all grades, signal badges, metric definitions, and keyboard shortcuts — triggered by `?` button in Analytics header
-- **MetricPill component**: Compact icon+number metrics with tooltip; `label` prop shown on touch devices via `@media (hover: none)` where tooltips don't fire
-- **Sidebar collapsed tooltips**: Radix Tooltip on all nav items when sidebar collapses to icon-only mode — label + description visible on hover
-- **Action buttons icon-first**: Validate (✓), Slop (✖), Save (bookmark), Read (external link) — icon-only with tooltip when collapsed, icon+short label when expanded
-- **DashboardTab ScorePill migrated**: Text-label ScorePill replaced with inline `SignalBadge` icon — all production UI now uses mark-first rendering
-- **12 new SVG icons**: Signal, Context, Noise, SlopRisk, Original, Insight, Credible, Derivative, Bookmark, ExternalLink, HelpCircle — shared `IconProps` type with existing icon system
-- **Threshold logic unified**: `deriveSignalTypes()` is single source of truth for score thresholds; `deriveScoreTags()` delegates to it via `signalTypeToTag()` mapper; `hasVCL()` exported from SignalBadge
-- **Global tooltip test mock**: `jest.setup.ts` mocks `@/components/ui/tooltip` — all 344 test suites work without per-file `TooltipProvider` wrapping
-- **LARP audit fixes**: Restored deleted verdict indicator, fixed missing React key props in Sidebar, removed undocumented "S" keyboard shortcut, eliminated threshold logic duplication
-- **Dead code removed**: FlagIcon (replaced by XCloseIcon), 12 restating JSDoc comments, 7 duplicate glossary entries, unused interfaces, nested div wrappers — net -82 lines
+- **Icon-driven signal badges**: 9 signal types with distinct SVG icon, color, and tooltip — replaced text labels
+- **Grade badge + verdict icon**: GradeBadge (A/B/C/D/F) with ✓/✖ verdict indicator; `GlossaryModal` for all definitions
+- **MetricPill**: Compact icon+number metrics; touch-device label fallback via `@media (hover: none)`
+- **12 new SVG icons**, unified threshold logic via `deriveSignalTypes()`, global tooltip test mock
 
-### A2A On-Chain Storage (OfferStore + ReceiptStore)
-- **IC canister extended** with `Offer` and `Receipt` types — agents can publish information catalogs and submit multi-chain USDC payment proofs without a server-side DB
-- **7 canister functions**: `put_offer` (10KB size guard), `get_offers` (paginated, limit-clamped, newest-first), `submit_receipt` (verified re-submission protected), `get_receipt`, `verify_payment_manual` (controller-only), `get_a2a_stats` (monitoring)
-- **Upgrade-safe**: `preupgrade`/`postupgrade` serialize both stores; new stable vars init to `[]` — backward-compatible with existing canister state
-- **TypeScript declarations synced**: `Offer`/`Receipt` interfaces, IDL factory, `_SERVICE` methods updated in `lib/ic/declarations/`
-- **Security hardening**: `submit_receipt` skips overwrite when receipt already verified (grief prevention); `verify_payment_manual` restricted to `Principal.isController(caller)`; `get_offers` limit clamped to max 100
-- **29 Jest tests** (IDL factory execution, Candid field verification, size guard boundary, existing method regression) + **20 dfx integration tests** (`scripts/test-a2a-storage.sh`)
+### A2A Protocol & On-Chain Storage
+- **OfferStore + ReceiptStore**: 7 canister functions — information catalogs, multi-chain USDC payment proofs, grief-prevention, controller-only verification, upgrade-safe
+- **Diff sync API**: `/api/d2a/briefing/changes` for lightweight A2A sync; pagination + `since`/`topics`/`limit` filtering; x402 free-tier preview
 
-### A2A Diff Sync API & Filtering
-- **5900 tests, 338 suites** — zero failures, zero skipped
-- **Pagination & filtering on `/api/d2a/briefing`**: New query params `since` (ISO 8601), `limit` (default 50, max 100), `offset`, `topics` (comma-separated, case-insensitive OR) — works on both individual (`?principal=`) and global paths; response now includes `pagination: { offset, limit, total, hasMore }`
-- **`/api/d2a/briefing/changes` endpoint**: Lightweight diff sync for A2A consumers — returns `itemHash` (SHA-256 of title+sourceUrl), `title`, `sourceUrl`, `composite` score, `generatedAt` for all briefing items newer than `?since=`; no x402 payment required
-- **x402 free-tier preview**: `?preview=true` (with `X402_FREE_TIER_ENABLED=true`) bypasses x402 paywall and truncates item content to 200 chars — full content requires payment
-- **`AEGIS_A2A_ALLOWED_ORIGINS` env var**: Comma-separated CORS origins for A2A consumers, merged with existing `D2A_CORS_ORIGINS`; validates HTTPS (+ `http://localhost` for dev)
-- **`/api/d2a/info` updated**: Service discovery now documents all new query params and the `/changes` endpoint
-- **Global path filtering**: `since` filters contributors by `generatedAt`, `topics` filters by contributor `topItems` topics — fetches larger batch from canister when filters active, paginates in-memory
-- **LARP audit**: Narrowed `BriefingChange.action` to `"added"` only (no dead `"updated"`/`"removed"` types); fixed `getRawGlobalBriefings` timestamp fallback ordering bug (fallback now computed before filter); extracted `applyPreview()` to eliminate in-place mutation
 
-### Production Readiness Audit & Hardening
-- **5760 tests, 332 suites** — zero failures, zero skipped, zero TypeScript errors
-- **Sentry client-side monitoring**: New `sentry.client.config.ts` — browser errors now captured (was server/edge only); query strings stripped from URLs before send; 10% error replay sampling
-- **IC sync safety net**: `syncToIC` rewritten from `void promise.catch(async...)` (floating unhandled rejection risk) to `.then(undefined, handler).catch(safetyNet)` pattern
-- **Scoring cache concurrent flush guard**: `_flushing` flag prevents overlapping IDB writes; re-schedules flush if new data arrives during write
-- **Offline queue dropped-action reporting**: Actions exceeding 5 retries now report to Sentry (`captureMessage`) and notify the user (was silent `console.warn` only)
-- **IDB cache fallback**: `saveCachedContent` falls back to localStorage when IDB write fails (was silent discard)
-- **Preference sync failure escalation**: `debouncedICSync` tracks consecutive failures; surfaces user notification after 3 consecutive IC sync errors
-- **`isValidState` validation gap fixed**: `rateLimitedUntil` field now validated in type guard (was silently skipped, relying on backfill)
-- **132 new edge/boundary tests**: dedup edge cases, custom filter rules, manifest decode/encode, peer stats, reputation concurrency, content serendipity detection, PreferenceContext lifecycle
-- **LARP audit (7 categories)**: Stubs, hardcoded values, mock-self tests, silent error handling, unwaited async, unvalidated validation, dead code paths — all verified genuine; 5 issues fixed
-- **Redundant code cleanup**: Removed restating JSDoc (6), unnecessary `@internal` tags (2), stale comment (1); simplified `topics?.length` check
+<details>
+<summary><strong>Previous Updates</strong></summary>
 
-### Code Integrity Audit & Bug Fixes
-- **5628 tests, 324 suites** — zero failures, zero skipped
-- **Scoring cache hardened**: `flushCache()` now properly `await`s IDB writes (was fire-and-forget void); `clearScoringCache()` returns `Promise<void>`; `isValidEntry()` validates full `AnalyzeResponse` structure (originality/insight/credibility/composite/verdict/reason)
-- **Scheduler Map iteration fix**: `httpCacheHeaders` cleanup now copies keys to array before deleting — eliminates undefined behavior from `Map.forEach` + `delete` during iteration
-- **Stale closure fix (PreferenceContext)**: Cleanup function uses `identityRef.current` instead of captured `identity` state — prevents preference data loss on logout
-- **Offline queue robustness**: Missing items logged and explicitly dropped (was silent skip); `action.id` null-guarded before use (removes all `!` non-null assertions in drain loop)
-- **Buffer flush race condition fix**: `addContentBuffered` takes snapshot of pending array before clearing — prevents item loss during concurrent calls
-- **Type-safe OG image backfill**: Type predicate filter `(c): c is ContentItem & { sourceUrl: string }` replaces `sourceUrl!` non-null assertions
-- **`incrementRetries` rewritten**: Direct transaction management with explicit `tx.oncomplete/onerror` (was indirect via `withDB` with void return)
-- **Mobile button layout**: Briefing cards show full-text buttons on mobile when only 3 actions present (Read more, Validate, Flag Slop); compact icon-only mode reserved for Dashboard cards with 5+ buttons
+#### Production Readiness Audit & Hardening
+Sentry 3-layer monitoring (client/server/edge), IC sync safety net, scoring cache concurrent flush guard, offline queue Sentry reporting, preference sync failure escalation, 132 new edge tests, 7-category LARP audit.
 
-### Social Links & Logout UX Refinement
-- **5627 tests, 324 suites** — zero failures, zero skipped
-- **Social link icons**: Discord, Medium, X icon buttons added to landing page footer, desktop sidebar, mobile nav footer, and Settings > About card
-- **`SOCIAL_LINKS` single source of truth**: `lib/config.ts` constant — URL changes propagate to all 4 locations automatically
-- **`SocialIcon` component**: Key-to-icon resolver in `components/icons/index.tsx` — maps `SOCIAL_LINKS` keys to SVG components, returns null for unknown keys
-- **Logout moved to Settings > Account**: Removed logout button from mobile nav footer (reclaimed space for social icons), added explicit Logout button in Settings > Account card
-- **Landing page redesign**: Image-rich sections with concise 1+1 sentence copy per section
+#### Code Integrity Audit & Bug Fixes
+Scoring cache `flushCache()` properly awaited, scheduler Map iteration fix, stale closure fix in PreferenceContext, buffer flush race condition fix, `incrementRetries` rewritten with direct transaction management.
 
-### Production Hardening & Test Quality Overhaul
-- **5588 tests, 322 suites** — zero failures, zero skipped, zero `toBeTruthy()` shallow assertions
-- **Push endpoint authorization**: HMAC-SHA256 token system — `/api/push/token` issues tokens, `/api/push/send` validates before dispatching; prevents unauthorized push spam
-- **Error logging standardized**: All `console.warn`/`console.error` calls across 9 files now use `errMsg()` utility — no raw Error objects that produce `[object Object]` in logs
-- **Test assertion quality**: 188 `toBeTruthy()` replaced — DOM assertions use `toBeInTheDocument()` (via `@testing-library/jest-dom`), non-DOM use `typeof`/`not.toBeNull()`/`toBeDefined()` with specific type checks
-- **Boolean return propagation**: `setUserApiKey`/`clearUserApiKey` return `boolean` — callers (FeedSection, SettingsTab) check return value and show error notification on storage failure
-- **Indeterminate test assertions eliminated**: OR-based `expect(a || b).toBe(true)` split into deterministic per-case tests; shallow `toBeTruthy` on step fields replaced with type + length checks
-- **Redundant code removed**: unnecessary `typeof window` in useEffect, double-cast `as unknown as` eliminated where direct property access works, 7 restating comments removed from preference storage
-- **`generatePushToken` extracted to `lib/api/pushToken.ts`**: satisfies Next.js route type constraints (route files can only export HTTP handlers + config)
+#### Social Links & Logout UX
+Discord/Medium/X icons via `SOCIAL_LINKS` constant, `SocialIcon` component, logout moved to Settings > Account.
 
-### Sidebar Enhancements & Topic Filtering
-- **5529 tests, 316 suites** — zero failures, zero skipped
-- **Interactive source filtering**: Click any source in Top Sources to filter feed by that source — quality rate bars show quality/total ratio per source
-- **Interactive topic filtering**: Click topics in Top Topics to filter feed — active topic chip appears in filter bar with `×` dismiss, CommandPalette dynamically generates topic filter commands
-- **Metrics delta indicators**: ↑/↓ arrows comparing today vs yesterday for quality, slop, and source counts — "High quality day!" badge when today's quality exceeds yesterday's
-- **Reading streak**: Counts consecutive days with user-reviewed items (`validated || flagged`), "at risk" nudge when no reviews today — streak resets on gap days
-- **Unreviewed queue**: Top 3 unreviewed quality items in collapsible sidebar section — click-to-scroll auto-expands `visibleCount` when target item is beyond current batch
-- **Topic trend arrows**: ↑ rising / ↓ falling / NEW badge based on affinity changes persisted to localStorage across sessions — top 5 topics (up from 3)
-- **Section collapse persistence**: Sidebar sections (metrics, streak, unreviewed, knowledge, sources, topics) collapse/expand with state persisted to localStorage
-- **Agent knowledge milestones**: Progress bar toward next milestone with remaining count — milestone reached celebration message
-- **Source filterKey/displayName split**: Sources keyed by `c.source` (matching filter logic) but displayed by `c.platform ?? c.source` — fixes platform/source mismatch bug
-- **40 new tests**: 39 sidebar enhancement tests + 1 infinite scroll sentinel fix
+#### Production Hardening & Test Quality
+HMAC-SHA256 push token authorization, `errMsg()` standardized logging, 188 `toBeTruthy()` replaced with specific assertions.
 
-### Infinite Scroll & Timer Cleanup
-- **5489 tests, 315 suites** — zero failures, zero skipped
-- **Infinite scroll replaces "Show All"**: `BATCH_SIZE=40` initial items, auto-load +40 on scroll via IntersectionObserver (300px rootMargin sentinel pattern)
-- **Batch separators**: "Showing X of Y items" divider at each 40-item boundary — lightweight visual progress indicator
-- **"Load remaining N items" fallback button**: Manual trigger at bottom of visible list for users who prefer explicit loading or when IntersectionObserver is unavailable
-- **Stagger animation capped to first batch**: Items 0–39 get `slideUp` animation with incremental delay; subsequent batches render instantly (prevents 6s animation queue at item #200)
-- **Filter change resets batch state**: Switching verdict or source filter resets `visibleCount` to `BATCH_SIZE`
-- **`useInfiniteScroll` hook**: 1-param API (`onLoadMore`) — sentinel conditionally rendered (`{hasMore && <div ref={...} />`}) eliminates need for `hasMore` in hook; `onLoadMoreRef` pattern prevents observer re-creation on callback changes; stable ref identity via `useCallback([], [])`
-- **`withTimeout` late-rejection fix**: Silent no-op `.catch()` replaces noisy `console.warn` that fired on every rejection (including normal pre-timeout ones)
-- **Dangling timer cleanup**: 3 test files (`timeout-edge`, `timeout-thorough`, `scoring-edge`) now `clearTimeout()` timers that kept event loop alive after test completion
-- **36 new tests**: 13 hook unit tests (intersection, null ref, rapid fire, empty entries, stable ref), 23 DashboardTab integration tests (batch boundaries 0/1/40/41/80/130 items, separators, stagger animation, filter reset, keyboard nav, Load remaining button)
+#### Sidebar Enhancements & Topic Filtering
+Interactive source/topic filtering, metrics delta indicators, reading streak, unreviewed queue, topic trend arrows, section collapse persistence.
 
-### Home Feed Right Sidebar (Foundation)
-- **5453 tests, 313 suites** — zero failures, zero skipped
-- **Desktop 2-column layout**: Feed mode renders sticky right sidebar (`w-[280px]`, `sticky top-4`) alongside content column — mobile stays single-column with metrics inline
-- **Metrics Bar**: Quality/Slop/Evaluated counts displayed in sidebar on desktop, inline on mobile
-- **Top Sources**: Ranked by item count — skips computation on mobile via early-return guard
-- **Top Topics**: Ranked by topic affinity from user preference profile — only computed when sidebar visible
-- **Agent Knowledge card**: Shared render variable (`agentKnowsCard`) eliminates JSX duplication between sidebar and mobile inline positions
-- **Aegis Score for Chrome CTA**: Sidebar on desktop feed, bottom section on dashboard/mobile — `CHROME_CTA_URL` constant prevents URL duplication
-- **41 new sidebar tests**: Layout, metrics placement, Top Sources ordering/counts, Top Topics, Agent Knowledge, Chrome CTA positioning, section ordering, edge cases
+#### Infinite Scroll & Timer Cleanup
+IntersectionObserver-based infinite scroll (batch 40), stagger animation capped to first batch, `useInfiniteScroll` hook.
 
-### YouTube Preview in Feed & Briefing
-- **5412 tests, 312 suites** — zero failures, zero skipped
-- **YouTube click-to-play preview**: `YouTubePreview` component renders thumbnail from `img.youtube.com` with play button overlay; clicking replaces thumbnail with autoplay iframe — avoids eager iframe loading for performance
-- **ContentCard integration**: YouTube preview appears below text in all card variants (default, priority, serendipity) across Home Feed list view, Briefing, and Discoveries
-- **CSP `frame-src` fix**: Added `frame-src https://www.youtube.com` to Content-Security-Policy — resolves iframe blocking for both new previews and existing DashboardCard embeds
-- **URL pattern support**: watch, youtu.be, shorts, embed, live via existing `extractYouTubeVideoId` utility
-- **stopPropagation**: Clicking the preview does not toggle the parent card expand/collapse
+#### Home Feed Right Sidebar
+Desktop 2-column layout with sticky sidebar, Top Sources/Topics, Agent Knowledge card, Chrome CTA.
 
-### Security Hardening & Production Cleanup
-- **5386 tests, 310 suites** — zero failures, zero skipped
-- **D2A sender pubkey verification**: `handleIncomingMessage` now cross-checks `fromPubkey` in encrypted payload against Nostr event sender — rejects spoofed payloads
-- **D2A deliver payload scores validation**: `isValidDeliverPayload` validates `originality`/`insight`/`credibility`/`composite` are finite numbers in [0, 10]
-- **CORS origin restriction**: `isValidOrigin` now only accepts `https://` origins + `http://localhost` for dev — blocks `http://` in production
-- **Cache score bounds validation**: `validateContentItems` rejects cached items with NaN, Infinity, or out-of-range score values
-- **Sentry observability**: `environment` tag on all 3 configs (server/edge/client), `Sentry.setUser()` on login/logout/session-expiry, `Sentry.startSpan()` on D2A broadcast/discover/message operations
-- **Silent error elimination**: 10 bare `catch {}` blocks converted to `catch (e) { console.debug/warn/error(...) }` across settings, contexts, and UI components
-- **Unnecessary defensive code removed**: try/catch around `String.split("?")` in Sentry configs (can't throw), 23 decorative section divider comments, 1 bloated module docstring
-- **Build type fix**: `ScoreBreakdown` → `Record<string, unknown>` cast via intermediate `unknown` in handshake validation
+#### YouTube Preview in Feed & Briefing
+Click-to-play `YouTubePreview` component, CSP `frame-src` fix, all URL patterns supported.
 
-### Latest Sort Mode & Code Cleanup
-- **5382 tests, 310 suites** — zero failures, zero skipped
-- **Latest mode (default)**: Home Feed now defaults to reverse-chronological order with automatic Slop exclusion — no clustering, flat list, newest first by `createdAt`
-- **Ranked mode**: Existing quality-ranked view with story clustering preserved as toggle option
-- **Sort mode persistence**: `localStorage` with SSR-safe initialization; CommandPalette commands for mode switching
-- **Shared filter logic**: `applyVerdictAndSource()` eliminates duplication between Latest and Dashboard filter paths
-- **Bookmarked/Validated filters**: Both Latest and Dashboard modes support bookmarked and validated verdict filters with correct sort semantics (Latest sorts by `createdAt`, Dashboard sorts by `validatedAt`)
-- **Reference stability fix**: `bookmarkedIds` wrapped in `useMemo` to prevent `filteredContent` invalidation on every render when bookmarks are empty
-- **Unified rendering loop**: Latest and Ranked modes share a single `ContentCard` rendering path (eliminated ~60 lines of duplication)
-- **Dead code removal**: Unused imports, `console.log` in production code, stale variables cleaned up across test and source files
+#### Security Hardening & Production Cleanup
+D2A sender pubkey verification, payload score bounds validation, CORS HTTPS-only, cache score validation, Sentry observability spans.
 
-### D2A Discovery Hardening & LARP Audit #3
-- **5242 tests, 305 suites** — zero failures, zero skipped
-- **Pool resource leak fix**: `broadcastPresence` now wraps `pool.publish()` in try/finally — guarantees `pool.destroy()` even on synchronous throw
-- **Discovery log tightened**: Diagnostic output capped at 5 peer details with shorter format — prevents console flooding during frequent polling cycles
-- **Stale test assertions fixed**: `discovery-dedup.test.ts` comment and assertion updated from old `0.3` to current `RESONANCE_THRESHOLD` (0.15)
-- **TypeScript strict compliance**: `ContentContext-analyze.test.tsx` cast fix for `AnalyzeResponse → Record<string, unknown>` via intermediate `unknown`
-- **Jest worker leak resolved**: `forceExit: true` in jest.config.js — eliminates intermittent worker timeout on full 305-suite parallel runs
-- **LARP Audit #3**: All 7 categories verified clean for D2A peer discovery changes — no stubs, no fake data, no silent failures
+#### Latest Sort Mode
+Reverse-chronological default, Ranked mode toggle, shared `applyVerdictAndSource()` filter, unified rendering loop.
 
-### Content Deduplication Overhaul
-- **5242 tests, 305 suites** — zero failures, zero skipped
-- **URL normalization**: `normalizeUrl()` strips `www.`, trailing slashes, UTM/tracking params (`fbclid`, `gclid`, `ref`, `mc_cid`), sorts query params, removes hash fragments — prevents same article from appearing as duplicate cards
-- **Multi-signal dedup**: `isDuplicateItem()` now matches by normalized URL **and** exact text — catches same-content-different-URL duplicates (e.g. syndicated articles)
-- **O(n+m) batch dedup**: `filterNewItems()` pre-builds Set index for flush path instead of O(n×m) per-item URL parsing; `deduplicateItems()` for render-layer safety net
-- **Render-layer dedup**: `DashboardTab.filteredContent` and `detectSerendipity()` wrap results in `deduplicateItems()` — eliminates duplicate cards in Discovers and Show All views
-- **Briefing dedup aligned**: `deduplicateBySource()` in ranker now uses `normalizeUrl()` + text matching (was raw URL only)
-- **IC sync ordering fix**: `addContentBuffered()` now checks dedup **before** firing `doSyncToIC` — prevents duplicate items from being needlessly synced to canister
-- **36 new dedup tests**: `normalizeUrl` (12), `deduplicateItems` (8), `filterNewItems` (5), `isDuplicateItem` URL normalization (4), `detectSerendipity` dedup (3), DashboardTab dedup integration (3), plus makeItem uniqueness fixes across 8 test files
+#### D2A Discovery Hardening
+Pool resource leak fix (`try/finally`), discovery log capping, Jest `forceExit` for worker leaks.
 
-### Security Hardening & Production Audit
-- **5190 tests, 303 suites** — zero failures, zero skipped
-- **Sentry data scrubbing**: Server + edge configs strip URL query params, auth headers, and cookies from error reports; client-side breadcrumbs stripped to pathname only
-- **Error boundary sanitization**: Both `error.tsx` and `global-error.tsx` show generic messages — no `error.message` or `error.stack` leaked to users; full details captured by Sentry with `error.digest` ID for support
-- **IC sync status indicator**: Account settings now displays real-time sync status (syncing/synced/offline/idle), network connectivity, and pending offline action count
-- **Dead code & comment cleanup**: ~30 redundant JSDoc comments removed across 23 files; ~20 valuable comments preserved (algorithm intent, security rationale, design pattern documentation)
-- **isDuplicateItem extracted**: Dedup logic moved from private ContentContext function to `contexts/content/dedup.ts` — directly importable and testable
-- **Worker process leak fix**: Relay flush delay (`RELAY_FLUSH_MS`) made configurable for tests; profile tests: 35s → 0.9s; content cache debounce timer properly cleaned up
-- **Test coverage expansion**: ContentContext (65%→76%), LoginButton (61%→92%), UserBadge (50%→100%), IncineratorTab (0%→100%)
-- **LARP audit**: All 7 categories (stubs, hardcoded values, mock-self tests, silent error handling, unwaited async, validation, dead code paths) verified genuine with evidence
+#### Content Deduplication Overhaul
+URL normalization (UTM stripping, www removal), multi-signal dedup (URL + text), O(n+m) batch dedup.
 
-### Next.js 15 Migration & Architecture Improvements
-- **Next.js 15.5.12**: Migrated from 14.2.35 — resolves GHSA-9g9p-9gw9-jx7f and GHSA-h25m-26qc-wcjf CVEs
-- **ContentContext refactor**: Split 831-line monolith into slim orchestrator (~310 lines) + 5 focused modules (types, cache, scoring, icSync, dedup) — public API unchanged
-- **E2E CI hardened**: Playwright tests now run against production build (`npm run build && npm run start`) instead of dev server
-- **Sentry instrumentation**: Added `onRequestError` hook for Next.js 15 server component error capture
-- **@sentry/nextjs 10.42.0**: Updated for full Next.js 15 compatibility
+#### Next.js 15 Migration
+Next.js 15.5.12 (CVE fixes), ContentContext split into 5 modules, E2E CI against production build, Sentry `onRequestError` hook.
 
-### Production Readiness
-- **Distributed rate limiting**: Per-IP rate limiting via Vercel KV (Redis) shared across serverless instances, with in-memory fallback
-- **Fail-secure design**: `calculateDynamicFee("restricted")` returns `Infinity` (was `0` — fail-open); callers pre-filter restricted tier as defense-in-depth
-- **IC call timeout protection**: All IC canister calls wrapped with `withTimeout()` (15–20s) — prevents indefinite hangs on slow/unreachable canisters
-- **API error sanitization**: All 16 API routes return generic error messages — no internal details leaked
-- **CSP hardened**: Full Content-Security-Policy with `default-src 'self'`, explicit allowlists for Google Fonts, Vercel Analytics, and Sentry CDN
-- **Tailwind CSS v4 + shadcn/ui migration**: 1341 inline styles reduced to 71 (94.7% reduction)
+#### Production Readiness
+Distributed rate limiting (Vercel KV), fail-secure fee design, IC call timeouts, API error sanitization, CSP hardening, Tailwind v4 + shadcn/ui.
 
-### Dashboard → Analytics UX Restructuring
-- **Action vs Observation separation**: Dashboard is now action-oriented (7 sections), Analytics is observation-oriented (9 sections)
-- **Activity Trends** moved from Dashboard to Analytics (default range: 7 days)
-- **Topic Breakdown** moved from Dashboard to Analytics — distribution bars with trend arrows and weekly sparklines
-- **Session Activity** merged into D2A Agent card — unified 8-metric grid
-- **"Your Agent" personality card**: Merged "Your Agent Knows" + "Agent Settings" into single card
+#### Dashboard UX & Performance
+Action/observation separation (Dashboard vs Analytics), Activity Trends + Topic Breakdown moved to Analytics, 15x clustering speedup, single-pass algorithms.
 
-### Dashboard Performance Optimization
-- **Feed-mode computation guard**: Dashboard-only calculations fully skipped in Feed mode — zero wasted work
-- **Story clustering 15x speedup**: `clusterByStory` uses sorted early-break instead of full O(n²)
-- **Single-pass algorithms**: `computeDashboardActivity` and `computeTopicTrends` reduced from O(kn) to O(n)
-- **Reactive dashboard**: `content.length` dependency ensures sections update when new content arrives
+</details>
 
 ## Live
 
