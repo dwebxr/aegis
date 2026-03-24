@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { typography } from "@/lib/design";
 import { ContentCard, YouTubePreview } from "@/components/ui/ContentCard";
 import { ShareBriefingModal } from "@/components/ui/ShareBriefingModal";
-import { ShareIcon } from "@/components/icons";
+import { ShareIcon, SearchIcon } from "@/components/icons";
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -35,12 +35,39 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   }, []);
   const [showFiltered, setShowFiltered] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [digest, setDigest] = useState<string | null>(null);
   const [digestLoading, setDigestLoading] = useState(false);
   const [digestError, setDigestError] = useState<string | null>(null);
   const { syncBriefing } = useContent();
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return null;
+    const matches = content.filter(item =>
+      item.text.toLowerCase().includes(q)
+      || item.author.toLowerCase().includes(q)
+      || item.topics?.some(t => t.toLowerCase().includes(q)),
+    );
+    matches.sort((a, b) => b.scores.composite - a.scores.composite || a.id.localeCompare(b.id));
+    return matches;
+  }, [content, searchQuery]);
+
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setSearchQuery("");
+      if (mobile) setSearchOpen(false);
+      searchInputRef.current?.blur();
+    }
+  }, [mobile]);
+
+  useEffect(() => {
+    if (searchOpen && searchInputRef.current) searchInputRef.current.focus();
+  }, [searchOpen]);
 
   const dedupedDiscoveries = useMemo(() => {
     const briefingIds = new Set(briefing.priority.map(b => b.item.id));
@@ -107,7 +134,6 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
 
   return (
     <div className="animate-fade-in">
-      {/* Header */}
       <div className={mobile ? "mb-8" : "mb-12"}>
         <div className="flex items-center justify-between">
           <h1 data-testid="aegis-briefing-heading" className={cn(
@@ -117,18 +143,64 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           )}>
             Your Briefing
           </h1>
-          {canShare && (
-            <button
-              onClick={() => setShowShareModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-md text-purple-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-all duration-150 hover:border-purple-400/25 hover:shadow-glow-purple"
-            >
-              <ShareIcon s={16} />
-              Share
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {mobile && (
+              <button
+                onClick={() => setSearchOpen(prev => !prev)}
+                className={cn(
+                  "p-2 rounded-md transition-colors cursor-pointer bg-transparent border-none font-[inherit]",
+                  searchOpen ? "text-cyan-400" : "text-muted-foreground hover:text-foreground",
+                )}
+                aria-label="Toggle search"
+              >
+                <SearchIcon s={18} />
+              </button>
+            )}
+            {canShare && (
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-md text-purple-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-all duration-150 hover:border-purple-400/25 hover:shadow-glow-purple"
+              >
+                <ShareIcon s={16} />
+                {!mobile && "Share"}
+              </button>
+            )}
+          </div>
         </div>
+
+        {(!mobile || searchOpen) && (
+          <div className={cn("flex items-center gap-2 mt-3", mobile && "animate-fade-in")}>
+            {!mobile && <span className="text-muted-foreground shrink-0"><SearchIcon s={16} /></span>}
+            <input
+              ref={searchInputRef}
+              type="search"
+              placeholder="Search by text, author, or topic..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              className={cn(
+                "flex-1 bg-card border border-border rounded-md px-3 py-2 text-foreground placeholder:text-disabled outline-none transition-colors focus:border-cyan-500/40 font-sans",
+                mobile ? "text-[14px]" : "text-body-sm",
+              )}
+              aria-label="Search briefing content"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(""); searchInputRef.current?.focus(); }}
+                className="text-muted-foreground hover:text-foreground text-caption px-2 py-1 shrink-0 cursor-pointer bg-transparent border-none font-[inherit]"
+                aria-label="Clear search"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
+
         <p data-testid="aegis-briefing-insight-count" className={cn("text-muted-foreground mt-2", mobile ? "text-[13px]" : "text-body")}>
-          {insightCount} insights selected from {briefing.totalItems} items
+          {searchResults !== null
+            ? `${searchResults.length} result${searchResults.length !== 1 ? "s" : ""} for \u201C${searchQuery.trim()}\u201D`
+            : `${insightCount} insights selected from ${briefing.totalItems} items`
+          }
         </p>
       </div>
 
@@ -142,7 +214,39 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         />
       )}
 
-      {/* Main content: Loading / Priority List / Empty */}
+      {searchResults !== null ? (
+        searchResults.length > 0 ? (
+          <div data-testid="aegis-briefing-search-results">
+            {searchResults.map((item, i) => (
+              <div key={item.id} style={{ animation: `slideUp .3s ease ${i * 0.04}s both` }}>
+                <ContentCard
+                  item={item}
+                  expanded={expanded === item.id}
+                  onToggle={handleToggle}
+                  onValidate={onValidate}
+                  onFlag={onFlag}
+                  mobile={mobile}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div data-testid="aegis-briefing-search-empty" className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
+            <div className="text-[32px] mb-3">&#x1F50D;</div>
+            <div className="text-h3 font-semibold text-tertiary">No matches found</div>
+            <div className="text-body-sm mt-2">
+              Try a different search term or{" "}
+              <button
+                onClick={() => { setSearchQuery(""); if (mobile) setSearchOpen(false); }}
+                className="text-cyan-400 underline cursor-pointer font-[inherit] bg-transparent border-none p-0"
+              >
+                clear the search
+              </button>
+            </div>
+          </div>
+        )
+      ) : (
+      <>
       {isLoading ? (
         <div data-testid="aegis-briefing-loading" className="text-center p-10 text-muted-foreground bg-card rounded-lg border border-border mb-4">
           <div className="text-[32px] mb-3 animate-pulse">&#x1F6E1;</div>
@@ -341,6 +445,9 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
             </div>
           )}
         </div>
+      )}
+
+      </>
       )}
 
       {/* Chrome Extension CTA */}
