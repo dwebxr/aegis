@@ -28,9 +28,7 @@ import Types "types";
 
 persistent actor AegisBackend {
 
-  // ──────────────────────────────────────
-  // ICP Ledger canister reference
-  // ──────────────────────────────────────
+  // — ICP Ledger canister reference —
 
   let ICP_LEDGER : Ledger.LedgerActor = actor "ryjl3-tyaaa-aaaaa-aaaba-cai";
   let ICP_FEE : Nat = 10_000; // 0.0001 ICP
@@ -40,18 +38,14 @@ persistent actor AegisBackend {
   let FLAG_THRESHOLD : Nat = 3; // Flags needed to slash stake
   let DEPOSIT_EXPIRY_NS : Int = 30 * 24 * 60 * 60 * 1_000_000_000; // 30 days in nanoseconds
 
-  // ──────────────────────────────────────
-  // Non-custodial: protocol wallet + cycles top-up
-  // ──────────────────────────────────────
+  // — Non-custodial: protocol wallet + cycles top-up —
 
   let PROTOCOL_WALLET : Principal = Principal.fromText("lg3sn-xvuag-vrcgb-xkhyo-4tlui-dw23v-sgtz3-573c7-obhuo-apcx6-uqe");
   let CMC : Ledger.CMCActor = actor "rkp4c-7iaaa-aaaaa-aaaca-cai";
   let CYCLES_THRESHOLD : Nat = 2_000_000_000_000; // 2T cycles — below this, top up from revenue
   let TPUP_MEMO : Blob = "\54\50\55\50\00\00\00\00"; // "TPUP" as little-endian u64
 
-  // ──────────────────────────────────────
-  // Stable storage for upgrades
-  // ──────────────────────────────────────
+  // — Stable storage for upgrades —
 
   // Migration: V1 type without validatedAt
   type ContentEvaluationV1 = {
@@ -101,9 +95,7 @@ persistent actor AegisBackend {
   var stableOffers : [(Text, Types.Offer)] = [];
   var stableReceipts : [(Text, Types.Receipt)] = [];
 
-  // ──────────────────────────────────────
-  // Runtime state (rebuilt from stable on upgrade)
-  // ──────────────────────────────────────
+  // — Runtime state (rebuilt from stable on upgrade) —
 
   transient var evaluations = HashMap.HashMap<Text, Types.ContentEvaluation>(64, Text.equal, Text.hash);
   transient var profiles = HashMap.HashMap<Principal, Types.UserProfile>(16, Principal.equal, Principal.hash);
@@ -115,7 +107,7 @@ persistent actor AegisBackend {
 
   // Staking storage
   transient var stakes = HashMap.HashMap<Text, Types.StakeRecord>(16, Text.equal, Text.hash);
-  transient var signalStakeIndex = HashMap.HashMap<Text, Text>(16, Text.equal, Text.hash); // signalId -> stakeId
+  transient var signalStakeIndex = HashMap.HashMap<Text, Text>(16, Text.equal, Text.hash);
   transient var reputations = HashMap.HashMap<Principal, Types.UserReputation>(16, Principal.equal, Principal.hash);
   // Track who has already validated/flagged a signal to prevent double-voting
   transient var signalVoters = HashMap.HashMap<Text, Buffer.Buffer<Principal>>(16, Text.equal, Text.hash);
@@ -147,9 +139,7 @@ persistent actor AegisBackend {
   // Owner -> evaluation IDs index for fast user queries
   transient var ownerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
 
-  // ──────────────────────────────────────
-  // II Alternative Origins (certified HTTP)
-  // ──────────────────────────────────────
+  // — II Alternative Origins (certified HTTP) —
 
   let II_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
   let II_ORIGINS_BODY : Blob = Text.encodeUtf8(
@@ -169,9 +159,7 @@ persistent actor AegisBackend {
 
   initCertCache();
 
-  // ──────────────────────────────────────
-  // Upgrade hooks
-  // ──────────────────────────────────────
+  // — Upgrade hooks —
 
   system func preupgrade() {
     stableEvaluations := [];
@@ -197,57 +185,12 @@ persistent actor AegisBackend {
   };
 
   system func postupgrade() {
-    // Load evaluations: prefer V3 (with imageUrl), then V2, then V1
-    if (stableEvaluationsV3.size() > 0) {
-      for ((id, eval) in stableEvaluationsV3.vals()) {
-        evaluations.put(id, eval);
-        addToPrincipalIndex(ownerIndex, eval.owner, id);
-      };
-    } else if (stableEvaluationsV2.size() > 0) {
-      for ((id, old) in stableEvaluationsV2.vals()) {
-        let migrated : Types.ContentEvaluation = {
-          id = old.id;
-          owner = old.owner;
-          author = old.author;
-          avatar = old.avatar;
-          text = old.text;
-          source = old.source;
-          sourceUrl = old.sourceUrl;
-          imageUrl = null;
-          scores = old.scores;
-          verdict = old.verdict;
-          reason = old.reason;
-          createdAt = old.createdAt;
-          validated = old.validated;
-          flagged = old.flagged;
-          validatedAt = old.validatedAt;
-        };
-        evaluations.put(id, migrated);
-        addToPrincipalIndex(ownerIndex, migrated.owner, id);
-      };
-    } else {
-      for ((id, old) in stableEvaluations.vals()) {
-        let migrated : Types.ContentEvaluation = {
-          id = old.id;
-          owner = old.owner;
-          author = old.author;
-          avatar = old.avatar;
-          text = old.text;
-          source = old.source;
-          sourceUrl = old.sourceUrl;
-          imageUrl = null;
-          scores = old.scores;
-          verdict = old.verdict;
-          reason = old.reason;
-          createdAt = old.createdAt;
-          validated = old.validated;
-          flagged = old.flagged;
-          validatedAt = null;
-        };
-        evaluations.put(id, migrated);
-        addToPrincipalIndex(ownerIndex, migrated.owner, id);
-      };
+    for ((id, eval) in stableEvaluationsV3.vals()) {
+      evaluations.put(id, eval);
+      addToPrincipalIndex(ownerIndex, eval.owner, id);
     };
+    // V1/V2 migration branches removed — preupgrade always writes V3 only.
+    // Stable vars kept for persistent actor field layout compatibility.
     stableEvaluations := [];
     stableEvaluationsV2 := [];
     stableEvaluationsV3 := [];
@@ -299,8 +242,37 @@ persistent actor AegisBackend {
     initCertCache();
   };
 
-  func requireAuth(caller : Principal) : Bool {
-    not Principal.isAnonymous(caller);
+  func requireAuthenticated(caller : Principal) {
+    if (Principal.isAnonymous(caller)) {
+      Debug.trap("anonymous caller not allowed");
+    };
+  };
+
+  func requireController(caller : Principal) {
+    requireAuthenticated(caller);
+    if (not Principal.isController(caller)) {
+      Debug.trap("caller is not a controller");
+    };
+  };
+
+  let SELF : Principal = Principal.fromActor(AegisBackend);
+
+  // — CallerGuard: per-caller reentrancy prevention —
+
+  transient var pendingCallers = HashMap.HashMap<Principal, Bool>(8, Principal.equal, Principal.hash);
+
+  func acquireGuard(principal : Principal) : Result.Result<(), Text> {
+    switch (pendingCallers.get(principal)) {
+      case (?_) { #err("already processing a request for this caller") };
+      case null {
+        pendingCallers.put(principal, true);
+        #ok();
+      };
+    };
+  };
+
+  func releaseGuard(principal : Principal) {
+    pendingCallers.delete(principal);
   };
 
   // Helper: add an ID to a Principal-keyed Buffer index
@@ -367,9 +339,7 @@ persistent actor AegisBackend {
     };
   };
 
-  // ──────────────────────────────────────
-  // Query methods
-  // ──────────────────────────────────────
+  // — Query methods —
 
   public query func getProfile(p : Principal) : async ?Types.UserProfile {
     profiles.get(p);
@@ -441,13 +411,11 @@ persistent actor AegisBackend {
     };
   };
 
-  // ──────────────────────────────────────
-  // Update methods
-  // ──────────────────────────────────────
+  // — Update methods —
 
   public shared(msg) func saveEvaluation(eval : Types.ContentEvaluation) : async Text {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
     let isNew = evaluations.get(eval.id) == null;
 
@@ -473,9 +441,6 @@ persistent actor AegisBackend {
 
     if (isNew) {
       addToPrincipalIndex(ownerIndex, caller, tagged.id);
-    };
-
-    if (isNew) {
       let profile = ensureProfile(caller);
       let updatedProfile : Types.UserProfile = {
         principal = profile.principal;
@@ -499,7 +464,7 @@ persistent actor AegisBackend {
 
   public shared(msg) func updateEvaluation(id : Text, validated : Bool, flagged : Bool) : async Bool {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
     switch (evaluations.get(id)) {
       case null { false };
@@ -543,7 +508,7 @@ persistent actor AegisBackend {
 
   public shared(msg) func batchSaveEvaluations(evals : [Types.ContentEvaluation]) : async Nat {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
     var saved : Nat = 0;
     var newCount : Nat = 0;
@@ -602,7 +567,7 @@ persistent actor AegisBackend {
 
   public shared(msg) func updateDisplayName(name : Text) : async Bool {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
     let profile = ensureProfile(caller);
     let updated : Types.UserProfile = {
@@ -617,13 +582,11 @@ persistent actor AegisBackend {
     true;
   };
 
-  // ──────────────────────────────────────
-  // Source Config methods
-  // ──────────────────────────────────────
+  // — Source Config methods —
 
   public shared(msg) func saveSourceConfig(config : Types.SourceConfigEntry) : async Text {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
     let tagged : Types.SourceConfigEntry = {
       id = config.id;
@@ -661,7 +624,7 @@ persistent actor AegisBackend {
 
   public shared(msg) func deleteSourceConfig(id : Text) : async Bool {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
     switch (sourceConfigs.get(id)) {
       case null { false };
@@ -673,13 +636,11 @@ persistent actor AegisBackend {
     };
   };
 
-  // ──────────────────────────────────────
-  // Signal Publishing methods
-  // ──────────────────────────────────────
+  // — Signal Publishing methods —
 
   public shared(msg) func saveSignal(signal : Types.PublishedSignal) : async Text {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
     let tagged : Types.PublishedSignal = {
       id = signal.id;
@@ -712,9 +673,7 @@ persistent actor AegisBackend {
     };
   };
 
-  // ──────────────────────────────────────
-  // Staking / Reputation methods
-  // ──────────────────────────────────────
+  // — Staking / Reputation methods —
 
   func ensureReputation(p : Principal) : Types.UserReputation {
     switch (reputations.get(p)) {
@@ -759,9 +718,7 @@ persistent actor AegisBackend {
     });
   };
 
-  // ──────────────────────────────────────
-  // Non-custodial revenue distribution
-  // ──────────────────────────────────────
+  // — Non-custodial revenue distribution —
 
   /// Convert a Principal to a 32-byte subaccount (for CMC top-up addressing).
   func principalToSubaccount(p : Principal) : Blob {
@@ -785,7 +742,7 @@ persistent actor AegisBackend {
         let xferResult = await ICP_LEDGER.icrc1_transfer({
           from_subaccount = null;
           to = { owner = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
-                 subaccount = ?principalToSubaccount(Principal.fromActor(AegisBackend)) };
+                 subaccount = ?principalToSubaccount(SELF) };
           amount = net;
           fee = ?ICP_FEE;
           memo = ?TPUP_MEMO;
@@ -795,7 +752,7 @@ persistent actor AegisBackend {
           case (#Ok(blockIdx)) {
             ignore await CMC.notify_top_up({
               block_index = Nat64.fromNat(blockIdx);
-              canister_id = Principal.fromActor(AegisBackend);
+              canister_id = SELF;
             });
           };
           case (#Err(_)) {}; // Transfer failed; funds stay for sweepProtocolFees
@@ -824,245 +781,280 @@ persistent actor AegisBackend {
   /// The caller must have previously approved this canister to transfer `stakeAmount` via icrc2_approve.
   public shared(msg) func publishWithStake(signal : Types.PublishedSignal, stakeAmount : Nat) : async Result.Result<Text, Text> {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
-    if (stakeAmount < MIN_STAKE) {
-      return #err("Stake too low: minimum is " # Nat.toText(MIN_STAKE) # " e8s (0.001 ICP)");
-    };
-    if (stakeAmount > MAX_STAKE) {
-      return #err("Stake too high: maximum is " # Nat.toText(MAX_STAKE) # " e8s (1.0 ICP)");
+    switch (acquireGuard(caller)) {
+      case (#err(m)) { return #err(m) };
+      case (#ok()) {};
     };
 
-    // Pre-debit: create records before async call (reentrancy guard)
-    let stakeId = signal.id # "-stake";
+    // try/finally guarantees releaseGuard even if a callback traps.
+    // finally runs in cleanup context where state changes persist.
+    let result : Result.Result<Text, Text> = try {
+      if (stakeAmount < MIN_STAKE) {
+        #err("Stake too low: minimum is " # Nat.toText(MIN_STAKE) # " e8s (0.001 ICP)");
+      } else if (stakeAmount > MAX_STAKE) {
+        #err("Stake too high: maximum is " # Nat.toText(MAX_STAKE) # " e8s (1.0 ICP)");
+      } else {
+        // Pre-debit: create records before async call
+        let stakeId = signal.id # "-stake";
 
-    let stakeRecord : Types.StakeRecord = {
-      id = stakeId;
-      owner = caller;
-      signalId = signal.id;
-      amount = stakeAmount;
-      status = #active;
-      validationCount = 0;
-      flagCount = 0;
-      createdAt = Time.now();
-      resolvedAt = null;
-    };
-    stakes.put(stakeId, stakeRecord);
-    signalStakeIndex.put(signal.id, stakeId);
-
-    // Update reputation counters
-    let rep = ensureReputation(caller);
-    let updatedRep : Types.UserReputation = {
-      principal = rep.principal;
-      trustScore = rep.trustScore;
-      totalStaked = rep.totalStaked + stakeAmount;
-      totalReturned = rep.totalReturned;
-      totalSlashed = rep.totalSlashed;
-      qualitySignals = rep.qualitySignals;
-      slopSignals = rep.slopSignals;
-    };
-    reputations.put(caller, updatedRep);
-
-    // Transfer ICP from caller to this canister via ICRC-2
-    let transferResult = try {
-      await ICP_LEDGER.icrc2_transfer_from({
-        spender_subaccount = null;
-        from = { owner = caller; subaccount = null };
-        to = { owner = Principal.fromActor(AegisBackend); subaccount = null };
-        amount = stakeAmount;
-        fee = ?ICP_FEE;
-        memo = null;
-        created_at_time = null;
-      });
-    } catch (e) {
-      Debug.print("[canister] publishWithStake transfer_from failed: " # Error.message(e));
-      // Rollback: remove pre-debited records
-      stakes.delete(stakeId);
-      signalStakeIndex.delete(signal.id);
-      reputations.put(caller, rep); // restore original
-      return #err("Ledger transfer_from failed");
-    };
-
-    switch (transferResult) {
-      case (#Err(err)) {
-        // Rollback
-        stakes.delete(stakeId);
-        signalStakeIndex.delete(signal.id);
-        reputations.put(caller, rep);
-        let errMsg = switch (err) {
-          case (#InsufficientFunds(_)) { "Insufficient ICP balance" };
-          case (#InsufficientAllowance(_)) { "Insufficient allowance — approve first" };
-          case (#BadFee(_)) { "Bad fee" };
-          case (_) { "Transfer failed" };
+        let stakeRecord : Types.StakeRecord = {
+          id = stakeId;
+          owner = caller;
+          signalId = signal.id;
+          amount = stakeAmount;
+          status = #active;
+          validationCount = 0;
+          flagCount = 0;
+          createdAt = Time.now();
+          resolvedAt = null;
         };
-        return #err(errMsg);
-      };
-      case (#Ok(_)) {};
-    };
+        stakes.put(stakeId, stakeRecord);
+        signalStakeIndex.put(signal.id, stakeId);
 
-    // Save the signal (same logic as saveSignal)
-    let tagged : Types.PublishedSignal = {
-      id = signal.id;
-      owner = caller;
-      text = signal.text;
-      nostrEventId = signal.nostrEventId;
-      nostrPubkey = signal.nostrPubkey;
-      scores = signal.scores;
-      verdict = signal.verdict;
-      topics = signal.topics;
-      createdAt = if (signal.createdAt == 0) { Time.now() } else { signal.createdAt };
+        let rep = ensureReputation(caller);
+        let updatedRep : Types.UserReputation = {
+          principal = rep.principal;
+          trustScore = rep.trustScore;
+          totalStaked = rep.totalStaked + stakeAmount;
+          totalReturned = rep.totalReturned;
+          totalSlashed = rep.totalSlashed;
+          qualitySignals = rep.qualitySignals;
+          slopSignals = rep.slopSignals;
+        };
+        reputations.put(caller, updatedRep);
+
+        // Transfer ICP from caller to this canister via ICRC-2
+        let transferErr : ?Text = try {
+          let xferResult = await ICP_LEDGER.icrc2_transfer_from({
+            spender_subaccount = null;
+            from = { owner = caller; subaccount = null };
+            to = { owner = SELF; subaccount = null };
+            amount = stakeAmount;
+            fee = ?ICP_FEE;
+            memo = null;
+            created_at_time = null;
+          });
+          switch (xferResult) {
+            case (#Ok(_)) { null };
+            case (#Err(err)) {
+              ?(switch (err) {
+                case (#InsufficientFunds(_)) { "Insufficient ICP balance" };
+                case (#InsufficientAllowance(_)) { "Insufficient allowance — approve first" };
+                case (#BadFee(_)) { "Bad fee" };
+                case (_) { "Transfer failed" };
+              });
+            };
+          };
+        } catch (e) {
+          Debug.print("[canister] publishWithStake transfer_from failed: " # Error.message(e));
+          ?"Ledger transfer_from failed";
+        };
+
+        switch (transferErr) {
+          case (?errText) {
+            // Rollback pre-debited records
+            stakes.delete(stakeId);
+            signalStakeIndex.delete(signal.id);
+            reputations.put(caller, rep);
+            #err(errText);
+          };
+          case null {
+            // Save the signal
+            let tagged : Types.PublishedSignal = {
+              id = signal.id;
+              owner = caller;
+              text = signal.text;
+              nostrEventId = signal.nostrEventId;
+              nostrPubkey = signal.nostrPubkey;
+              scores = signal.scores;
+              verdict = signal.verdict;
+              topics = signal.topics;
+              createdAt = if (signal.createdAt == 0) { Time.now() } else { signal.createdAt };
+            };
+            signals.put(tagged.id, tagged);
+            addToPrincipalIndex(signalOwnerIndex, caller, tagged.id);
+            #ok(tagged.id);
+          };
+        };
+      };
+    } catch (e) {
+      #err("Unexpected error: " # Error.message(e));
+    } finally {
+      releaseGuard(caller);
     };
-    signals.put(tagged.id, tagged);
-    addToPrincipalIndex(signalOwnerIndex, caller, tagged.id);
-    #ok(tagged.id);
+    result;
   };
 
   /// Community validate: vote that a staked signal is quality.
   /// When validationCount reaches threshold, stake is returned to owner.
   public shared(msg) func validateSignal(signalId : Text) : async Result.Result<Bool, Text> {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
-    // Find the stake for this signal
-    let stakeId = switch (signalStakeIndex.get(signalId)) {
-      case (?id) { id };
-      case null { return #err("No stake found for this signal") };
-    };
-    let stake = switch (stakes.get(stakeId)) {
-      case (?s) { s };
-      case null { return #err("Stake record not found") };
+    switch (acquireGuard(caller)) {
+      case (#err(m)) { return #err(m) };
+      case (#ok()) {};
     };
 
-    // Cannot vote on your own signal
-    if (Principal.equal(caller, stake.owner)) {
-      return #err("Cannot validate your own signal");
-    };
+    let result : Result.Result<Bool, Text> = try {
+      // Find the stake for this signal
+      let stakeId = switch (signalStakeIndex.get(signalId)) {
+        case (?id) { id };
+        case null { return #err("No stake found for this signal") };
+      };
+      let stake = switch (stakes.get(stakeId)) {
+        case (?s) { s };
+        case null { return #err("Stake record not found") };
+      };
 
-    // Check stake is still active
-    switch (stake.status) {
-      case (#active) {};
-      case (_) { return #err("Stake already resolved") };
-    };
+      if (Principal.equal(caller, stake.owner)) {
+        return #err("Cannot validate your own signal");
+      };
 
-    // Prevent double-voting
-    switch (signalVoters.get(signalId)) {
-      case (?voters) {
-        for (v in voters.vals()) {
-          if (Principal.equal(v, caller)) {
-            return #err("Already voted on this signal");
+      switch (stake.status) {
+        case (#active) {};
+        case (_) { return #err("Stake already resolved") };
+      };
+
+      // Prevent double-voting
+      switch (signalVoters.get(signalId)) {
+        case (?voters) {
+          for (v in voters.vals()) {
+            if (Principal.equal(v, caller)) {
+              return #err("Already voted on this signal");
+            };
           };
+          voters.add(caller);
         };
-        voters.add(caller);
+        case null {
+          let buf = Buffer.Buffer<Principal>(4);
+          buf.add(caller);
+          signalVoters.put(signalId, buf);
+        };
       };
-      case null {
-        let buf = Buffer.Buffer<Principal>(4);
-        buf.add(caller);
-        signalVoters.put(signalId, buf);
-      };
-    };
 
-    let newCount = stake.validationCount + 1;
+      let newCount = stake.validationCount + 1;
 
-    if (newCount < VALIDATE_THRESHOLD) {
-      putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
-      return #ok(false);
-    };
-
-    // Threshold reached: return stake to owner (pre-debit pattern)
-    putStakeUpdate(stakeId, stake, #returned, newCount, stake.flagCount, ?Time.now());
-
-    let returnAmount = if (stake.amount > ICP_FEE) { stake.amount - ICP_FEE } else { 0 };
-    var transferOk = true;
-    if (returnAmount > 0) {
-      let transferResult = try {
-        await ICP_LEDGER.icrc1_transfer({
-          from_subaccount = null;
-          to = { owner = stake.owner; subaccount = null };
-          amount = returnAmount;
-          fee = ?ICP_FEE;
-          memo = null;
-          created_at_time = null;
-        });
-      } catch (e) {
-        Debug.print("[canister] validateSignal stake return failed: " # Error.message(e));
-        transferOk := false;
+      if (newCount < VALIDATE_THRESHOLD) {
         putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
-        #Err(#TemporarilyUnavailable);
+        return #ok(false);
       };
-      switch (transferResult) {
-        case (#Err(_)) {
-          if (transferOk) {
-            transferOk := false;
-            putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
-          };
+
+      // Threshold reached: return stake to owner (pre-debit pattern)
+      putStakeUpdate(stakeId, stake, #returned, newCount, stake.flagCount, ?Time.now());
+
+      let returnAmount = if (stake.amount > ICP_FEE) { stake.amount - ICP_FEE } else { 0 };
+      var transferOk = true;
+      if (returnAmount > 0) {
+        let transferResult = try {
+          await ICP_LEDGER.icrc1_transfer({
+            from_subaccount = null;
+            to = { owner = stake.owner; subaccount = null };
+            amount = returnAmount;
+            fee = ?ICP_FEE;
+            memo = null;
+            created_at_time = null;
+          });
+        } catch (e) {
+          Debug.print("[canister] validateSignal stake return failed: " # Error.message(e));
+          transferOk := false;
+          putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
+          #Err(#TemporarilyUnavailable);
         };
-        case (#Ok(_)) {};
+        switch (transferResult) {
+          case (#Err(_)) {
+            if (transferOk) {
+              transferOk := false;
+              putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
+            };
+          };
+          case (#Ok(_)) {};
+        };
       };
-    };
 
-    if (transferOk) {
-      resolveReputation(stake.owner, 1, 0, stake.amount, 0);
-    };
+      if (transferOk) {
+        resolveReputation(stake.owner, 1, 0, stake.amount, 0);
+      };
 
-    #ok(true);
+      #ok(true);
+    } catch (e) {
+      #err("Unexpected error: " # Error.message(e));
+    } finally {
+      releaseGuard(caller);
+    };
+    result;
   };
 
   /// Community flag: vote that a staked signal is low quality.
   /// When flagCount reaches threshold, deposit is forfeited (auto-distributed).
   public shared(msg) func flagSignal(signalId : Text) : async Result.Result<Bool, Text> {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
-    let stakeId = switch (signalStakeIndex.get(signalId)) {
-      case (?id) { id };
-      case null { return #err("No stake found for this signal") };
-    };
-    let stake = switch (stakes.get(stakeId)) {
-      case (?s) { s };
-      case null { return #err("Stake record not found") };
+    switch (acquireGuard(caller)) {
+      case (#err(m)) { return #err(m) };
+      case (#ok()) {};
     };
 
-    if (Principal.equal(caller, stake.owner)) {
-      return #err("Cannot flag your own signal");
-    };
+    let result : Result.Result<Bool, Text> = try {
+      let stakeId = switch (signalStakeIndex.get(signalId)) {
+        case (?id) { id };
+        case null { return #err("No stake found for this signal") };
+      };
+      let stake = switch (stakes.get(stakeId)) {
+        case (?s) { s };
+        case null { return #err("Stake record not found") };
+      };
 
-    switch (stake.status) {
-      case (#active) {};
-      case (_) { return #err("Stake already resolved") };
-    };
+      if (Principal.equal(caller, stake.owner)) {
+        return #err("Cannot flag your own signal");
+      };
 
-    // Prevent double-voting
-    switch (signalVoters.get(signalId)) {
-      case (?voters) {
-        for (v in voters.vals()) {
-          if (Principal.equal(v, caller)) {
-            return #err("Already voted on this signal");
+      switch (stake.status) {
+        case (#active) {};
+        case (_) { return #err("Stake already resolved") };
+      };
+
+      // Prevent double-voting
+      switch (signalVoters.get(signalId)) {
+        case (?voters) {
+          for (v in voters.vals()) {
+            if (Principal.equal(v, caller)) {
+              return #err("Already voted on this signal");
+            };
           };
+          voters.add(caller);
         };
-        voters.add(caller);
+        case null {
+          let buf = Buffer.Buffer<Principal>(4);
+          buf.add(caller);
+          signalVoters.put(signalId, buf);
+        };
       };
-      case null {
-        let buf = Buffer.Buffer<Principal>(4);
-        buf.add(caller);
-        signalVoters.put(signalId, buf);
+
+      let newCount = stake.flagCount + 1;
+
+      if (newCount < FLAG_THRESHOLD) {
+        putStakeUpdate(stakeId, stake, #active, stake.validationCount, newCount, null);
+        return #ok(false);
       };
+
+      // Threshold reached: forfeit stake (auto-distribute to protocol wallet or cycles)
+      putStakeUpdate(stakeId, stake, #slashed, stake.validationCount, newCount, ?Time.now());
+      resolveReputation(stake.owner, 0, 1, 0, stake.amount);
+
+      // Auto-distribute forfeited deposit
+      await distributeProtocolRevenue(stake.amount);
+
+      #ok(true);
+    } catch (e) {
+      #err("Unexpected error: " # Error.message(e));
+    } finally {
+      releaseGuard(caller);
     };
-
-    let newCount = stake.flagCount + 1;
-
-    if (newCount < FLAG_THRESHOLD) {
-      putStakeUpdate(stakeId, stake, #active, stake.validationCount, newCount, null);
-      return #ok(false);
-    };
-
-    // Threshold reached: forfeit stake (auto-distribute to protocol wallet or cycles)
-    putStakeUpdate(stakeId, stake, #slashed, stake.validationCount, newCount, ?Time.now());
-    resolveReputation(stake.owner, 0, 1, 0, stake.amount);
-
-    // Auto-distribute forfeited deposit
-    await distributeProtocolRevenue(stake.amount);
-
-    #ok(true);
+    result;
   };
 
   /// Get a user's reputation profile (query-safe: no state mutation)
@@ -1083,9 +1075,7 @@ persistent actor AegisBackend {
     };
   };
 
-  // ──────────────────────────────────────
-  // D2A Precision Match Fee
-  // ──────────────────────────────────────
+  // — D2A Precision Match Fee —
 
   /// Record a D2A match and collect fee from receiver.
   /// Fee split: 80% to content provider, 20% auto-distributed (cycles top-up or protocol wallet).
@@ -1097,78 +1087,90 @@ persistent actor AegisBackend {
     feeAmount : Nat
   ) : async Result.Result<Text, Text> {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
-    if (feeAmount < ICP_FEE * 3) {
-      return #err("Fee too low to cover transfer costs");
+    switch (acquireGuard(caller)) {
+      case (#err(m)) { return #err(m) };
+      case (#ok()) {};
     };
 
-    // Calculate split: 80% sender, 20% protocol
-    let senderPayout = (feeAmount * 80) / 100;
-    let protocolPayout = feeAmount - senderPayout;
-
-    // Transfer fee from receiver (caller) to this canister first
-    let transferResult = try {
-      await ICP_LEDGER.icrc2_transfer_from({
-        spender_subaccount = null;
-        from = { owner = caller; subaccount = null };
-        to = { owner = Principal.fromActor(AegisBackend); subaccount = null };
-        amount = feeAmount;
-        fee = ?ICP_FEE;
-        memo = null;
-        created_at_time = null;
-      });
-    } catch (e) {
-      Debug.print("[canister] recordD2AMatch fee collection failed: " # Error.message(e));
-      return #err("Fee collection failed");
-    };
-
-    switch (transferResult) {
-      case (#Err(_)) {
-        return #err("Insufficient funds or allowance for D2A fee");
+    let result : Result.Result<Text, Text> = try {
+      if (feeAmount < ICP_FEE * 3) {
+        return #err("Fee too low to cover transfer costs");
       };
-      case (#Ok(_)) {};
-    };
 
-    // Transfer succeeded: now create record and index
-    let record : Types.D2AMatchRecord = {
-      id = matchId;
-      senderPrincipal = senderPrincipal;
-      receiverPrincipal = caller;
-      contentHash = contentHash;
-      feeAmount = feeAmount;
-      senderPayout = senderPayout;
-      protocolPayout = protocolPayout;
-      createdAt = Time.now();
-    };
-    d2aMatches.put(matchId, record);
+      // Calculate split: 80% sender, 20% protocol
+      let senderPayout = (feeAmount * 80) / 100;
+      let protocolPayout = feeAmount - senderPayout;
 
-    for (p in [senderPrincipal, caller].vals()) {
-      addToPrincipalIndex(d2aOwnerIndex, p, matchId);
-    };
-
-    // Pay sender their 80% share (minus transfer fee)
-    let senderNet = if (senderPayout > ICP_FEE) { senderPayout - ICP_FEE } else { 0 };
-    if (senderNet > 0) {
-      try {
-        let _r = await ICP_LEDGER.icrc1_transfer({
-          from_subaccount = null;
-          to = { owner = senderPrincipal; subaccount = null };
-          amount = senderNet;
+      // Transfer fee from receiver (caller) to this canister first
+      let transferResult = try {
+        await ICP_LEDGER.icrc2_transfer_from({
+          spender_subaccount = null;
+          from = { owner = caller; subaccount = null };
+          to = { owner = SELF; subaccount = null };
+          amount = feeAmount;
           fee = ?ICP_FEE;
           memo = null;
           created_at_time = null;
         });
       } catch (e) {
-        // Sender payout failed; funds remain in canister for sweepProtocolFees
-        Debug.print("[canister] recordD2AMatch sender payout failed: " # Error.message(e));
+        Debug.print("[canister] recordD2AMatch fee collection failed: " # Error.message(e));
+        return #err("Fee collection failed");
       };
+
+      switch (transferResult) {
+        case (#Err(_)) {
+          return #err("Insufficient funds or allowance for D2A fee");
+        };
+        case (#Ok(_)) {};
+      };
+
+      // Transfer succeeded: now create record and index
+      let record : Types.D2AMatchRecord = {
+        id = matchId;
+        senderPrincipal = senderPrincipal;
+        receiverPrincipal = caller;
+        contentHash = contentHash;
+        feeAmount = feeAmount;
+        senderPayout = senderPayout;
+        protocolPayout = protocolPayout;
+        createdAt = Time.now();
+      };
+      d2aMatches.put(matchId, record);
+
+      for (p in [senderPrincipal, caller].vals()) {
+        addToPrincipalIndex(d2aOwnerIndex, p, matchId);
+      };
+
+      // Pay sender their 80% share (minus transfer fee)
+      let senderNet = if (senderPayout > ICP_FEE) { senderPayout - ICP_FEE } else { 0 };
+      if (senderNet > 0) {
+        try {
+          let _r = await ICP_LEDGER.icrc1_transfer({
+            from_subaccount = null;
+            to = { owner = senderPrincipal; subaccount = null };
+            amount = senderNet;
+            fee = ?ICP_FEE;
+            memo = null;
+            created_at_time = null;
+          });
+        } catch (e) {
+          // Sender payout failed; funds remain in canister for sweepProtocolFees
+          Debug.print("[canister] recordD2AMatch sender payout failed: " # Error.message(e));
+        };
+      };
+
+      // Distribute protocol's 20% share (cycles top-up or protocol wallet)
+      await distributeProtocolRevenue(protocolPayout);
+
+      #ok(matchId);
+    } catch (e) {
+      #err("Unexpected error: " # Error.message(e));
+    } finally {
+      releaseGuard(caller);
     };
-
-    // Distribute protocol's 20% share (cycles top-up or protocol wallet)
-    await distributeProtocolRevenue(protocolPayout);
-
-    #ok(matchId);
+    result;
   };
 
   /// Get D2A match history for a user (as sender or receiver)
@@ -1186,9 +1188,7 @@ persistent actor AegisBackend {
     };
   };
 
-  // ──────────────────────────────────────
-  // Engagement Index
-  // ──────────────────────────────────────
+  // — Engagement Index —
 
   /// E_index = (Validations / Total_Reach) * Avg_Composite_of_Signals
   /// Measures how effectively a user's signals engage the community.
@@ -1244,7 +1244,7 @@ persistent actor AegisBackend {
     endpoint : Text, p256dh : Text, auth : Text
   ) : async Bool {
     let caller = msg.caller;
-    if (not requireAuth(caller)) { return false };
+    requireAuthenticated(caller);
 
     let newSub : Types.PushSubscription = {
       endpoint = endpoint;
@@ -1277,7 +1277,7 @@ persistent actor AegisBackend {
 
   public shared(msg) func unregisterPushSubscription(endpoint : Text) : async Bool {
     let caller = msg.caller;
-    if (not requireAuth(caller)) { return false };
+    requireAuthenticated(caller);
 
     switch (pushSubscriptions.get(caller)) {
       case (?existing) {
@@ -1302,10 +1302,8 @@ persistent actor AegisBackend {
     };
   };
 
-  // Called from Vercel API route to clean up expired subscriptions (410/404)
-  // NOTE: No auth check — server calls with anonymous identity.
-  // Risk: push-notification DoS only (no data leak). Proper fix requires
-  // server-side identity + controller check.
+  // Called from Vercel API route to clean up expired subscriptions (410/404).
+  // No auth: server calls with anonymous identity. Risk: push DoS only (no data leak).
   public shared func removePushSubscriptions(
     user : Principal, endpoints : [Text]
   ) : async Bool {
@@ -1338,7 +1336,8 @@ persistent actor AegisBackend {
   };
 
   // ──────────────────────────────────────
-  // Treasury (non-custodial — no operator withdrawal)
+  // Treasury — controller can sweep surplus to protocol wallet or cycles top-up.
+  // Active stakes are reserved and cannot be swept.
   // ──────────────────────────────────────
 
   /// Sum of all active (pending) deposits — these funds must be reserved
@@ -1355,18 +1354,18 @@ persistent actor AegisBackend {
   };
 
   /// Get the canister's total ICP balance (transparency).
-  public shared func getTreasuryBalance() : async Nat {
+  public shared ({ caller }) func getTreasuryBalance() : async Nat {
+    requireAuthenticated(caller);
     await ICP_LEDGER.icrc1_balance_of({
-      owner = Principal.fromActor(AegisBackend);
+      owner = SELF;
       subaccount = null;
     });
   };
 
-  /// Sweep any accumulated surplus to protocol wallet or cycles.
-  /// Anyone can call this — no controller restriction.
-  public shared func sweepProtocolFees() : async Result.Result<Text, Text> {
+  /// Internal: sweep surplus to protocol wallet or cycles.
+  func doSweep() : async Result.Result<Text, Text> {
     let totalBalance = await ICP_LEDGER.icrc1_balance_of({
-      owner = Principal.fromActor(AegisBackend); subaccount = null;
+      owner = SELF; subaccount = null;
     });
     let reserved = calcActiveStakeTotal();
     let surplus = if (totalBalance > reserved + ICP_FEE) { totalBalance - reserved - ICP_FEE } else { 0 };
@@ -1375,9 +1374,16 @@ persistent actor AegisBackend {
     #ok("Processed " # Nat.toText(surplus) # " e8s surplus");
   };
 
-  /// Alias for sweepProtocolFees — kept for backward compatibility.
-  public shared func topUpCycles() : async Result.Result<Text, Text> {
-    await sweepProtocolFees();
+  /// Sweep any accumulated surplus to protocol wallet or cycles.
+  public shared ({ caller }) func sweepProtocolFees() : async Result.Result<Text, Text> {
+    requireController(caller);
+    await doSweep();
+  };
+
+  /// Alias for sweepProtocolFees.
+  public shared ({ caller }) func topUpCycles() : async Result.Result<Text, Text> {
+    requireController(caller);
+    await doSweep();
   };
 
   /// Return deposits that have been active for longer than DEPOSIT_EXPIRY_NS (30 days).
@@ -1448,21 +1454,12 @@ persistent actor AegisBackend {
 
   // Monthly maintenance timer: sweep surplus & top-up cycles every 30 days
   func monthlyMaintenance() : async () {
-    let totalBalance = await ICP_LEDGER.icrc1_balance_of({
-      owner = Principal.fromActor(AegisBackend); subaccount = null;
-    });
-    let reserved = calcActiveStakeTotal();
-    let surplus = if (totalBalance > reserved + ICP_FEE) { totalBalance - reserved - ICP_FEE } else { 0 };
-    if (surplus > 0) {
-      await distributeProtocolRevenue(surplus + ICP_FEE);
-    };
+    ignore await doSweep();
   };
 
   ignore Timer.recurringTimer<system>(#seconds(30 * 24 * 60 * 60), monthlyMaintenance);
 
-  // ──────────────────────────────────────
-  // IC LLM Analysis (on-chain scoring)
-  // ──────────────────────────────────────
+  // — IC LLM Analysis (on-chain scoring) —
 
   func buildScoringPrompt(text : Text, userTopics : [Text]) : Text {
     let contentSlice = if (Text.size(text) > 3000) {
@@ -1591,7 +1588,7 @@ persistent actor AegisBackend {
   /// This is the free-tier scoring endpoint — no API key required.
   public shared(msg) func analyzeOnChain(text : Text, userTopics : [Text]) : async Result.Result<Types.OnChainAnalysis, Text> {
     let caller = msg.caller;
-    assert(requireAuth(caller));
+    requireAuthenticated(caller);
 
     if (Text.size(text) == 0) {
       return #err("Text is required");
@@ -1613,12 +1610,10 @@ persistent actor AegisBackend {
     parseAnalysisResponse(response);
   };
 
-  // ──────────────────────────────────────
-  // D2A Briefing Snapshots
-  // ──────────────────────────────────────
+  // — D2A Briefing Snapshots —
 
   public shared(msg) func saveLatestBriefing(briefingJson : Text) : async Bool {
-    if (not requireAuth(msg.caller)) { return false };
+    requireAuthenticated(msg.caller);
     if (Text.size(briefingJson) > 500_000) { return false }; // 500KB max
     let snapshot : Types.D2ABriefingSnapshot = {
       owner = msg.caller;
@@ -1676,9 +1671,7 @@ persistent actor AegisBackend {
     { items = Buffer.toArray(result); total = total };
   };
 
-  // ──────────────────────────────────────
-  // User Settings (cross-device sync)
-  // ──────────────────────────────────────
+  // — User Settings (cross-device sync) —
 
   public query func getUserSettings(p : Principal) : async ?Types.UserSettings {
     userSettings.get(p);
@@ -1686,7 +1679,7 @@ persistent actor AegisBackend {
 
   public shared(msg) func saveUserSettings(settings : Types.UserSettings) : async Bool {
     let caller = msg.caller;
-    if (not requireAuth(caller)) { return false };
+    requireAuthenticated(caller);
     userSettings.put(caller, {
       linkedNostrNpub = settings.linkedNostrNpub;
       linkedNostrPubkeyHex = settings.linkedNostrPubkeyHex;
@@ -1702,7 +1695,7 @@ persistent actor AegisBackend {
 
   public shared(msg) func saveUserPreferences(preferencesJson : Text, lastUpdated : Int) : async Bool {
     let caller = msg.caller;
-    if (not requireAuth(caller)) { return false };
+    requireAuthenticated(caller);
     if (Text.size(preferencesJson) > 500_000) { return false };
 
     switch (userPreferences.get(caller)) {
@@ -1721,13 +1714,12 @@ persistent actor AegisBackend {
     true;
   };
 
-  // ──────────────────────────────────────
-  // A2A OfferStore / ReceiptStore
-  // ──────────────────────────────────────
+  // — A2A OfferStore / ReceiptStore —
 
   let MAX_OFFER_TEXT : Nat = 10_000; // title + description size cap
 
-  public shared func put_offer(offer : Types.Offer) : async () {
+  public shared ({ caller }) func put_offer(offer : Types.Offer) : async () {
+    requireAuthenticated(caller);
     if (Text.size(offer.title) + Text.size(offer.description) > MAX_OFFER_TEXT) {
       Debug.trap("offer title + description exceeds 10KB");
     };
@@ -1750,7 +1742,8 @@ persistent actor AegisBackend {
     offers.get(id);
   };
 
-  public shared func delete_offer(id : Text) : async Bool {
+  public shared ({ caller }) func delete_offer(id : Text) : async Bool {
+    requireAuthenticated(caller);
     switch (offers.get(id)) {
       case (?_) { offers.delete(id); true };
       case null { false };
@@ -1758,7 +1751,8 @@ persistent actor AegisBackend {
   };
 
   // Skip if already verified — prevents grief by re-submission
-  public shared func submit_receipt(receipt : Types.Receipt) : async () {
+  public shared ({ caller }) func submit_receipt(receipt : Types.Receipt) : async () {
+    requireAuthenticated(caller);
     switch (receipts.get(receipt.txHash)) {
       case (?existing) { if (existing.verified) { return } };
       case null {};
@@ -1771,6 +1765,11 @@ persistent actor AegisBackend {
       amount = receipt.amount;
       verified = false;
     });
+  };
+
+  /// Get canister cycles balance for monitoring.
+  public query func getCyclesBalance() : async Nat {
+    ExperimentalCycles.balance();
   };
 
   public query func get_a2a_stats() : async { offerCount : Nat; receiptCount : Nat } {
@@ -1800,9 +1799,7 @@ persistent actor AegisBackend {
     };
   };
 
-  // ──────────────────────────────────────
-  // HTTP Interface (II alternative origins)
-  // ──────────────────────────────────────
+  // — HTTP Interface (II alternative origins) —
 
   public query func http_request(req : HTTP.HttpRequest) : async HTTP.HttpResponse {
     if (req.url == II_ORIGINS_PATH or Text.startsWith(req.url, #text(II_ORIGINS_PATH # "?"))) {

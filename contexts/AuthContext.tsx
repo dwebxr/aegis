@@ -85,7 +85,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const authed = await client.isAuthenticated();
       if (authed) {
         const id = client.getIdentity();
-        if (!isDelegationFresh(id)) {
+        const principalId = id.getPrincipal();
+        if (principalId.isAnonymous()) {
+          console.warn("[auth] Got anonymous principal after auth — treating as unauthenticated");
+          await client.logout();
+          setIsAuthenticated(false);
+          Sentry.setUser(null);
+        } else if (!isDelegationFresh(id)) {
           console.warn("[auth] Delegation expired — logging out");
           await client.logout();
           setIsAuthenticated(false);
@@ -94,8 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setIsAuthenticated(true);
           setIdentity(id);
-          setPrincipal(id.getPrincipal());
-          Sentry.setUser({ id: id.getPrincipal().toText() });
+          setPrincipal(principalId);
+          Sentry.setUser({ id: principalId.toText() });
         }
       } else {
         setIsAuthenticated(false);
@@ -117,14 +123,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1_000_000_000),
         onSuccess: () => {
           const id = authClient.getIdentity();
+          const principalId = id.getPrincipal();
+          if (principalId.isAnonymous()) {
+            addNotification("Login failed: received anonymous identity", "error");
+            reject(new Error("Authentication failed: received anonymous principal (2vxsx-fae)"));
+            return;
+          }
           setIdentity(id);
-          setPrincipal(id.getPrincipal());
+          setPrincipal(principalId);
           setIsAuthenticated(true);
-          Sentry.setUser({ id: id.getPrincipal().toText() });
+          Sentry.setUser({ id: principalId.toText() });
           resolve();
         },
         onError: (err) => {
-          reject(new Error(err));
+          const message = typeof err === "string" ? err : errMsg(err);
+          console.error("[auth] Login failed:", message);
+          addNotification(`Login failed: ${message}`, "error");
+          reject(new Error(message));
         },
       });
     });

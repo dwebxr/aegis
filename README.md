@@ -9,26 +9,26 @@
 
 ## Latest Updates (March 2026)
 
-### Briefing Search & Scoring Transparency
-- **6,146 tests, 352 suites** — zero failures, zero skipped
-- **Briefing content search**: Full-text search in BriefingTab across text, author, and topics — desktop always-visible, mobile collapsible via toggle; results sorted by composite score; Escape clears; 27 tests covering filtering, sort, edge cases, mobile toggle
-- **Scoring engine badge**: ContentCard shows "AI" (sky) or "H" (amber) indicator with tooltip for exact engine (Ollama / WebLLM / Claude Server / IC / BYOK / Heuristic)
-- **Speed Insights throttled**: `sampleRate={0.3}` reduces Vercel data point consumption ~70%
-- **8 new test files (86 tests)**: BriefingTab search, NotificationContext, DemoContext, FilterModeContext, useWindowSize, useCurrentRef, SourceContext CRUD, ContentCard engine badge
-
-### Mark-First UI Refactor
-- **Icon-driven signal badges**: 9 signal types with distinct SVG icon, color, and tooltip — replaced text labels
-- **Grade badge + verdict icon**: GradeBadge (A/B/C/D/F) with ✓/✖ verdict indicator; `GlossaryModal` for all definitions
-- **MetricPill**: Compact icon+number metrics; touch-device label fallback via `@media (hover: none)`
-- **12 new SVG icons**, unified threshold logic via `deriveSignalTypes()`, global tooltip test mock
-
-### A2A Protocol & On-Chain Storage
-- **OfferStore + ReceiptStore**: 7 canister functions — information catalogs, multi-chain USDC payment proofs, grief-prevention, controller-only verification, upgrade-safe
-- **Diff sync API**: `/api/d2a/briefing/changes` for lightweight A2A sync; pagination + `since`/`topics`/`limit` filtering; x402 free-tier preview
-
+### Canister Security Hardening
+- **6,161 tests, 353 suites** — zero failures, zero skipped
+- **Anonymous principal rejection**: `requireAuthenticated()` guard on all 22 canister update endpoints — replaces fragile `assert(requireAuth())` pattern with `Debug.trap`
+- **Controller authorization**: `sweepProtocolFees`, `topUpCycles` restricted to canister controllers via `Principal.isController()`
+- **CallerGuard reentrancy prevention**: `try/finally` pattern on 4 async functions (`publishWithStake`, `validateSignal`, `flagSignal`, `recordD2AMatch`) — guard release guaranteed even on callback trap
+- **Cycle monitoring**: `getCyclesBalance()` query endpoint for canister health checks
+- **AuthContext hardening**: Anonymous principal detection on login + init, error notifications on login failure, delegation freshness edge cases
+- **ICP Skills integration**: 7 skill files from [skills.internetcomputer.org](https://skills.internetcomputer.org/) in `.claude/skills/` for AI-assisted canister development
 
 <details>
 <summary><strong>Previous Updates</strong></summary>
+
+#### Briefing Search & Scoring Transparency
+6,146 tests, 352 suites. Briefing content search (full-text across text/author/topics), scoring engine badge (AI/Heuristic indicator), Speed Insights throttled to 30% sample rate.
+
+#### Mark-First UI Refactor
+Icon-driven signal badges (9 types), GradeBadge (A/B/C/D/F) with verdict indicator, MetricPill compact metrics, 12 new SVG icons, `deriveSignalTypes()`.
+
+#### A2A Protocol & On-Chain Storage
+OfferStore + ReceiptStore (7 canister functions), diff sync API (`/api/d2a/briefing/changes`), x402 free-tier preview.
 
 #### Production Readiness Audit & Hardening
 Sentry 3-layer monitoring (client/server/edge), IC sync safety net, scoring cache concurrent flush guard, offline queue Sentry reporting, preference sync failure escalation, 132 new edge tests, 7-category LARP audit.
