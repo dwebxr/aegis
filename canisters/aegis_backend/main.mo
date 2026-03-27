@@ -143,7 +143,7 @@ persistent actor AegisBackend {
 
   let II_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
   let II_ORIGINS_BODY : Blob = Text.encodeUtf8(
-    "{\"alternativeOrigins\":[\"https://aegis.dwebxr.xyz\",\"https://aegis-kappa-eight.vercel.app\",\"https://aegis-ai.xyz\"]}"
+    "{\"alternativeOrigins\":[\"https://aegis.dwebxr.xyz\",\"https://aegis-kappa-eight.vercel.app\",\"https://aegis-ai.xyz\",\"https://www.aegis-ai.xyz\"]}"
   );
 
   transient var certCache = CertifiedCache.CertifiedCache<Text, Blob>(

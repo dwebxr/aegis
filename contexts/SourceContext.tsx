@@ -14,6 +14,33 @@ import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
 import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
 import { getSourceKey, resetSourceErrors } from "@/lib/ingestion/sourceState";
 
+/** Content identity key: rss:{feedUrl}, nostr:{sorted relays}, fc:{fid}. */
+function contentKey(s: SavedSource): string {
+  if (s.type === "rss") return `rss:${s.feedUrl || s.id}`;
+  if (s.type === "nostr") return `nostr:${(s.relays || []).slice().sort().join(",")}`;
+  if (s.type === "farcaster") return `fc:${s.fid || s.id}`;
+  return `unknown:${s.id}`;
+}
+
+function isContentKey(entry: string): boolean {
+  return entry.startsWith("rss:") || entry.startsWith("nostr:") || entry.startsWith("fc:") || entry.startsWith("unknown:");
+}
+
+/** Deduplicate sources by content identity. Keeps the first occurrence. */
+function dedup(sources: SavedSource[]): SavedSource[] {
+  const seen = new Set<string>();
+  return sources.filter(s => {
+    const key = contentKey(s);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isDeletePending(s: SavedSource, pending: Set<string>): boolean {
+  return pending.has(s.id) || pending.has(contentKey(s));
+}
+
 export type SchedulerSource = { type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform };
 
 interface SourceState {
@@ -85,14 +112,12 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     }
 
     let cancelled = false;
+    const pendingDeletes = pendingDeletesRef.current;
 
     // Restore pending deletes from localStorage so deletions survive tab close
-    const restoredDeletes = loadPendingDeletes(principalText);
-    for (const id of restoredDeletes) pendingDeletesRef.current.add(id);
+    for (const id of loadPendingDeletes(principalText)) pendingDeletes.add(id);
 
-    // Load local sources, filtering out pending deletions and deduplicating
-    const local = dedup(loadSources(principalText).filter(s => !pendingDeletesRef.current.has(s.id)));
-    setSources(local);
+    setSources(dedup(loadSources(principalText).filter(s => !isDeletePending(s, pendingDeletes))));
 
     const doSync = async () => {
       let actor: _SERVICE;
@@ -115,40 +140,48 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       try {
         const principal = identity.getPrincipal();
 
-        const pendingDeletes = pendingDeletesRef.current;
+        // Flush pending deletes (only real IDs, not content keys)
         if (pendingDeletes.size > 0) {
-          const toDelete = Array.from(pendingDeletes);
-          const results = await Promise.allSettled(
-            toDelete.map(id => actor.deleteSourceConfig(id))
-          );
-          if (cancelled) return;
-          results.forEach((res, idx) => {
-            if (res.status === "fulfilled") pendingDeletes.delete(toDelete[idx]);
-            else console.warn("[sources] pending delete failed:", toDelete[idx], errMsg(res.reason));
-          });
-          savePendingDeletes(principalText, pendingDeletes);
+          const idsToDelete = Array.from(pendingDeletes).filter(e => !isContentKey(e));
+          if (idsToDelete.length > 0) {
+            const results = await Promise.allSettled(
+              idsToDelete.map(id => actor.deleteSourceConfig(id))
+            );
+            if (cancelled) return;
+            results.forEach((res, idx) => {
+              if (res.status === "fulfilled") pendingDeletes.delete(idsToDelete[idx]);
+              else console.warn("[sources] pending delete failed:", idsToDelete[idx], errMsg(res.reason));
+            });
+          }
         }
 
         const icConfigs = await actor.getUserSourceConfigs(principal);
         if (cancelled) return;
 
-        const icSources = dedup(icConfigs.map(icToSaved)
-          .filter((s): s is SavedSource => s !== null)
-          .filter(s => !pendingDeletes.has(s.id)));
-        let localOnly: SavedSource[] = [];
-        setSources(prev => {
-          const icIds = new Set(icSources.map(s => s.id));
-          const localById = new Map(prev.map(s => [s.id, s]));
-          localOnly = prev.filter(s => !icIds.has(s.id) && !pendingDeletes.has(s.id));
-          for (const ic of icSources) {
-            if (!ic.platform) {
-              ic.platform = localById.get(ic.id)?.platform || inferPlatform(ic) || undefined;
-            }
+        const allIcSources = icConfigs.map(icToSaved).filter((s): s is SavedSource => s !== null);
+        const icSources = dedup(allIcSources.filter(s => !isDeletePending(s, pendingDeletes)));
+
+        // Clean up stale content keys (no longer present on IC)
+        const icContentKeys = new Set(allIcSources.map(contentKey));
+        for (const entry of pendingDeletes) {
+          if (isContentKey(entry) && !icContentKeys.has(entry)) pendingDeletes.delete(entry);
+        }
+        savePendingDeletes(principalText, pendingDeletes);
+
+        // Compute localOnly from ref (always latest committed state) to avoid
+        // React 18 batching issues where setSources updater runs after this scope
+        const currentSources = sourcesRef.current;
+        const icIds = new Set(icSources.map(s => s.id));
+        const localById = new Map(currentSources.map(s => [s.id, s]));
+        const localOnly = currentSources.filter(s => !icIds.has(s.id) && !isDeletePending(s, pendingDeletes));
+        for (const ic of icSources) {
+          if (!ic.platform) {
+            ic.platform = localById.get(ic.id)?.platform || inferPlatform(ic);
           }
-          const merged = [...icSources, ...localOnly];
-          saveSources(principalText, merged);
-          return merged;
-        });
+        }
+        const merged = [...icSources, ...localOnly];
+        saveSources(principalText, merged);
+        setSources(merged);
         let pushFailed = false;
         await Promise.all(
           localOnly.map(localSource =>
@@ -195,17 +228,17 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
 
   const addSource = useCallback((partial: Omit<SavedSource, "id" | "createdAt">): boolean => {
     if (isDemoMode) return false;
-    // Duplicate check: same feedUrl (RSS) or same relays (Nostr)
-    const existing = sourcesRef.current;
-    if (partial.type === "rss" && partial.feedUrl) {
-      if (existing.some(s => s.type === "rss" && s.feedUrl === partial.feedUrl)) return false;
-    } else if (partial.type === "nostr" && partial.relays) {
-      const key = [...partial.relays].sort().join(",");
-      if (existing.some(s => s.type === "nostr" && s.relays && [...s.relays].sort().join(",") === key)) return false;
-    } else if (partial.type === "farcaster" && partial.fid) {
-      if (existing.some(s => s.type === "farcaster" && s.fid === partial.fid)) return false;
-    }
+    const candidate = { ...partial, id: "", createdAt: 0 } as SavedSource;
+    const ck = contentKey(candidate);
+    if (sourcesRef.current.some(s => contentKey(s) === ck)) return false;
+
     const source: SavedSource = { ...partial, id: uuidv4(), createdAt: Date.now() };
+    // Clear any pending delete for this content key so re-added sources aren't filtered
+    if (pendingDeletesRef.current.has(ck)) {
+      pendingDeletesRef.current.delete(ck);
+      const pt = principalTextRef.current;
+      if (pt) savePendingDeletes(pt, pendingDeletesRef.current);
+    }
     setSources(prev => {
       const next = [...prev, source];
       persist(next);
@@ -231,8 +264,9 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       persist(next);
       return next;
     });
-    // Track deletion so it survives tab close and IC sync re-fetch
+    // Track deletion by both ID and content key so IC sources with different IDs are also caught
     pendingDeletesRef.current.add(id);
+    if (toRemove) pendingDeletesRef.current.add(contentKey(toRemove));
     const pt = principalTextRef.current;
     if (pt) savePendingDeletes(pt, pendingDeletesRef.current);
 
@@ -256,44 +290,35 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
 
   const toggleSource = useCallback((id: string) => {
     if (isDemoMode) return;
-    let toggled: SavedSource | undefined;
+    // Compute toggled from ref to avoid React 18 batching issues with setSources updater
+    const current = sourcesRef.current.find(s => s.id === id);
+    if (!current) return;
+    const toggled = { ...current, enabled: !current.enabled };
     setSources(prev => {
-      const next = prev.map(s => {
-        if (s.id !== id) return s;
-        const updated = { ...s, enabled: !s.enabled };
-        toggled = updated;
-        return updated;
-      });
+      const next = prev.map(s => s.id === id ? toggled : s);
       persist(next);
       return next;
     });
-    queueMicrotask(() => {
-      if (toggled) {
-        saveToIC(toggled);
-        if (toggled.enabled) {
-          const config: Record<string, string> = {};
-          if (toggled.feedUrl) config.feedUrl = toggled.feedUrl;
-          if (toggled.relays) config.relays = toggled.relays.join(",");
-          resetSourceErrors(getSourceKey(toggled.type, config));
-        }
-      }
-    });
+    saveToIC(toggled);
+    if (toggled.enabled) {
+      const config: Record<string, string> = {};
+      if (toggled.feedUrl) config.feedUrl = toggled.feedUrl;
+      if (toggled.relays) config.relays = toggled.relays.join(",");
+      resetSourceErrors(getSourceKey(toggled.type, config));
+    }
   }, [persist, isDemoMode, saveToIC]);
 
   const updateSource = useCallback((id: string, partial: Partial<Pick<SavedSource, "label" | "feedUrl" | "relays" | "pubkeys">>) => {
     if (isDemoMode) return;
-    let updated: SavedSource | undefined;
+    const current = sourcesRef.current.find(s => s.id === id);
+    if (!current) return;
+    const updated = { ...current, ...partial };
     setSources(prev => {
-      const next = prev.map(s => {
-        if (s.id !== id) return s;
-        const merged = { ...s, ...partial };
-        updated = merged;
-        return merged;
-      });
+      const next = prev.map(s => s.id === id ? updated : s);
       persist(next);
       return next;
     });
-    queueMicrotask(() => { if (updated) saveToIC(updated); });
+    saveToIC(updated);
   }, [persist, isDemoMode, saveToIC]);
 
   const getSchedulerSources = useCallback((): SchedulerSource[] => {
@@ -338,22 +363,6 @@ export function useSources() {
   return useContext(SourceContext);
 }
 
-/** Deduplicate sources by content identity (feedUrl for RSS, sorted relays for Nostr, fid for Farcaster). Keeps the first occurrence. */
-function dedup(sources: SavedSource[]): SavedSource[] {
-  const seen = new Set<string>();
-  return sources.filter(s => {
-    let key: string;
-    if (s.type === "rss") key = `rss:${s.feedUrl || s.id}`;
-    else if (s.type === "nostr") key = `nostr:${(s.relays || []).slice().sort().join(",")}`;
-    else if (s.type === "farcaster") key = `fc:${s.fid || s.id}`;
-    else key = s.id;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-// IC <-> SavedSource conversion helpers
 function savedToIC(s: SavedSource, owner: import("@dfinity/principal").Principal): SourceConfigEntry {
   const config: Record<string, unknown> = {};
   if (s.feedUrl) config.feedUrl = s.feedUrl;
