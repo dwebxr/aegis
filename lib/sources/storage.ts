@@ -2,6 +2,29 @@ import type { SavedSource, SourcePlatform } from "@/lib/types/sources";
 import { errMsg } from "@/lib/utils/errors";
 
 const KEY_PREFIX = "aegis_sources_";
+const DELETES_PREFIX = "aegis_pending_deletes_";
+
+export function loadPendingDeletes(principalId: string): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DELETES_PREFIX + principalId);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((id): id is string => typeof id === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+export function savePendingDeletes(principalId: string, ids: Set<string>): void {
+  if (typeof window === "undefined") return;
+  if (ids.size === 0) {
+    localStorage.removeItem(DELETES_PREFIX + principalId);
+  } else {
+    localStorage.setItem(DELETES_PREFIX + principalId, JSON.stringify([...ids]));
+  }
+}
 
 export function inferPlatform(s: SavedSource): SourcePlatform | undefined {
   if (s.type === "farcaster") return "farcaster";

@@ -7,7 +7,7 @@ import { useDemo } from "./DemoContext";
 import { DEMO_SOURCES } from "@/lib/demo/sources";
 import { useNotify } from "./NotificationContext";
 import { createBackendActorAsync } from "@/lib/ic/actor";
-import { loadSources, saveSources, inferPlatform } from "@/lib/sources/storage";
+import { loadSources, saveSources, inferPlatform, loadPendingDeletes, savePendingDeletes } from "@/lib/sources/storage";
 import type { SavedSource } from "@/lib/types/sources";
 import { SOURCE_PLATFORMS } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
@@ -85,7 +85,13 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     }
 
     let cancelled = false;
-    const local = loadSources(principalText);
+
+    // Restore pending deletes from localStorage so deletions survive tab close
+    const restoredDeletes = loadPendingDeletes(principalText);
+    for (const id of restoredDeletes) pendingDeletesRef.current.add(id);
+
+    // Load local sources, filtering out any that are pending deletion
+    const local = loadSources(principalText).filter(s => !pendingDeletesRef.current.has(s.id));
     setSources(local);
 
     const doSync = async () => {
@@ -120,6 +126,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
             if (res.status === "fulfilled") pendingDeletes.delete(toDelete[idx]);
             else console.warn("[sources] pending delete failed:", toDelete[idx], errMsg(res.reason));
           });
+          savePendingDeletes(principalText, pendingDeletes);
         }
 
         const icConfigs = await actor.getUserSourceConfigs(principal);
@@ -132,7 +139,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         setSources(prev => {
           const icIds = new Set(icSources.map(s => s.id));
           const localById = new Map(prev.map(s => [s.id, s]));
-          localOnly = prev.filter(s => !icIds.has(s.id));
+          localOnly = prev.filter(s => !icIds.has(s.id) && !pendingDeletes.has(s.id));
           for (const ic of icSources) {
             if (!ic.platform) {
               ic.platform = localById.get(ic.id)?.platform || inferPlatform(ic) || undefined;
@@ -224,19 +231,25 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       persist(next);
       return next;
     });
+    // Track deletion so it survives tab close and IC sync re-fetch
+    pendingDeletesRef.current.add(id);
+    const pt = principalTextRef.current;
+    if (pt) savePendingDeletes(pt, pendingDeletesRef.current);
+
     const actor = getActor();
     if (actor) {
       actor.deleteSourceConfig(id)
-        .then(() => { pendingDeletesRef.current.delete(id); })
+        .then(() => {
+          pendingDeletesRef.current.delete(id);
+          if (pt) savePendingDeletes(pt, pendingDeletesRef.current);
+        })
         .catch((err: unknown) => {
           console.error("[sources] IC delete failed:", errMsg(err));
-          pendingDeletesRef.current.add(id);
           setSyncStatus("error");
           setSyncError("Failed to delete source from IC");
           addNotification("Source removed locally but IC sync failed", "error");
         });
     } else if (isAuthRef.current) {
-      pendingDeletesRef.current.add(id);
       addNotification("Source removed locally — IC sync pending", "info");
     }
   }, [persist, isDemoMode, addNotification]);
