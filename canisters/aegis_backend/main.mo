@@ -143,7 +143,7 @@ persistent actor AegisBackend {
 
   let II_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
   let II_ORIGINS_BODY : Blob = Text.encodeUtf8(
-    "{\"alternativeOrigins\":[\"https://aegis.dwebxr.xyz\",\"https://aegis-kappa-eight.vercel.app\"]}"
+    "{\"alternativeOrigins\":[\"https://aegis.dwebxr.xyz\",\"https://aegis-kappa-eight.vercel.app\",\"https://aegis-ai.xyz\"]}"
   );
 
   transient var certCache = CertifiedCache.CertifiedCache<Text, Blob>(
@@ -154,7 +154,11 @@ persistent actor AegisBackend {
   );
 
   func initCertCache() {
-    certCache.put(II_ORIGINS_PATH, II_ORIGINS_BODY, null);
+    // Use local value to bypass persistent actor's stale let binding
+    let currentOrigins : Blob = Text.encodeUtf8(
+      "{\"alternativeOrigins\":[\"https://aegis.dwebxr.xyz\",\"https://aegis-kappa-eight.vercel.app\",\"https://aegis-ai.xyz\",\"https://www.aegis-ai.xyz\"]}"
+    );
+    certCache.put(II_ORIGINS_PATH, currentOrigins, null);
   };
 
   initCertCache();

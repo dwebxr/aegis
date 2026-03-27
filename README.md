@@ -9,6 +9,11 @@
 
 ## Latest Updates (March 2026)
 
+### Domain Migration
+- **New primary domain**: `aegis-ai.xyz` — all traffic redirected from `www.aegis-ai.xyz`
+- **Internet Identity**: `alternativeOrigins` updated for `aegis-ai.xyz` + `www.aegis-ai.xyz`
+- **Persistent actor workaround**: `initCertCache()` uses local variable to bypass stale `let` binding on canister upgrade
+
 ### Canister Security Hardening
 - **6,161 tests, 353 suites** — zero failures, zero skipped
 - **Anonymous principal rejection**: `requireAuthenticated()` guard on all 22 canister update endpoints — replaces fragile `assert(requireAuth())` pattern with `Debug.trap`
@@ -79,7 +84,7 @@ Action/observation separation (Dashboard vs Analytics), Activity Trends + Topic 
 
 ## Live
 
-- **Frontend**: https://aegis.dwebxr.xyz
+- **Frontend**: https://aegis-ai.xyz (alias: https://aegis.dwebxr.xyz)
 - **Backend Canister**: [`rluf3-eiaaa-aaaam-qgjuq-cai`](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=rluf3-eiaaa-aaaam-qgjuq-cai)
 - **Repository**: https://github.com/dwebxr/aegis
 
@@ -89,7 +94,7 @@ Aegis is **free to use** for content filtering. No wallet, no deposit, no setup 
 
 ### Getting Started
 
-1. **Open** https://aegis.dwebxr.xyz — Demo mode starts immediately with preset feeds
+1. **Open** https://aegis-ai.xyz — Demo mode starts immediately with preset feeds
 2. **Browse** the Dashboard — 3 preset RSS feeds (Hacker News, CoinDesk, The Verge) are auto-fetched and scored
 3. **Login** with Internet Identity — unlocks custom sources, Pro mode, and publishing
 4. **Add Sources** in the Sources tab — use Quick Add presets (YouTube, Topic, GitHub, Bluesky, Reddit, Mastodon, Farcaster) or paste any RSS/Atom feed URL
@@ -215,7 +220,7 @@ Aegis uses a multi-tier scoring pipeline with automatic fallback. The system tri
 
 When enabled in Settings > Feeds, **Ollama** (or any OpenAI-compatible local LLM server) is tried **first** — before any other tier. It calls `POST /v1/chat/completions` on your local server (default `http://localhost:11434`). Zero cost, zero latency, fully private — no data leaves your machine. Configure the endpoint and model in Settings > Feeds.
 
-**Setup**: Install [Ollama](https://ollama.ai), pull a model (`ollama pull llama3.2`), and start the server. Set `OLLAMA_ORIGINS=*` (or `OLLAMA_ORIGINS=https://aegis.dwebxr.xyz`) to allow cross-origin requests from the browser. Any OpenAI-compatible server (LM Studio, llama.cpp server, vLLM, etc.) works — just set the endpoint in Settings.
+**Setup**: Install [Ollama](https://ollama.ai), pull a model (`ollama pull llama3.2`), and start the server. Set `OLLAMA_ORIGINS=*` (or `OLLAMA_ORIGINS=https://aegis-ai.xyz`) to allow cross-origin requests from the browser. Any OpenAI-compatible server (LM Studio, llama.cpp server, vLLM, etc.) works — just set the endpoint in Settings.
 
 If Ollama is not enabled or fails, the system falls through to Tier 1.
 
@@ -1117,8 +1122,8 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=...      # VAPID public key
 VAPID_PRIVATE_KEY=...                 # VAPID private key
 VAPID_SUBJECT=mailto:admin@example.com
 
-# Canonical app URL (optional — defaults to https://aegis.dwebxr.xyz)
-NEXT_PUBLIC_APP_URL=https://aegis.dwebxr.xyz
+# Canonical app URL (optional — defaults to https://aegis-ai.xyz)
+NEXT_PUBLIC_APP_URL=https://aegis-ai.xyz
 
 # D2A CORS (optional — defaults to ICP canister + app URL)
 D2A_CORS_ORIGINS=https://example.com,https://other.com
