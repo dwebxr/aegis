@@ -48,7 +48,7 @@ const HEALTH_BG: Record<string, string> = {
   rate_limited: "bg-sky-400",
 };
 
-const inputClass = "w-full bg-navy-lighter border border-border rounded-md px-4 py-3 text-secondary-foreground text-body-sm font-[inherit] outline-none box-border";
+const inputClass = "w-full bg-card border border-border rounded-md px-4 py-3 text-foreground text-body-sm font-[inherit] outline-none box-border";
 
 const btnClass = (disabled: boolean, loading: boolean) => cn(
   "px-5 py-3 rounded-md text-white text-body-sm font-bold whitespace-nowrap transition-fast border-none",
