@@ -90,8 +90,8 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     const restoredDeletes = loadPendingDeletes(principalText);
     for (const id of restoredDeletes) pendingDeletesRef.current.add(id);
 
-    // Load local sources, filtering out any that are pending deletion
-    const local = loadSources(principalText).filter(s => !pendingDeletesRef.current.has(s.id));
+    // Load local sources, filtering out pending deletions and deduplicating
+    const local = dedup(loadSources(principalText).filter(s => !pendingDeletesRef.current.has(s.id)));
     setSources(local);
 
     const doSync = async () => {
@@ -132,9 +132,9 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
         const icConfigs = await actor.getUserSourceConfigs(principal);
         if (cancelled) return;
 
-        const icSources = icConfigs.map(icToSaved)
+        const icSources = dedup(icConfigs.map(icToSaved)
           .filter((s): s is SavedSource => s !== null)
-          .filter(s => !pendingDeletes.has(s.id));
+          .filter(s => !pendingDeletes.has(s.id)));
         let localOnly: SavedSource[] = [];
         setSources(prev => {
           const icIds = new Set(icSources.map(s => s.id));
@@ -336,6 +336,21 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
 
 export function useSources() {
   return useContext(SourceContext);
+}
+
+/** Deduplicate sources by content identity (feedUrl for RSS, sorted relays for Nostr, fid for Farcaster). Keeps the first occurrence. */
+function dedup(sources: SavedSource[]): SavedSource[] {
+  const seen = new Set<string>();
+  return sources.filter(s => {
+    let key: string;
+    if (s.type === "rss") key = `rss:${s.feedUrl || s.id}`;
+    else if (s.type === "nostr") key = `nostr:${(s.relays || []).slice().sort().join(",")}`;
+    else if (s.type === "farcaster") key = `fc:${s.fid || s.id}`;
+    else key = s.id;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // IC <-> SavedSource conversion helpers
