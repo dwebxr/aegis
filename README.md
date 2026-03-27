@@ -9,13 +9,19 @@
 
 ## Latest Updates (March 2026)
 
+### Source Deletion Persistence & Light Mode
+- **6,215 tests, 355 suites** — zero failures, zero skipped
+- **Content-key deletion**: `pendingDeletes` tracks both ID and content key (`rss:{feedUrl}`, `fc:{fid}`) — blocks IC sources with different IDs but same feed from reappearing
+- **React 18 batching fix**: `localOnly`, `toggled`, `updated` computed from `sourcesRef.current` instead of `setSources` updater closure
+- **Light mode theme persistence**: head script always sets `data-theme` attribute before hydration
+- **Light mode readability**: navy CSS variables overridden with slate equivalents in light theme
+
 ### Domain Migration
 - **New primary domain**: `aegis-ai.xyz` — all traffic redirected from `www.aegis-ai.xyz`
 - **Internet Identity**: `alternativeOrigins` updated for `aegis-ai.xyz` + `www.aegis-ai.xyz`
-- **Persistent actor workaround**: `initCertCache()` uses local variable to bypass stale `let` binding on canister upgrade
 
 ### Canister Security Hardening
-- **6,161 tests, 353 suites** — zero failures, zero skipped
+- **Anonymous principal rejection**: `requireAuthenticated()` guard on all 22 canister update endpoints
 - **Anonymous principal rejection**: `requireAuthenticated()` guard on all 22 canister update endpoints — replaces fragile `assert(requireAuth())` pattern with `Debug.trap`
 - **Controller authorization**: `sweepProtocolFees`, `topUpCycles` restricted to canister controllers via `Principal.isController()`
 - **CallerGuard reentrancy prevention**: `try/finally` pattern on 4 async functions (`publishWithStake`, `validateSignal`, `flagSignal`, `recordD2AMatch`) — guard release guaranteed even on callback trap
