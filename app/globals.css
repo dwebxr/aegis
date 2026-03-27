@@ -287,6 +287,13 @@
   --color-text-muted: #64748b;
   --color-text-disabled: #94a3b8;
   --color-scrollbar: #cbd5e1;
+
+  /* Navy overrides — light-friendly equivalents */
+  --color-navy: #e2e8f0;
+  --color-navy-light: #e9edf4;
+  --color-navy-lighter: #f1f5f9;
+  --color-navy-surface: #e2e8f0;
+  --color-navy-hover: #cbd5e1;
 }
 
 /* ── Base Styles ─────────────────────────────────────────── */
