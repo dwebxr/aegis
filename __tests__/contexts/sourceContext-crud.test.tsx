@@ -88,7 +88,6 @@ describe("SourceContext — addSource", () => {
 
   it("rejects duplicate RSS source with same feedUrl", () => {
     renderWithProvider();
-    let result: boolean | undefined;
 
     act(() => { screen.getByTestId("add-rss").click(); });
     expect(screen.getByTestId("count").textContent).toBe("1");
