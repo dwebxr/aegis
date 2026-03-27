@@ -142,7 +142,6 @@ persistent actor AegisBackend {
   // — II Alternative Origins (certified HTTP) —
 
   let II_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
-  // Persistent actor field — stale after upgrade. Runtime value is in initCertCache() below.
   let II_ORIGINS_BODY : Blob = Text.encodeUtf8(
     "{\"alternativeOrigins\":[\"https://aegis.dwebxr.xyz\",\"https://aegis-kappa-eight.vercel.app\",\"https://aegis-ai.xyz\",\"https://www.aegis-ai.xyz\"]}"
   );

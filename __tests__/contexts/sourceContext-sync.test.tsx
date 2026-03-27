@@ -691,3 +691,43 @@ describe("isContentKey and contentKey edge cases (via pendingDeletes behavior)",
     expect(mockDeleteSourceConfig).not.toHaveBeenCalled();
   });
 });
+
+// ─── removeSource IC delete lifecycle ───
+
+describe("removeSource IC delete lifecycle", () => {
+  it("IC delete success clears ID from pendingDeletes", async () => {
+    mockDeleteSourceConfig.mockResolvedValue(true);
+    mockGetUserSourceConfigs.mockResolvedValue([
+      makeICSource({ id: "del-ok", configJson: JSON.stringify({ label: "Feed", feedUrl: "https://del-ok.com/feed" }) }),
+    ]);
+    renderAuth();
+    await waitFor(() => expect(captured.syncStatus).toBe("synced"));
+
+    await act(async () => { screen.getByTestId("remove-first").click(); });
+    // Wait for async .then() to execute
+    await act(async () => { await new Promise(r => setTimeout(r, 50)); });
+    // ID must be cleared; content key may remain
+    const pending = deleteStore.get(PRINCIPAL_TEXT);
+    expect(!pending || !pending.has("del-ok")).toBe(true);
+  });
+
+  it("IC delete failure keeps ID in pendingDeletes and notifies", async () => {
+    mockDeleteSourceConfig.mockRejectedValue(new Error("network"));
+    mockGetUserSourceConfigs.mockResolvedValue([
+      makeICSource({ id: "del-fail", configJson: JSON.stringify({ label: "Feed", feedUrl: "https://del-fail.com/feed" }) }),
+    ]);
+    renderAuth();
+    await waitFor(() => expect(captured.syncStatus).toBe("synced"));
+    mockAddNotification.mockClear();
+
+    await act(async () => { screen.getByTestId("remove-first").click(); });
+    await act(async () => { await new Promise(r => setTimeout(r, 50)); });
+
+    const pending = deleteStore.get(PRINCIPAL_TEXT);
+    expect(pending).toBeDefined();
+    expect(pending!.has("del-fail")).toBe(true);
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      "Source removed locally but IC sync failed", "error"
+    );
+  });
+});
