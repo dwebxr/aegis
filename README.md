@@ -7,9 +7,18 @@
   </p>
 </div>
 
-## Latest Updates (March 2026)
+## Latest Updates (April 2026)
 
-### Source Deletion Persistence & Light Mode
+### OPML Import / Export
+- **6,277 tests, 357 suites** — zero failures, zero skipped
+- **OPML import**: Import feeds from Feedly, Inoreader, or any RSS reader — parses nested folder structures, validates URLs (http/https only, 2048 char limit), deduplicates against existing sources, 500 feed / 1 MB file limits
+- **OPML export**: Export all RSS sources as OPML 2.0 XML — grouped by platform folder (YouTube, GitHub, etc.), special character XML escaping, one-click `.opml` download
+- **Demo mode**: Import disabled in demo mode (matching existing read-only pattern)
+
+<details>
+<summary><strong>Previous Updates</strong></summary>
+
+### Source Deletion Persistence & Light Mode (March 2026)
 - **6,215 tests, 355 suites** — zero failures, zero skipped
 - **Content-key deletion**: `pendingDeletes` tracks both ID and content key (`rss:{feedUrl}`, `fc:{fid}`) — blocks IC sources with different IDs but same feed from reappearing
 - **React 18 batching fix**: `localOnly`, `toggled`, `updated` computed from `sourcesRef.current` instead of `setSources` updater closure
@@ -28,9 +37,6 @@
 - **Cycle monitoring**: `getCyclesBalance()` query endpoint for canister health checks
 - **AuthContext hardening**: Anonymous principal detection on login + init, error notifications on login failure, delegation freshness edge cases
 - **ICP Skills integration**: 7 skill files from [skills.internetcomputer.org](https://skills.internetcomputer.org/) in `.claude/skills/` for AI-assisted canister development
-
-<details>
-<summary><strong>Previous Updates</strong></summary>
 
 #### Briefing Search & Scoring Transparency
 6,146 tests, 352 suites. Briefing content search (full-text across text/author/topics), scoring engine badge (AI/Heuristic indicator), Speed Insights throttled to 30% sample rate.
@@ -884,6 +890,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Adaptive fetch intervals (scales with source activity, exponential backoff on errors)
 - Auto-disable after 5 consecutive failures with user notification
 - CSV export with RFC-compliant escaping (handles commas, quotes, newlines in all fields)
+- OPML import/export — migrate feeds from Feedly, Inoreader, or any RSS reader; export as OPML 2.0 with platform folders
 
 ## Tech Stack
 

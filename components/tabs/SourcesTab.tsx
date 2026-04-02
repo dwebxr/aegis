@@ -15,6 +15,7 @@ import { loadSourceStates, resetSourceErrors, type SourceRuntimeState, getSource
 import { relativeTime } from "@/lib/utils/scores";
 import { getSuggestions, dismissSuggestion, discoverFeed as discoverFeedForDomain, type DomainValidation } from "@/lib/sources/discovery";
 import { isTimeout } from "@/lib/utils/errors";
+import { OpmlImportExport } from "@/components/sources/OpmlImportExport";
 
 interface SourcesTabProps {
   onAnalyze: (text: string, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
@@ -871,6 +872,9 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             ))}
           </div>
         )}
+
+      {/* OPML Import / Export */}
+      <OpmlImportExport />
 
       {/* Saved Sources List */}
       {sources.length > 0 && (
