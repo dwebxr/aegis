@@ -63,7 +63,7 @@ function AegisAppInner() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
   const { content, isAnalyzing, syncStatus, cacheChecked, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, pendingCount, clearDemoContent, patchItem, actorRef } = useContent();
-  const { translateItem, isItemTranslating, autoTranslate } = useTranslation(content, patchItem, actorRef);
+  const { translateItem, isItemTranslating } = useTranslation(content, patchItem, actorRef);
   const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
@@ -95,14 +95,6 @@ function AegisAppInner() {
     // sessionStorage may throw in SSR or restrictive privacy modes; default to not-dismissed
     try { return sessionStorage.getItem("aegis-wot-prompt-dismissed") === "true"; } catch { return false; }
   });
-
-  // Auto-translate content based on policy (high_quality or all)
-  useEffect(() => {
-    for (const item of content) {
-      if (item.translation) continue;
-      autoTranslate(item);
-    }
-  }, [content, autoTranslate]);
 
   // One-time migration from localStorage to IndexedDB + scoring cache init
   useEffect(() => {

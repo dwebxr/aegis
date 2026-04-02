@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotify } from "@/contexts/NotificationContext";
@@ -11,12 +11,8 @@ import { errMsg } from "@/lib/utils/errors";
 const MAX_CONCURRENT = 3;
 
 interface UseTranslationReturn {
-  /** Translate a single item by ID */
   translateItem: (itemId: string) => void;
-  /** Check if a given item is currently being translated */
   isItemTranslating: (itemId: string) => boolean;
-  /** Process items after scoring — auto-translate based on policy */
-  autoTranslate: (item: ContentItem) => void;
 }
 
 export function useTranslation(
@@ -27,92 +23,108 @@ export function useTranslation(
   const { profile } = usePreferences();
   const { isAuthenticated } = useAuth();
   const { addNotification } = useNotify();
-  const [translating, setTranslating] = useState<Set<string>>(new Set());
-  const translatingRef = useRef(translating);
-  translatingRef.current = translating;
-
-  const queueRef = useRef<ContentItem[]>([]);
-  const processingRef = useRef(false);
-  // "skip" items: content already in target language — don't re-queue.
-  // Keyed by targetLanguage so language changes reset.
-  const skippedRef = useRef<{ lang: string; ids: Set<string> }>({ lang: "", ids: new Set() });
+  const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
 
   const prefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
 
-  if (skippedRef.current.lang !== prefs.targetLanguage) {
-    skippedRef.current = { lang: prefs.targetLanguage, ids: new Set() };
+  // Refs for stable access inside async functions without re-renders
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  const authRef = useRef(isAuthenticated);
+  authRef.current = isAuthenticated;
+  const patchRef = useRef(patchItem);
+  patchRef.current = patchItem;
+  const notifyRef = useRef(addNotification);
+  notifyRef.current = addNotification;
+
+  // Track attempted items to avoid infinite retry (keyed by target language)
+  const attemptedRef = useRef<{ lang: string; skip: Set<string>; failed: Set<string> }>({
+    lang: "", skip: new Set(), failed: new Set(),
+  });
+  if (attemptedRef.current.lang !== prefs.targetLanguage) {
+    attemptedRef.current = { lang: prefs.targetLanguage, skip: new Set(), failed: new Set() };
   }
 
-  const doTranslate = useCallback(async (item: ContentItem) => {
-    if (item.translation) return;
-    if (translatingRef.current.has(item.id)) return;
+  // Active translation count for concurrency control
+  const activeRef = useRef(0);
 
-    setTranslating(prev => new Set(prev).add(item.id));
-
+  const runTranslation = useCallback(async (item: ContentItem) => {
+    const p = prefsRef.current;
     const opts: TranslateOptions = {
       text: item.text,
       reason: item.reason,
-      targetLanguage: prefs.targetLanguage,
-      backend: prefs.backend,
+      targetLanguage: p.targetLanguage,
+      backend: p.backend,
       actorRef,
-      isAuthenticated,
+      isAuthenticated: authRef.current,
     };
+
+    setTranslatingIds(prev => new Set(prev).add(item.id));
+    activeRef.current++;
 
     let outcome: Awaited<ReturnType<typeof translateContent>> = "failed";
     try {
       outcome = await translateContent(opts);
     } catch (err) {
-      addNotification(`Translation failed: ${errMsg(err)}`, "error");
+      notifyRef.current(`Translation failed: ${errMsg(err)}`, "error");
     }
 
-    setTranslating(prev => {
+    activeRef.current--;
+    setTranslatingIds(prev => {
       const next = new Set(prev);
       next.delete(item.id);
       return next;
     });
 
     if (typeof outcome === "object") {
-      patchItem(item.id, { translation: outcome });
+      patchRef.current(item.id, { translation: outcome });
     } else if (outcome === "skip") {
-      skippedRef.current.ids.add(item.id);
+      attemptedRef.current.skip.add(item.id);
+    } else {
+      attemptedRef.current.failed.add(item.id);
     }
-    // "failed" → don't skip, allow retry on next cycle
-  }, [prefs.targetLanguage, prefs.backend, actorRef, isAuthenticated, patchItem, addNotification]);
+  }, [actorRef]);
 
-  // Process queued items in batches of MAX_CONCURRENT
-  const processQueue = useCallback(async () => {
-    if (processingRef.current) return;
-    processingRef.current = true;
-
-    while (queueRef.current.length > 0) {
-      const batch = queueRef.current.splice(0, MAX_CONCURRENT);
-      await Promise.allSettled(batch.map(item => doTranslate(item)));
-    }
-
-    processingRef.current = false;
-  }, [doTranslate]);
-
+  // Manual translate button — bypasses policy, always translates
   const translateItem = useCallback((itemId: string) => {
     const item = items.find(it => it.id === itemId);
-    if (item) void doTranslate(item);
-  }, [items, doTranslate]);
+    if (item && !item.translation) void runTranslation(item);
+  }, [items, runTranslation]);
 
   const isItemTranslating = useCallback((itemId: string) => {
-    return translating.has(itemId);
-  }, [translating]);
+    return translatingIds.has(itemId);
+  }, [translatingIds]);
 
-  const autoTranslate = useCallback((item: ContentItem) => {
+  // Auto-translate effect: runs when content or prefs change
+  useEffect(() => {
     if (prefs.policy === "manual") return;
-    if (item.translation) return;
-    if (translatingRef.current.has(item.id)) return;
-    if (skippedRef.current.ids.has(item.id)) return;
-    if (queueRef.current.some(q => q.id === item.id)) return;
 
-    if (prefs.policy === "high_quality" && item.scores.composite < prefs.minScore) return;
+    const pending = items.filter(item => {
+      if (item.translation) return false;
+      if (translatingIds.has(item.id)) return false;
+      if (attemptedRef.current.skip.has(item.id)) return false;
+      if (attemptedRef.current.failed.has(item.id)) return false;
+      if (prefs.policy === "high_quality" && item.scores.composite < prefs.minScore) return false;
+      return true;
+    });
 
-    queueRef.current.push(item);
-    void processQueue();
-  }, [prefs.policy, prefs.minScore, processQueue]);
+    if (pending.length === 0) return;
 
-  return { translateItem, isItemTranslating, autoTranslate };
+    // Launch up to MAX_CONCURRENT, respecting active count
+    const slots = Math.max(0, MAX_CONCURRENT - activeRef.current);
+    const batch = pending.slice(0, slots);
+    for (const item of batch) {
+      void runTranslation(item);
+    }
+  }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, translatingIds, runTranslation]);
+
+  // Clear failed set periodically to allow retry (every 60s)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      attemptedRef.current.failed.clear();
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return { translateItem, isItemTranslating };
 }
