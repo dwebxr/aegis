@@ -96,16 +96,17 @@ function AegisAppInner() {
     try { return sessionStorage.getItem("aegis-wot-prompt-dismissed") === "true"; } catch { return false; }
   });
 
-  // Auto-translate new content items based on translation policy
-  const prevContentLenRef = useRef(content.length);
+  // Auto-translate content based on policy (high_quality or all).
+  // Runs when content changes or policy/language settings change.
+  const translatedIdsRef = useRef(new Set<string>());
   useEffect(() => {
-    const prevLen = prevContentLenRef.current;
-    prevContentLenRef.current = content.length;
-    if (content.length <= prevLen) return;
-    for (const item of content.slice(0, content.length - prevLen)) {
+    for (const item of content) {
+      if (item.translation) continue;
+      if (translatedIdsRef.current.has(item.id)) continue;
+      translatedIdsRef.current.add(item.id);
       autoTranslate(item);
     }
-  }, [content.length, autoTranslate]);
+  }, [content, autoTranslate]);
 
   // One-time migration from localStorage to IndexedDB + scoring cache init
   useEffect(() => {
