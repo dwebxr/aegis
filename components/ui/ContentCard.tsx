@@ -466,7 +466,7 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
           <ScoreGrid item={item} />
           {item.reason && (
             <div data-testid="aegis-card-reason" className="text-body-sm text-tertiary leading-body-sm italic bg-navy-lighter px-4 py-3 rounded-md mb-3">
-              {item.reason}
+              {item.translation?.translatedReason ?? item.reason}
             </div>
           )}
           <div className="flex gap-2 flex-wrap">

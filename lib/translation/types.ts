@@ -14,6 +14,7 @@ export interface TranslationPrefs {
 
 export interface TranslationResult {
   translatedText: string;
+  translatedReason?: string;
   targetLanguage: string;
   backend: string;
   generatedAt: number;

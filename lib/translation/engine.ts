@@ -1,6 +1,6 @@
 import type { TranslationLanguage, TranslationBackend, TranslationResult } from "./types";
 import type { _SERVICE } from "@/lib/ic/declarations";
-import { buildTranslationPrompt, isAlreadyInTarget } from "./prompt";
+import { buildTranslationPrompt, isAlreadyInTarget, parseTranslationResponse } from "./prompt";
 import { lookupTranslation, storeTranslation } from "./cache";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
@@ -74,6 +74,7 @@ async function translateWithIC(
 
 export interface TranslateOptions {
   text: string;
+  reason?: string;
   targetLanguage: TranslationLanguage;
   backend: TranslationBackend;
   actorRef?: React.MutableRefObject<_SERVICE | null>;
@@ -81,12 +82,12 @@ export interface TranslateOptions {
 }
 
 export async function translateContent(opts: TranslateOptions): Promise<TranslationResult | null> {
-  const { text, targetLanguage, backend, actorRef, isAuthenticated } = opts;
+  const { text, reason, targetLanguage, backend, actorRef, isAuthenticated } = opts;
 
   const cached = await lookupTranslation(text, targetLanguage);
   if (cached) return cached;
 
-  const prompt = buildTranslationPrompt(text, targetLanguage);
+  const prompt = buildTranslationPrompt(text, targetLanguage, reason);
 
   let raw = "";
   let usedBackend = "";
@@ -139,8 +140,12 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
 
   if (!raw || isAlreadyInTarget(raw)) return null;
 
+  const parsed = parseTranslationResponse(raw);
+  if (!parsed) return null;
+
   const result: TranslationResult = {
-    translatedText: raw,
+    translatedText: parsed.text,
+    translatedReason: parsed.reason,
     targetLanguage,
     backend: usedBackend,
     generatedAt: Date.now(),

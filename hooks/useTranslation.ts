@@ -40,6 +40,7 @@ export function useTranslation(
 
     const opts: TranslateOptions = {
       text: item.text,
+      reason: item.reason,
       targetLanguage: prefs.targetLanguage,
       backend: prefs.backend,
       actorRef,
