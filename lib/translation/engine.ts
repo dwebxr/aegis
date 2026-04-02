@@ -117,7 +117,9 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
       attempts.push({ name: "webllm", fn: () => translateWithWebLLM(prompt) });
     }
     if (actorRef?.current && isAuthenticated) {
-      attempts.push({ name: "ic-llm", fn: () => translateWithIC(prompt, actorRef) });
+      attempts.push({ name: "ic-llm", fn: () => withTimeout(
+        translateWithIC(prompt, actorRef), 5_000, "IC LLM auto-cascade timeout",
+      ) });
     }
     const byokKey = getUserApiKey();
     if (byokKey) {

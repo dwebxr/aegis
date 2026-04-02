@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotify } from "@/contexts/NotificationContext";
@@ -8,6 +8,8 @@ import type { ContentItem } from "@/lib/types/content";
 import type { TranslationResult } from "@/lib/translation/types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
+
+const MAX_CONCURRENT = 3;
 
 interface UseTranslationReturn {
   /** Translate a single item by ID */
@@ -29,6 +31,10 @@ export function useTranslation(
   const [translating, setTranslating] = useState<Set<string>>(new Set());
   const translatingRef = useRef(translating);
   translatingRef.current = translating;
+
+  // Queue for auto-translate to avoid flooding API
+  const queueRef = useRef<ContentItem[]>([]);
+  const processingRef = useRef(false);
 
   const prefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
 
@@ -65,6 +71,19 @@ export function useTranslation(
     }
   }, [prefs.targetLanguage, prefs.backend, actorRef, isAuthenticated, patchItem, addNotification]);
 
+  // Process queued items with concurrency limit
+  const processQueue = useCallback(async () => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+
+    while (queueRef.current.length > 0) {
+      const batch = queueRef.current.splice(0, MAX_CONCURRENT);
+      await Promise.allSettled(batch.map(item => doTranslate(item)));
+    }
+
+    processingRef.current = false;
+  }, [doTranslate]);
+
   const translateItem = useCallback((itemId: string) => {
     const item = items.find(it => it.id === itemId);
     if (item) void doTranslate(item);
@@ -77,11 +96,18 @@ export function useTranslation(
   const autoTranslate = useCallback((item: ContentItem) => {
     if (prefs.policy === "manual") return;
     if (item.translation) return;
+    if (translatingRef.current.has(item.id)) return;
+    if (queueRef.current.some(q => q.id === item.id)) return;
 
     if (prefs.policy === "high_quality" && item.scores.composite < prefs.minScore) return;
 
-    void doTranslate(item);
-  }, [prefs.policy, prefs.minScore, doTranslate]);
+    queueRef.current.push(item);
+  }, [prefs.policy, prefs.minScore]);
+
+  // Drain queue whenever items are added
+  useEffect(() => {
+    if (queueRef.current.length > 0) void processQueue();
+  });
 
   return { translateItem, isItemTranslating, autoTranslate };
 }
