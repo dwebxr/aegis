@@ -4,6 +4,7 @@ import { buildTranslationPrompt, isAlreadyInTarget, parseTranslationResponse } f
 import { lookupTranslation, storeTranslation } from "./cache";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
+import { isWebLLMLoaded } from "@/lib/webllm/engine";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
@@ -112,7 +113,7 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     if (isOllamaEnabled()) {
       attempts.push({ name: "ollama", fn: () => translateWithOllama(prompt) });
     }
-    if (isWebLLMEnabled()) {
+    if (isWebLLMEnabled() && isWebLLMLoaded()) {
       attempts.push({ name: "webllm", fn: () => translateWithWebLLM(prompt) });
     }
     if (actorRef?.current && isAuthenticated) {

@@ -55,6 +55,7 @@ jest.mock("@/lib/webllm/engine", () => ({
       },
     },
   }),
+  isWebLLMLoaded: () => mockWebLLMEnabled,
 }));
 
 jest.mock("@/lib/utils/timeout", () => ({

@@ -87,6 +87,10 @@ export async function scoreWithWebLLM(
   return result;
 }
 
+export function isWebLLMLoaded(): boolean {
+  return engine !== null;
+}
+
 export async function destroyEngine(): Promise<void> {
   if (engine) {
     await engine.unload();
