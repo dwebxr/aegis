@@ -97,12 +97,9 @@ function AegisAppInner() {
   });
 
   // Auto-translate content based on policy (high_quality or all)
-  const translatedIdsRef = useRef(new Set<string>());
   useEffect(() => {
     for (const item of content) {
       if (item.translation) continue;
-      if (translatedIdsRef.current.has(item.id)) continue;
-      translatedIdsRef.current.add(item.id);
       autoTranslate(item);
     }
   }, [content, autoTranslate]);
