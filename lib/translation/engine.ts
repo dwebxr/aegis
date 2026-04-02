@@ -82,7 +82,7 @@ export interface TranslateOptions {
   isAuthenticated?: boolean;
 }
 
-export async function translateContent(opts: TranslateOptions): Promise<TranslationResult | null> {
+export async function translateContent(opts: TranslateOptions): Promise<TranslationResult | "skip" | "failed"> {
   const { text, reason, targetLanguage, backend, actorRef, isAuthenticated } = opts;
 
   const cached = await lookupTranslation(text, targetLanguage);
@@ -138,13 +138,13 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
       }
     }
 
-    if (!usedBackend) return null;
+    if (!usedBackend) return "failed";
   }
 
-  if (!raw) return null;
+  if (!raw) return "failed";
 
   const parsed = parseTranslationResponse(raw);
-  if (!parsed) return null;
+  if (!parsed) return "skip";
 
   const result: TranslationResult = {
     translatedText: parsed.text,

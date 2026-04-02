@@ -80,6 +80,11 @@ afterAll(() => {
   globalThis.fetch = origFetch;
 });
 
+function expectResult(r: Awaited<ReturnType<typeof translateContent>>): TranslationResult {
+  expect(typeof r).toBe("object");
+  return r as TranslationResult;
+}
+
 describe("translateContent", () => {
   it("returns cached result if available", async () => {
     const cached: TranslationResult = {
@@ -96,9 +101,9 @@ describe("translateContent", () => {
       backend: "local",
     });
 
-    expect(result).not.toBeNull();
-    expect(result!.translatedText).toBe("キャッシュされた翻訳");
-    expect(result!.backend).toBe("ollama");
+    const r = expectResult(result);
+    expect(r.translatedText).toBe("キャッシュされた翻訳");
+    expect(expectResult(result).backend).toBe("ollama");
   });
 
   it("calls Ollama for 'local' backend", async () => {
@@ -116,9 +121,9 @@ describe("translateContent", () => {
       backend: "local",
     });
 
-    expect(result).not.toBeNull();
-    expect(result!.translatedText).toBe("Ollamaで翻訳");
-    expect(result!.backend).toBe("ollama");
+    const r = expectResult(result);
+    expect(r.translatedText).toBe("Ollamaで翻訳");
+    expect(expectResult(result).backend).toBe("ollama");
     expect(capturedBody).not.toBeNull();
     expect((capturedBody as unknown as Record<string, unknown>).model).toBe("llama3.2");
     expect((globalThis.fetch as jest.Mock).mock.calls[0][0]).toContain("/v1/chat/completions");
@@ -131,9 +136,9 @@ describe("translateContent", () => {
       backend: "browser",
     });
 
-    expect(result).not.toBeNull();
-    expect(result!.translatedText).toBe("WebLLMで翻訳されました");
-    expect(result!.backend).toBe("webllm");
+    const r = expectResult(result);
+    expect(r.translatedText).toBe("WebLLMで翻訳されました");
+    expect(expectResult(result).backend).toBe("webllm");
   });
 
   it("calls /api/translate for 'cloud' backend with BYOK key", async () => {
@@ -152,8 +157,8 @@ describe("translateContent", () => {
       backend: "cloud",
     });
 
-    expect(result).not.toBeNull();
-    expect(result!.backend).toBe("claude-byok");
+    const r = expectResult(result);
+    expect(r.backend).toBe("claude-byok");
     expect(capturedHeaders["x-user-api-key"]).toBe("sk-ant-test-key");
   });
 
@@ -169,8 +174,8 @@ describe("translateContent", () => {
       backend: "cloud",
     });
 
-    expect(result).not.toBeNull();
-    expect(result!.backend).toBe("claude-server");
+    const r = expectResult(result);
+    expect(r.backend).toBe("claude-server");
   });
 
   it("throws for 'ic' backend without authentication", async () => {
@@ -194,13 +199,13 @@ describe("translateContent", () => {
       isAuthenticated: true,
     });
 
-    expect(result).not.toBeNull();
-    expect(result!.translatedText).toBe("IC翻訳結果");
-    expect(result!.backend).toBe("ic-llm");
+    const r = expectResult(result);
+    expect(r.translatedText).toBe("IC翻訳結果");
+    expect(expectResult(result).backend).toBe("ic-llm");
     expect(mockTranslate).toHaveBeenCalled();
   });
 
-  it("returns null when response is ALREADY_IN_TARGET", async () => {
+  it("returns 'skip' when response is ALREADY_IN_TARGET", async () => {
     globalThis.fetch = jest.fn().mockImplementation(async () => {
       return mockResponse({
         choices: [{ message: { content: "ALREADY_IN_TARGET" } }],
@@ -213,10 +218,10 @@ describe("translateContent", () => {
       backend: "local",
     });
 
-    expect(result).toBeNull();
+    expect(result).toBe("skip");
   });
 
-  it("returns null when response is empty", async () => {
+  it("returns 'failed' when response is empty", async () => {
     globalThis.fetch = jest.fn().mockImplementation(async () => {
       return mockResponse({
         choices: [{ message: { content: "" } }],
@@ -229,7 +234,7 @@ describe("translateContent", () => {
       backend: "local",
     });
 
-    expect(result).toBeNull();
+    expect(result).toBe("failed");
   });
 
   it("caches successful translation result", async () => {
@@ -245,8 +250,8 @@ describe("translateContent", () => {
     (globalThis.fetch as jest.Mock).mockClear();
     const result = await translateContent({ text: "Cache test", targetLanguage: "ja", backend: "local" });
 
-    expect(result).not.toBeNull();
-    expect(result!.translatedText).toBe("翻訳テスト");
+    const r = expectResult(result);
+    expect(r.translatedText).toBe("翻訳テスト");
     expect(globalThis.fetch as jest.Mock).not.toHaveBeenCalled();
   });
 
@@ -314,7 +319,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result!.backend).toBe("ollama");
+      expect(expectResult(result).backend).toBe("ollama");
     });
 
     it("falls back to WebLLM when Ollama fails", async () => {
@@ -328,8 +333,8 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result!.backend).toBe("webllm");
-      expect(result!.translatedText).toBe("WebLLMで翻訳されました");
+      expect(expectResult(result).backend).toBe("webllm");
+      expect(expectResult(result).translatedText).toBe("WebLLMで翻訳されました");
     });
 
     it("falls through to server Claude when all local backends fail", async () => {
@@ -346,7 +351,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result!.backend).toBe("claude-server");
+      expect(expectResult(result).backend).toBe("claude-server");
     });
 
     it("includes IC LLM in auto cascade when authenticated", async () => {
@@ -367,7 +372,7 @@ describe("translateContent", () => {
         isAuthenticated: true,
       });
 
-      expect(result!.backend).toBe("ic-llm");
+      expect(expectResult(result).backend).toBe("ic-llm");
       expect(mockTranslate).toHaveBeenCalled();
     });
 
@@ -383,7 +388,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBeNull();
+      expect(result).toBe("failed");
     });
   });
 
@@ -402,9 +407,9 @@ describe("translateContent", () => {
         backend: "local",
       });
 
-      expect(result).not.toBeNull();
-      expect(result!.translatedText).toBe("翻訳テキスト");
-      expect(result!.translatedReason).toBe("翻訳理由");
+      const r = expectResult(result);
+      expect(r.translatedText).toBe("翻訳テキスト");
+      expect(r.translatedReason).toBe("翻訳理由");
     });
 
     it("handles plain text response even when reason was provided", async () => {
@@ -421,9 +426,9 @@ describe("translateContent", () => {
         backend: "local",
       });
 
-      expect(result).not.toBeNull();
-      expect(result!.translatedText).toBe("プレーンテキスト翻訳");
-      expect(result!.translatedReason).toBeUndefined();
+      const r = expectResult(result);
+      expect(r.translatedText).toBe("プレーンテキスト翻訳");
+      expect(r.translatedReason).toBeUndefined();
     });
 
     it("returns null for ALREADY_IN_TARGET via parseTranslationResponse", async () => {
@@ -440,7 +445,7 @@ describe("translateContent", () => {
         backend: "local",
       });
 
-      expect(result).toBeNull();
+      expect(result).toBe("skip");
     });
   });
 });

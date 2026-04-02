@@ -5,7 +5,6 @@ import { useNotify } from "@/contexts/NotificationContext";
 import { translateContent, type TranslateOptions } from "@/lib/translation/engine";
 import { DEFAULT_TRANSLATION_PREFS } from "@/lib/translation/types";
 import type { ContentItem } from "@/lib/types/content";
-import type { TranslationResult } from "@/lib/translation/types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 
@@ -34,13 +33,12 @@ export function useTranslation(
 
   const queueRef = useRef<ContentItem[]>([]);
   const processingRef = useRef(false);
-  // Items where translateContent returned null (already in target language)
-  // — prevents infinite re-queue. Keyed by targetLanguage so language changes reset.
+  // "skip" items: content already in target language — don't re-queue.
+  // Keyed by targetLanguage so language changes reset.
   const skippedRef = useRef<{ lang: string; ids: Set<string> }>({ lang: "", ids: new Set() });
 
   const prefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
 
-  // Reset skipped set when target language changes
   if (skippedRef.current.lang !== prefs.targetLanguage) {
     skippedRef.current = { lang: prefs.targetLanguage, ids: new Set() };
   }
@@ -60,9 +58,9 @@ export function useTranslation(
       isAuthenticated,
     };
 
-    let result: TranslationResult | null = null;
+    let outcome: Awaited<ReturnType<typeof translateContent>> = "failed";
     try {
-      result = await translateContent(opts);
+      outcome = await translateContent(opts);
     } catch (err) {
       addNotification(`Translation failed: ${errMsg(err)}`, "error");
     }
@@ -73,12 +71,12 @@ export function useTranslation(
       return next;
     });
 
-    if (result) {
-      patchItem(item.id, { translation: result });
-    } else {
-      // null = already in target language or empty — don't retry
+    if (typeof outcome === "object") {
+      patchItem(item.id, { translation: outcome });
+    } else if (outcome === "skip") {
       skippedRef.current.ids.add(item.id);
     }
+    // "failed" → don't skip, allow retry on next cycle
   }, [prefs.targetLanguage, prefs.backend, actorRef, isAuthenticated, patchItem, addNotification]);
 
   // Process queued items in batches of MAX_CONCURRENT
