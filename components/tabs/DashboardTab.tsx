@@ -135,6 +135,7 @@ function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookm
 }) {
   const gr = scoreGrade(item.scores.composite);
   const signalType = deriveSignalTypes(item)[0] ?? null;
+  const displayText = item.translation?.translatedText ?? item.text;
   return (
     <div className={cn("bg-card border border-border rounded-lg overflow-hidden transition-fast", extraClass)}>
       <ThumbnailArea item={item} gr={gr} gradeSize={gradeSize}
@@ -153,7 +154,7 @@ function DashboardCard({ item, failedImages, markImgFailed, bookmarkSet, onBookm
             fontWeight: textWeight,
           }}
         >
-          {(item.translation?.translatedText ?? item.text).slice(0, textSlice)}
+          {displayText.slice(0, textSlice)}
         </div>
         <div className="text-caption text-disabled overflow-hidden text-ellipsis whitespace-nowrap mb-3">
           {item.author} &middot; {showPlatform ? (item.platform || item.source) : item.source} &middot; {item.timestamp}
@@ -1077,7 +1078,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         className="flex flex-col gap-0.5 text-left bg-transparent border-none cursor-pointer font-[inherit] p-0 group"
                       >
                         <div className="text-caption text-secondary-foreground font-medium truncate group-hover:text-cyan-400 transition-fast">
-                          {(() => { const t = item.translation?.translatedText ?? item.text; return t.slice(0, 60) + (t.length > 60 ? "..." : ""); })()}
+                          {item.translation?.translatedText ?? item.text}
                         </div>
                         <div className="flex items-center gap-1.5 text-tiny text-disabled">
                           <span>{item.source}</span>

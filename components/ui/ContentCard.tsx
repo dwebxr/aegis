@@ -262,7 +262,7 @@ function ActionLink({
 const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, onTranslate, isBookmarked, isTranslating, mobile, variant = "default", rank, focused, clusterCount }) => {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showOriginal, setShowOriginal] = useState<string | null>(null);
+  const [showOriginal, setShowOriginal] = useState(false);
   const isSlop = item.verdict === "slop";
   const gr = scoreGrade(item.scores.composite);
 
@@ -411,13 +411,13 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                   {"\uD83C\uDF10"} {item.translation.targetLanguage} via {item.translation.backend}
                 </span>
                 <button
-                  onClick={e => { e.stopPropagation(); setShowOriginal(prev => prev === item.id ? null : item.id); }}
+                  onClick={e => { e.stopPropagation(); setShowOriginal(p => !p); }}
                   className="bg-transparent border-none text-tiny text-muted-foreground cursor-pointer font-[inherit] underline decoration-dotted underline-offset-2 p-0"
                 >
-                  {showOriginal === item.id ? "Hide original" : "Show original"}
+                  {showOriginal ? "Hide original" : "Show original"}
                 </button>
               </div>
-              {showOriginal === item.id && (
+              {showOriginal && (
                 <p className={cn(
                   "m-0 mt-2 break-words text-tertiary opacity-60",
                   isLarge ? "text-[14px] leading-[1.35]" : "text-body-sm leading-body-sm",
