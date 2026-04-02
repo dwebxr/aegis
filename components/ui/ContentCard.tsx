@@ -262,6 +262,7 @@ function ActionLink({
 const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, onTranslate, isBookmarked, isTranslating, mobile, variant = "default", rank, focused, clusterCount }) => {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showOriginal, setShowOriginal] = useState<string | null>(null);
   const isSlop = item.verdict === "slop";
   const gr = scoreGrade(item.scores.composite);
 
@@ -395,37 +396,49 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
             )}
           </div>
 
-          <p className={cn(
-            "m-0 break-words",
-            isSlop && !isLarge && "line-through opacity-50",
-            variant === "serendipity" ? "text-purple-300" : "text-tertiary",
-            isLarge ? "text-[16px] leading-[1.35]" : "text-body-lg leading-body-lg",
-          )}>
-            {item.text}
-          </p>
-          {variant === "serendipity" && (
-            <div className="mt-2 text-caption text-purple-400 italic">
-              Outside your usual topics — expanding your perspective
-            </div>
-          )}
-          {item.translation && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <div className="text-caption text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                <span>{"\uD83C\uDF10"}</span>
-                <span className="uppercase text-tiny font-bold tracking-wider">
-                  {item.translation.targetLanguage} translation
-                </span>
-                <span className="text-disabled text-tiny">
-                  via {item.translation.backend}
-                </span>
-              </div>
+          {item.translation ? (
+            <>
               <p className={cn(
                 "m-0 break-words",
+                isSlop && !isLarge && "line-through opacity-50",
+                variant === "serendipity" ? "text-purple-300" : "text-foreground",
                 isLarge ? "text-[16px] leading-[1.35]" : "text-body-lg leading-body-lg",
-                "text-foreground"
               )}>
                 {item.translation.translatedText}
               </p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className="text-disabled text-tiny">
+                  {"\uD83C\uDF10"} {item.translation.targetLanguage} via {item.translation.backend}
+                </span>
+                <button
+                  onClick={e => { e.stopPropagation(); setShowOriginal(prev => prev === item.id ? null : item.id); }}
+                  className="bg-transparent border-none text-tiny text-muted-foreground cursor-pointer font-[inherit] underline decoration-dotted underline-offset-2 p-0"
+                >
+                  {showOriginal === item.id ? "Hide original" : "Show original"}
+                </button>
+              </div>
+              {showOriginal === item.id && (
+                <p className={cn(
+                  "m-0 mt-2 break-words text-tertiary opacity-60",
+                  isLarge ? "text-[14px] leading-[1.35]" : "text-body-sm leading-body-sm",
+                )}>
+                  {item.text}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className={cn(
+              "m-0 break-words",
+              isSlop && !isLarge && "line-through opacity-50",
+              variant === "serendipity" ? "text-purple-300" : "text-tertiary",
+              isLarge ? "text-[16px] leading-[1.35]" : "text-body-lg leading-body-lg",
+            )}>
+              {item.text}
+            </p>
+          )}
+          {variant === "serendipity" && (
+            <div className="mt-2 text-caption text-purple-400 italic">
+              Outside your usual topics — expanding your perspective
             </div>
           )}
         </div>
