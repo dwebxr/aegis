@@ -397,12 +397,12 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 </div>
 
                 <p className={cn("text-purple-300 leading-body m-0 break-words", mobile ? "text-[13px]" : "text-body")}>
-                  {d.item.text}
+                  {d.item.translation?.translatedText ?? d.item.text}
                 </p>
 
                 <YouTubePreview sourceUrl={d.item.sourceUrl} />
 
-                <div className="mt-2 text-caption text-purple-400 italic">{d.reason}</div>
+                <div className="mt-2 text-caption text-purple-400 italic">{d.item.translation?.translatedReason ?? d.reason}</div>
 
                 {d.item.sourceUrl && /^https?:\/\//i.test(d.item.sourceUrl) && (
                   <a
