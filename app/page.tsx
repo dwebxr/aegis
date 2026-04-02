@@ -96,8 +96,7 @@ function AegisAppInner() {
     try { return sessionStorage.getItem("aegis-wot-prompt-dismissed") === "true"; } catch { return false; }
   });
 
-  // Auto-translate content based on policy (high_quality or all).
-  // Runs when content changes or policy/language settings change.
+  // Auto-translate content based on policy (high_quality or all)
   const translatedIdsRef = useRef(new Set<string>());
   useEffect(() => {
     for (const item of content) {

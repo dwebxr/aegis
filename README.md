@@ -10,7 +10,7 @@
 ## Latest Updates (April 2026)
 
 ### Content Translation (Multi-Backend)
-- **6,333 tests, 362 suites** — zero failures, zero skipped
+- **6,347 tests, 363 suites** — zero failures, zero skipped
 - **4 translation backends**: IC LLM (on-chain, free, ideal for PWA/mobile), Ollama (local), WebLLM (browser), Claude BYOK (cloud premium)
 - **Auto cascade**: tries enabled backends in order (Ollama → WebLLM → IC LLM → BYOK → Server Claude), falls back gracefully
 - **3 translation policies**: Manual (button per post), High quality (auto-translate above score threshold), All posts

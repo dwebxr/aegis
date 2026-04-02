@@ -249,6 +249,55 @@ describe("translateContent", () => {
     expect(globalThis.fetch as jest.Mock).not.toHaveBeenCalled();
   });
 
+  it("throws when IC actor returns error result", async () => {
+    const mockTranslate = jest.fn().mockResolvedValue({ err: "LLM overloaded" });
+    const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+    await expect(translateContent({
+      text: "Hello",
+      targetLanguage: "ja",
+      backend: "ic",
+      actorRef,
+      isAuthenticated: true,
+    })).rejects.toThrow("LLM overloaded");
+  });
+
+  it("throws when IC actor ref is null", async () => {
+    const actorRef = { current: null } as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+    await expect(translateContent({
+      text: "Hello",
+      targetLanguage: "ja",
+      backend: "ic",
+      actorRef,
+      isAuthenticated: true,
+    })).rejects.toThrow("IC actor not available");
+  });
+
+  it("throws on Ollama HTTP error", async () => {
+    globalThis.fetch = jest.fn().mockImplementation(async () => {
+      return mockResponse({}, { status: 500 });
+    });
+
+    await expect(translateContent({
+      text: "Hello",
+      targetLanguage: "ja",
+      backend: "local",
+    })).rejects.toThrow("Ollama HTTP 500");
+  });
+
+  it("throws on Claude API HTTP error", async () => {
+    globalThis.fetch = jest.fn().mockImplementation(async () => {
+      return mockResponse({}, { status: 429 });
+    });
+
+    await expect(translateContent({
+      text: "Hello",
+      targetLanguage: "ja",
+      backend: "cloud",
+    })).rejects.toThrow("Translate API HTTP 429");
+  });
+
   describe("auto mode cascade", () => {
     it("tries Ollama first when enabled", async () => {
       mockOllamaEnabled = true;
@@ -297,6 +346,28 @@ describe("translateContent", () => {
       });
 
       expect(result!.backend).toBe("claude-server");
+    });
+
+    it("includes IC LLM in auto cascade when authenticated", async () => {
+      mockOllamaEnabled = false;
+      mockWebLLMEnabled = false;
+      mockApiKey = null;
+      const mockTranslate = jest.fn().mockResolvedValue({ ok: "IC自動翻訳" });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      // Mock server Claude to fail so IC gets tried
+      globalThis.fetch = jest.fn().mockRejectedValue(new Error("no server"));
+
+      const result = await translateContent({
+        text: "IC auto test",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(result!.backend).toBe("ic-llm");
+      expect(mockTranslate).toHaveBeenCalled();
     });
 
     it("returns null when all backends fail", async () => {
