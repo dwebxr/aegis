@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef } from "react";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotify } from "@/contexts/NotificationContext";
@@ -32,7 +32,6 @@ export function useTranslation(
   const translatingRef = useRef(translating);
   translatingRef.current = translating;
 
-  // Queue for auto-translate to avoid flooding API
   const queueRef = useRef<ContentItem[]>([]);
   const processingRef = useRef(false);
 
@@ -71,7 +70,7 @@ export function useTranslation(
     }
   }, [prefs.targetLanguage, prefs.backend, actorRef, isAuthenticated, patchItem, addNotification]);
 
-  // Process queued items with concurrency limit
+  // Process queued items in batches of MAX_CONCURRENT
   const processQueue = useCallback(async () => {
     if (processingRef.current) return;
     processingRef.current = true;
@@ -102,12 +101,8 @@ export function useTranslation(
     if (prefs.policy === "high_quality" && item.scores.composite < prefs.minScore) return;
 
     queueRef.current.push(item);
-  }, [prefs.policy, prefs.minScore]);
-
-  // Drain queue whenever items are added
-  useEffect(() => {
-    if (queueRef.current.length > 0) void processQueue();
-  });
+    void processQueue();
+  }, [prefs.policy, prefs.minScore, processQueue]);
 
   return { translateItem, isItemTranslating, autoTranslate };
 }
