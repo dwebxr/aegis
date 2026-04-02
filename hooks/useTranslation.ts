@@ -34,8 +34,16 @@ export function useTranslation(
 
   const queueRef = useRef<ContentItem[]>([]);
   const processingRef = useRef(false);
+  // Items where translateContent returned null (already in target language)
+  // — prevents infinite re-queue. Keyed by targetLanguage so language changes reset.
+  const skippedRef = useRef<{ lang: string; ids: Set<string> }>({ lang: "", ids: new Set() });
 
   const prefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
+
+  // Reset skipped set when target language changes
+  if (skippedRef.current.lang !== prefs.targetLanguage) {
+    skippedRef.current = { lang: prefs.targetLanguage, ids: new Set() };
+  }
 
   const doTranslate = useCallback(async (item: ContentItem) => {
     if (item.translation) return;
@@ -67,6 +75,9 @@ export function useTranslation(
 
     if (result) {
       patchItem(item.id, { translation: result });
+    } else {
+      // null = already in target language or empty — don't retry
+      skippedRef.current.ids.add(item.id);
     }
   }, [prefs.targetLanguage, prefs.backend, actorRef, isAuthenticated, patchItem, addNotification]);
 
@@ -96,6 +107,7 @@ export function useTranslation(
     if (prefs.policy === "manual") return;
     if (item.translation) return;
     if (translatingRef.current.has(item.id)) return;
+    if (skippedRef.current.ids.has(item.id)) return;
     if (queueRef.current.some(q => q.id === item.id)) return;
 
     if (prefs.policy === "high_quality" && item.scores.composite < prefs.minScore) return;
