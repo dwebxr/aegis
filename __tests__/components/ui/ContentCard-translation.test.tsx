@@ -141,4 +141,32 @@ describe("ContentCard translation display", () => {
     );
     expect(screen.getByText("Translating...")).toBeTruthy();
   });
+
+  it("shows translated reason in expanded card", () => {
+    renderCard({
+      reason: "Original English reason",
+      translation: {
+        translatedText: "翻訳テキスト",
+        translatedReason: "翻訳された理由",
+        targetLanguage: "ja",
+        backend: "claude-server",
+        generatedAt: Date.now(),
+      },
+    });
+    expect(screen.getByText("翻訳された理由")).toBeTruthy();
+    expect(screen.queryByText("Original English reason")).toBeNull();
+  });
+
+  it("shows original reason when no translatedReason", () => {
+    renderCard({
+      reason: "Original reason here",
+      translation: {
+        translatedText: "翻訳テキスト",
+        targetLanguage: "ja",
+        backend: "claude-server",
+        generatedAt: Date.now(),
+      },
+    });
+    expect(screen.getByText("Original reason here")).toBeTruthy();
+  });
 });

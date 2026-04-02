@@ -386,4 +386,61 @@ describe("translateContent", () => {
       expect(result).toBeNull();
     });
   });
+
+  describe("reason translation", () => {
+    it("includes translatedReason when LLM returns JSON with reason", async () => {
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({
+          choices: [{ message: { content: '{"text":"翻訳テキスト","reason":"翻訳理由"}' } }],
+        });
+      });
+
+      const result = await translateContent({
+        text: "Hello",
+        reason: "Good analysis",
+        targetLanguage: "ja",
+        backend: "local",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.translatedText).toBe("翻訳テキスト");
+      expect(result!.translatedReason).toBe("翻訳理由");
+    });
+
+    it("handles plain text response even when reason was provided", async () => {
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({
+          choices: [{ message: { content: "プレーンテキスト翻訳" } }],
+        });
+      });
+
+      const result = await translateContent({
+        text: "Hello",
+        reason: "Some reason",
+        targetLanguage: "ja",
+        backend: "local",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.translatedText).toBe("プレーンテキスト翻訳");
+      expect(result!.translatedReason).toBeUndefined();
+    });
+
+    it("returns null for ALREADY_IN_TARGET via parseTranslationResponse", async () => {
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({
+          choices: [{ message: { content: "ALREADY_IN_TARGET" } }],
+        });
+      });
+
+      const result = await translateContent({
+        text: "既に日本語",
+        reason: "理由",
+        targetLanguage: "ja",
+        backend: "local",
+      });
+
+      expect(result).toBeNull();
+    });
+  });
 });

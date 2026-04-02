@@ -47,16 +47,10 @@ Text:
 ${content}`;
 }
 
-export function isAlreadyInTarget(response: string): boolean {
-  return response.trim() === "ALREADY_IN_TARGET";
-}
-
-/** Parse JSON response when reason was included in prompt */
 export function parseTranslationResponse(raw: string): { text: string; reason?: string } | null {
   const trimmed = raw.trim();
   if (trimmed === "ALREADY_IN_TARGET") return null;
 
-  // Try JSON parse first (when reason was included)
   const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     try {
@@ -70,6 +64,5 @@ export function parseTranslationResponse(raw: string): { text: string; reason?: 
     } catch { /* fall through to plain text */ }
   }
 
-  // Plain text response (no reason in prompt)
   return { text: trimmed };
 }

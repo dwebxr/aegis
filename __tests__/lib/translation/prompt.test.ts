@@ -1,4 +1,4 @@
-import { buildTranslationPrompt, isAlreadyInTarget, parseTranslationResponse } from "@/lib/translation/prompt";
+import { buildTranslationPrompt, parseTranslationResponse } from "@/lib/translation/prompt";
 
 describe("buildTranslationPrompt", () => {
   it("includes target language name", () => {
@@ -56,28 +56,6 @@ describe("buildTranslationPrompt", () => {
     const prompt = buildTranslationPrompt("text", "ja", longReason);
     const zCount = (prompt.match(/Z/g) ?? []).length;
     expect(zCount).toBe(500);
-  });
-});
-
-describe("isAlreadyInTarget", () => {
-  it("returns true for exact match", () => {
-    expect(isAlreadyInTarget("ALREADY_IN_TARGET")).toBe(true);
-  });
-
-  it("returns true with surrounding whitespace", () => {
-    expect(isAlreadyInTarget("  ALREADY_IN_TARGET  \n")).toBe(true);
-  });
-
-  it("returns false for translated text", () => {
-    expect(isAlreadyInTarget("This is a translation")).toBe(false);
-  });
-
-  it("returns false for empty string", () => {
-    expect(isAlreadyInTarget("")).toBe(false);
-  });
-
-  it("returns false for partial match", () => {
-    expect(isAlreadyInTarget("ALREADY_IN_TARGET plus more text")).toBe(false);
   });
 });
 

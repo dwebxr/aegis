@@ -1,6 +1,6 @@
 import type { TranslationLanguage, TranslationBackend, TranslationResult } from "./types";
 import type { _SERVICE } from "@/lib/ic/declarations";
-import { buildTranslationPrompt, isAlreadyInTarget, parseTranslationResponse } from "./prompt";
+import { buildTranslationPrompt, parseTranslationResponse } from "./prompt";
 import { lookupTranslation, storeTranslation } from "./cache";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
@@ -141,7 +141,7 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     if (!usedBackend) return null;
   }
 
-  if (!raw || isAlreadyInTarget(raw)) return null;
+  if (!raw) return null;
 
   const parsed = parseTranslationResponse(raw);
   if (!parsed) return null;
