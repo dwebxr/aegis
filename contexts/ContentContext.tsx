@@ -44,6 +44,8 @@ const ContentContext = createContext<ContentState>({
   clearDemoContent: () => {},
   loadFromIC: async () => {},
   syncBriefing: () => {},
+  patchItem: () => {},
+  actorRef: { current: null },
   pendingActions: 0,
   isOnline: true,
 });
@@ -310,6 +312,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const clearDemoContent = useCallback(() => setContent(prev => prev.filter(c => c.owner !== "")), []);
 
+  const patchItem = useCallback((id: string, patch: Partial<ContentItem>) => {
+    setContent(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c));
+  }, []);
+
   const backfillImageUrls = useCallback((): (() => void) => {
     const items = contentRef.current
       .filter((c): c is ContentItem & { sourceUrl: string } => !!c.sourceUrl && !c.imageUrl && /^https?:\/\//i.test(c.sourceUrl))
@@ -388,8 +394,8 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const value = useMemo(() => ({
     content, isAnalyzing, syncStatus, cacheChecked, pendingActions, isOnline, pendingCount,
-    analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, clearDemoContent, loadFromIC, syncBriefing,
-  }), [content, isAnalyzing, syncStatus, cacheChecked, pendingActions, isOnline, pendingCount, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, clearDemoContent, loadFromIC, syncBriefing]);
+    analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, clearDemoContent, loadFromIC, syncBriefing, patchItem, actorRef,
+  }), [content, isAnalyzing, syncStatus, cacheChecked, pendingActions, isOnline, pendingCount, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, clearDemoContent, loadFromIC, syncBriefing, patchItem]);
 
   return (
     <ContentContext.Provider value={value}>

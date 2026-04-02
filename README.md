@@ -9,8 +9,18 @@
 
 ## Latest Updates (April 2026)
 
+### Content Translation (Multi-Backend)
+- **6,333 tests, 362 suites** — zero failures, zero skipped
+- **4 translation backends**: IC LLM (on-chain, free, ideal for PWA/mobile), Ollama (local), WebLLM (browser), Claude BYOK (cloud premium)
+- **Auto cascade**: tries enabled backends in order (Ollama → WebLLM → IC LLM → BYOK → Server Claude), falls back gracefully
+- **3 translation policies**: Manual (button per post), High quality (auto-translate above score threshold), All posts
+- **Settings → General → Translation**: language selector (10 languages incl. Japanese), policy pills, min-score slider, backend selector
+- **Translate button** on every ContentCard across Dashboard, Briefing, and D2A tabs
+- **Translation cache**: SHA-256 keyed localStorage cache (200 entries, 7-day TTL), skips already-translated and same-language content
+- **Canister endpoint**: `translateOnChain` — generic LLM prompt via `mo:llm`, 8000 char cap, authenticated
+- **API route**: `/api/translate` with BYOK support, rate-limited (10 req/60s)
+
 ### OPML Import / Export
-- **6,277 tests, 357 suites** — zero failures, zero skipped
 - **OPML import**: Import feeds from Feedly, Inoreader, or any RSS reader — parses nested folder structures, validates URLs (http/https only, 2048 char limit), deduplicates against existing sources, 500 feed / 1 MB file limits
 - **OPML export**: Export all RSS sources as OPML 2.0 XML — grouped by platform folder (YouTube, GitHub, etc.), special character XML escaping, one-click `.opml` download
 - **Demo mode**: Import disabled in demo mode (matching existing read-only pattern)
@@ -774,6 +784,13 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 - Before offering content, agents diff their items against the peer's manifest
 - Only novel content (not already in peer's manifest) is offered — eliminates redundant delivery
 - Backward-compatible: peers without manifests fall back to topic-matching
+
+### Content Translation
+- Multi-backend translation: IC LLM (free, on-chain), Ollama (local), WebLLM (browser), Claude BYOK (premium)
+- 10 target languages: English, Japanese, Chinese, Korean, Spanish, French, German, Portuguese, Italian, Russian
+- 3 policies: Manual (per-post button), High quality (auto above threshold), All posts
+- LLM-based language detection: skips content already in target language
+- Translation cache with SHA-256 key dedup, 7-day TTL
 
 ### Personalization Engine
 - Learns from Validate/Flag feedback — topic affinities, author trust, quality threshold calibration

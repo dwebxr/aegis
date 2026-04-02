@@ -15,12 +15,14 @@ interface GroupFeedViewProps {
   onAddMember?: (pubkey: string) => void;
   onRemoveMember?: (pubkey: string) => void;
   onSync?: () => void;
+  onTranslate?: (id: string) => void;
+  isItemTranslating?: (id: string) => boolean;
   mobile?: boolean;
 }
 
 export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
   group, feed, isOwner, currentUserPk, onValidate, onFlag,
-  onAddMember, onRemoveMember, onSync, mobile,
+  onAddMember, onRemoveMember, onSync, onTranslate, isItemTranslating, mobile,
 }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const handleToggle = useCallback((id: string) => {
@@ -99,6 +101,8 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
               onToggle={handleToggle}
               onValidate={onValidate}
               onFlag={onFlag}
+              onTranslate={onTranslate}
+              isTranslating={isItemTranslating?.(item.id)}
               mobile={mobile}
             />
           </div>

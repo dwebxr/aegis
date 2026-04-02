@@ -45,6 +45,8 @@ interface D2ATabProps {
   onValidate: (id: string) => void;
   onFlag: (id: string) => void;
   onTabChange?: (tab: string) => void;
+  onTranslate?: (id: string) => void;
+  isItemTranslating?: (id: string) => boolean;
 }
 
 const surfaceCardClass = (m?: boolean) => cn(
@@ -90,7 +92,7 @@ const LOG_ICONS: Record<string, { icon: string; colorClass: string }> = {
 
 export const D2ATab: React.FC<D2ATabProps> = ({
   content, agentState, mobile, identity, principalText,
-  onValidate, onFlag, onTabChange,
+  onValidate, onFlag, onTabChange, onTranslate, isItemTranslating,
 }) => {
   const { agentProfile, agentProfileLoading, nostrKeys, refreshAgentProfile, wotGraph, sendComment, d2aComments } = useAgent();
   const [subTab, setSubTab] = useState<SubTab>("exchanges");
@@ -444,6 +446,8 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                     onToggle={handleToggle}
                     onValidate={onValidate}
                     onFlag={onFlag}
+                    onTranslate={onTranslate}
+                    isTranslating={isItemTranslating?.(item.id)}
                     mobile={mobile}
                   />
                   {expanded === item.id && peerPk && (
@@ -811,6 +815,8 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                           createdAt: group.createdAt,
                         }).catch(err => console.warn("[d2a] publishCurationList failed:", err));
                       } : undefined}
+                      onTranslate={onTranslate}
+                      isItemTranslating={isItemTranslating}
                       mobile={mobile}
                     />
                   )}

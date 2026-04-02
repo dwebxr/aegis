@@ -26,9 +26,11 @@ interface BriefingTabProps {
   isLoading?: boolean;
   discoveries?: SerendipityItem[];
   onTabChange?: (tab: string) => void;
+  onTranslate?: (id: string) => void;
+  isItemTranslating?: (id: string) => boolean;
 }
 
-export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys, isLoading, discoveries = [], onTabChange }) => {
+export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys, isLoading, discoveries = [], onTabChange, onTranslate, isItemTranslating }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const handleToggle = useCallback((id: string) => {
     setExpanded(prev => prev === id ? null : id);
@@ -225,6 +227,8 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                   onToggle={handleToggle}
                   onValidate={onValidate}
                   onFlag={onFlag}
+                  onTranslate={onTranslate}
+                  isTranslating={isItemTranslating?.(item.id)}
                   mobile={mobile}
                 />
               </div>
@@ -270,6 +274,8 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 onToggle={handleToggle}
                 onValidate={onValidate}
                 onFlag={onFlag}
+                onTranslate={onTranslate}
+                isTranslating={isItemTranslating?.(b.item.id)}
                 mobile={mobile}
               />
             </div>
@@ -338,6 +344,8 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
             onToggle={handleToggle}
             onValidate={onValidate}
             onFlag={onFlag}
+            onTranslate={onTranslate}
+            isTranslating={isItemTranslating?.(briefing.serendipity.item.id)}
             mobile={mobile}
           />
         </div>
@@ -438,6 +446,8 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                     onToggle={handleToggle}
                     onValidate={onValidate}
                     onFlag={onFlag}
+                    onTranslate={onTranslate}
+                    isTranslating={isItemTranslating?.(it.id)}
                     mobile={mobile}
                   />
                 </div>

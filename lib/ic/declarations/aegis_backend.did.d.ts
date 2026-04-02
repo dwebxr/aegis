@@ -206,6 +206,7 @@ export interface _SERVICE {
   sweepProtocolFees: ActorMethod<[], Result<string, string>>;
   topUpCycles: ActorMethod<[], Result<string, string>>;
   analyzeOnChain: ActorMethod<[string, string[]], Result<OnChainAnalysis, string>>;
+  translateOnChain: ActorMethod<[string], Result<string, string>>;
   registerPushSubscription: ActorMethod<[string, string, string], boolean>;
   unregisterPushSubscription: ActorMethod<[string], boolean>;
   getPushSubscriptions: ActorMethod<[Principal], PushSubscription[]>;

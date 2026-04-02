@@ -40,4 +40,6 @@ export interface ContentItem extends ContentEvaluation {
   scoringEngine?: import("@/lib/scoring/types").ScoringEngine;
   /** Original platform (e.g. "youtube", "bluesky") for RSS-type items. Omitted for direct nostr. */
   platform?: import("@/lib/types/sources").SourcePlatform;
+  /** Translation result, populated by translation engine */
+  translation?: import("@/lib/translation/types").TranslationResult;
 }

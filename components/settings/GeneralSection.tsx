@@ -6,6 +6,7 @@ import { usePushNotification } from "@/hooks/usePushNotification";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { NotificationToggle } from "@/components/ui/NotificationToggle";
 import { cardClass, sectionTitleClass, actionBtnClass, pillBtnClass } from "./styles";
+import { TranslationSettings } from "./TranslationSettings";
 
 const LS_PUSH_FREQ_KEY = "aegis-push-frequency";
 
@@ -98,6 +99,8 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ mobile }) => {
           </button>
         </div>
       </div>
+
+      <TranslationSettings mobile={mobile} />
 
       <div className={cardClass(mobile)}>
         <div className={sectionTitleClass}>Push Notifications</div>

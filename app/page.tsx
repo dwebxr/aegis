@@ -22,6 +22,7 @@ import { useSources } from "@/contexts/SourceContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { useFilterMode } from "@/contexts/FilterModeContext";
+import { useTranslation } from "@/hooks/useTranslation";
 import { DEMO_SOURCES } from "@/lib/demo/sources";
 import { buildFollowGraph } from "@/lib/wot/graph";
 import { loadWoTCache, saveWoTCache, clearWoTCache } from "@/lib/wot/cache";
@@ -61,7 +62,8 @@ const PUSH_THROTTLE: Record<string, number> = {
 function AegisAppInner() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
-  const { content, isAnalyzing, syncStatus, cacheChecked, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, pendingCount, clearDemoContent } = useContent();
+  const { content, isAnalyzing, syncStatus, cacheChecked, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, pendingCount, clearDemoContent, patchItem, actorRef } = useContent();
+  const { translateItem, isItemTranslating, autoTranslate } = useTranslation(content, patchItem, actorRef);
   const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile } = usePreferences();
   const { getSchedulerSources } = useSources();
@@ -93,6 +95,17 @@ function AegisAppInner() {
     // sessionStorage may throw in SSR or restrictive privacy modes; default to not-dismissed
     try { return sessionStorage.getItem("aegis-wot-prompt-dismissed") === "true"; } catch { return false; }
   });
+
+  // Auto-translate new content items based on translation policy
+  const prevContentLenRef = useRef(content.length);
+  useEffect(() => {
+    const prevLen = prevContentLenRef.current;
+    prevContentLenRef.current = content.length;
+    if (content.length <= prevLen) return;
+    for (const item of content.slice(0, content.length - prevLen)) {
+      autoTranslate(item);
+    }
+  }, [content.length, autoTranslate]);
 
   // One-time migration from localStorage to IndexedDB + scoring cache init
   useEffect(() => {
@@ -627,12 +640,12 @@ function AegisAppInner() {
       )}
       {tab === "dashboard" && (
         <TabErrorBoundary tabName="Home">
-          <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} />
+          <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} onTranslate={translateItem} isItemTranslating={isItemTranslating} />
         </TabErrorBoundary>
       )}
       {tab === "briefing" && (
         <TabErrorBoundary tabName="Briefing">
-          <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} discoveries={discoveries} onTabChange={handleTabChange} />
+          <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} discoveries={discoveries} onTabChange={handleTabChange} onTranslate={translateItem} isItemTranslating={isItemTranslating} />
         </TabErrorBoundary>
       )}
       {tab === "incinerator" && (
@@ -662,7 +675,7 @@ function AegisAppInner() {
       )}
       {tab === "d2a" && (
         <TabErrorBoundary tabName="D2A">
-          <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={handleTabChange} />
+          <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={handleTabChange} onTranslate={translateItem} isItemTranslating={isItemTranslating} />
         </TabErrorBoundary>
       )}
       {tab === "settings" && (

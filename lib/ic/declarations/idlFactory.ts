@@ -182,6 +182,7 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     sweepProtocolFees: IDL.Func([], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })], []),
     topUpCycles: IDL.Func([], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })], []),
     analyzeOnChain: IDL.Func([IDL.Text, IDL.Vec(IDL.Text)], [AnalyzeResult], []),
+    translateOnChain: IDL.Func([IDL.Text], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })], []),
     registerPushSubscription: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
     unregisterPushSubscription: IDL.Func([IDL.Text], [IDL.Bool], []),
     getPushSubscriptions: IDL.Func([IDL.Principal], [IDL.Vec(PushSubscription)], ["query"]),

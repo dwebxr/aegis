@@ -279,9 +279,11 @@ interface DashboardTabProps {
   discoveries?: SerendipityItem[];
   pendingCount?: number;
   onFlushPending?: () => void;
+  onTranslate?: (id: string) => void;
+  isItemTranslating?: (id: string) => boolean;
 }
 
-export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [], pendingCount = 0, onFlushPending }) => {
+export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [], pendingCount = 0, onFlushPending, onTranslate, isItemTranslating }) => {
   const { filterMode } = useFilterMode();
   const { sources } = useSources();
   const { isDemoMode } = useDemo();
@@ -940,6 +942,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         onBookmark={handleBookmark}
                         isBookmarked={bookmarkSet.has(item.id)}
                         onAddFilterRule={addFilterRule}
+                        onTranslate={onTranslate}
+                        isTranslating={isItemTranslating?.(item.id)}
                         mobile={mobile}
                         focused={focusedId === item.id}
                       />

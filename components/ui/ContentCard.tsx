@@ -29,7 +29,9 @@ interface ContentCardProps {
   onFlag: (id: string) => void;
   onAddFilterRule?: (rule: Omit<CustomFilterRule, "id" | "createdAt">) => void;
   onBookmark?: (id: string) => void;
+  onTranslate?: (id: string) => void;
   isBookmarked?: boolean;
+  isTranslating?: boolean;
   mobile?: boolean;
   variant?: CardVariant;
   rank?: number;
@@ -257,7 +259,7 @@ function ActionLink({
   );
 }
 
-const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, isBookmarked, mobile, variant = "default", rank, focused, clusterCount }) => {
+const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, onTranslate, isBookmarked, isTranslating, mobile, variant = "default", rank, focused, clusterCount }) => {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const isSlop = item.verdict === "slop";
@@ -406,6 +408,26 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
               Outside your usual topics — expanding your perspective
             </div>
           )}
+          {item.translation && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <div className="text-caption text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                <span>{"\uD83C\uDF10"}</span>
+                <span className="uppercase text-tiny font-bold tracking-wider">
+                  {item.translation.targetLanguage} translation
+                </span>
+                <span className="text-disabled text-tiny">
+                  via {item.translation.backend}
+                </span>
+              </div>
+              <p className={cn(
+                "m-0 break-words",
+                isLarge ? "text-[16px] leading-[1.35]" : "text-body-lg leading-body-lg",
+                "text-foreground"
+              )}>
+                {item.translation.translatedText}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -462,6 +484,22 @@ const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle
                     ? "bg-amber-400/[0.09] border border-amber-400/[0.19] text-amber-400"
                     : "bg-transparent border border-border text-muted-foreground",
                   compactBtns ? "p-2" : "px-3 py-2"
+                )}
+              />
+            )}
+            {onTranslate && !item.translation && (
+              <ActionBtn
+                label="Translate content"
+                icon={<span className="text-[13px]">{"\uD83C\uDF10"}</span>}
+                showText={showActionText}
+                text={isTranslating ? "Translating..." : "Translate"}
+                disabled={isTranslating}
+                onClick={e => { e.stopPropagation(); onTranslate(item.id); }}
+                className={cn(
+                  actionBtnBase,
+                  "bg-sky-400/[0.06] border border-sky-400/[0.19] text-sky-400",
+                  compactBtns ? "p-2" : "px-3 py-2",
+                  isTranslating && "opacity-50"
                 )}
               />
             )}

@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { useCurrentRef } from "@/hooks/useCurrentRef";
 import { useAuth } from "./AuthContext";
 import type { UserPreferenceProfile, UserContext, CustomFilterRule, NotificationPrefs } from "@/lib/preferences/types";
+import type { TranslationPrefs } from "@/lib/translation/types";
 import { createEmptyProfile, TOPIC_AFFINITY_CAP, TOPIC_AFFINITY_FLOOR } from "@/lib/preferences/types";
 import { learn, getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { loadProfile, saveProfile, syncPreferencesToIC, loadPreferencesFromIC, mergeProfiles } from "@/lib/preferences/storage";
@@ -24,6 +25,7 @@ interface PreferenceState {
   bookmarkItem: (id: string) => void;
   unbookmarkItem: (id: string) => void;
   setNotificationPrefs: (prefs: NotificationPrefs) => void;
+  setTranslationPrefs: (prefs: TranslationPrefs) => void;
 }
 
 const emptyProfile = createEmptyProfile("");
@@ -42,6 +44,7 @@ const PreferenceContext = createContext<PreferenceState>({
   bookmarkItem: () => {},
   unbookmarkItem: () => {},
   setNotificationPrefs: () => {},
+  setTranslationPrefs: () => {},
 });
 
 export function PreferenceProvider({ children }: { children: React.ReactNode }) {
@@ -227,6 +230,10 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     updateProfile(p => { p.notificationPrefs = prefs; });
   }, [updateProfile]);
 
+  const setTranslationPrefs = useCallback((prefs: TranslationPrefs) => {
+    updateProfile(p => { p.translationPrefs = prefs; });
+  }, [updateProfile]);
+
   const isPersonalized = useMemo(() => hasEnoughData(profile), [profile]);
   const userContext = useMemo(() => isPersonalized ? getContext(profile) : null, [profile, isPersonalized]);
 
@@ -234,8 +241,8 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     profile, userContext, isPersonalized, onValidate, onFlag,
     setTopicAffinity, removeTopicAffinity, setQualityThreshold,
     addFilterRule, removeFilterRule,
-    bookmarkItem, unbookmarkItem, setNotificationPrefs,
-  }), [profile, userContext, isPersonalized, onValidate, onFlag, setTopicAffinity, removeTopicAffinity, setQualityThreshold, addFilterRule, removeFilterRule, bookmarkItem, unbookmarkItem, setNotificationPrefs]);
+    bookmarkItem, unbookmarkItem, setNotificationPrefs, setTranslationPrefs,
+  }), [profile, userContext, isPersonalized, onValidate, onFlag, setTopicAffinity, removeTopicAffinity, setQualityThreshold, addFilterRule, removeFilterRule, bookmarkItem, unbookmarkItem, setNotificationPrefs, setTranslationPrefs]);
 
   return (
     <PreferenceContext.Provider value={value}>

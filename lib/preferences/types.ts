@@ -45,6 +45,7 @@ export interface UserPreferenceProfile {
   activityHistogram?: ActivityHistogram;
   bookmarkedIds?: string[];
   notificationPrefs?: NotificationPrefs;
+  translationPrefs?: import("@/lib/translation/types").TranslationPrefs;
 }
 
 export interface NotificationPrefs {

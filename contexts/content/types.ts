@@ -23,6 +23,8 @@ export interface ContentState {
   clearDemoContent: () => void;
   loadFromIC: () => Promise<void>;
   syncBriefing: (state: BriefingState, nostrPubkey?: string | null) => void;
+  patchItem: (id: string, patch: Partial<ContentItem>) => void;
+  actorRef: React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
   pendingActions: number;
   isOnline: boolean;
 }

@@ -1613,6 +1613,44 @@ persistent actor AegisBackend {
     parseAnalysisResponse(response);
   };
 
+  // — IC LLM Translation —
+
+  /// Translate text using IC LLM (Llama 3.1 8B).
+  /// Accepts a pre-built translation prompt and returns raw LLM output.
+  public shared(msg) func translateOnChain(prompt : Text) : async Result.Result<Text, Text> {
+    let caller = msg.caller;
+    requireAuthenticated(caller);
+
+    if (Text.size(prompt) == 0) {
+      return #err("Prompt is required");
+    };
+
+    // Cap prompt at 8000 chars (translation prompt + content)
+    let cappedPrompt = if (Text.size(prompt) > 8000) {
+      var result = "";
+      var count = 0;
+      label charLoop for (c in prompt.chars()) {
+        if (count >= 8000) break charLoop;
+        result #= Text.fromChar(c);
+        count += 1;
+      };
+      result;
+    } else { prompt };
+
+    let response = try {
+      await LLM.prompt(#Llama3_1_8B, cappedPrompt);
+    } catch (e) {
+      Debug.print("[canister] translateOnChain LLM call failed: " # Error.message(e));
+      return #err("IC LLM translation failed");
+    };
+
+    if (Text.size(response) == 0) {
+      return #err("IC LLM returned empty response");
+    };
+
+    #ok(response);
+  };
+
   // — D2A Briefing Snapshots —
 
   public shared(msg) func saveLatestBriefing(briefingJson : Text) : async Bool {
