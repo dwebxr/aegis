@@ -66,7 +66,7 @@ function AegisAppInner() {
   const { translateItem: rawTranslateItem, isItemTranslating } = useTranslation(content, patchItem, actorRef);
   const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile } = usePreferences();
-  const translationOff = (profile.translationPrefs ?? { policy: "manual" }).policy === "off";
+  const translationOff = (profile.translationPrefs?.policy ?? "manual") === "off";
   const translateItem = translationOff ? undefined : rawTranslateItem;
   const { getSchedulerSources } = useSources();
   const { agentState, isEnabled: agentIsEnabled, setD2AEnabled, setWoTGraph: pushWoTGraph } = useAgent();

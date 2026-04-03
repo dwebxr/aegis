@@ -6,6 +6,7 @@ import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isWebLLMLoaded } from "@/lib/webllm/engine";
 import { isMediaPipeEnabled } from "@/lib/mediapipe/storage";
+import { isMediaPipeLoaded } from "@/lib/mediapipe/engine";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
@@ -126,7 +127,7 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     if (isOllamaEnabled()) {
       attempts.push({ name: "ollama", fn: () => translateWithOllama(prompt) });
     }
-    if (isMediaPipeEnabled()) {
+    if (isMediaPipeEnabled() && isMediaPipeLoaded()) {
       attempts.push({ name: "mediapipe", fn: () => translateWithMediaPipe(prompt) });
     } else if (isWebLLMEnabled() && isWebLLMLoaded()) {
       attempts.push({ name: "webllm", fn: () => translateWithWebLLM(prompt) });

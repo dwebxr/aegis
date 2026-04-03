@@ -29,7 +29,10 @@ export async function isWebGPUUsable(): Promise<boolean> {
     return false;
   }
   const gpu = navigator.gpu;
-  if (!gpu) return false;
+  if (!gpu) {
+    emitStatus({ available: false, error: "WebGPU not available" });
+    return false;
+  }
   const adapter = await gpu.requestAdapter();
   if (!adapter) {
     emitStatus({ available: false, error: "No GPU adapter found" });
