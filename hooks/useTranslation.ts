@@ -97,9 +97,7 @@ export function useTranslation(
     }
   }, [actorRef]);
 
-  // Manual translate button — bypasses policy unless translation is off
   const translateItem = useCallback((itemId: string) => {
-    if (prefsRef.current.policy === "off") return;
     const item = items.find(it => it.id === itemId);
     if (item && !item.translation) void runTranslation(item);
   }, [items, runTranslation]);
