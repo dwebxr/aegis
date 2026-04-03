@@ -5,6 +5,7 @@ import { lookupTranslation, storeTranslation } from "./cache";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isWebLLMLoaded } from "@/lib/webllm/engine";
+import { isMediaPipeEnabled } from "@/lib/mediapipe/storage";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
@@ -39,6 +40,13 @@ async function translateWithWebLLM(prompt: string): Promise<string> {
     max_tokens: 4000,
   });
   return response.choices[0]?.message?.content?.trim() ?? "";
+}
+
+async function translateWithMediaPipe(prompt: string): Promise<string> {
+  const { getOrCreateInference } = await import("@/lib/mediapipe/engine");
+  const inf = await getOrCreateInference();
+  const raw = await inf.generateResponse(prompt);
+  return raw.trim();
 }
 
 async function translateWithClaude(prompt: string, apiKey?: string | null): Promise<string> {
@@ -97,8 +105,13 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     raw = await translateWithOllama(prompt);
     usedBackend = "ollama";
   } else if (backend === "browser") {
-    raw = await translateWithWebLLM(prompt);
-    usedBackend = "webllm";
+    if (isMediaPipeEnabled()) {
+      raw = await translateWithMediaPipe(prompt);
+      usedBackend = "mediapipe";
+    } else {
+      raw = await translateWithWebLLM(prompt);
+      usedBackend = "webllm";
+    }
   } else if (backend === "cloud") {
     const key = getUserApiKey();
     raw = await translateWithClaude(prompt, key);
@@ -113,7 +126,9 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     if (isOllamaEnabled()) {
       attempts.push({ name: "ollama", fn: () => translateWithOllama(prompt) });
     }
-    if (isWebLLMEnabled() && isWebLLMLoaded()) {
+    if (isMediaPipeEnabled()) {
+      attempts.push({ name: "mediapipe", fn: () => translateWithMediaPipe(prompt) });
+    } else if (isWebLLMEnabled() && isWebLLMLoaded()) {
       attempts.push({ name: "webllm", fn: () => translateWithWebLLM(prompt) });
     }
     if (actorRef?.current && isAuthenticated) {
