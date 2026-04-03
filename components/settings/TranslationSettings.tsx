@@ -11,6 +11,7 @@ import {
 } from "@/lib/translation/types";
 
 const POLICY_OPTIONS: ReadonlyArray<{ value: TranslationPolicy; label: string; desc: string }> = [
+  { value: "off", label: "Off", desc: "Translation disabled — no translate buttons or auto-translation" },
   { value: "manual", label: "Manual", desc: "Translate only when you tap the translate button" },
   { value: "high_quality", label: "High quality", desc: "Auto-translate posts above the score threshold" },
   { value: "all", label: "All posts", desc: "Auto-translate every post in the feed" },
@@ -42,24 +43,6 @@ export const TranslationSettings: React.FC<TranslationSettingsProps> = ({ mobile
     <div className={cardClass(mobile)}>
       <div className={sectionTitleClass}>Translation</div>
 
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <div className="text-body font-semibold text-secondary-foreground">Language</div>
-          <div className="text-caption text-muted-foreground mt-0.5">
-            Translate content into this language
-          </div>
-        </div>
-        <select
-          value={prefs.targetLanguage}
-          onChange={e => update({ targetLanguage: e.target.value as TranslationLanguage })}
-          className={selectClass}
-        >
-          {LANGUAGES.map(l => (
-            <option key={l.code} value={l.code}>{l.nativeLabel} ({l.label})</option>
-          ))}
-        </select>
-      </div>
-
       <div className="mb-4">
         <div className="text-caption font-semibold text-muted-foreground mb-2">
           Translation Policy
@@ -79,6 +62,26 @@ export const TranslationSettings: React.FC<TranslationSettingsProps> = ({ mobile
           {POLICY_OPTIONS.find(o => o.value === prefs.policy)?.desc}
         </div>
       </div>
+
+      {prefs.policy !== "off" && (
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="text-body font-semibold text-secondary-foreground">Language</div>
+            <div className="text-caption text-muted-foreground mt-0.5">
+              Translate content into this language
+            </div>
+          </div>
+          <select
+            value={prefs.targetLanguage}
+            onChange={e => update({ targetLanguage: e.target.value as TranslationLanguage })}
+            className={selectClass}
+          >
+            {LANGUAGES.map(l => (
+              <option key={l.code} value={l.code}>{l.nativeLabel} ({l.label})</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {prefs.policy === "high_quality" && (
         <div className="mb-4">
@@ -101,25 +104,27 @@ export const TranslationSettings: React.FC<TranslationSettingsProps> = ({ mobile
         </div>
       )}
 
-      <div>
-        <div className="text-caption font-semibold text-muted-foreground mb-2">
-          Translation Engine
+      {prefs.policy !== "off" && (
+        <div>
+          <div className="text-caption font-semibold text-muted-foreground mb-2">
+            Translation Engine
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {BACKEND_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => update({ backend: opt.value })}
+                className={pillBtnClass(prefs.backend === opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <div className="text-tiny text-disabled mt-2 leading-normal">
+            {BACKEND_OPTIONS.find(o => o.value === prefs.backend)?.desc}
+          </div>
         </div>
-        <div className="flex gap-1 flex-wrap">
-          {BACKEND_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => update({ backend: opt.value })}
-              className={pillBtnClass(prefs.backend === opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <div className="text-tiny text-disabled mt-2 leading-normal">
-          {BACKEND_OPTIONS.find(o => o.value === prefs.backend)?.desc}
-        </div>
-      </div>
+      )}
     </div>
   );
 };

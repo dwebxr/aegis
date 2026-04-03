@@ -9,6 +9,7 @@ import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 
 const MAX_CONCURRENT = 3;
+const RETRY_INTERVAL_MS = 60_000;
 
 interface UseTranslationReturn {
   translateItem: (itemId: string) => void;
@@ -48,6 +49,12 @@ export function useTranslation(
   // Active translation count for concurrency control
   const activeRef = useRef(0);
 
+  // Bumped to force effect re-run after clearing the failed set
+  const [retryTick, setRetryTick] = useState(0);
+
+  // Debounce "all backends failed" notification — show once per language
+  const failNotifiedLangRef = useRef("");
+
   const runTranslation = useCallback(async (item: ContentItem) => {
     const p = prefsRef.current;
     const opts: TranslateOptions = {
@@ -82,11 +89,17 @@ export function useTranslation(
       attemptedRef.current.skip.add(item.id);
     } else {
       attemptedRef.current.failed.add(item.id);
+      // Notify once per target language so the user knows auto-translate isn't working
+      if (failNotifiedLangRef.current !== prefsRef.current.targetLanguage) {
+        failNotifiedLangRef.current = prefsRef.current.targetLanguage;
+        notifyRef.current("Auto-translate: no translation backend available. Check Settings → Translation Engine.", "error");
+      }
     }
   }, [actorRef]);
 
-  // Manual translate button — bypasses policy, always translates
+  // Manual translate button — bypasses policy unless translation is off
   const translateItem = useCallback((itemId: string) => {
+    if (prefsRef.current.policy === "off") return;
     const item = items.find(it => it.id === itemId);
     if (item && !item.translation) void runTranslation(item);
   }, [items, runTranslation]);
@@ -97,7 +110,7 @@ export function useTranslation(
 
   // Auto-translate effect: runs when content or prefs change
   useEffect(() => {
-    if (prefs.policy === "manual") return;
+    if (prefs.policy === "manual" || prefs.policy === "off") return;
 
     const pending = items.filter(item => {
       if (item.translation) return false;
@@ -116,13 +129,18 @@ export function useTranslation(
     for (const item of batch) {
       void runTranslation(item);
     }
-  }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, translatingIds, runTranslation]);
+  }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, translatingIds, runTranslation, retryTick]);
 
   // Clear failed set periodically to allow retry (every 60s)
+  // Bump retryTick so the auto-translate effect re-runs after clearing.
   useEffect(() => {
     const interval = setInterval(() => {
-      attemptedRef.current.failed.clear();
-    }, 60_000);
+      if (attemptedRef.current.failed.size > 0) {
+        attemptedRef.current.failed.clear();
+        failNotifiedLangRef.current = "";           // allow notification again
+        setRetryTick(t => t + 1);                   // trigger effect re-run
+      }
+    }, RETRY_INTERVAL_MS);
     return () => clearInterval(interval);
   }, []);
 

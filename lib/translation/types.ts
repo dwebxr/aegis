@@ -1,6 +1,6 @@
 export type TranslationLanguage = "en" | "ja" | "zh" | "ko" | "es" | "fr" | "de" | "pt" | "it" | "ru";
 
-export type TranslationPolicy = "high_quality" | "all" | "manual";
+export type TranslationPolicy = "off" | "manual" | "high_quality" | "all";
 
 export type TranslationBackend = "auto" | "browser" | "local" | "cloud" | "ic";
 
