@@ -10,12 +10,14 @@
 ## Latest Updates (April 2026)
 
 ### Mobile AI Scoring (MediaPipe LLM Inference)
-- **6,426 tests, 365 suites** — zero failures, zero skipped
+- **6,435 tests, 365 suites** — zero failures, zero skipped
 - **MediaPipe LLM Inference**: on-device AI scoring for mobile via WebGPU, using Google's `@mediapipe/tasks-genai` SDK
 - **Dual model**: Gemma 3 1B (700MB, default) or Gemma 4 E2B (2GB, optional) — selectable in Settings > Feeds on mobile
 - **OOM handling**: Gemma 4 E2B "Array buffer allocation failed" detected with actionable guidance to switch to Gemma 3 1B
-- **Mobile/desktop split**: mobile users see MediaPipe card, desktop users see WebLLM card — mutual exclusion in scoring cascade
-- **Scoring cascade**: MediaPipe at Tier 1 (mobile), WebLLM at Tier 1 (desktop), `else if` prevents both racing for WebGPU
+- **Safari error handling**: iOS Safari throws Event objects (not Error) for WebGPU failures — `describeError()` extracts useful messages with Safari-specific guidance ("wait for iOS 26+ Safari")
+- **Mobile/desktop split**: mobile users see MediaPipe card, desktop users see WebLLM card — mutual exclusion in scoring + translation cascades
+- **Translation integration**: MediaPipe as translation backend (browser mode on mobile), `isMediaPipeLoaded()` check prevents unintended model downloads in auto-cascade
+- **Translation Off**: new policy option to fully disable translation (no buttons, no auto-translate) — for devices where no backend is available
 
 ### Content Translation (Multi-Backend)
 - **4 translation backends**: IC LLM (on-chain, free, ideal for PWA/mobile), Ollama (local), WebLLM (browser), Claude BYOK (cloud premium)
