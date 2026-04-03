@@ -20,7 +20,7 @@ const POLICY_OPTIONS: ReadonlyArray<{ value: TranslationPolicy; label: string; d
 const BACKEND_OPTIONS: ReadonlyArray<{ value: TranslationBackend; label: string; desc: string }> = [
   { value: "auto", label: "Auto", desc: "Use best available engine" },
   { value: "ic", label: "IC LLM", desc: "On-chain Llama 3.1 — free, no device load" },
-  { value: "browser", label: "Browser", desc: "WebLLM — in-browser, requires WebGPU" },
+  { value: "browser", label: "Browser", desc: "In-browser via WebGPU (MediaPipe on mobile, WebLLM on desktop)" },
   { value: "local", label: "Local", desc: "Ollama — local server" },
   { value: "cloud", label: "Cloud", desc: "Claude API — highest quality" },
 ];
