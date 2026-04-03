@@ -115,7 +115,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
       unsub = onStatusChange(setMediapipeStatus);
     })();
     return () => { unsub?.(); };
-  }, [mediapipeOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mediapipeOn]);
 
   const handleMediaPipeToggle = useCallback(async () => {
     if (mediapipeOn) {
