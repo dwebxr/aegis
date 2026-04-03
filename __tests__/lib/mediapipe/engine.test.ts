@@ -134,8 +134,9 @@ describe("isWebGPUUsable", () => {
     onStatusChange((s: Record<string, unknown>) => { lastStatus = s; });
 
     await isWebGPUUsable();
-    expect(lastStatus.available).toBe(false); // initial value, never set to true
+    expect(lastStatus.available).toBe(false);
   });
+
 });
 
 // ─── getOrCreateInference ───
@@ -248,6 +249,37 @@ describe("getOrCreateInference", () => {
     expect(lastStatus.error).toContain("Memory error");
   });
 
+  it("handles Event object errors (Safari WebGPU) with useful message", async () => {
+    // Safari throws Event objects instead of Error for WebGPU failures
+    const eventError = { type: "error", message: undefined };
+    mockCreateFromOptions.mockRejectedValue(eventError);
+
+    const { getOrCreateInference, onStatusChange } = require("@/lib/mediapipe/engine");
+    let lastStatus: Record<string, unknown> = {};
+    onStatusChange((s: Record<string, unknown>) => { lastStatus = s; });
+
+    await expect(getOrCreateInference()).rejects.toBe(eventError);
+    expect(lastStatus.error).toContain("WebGPU/wasm error");
+    expect(lastStatus.error).not.toBe("[object Object]");
+  });
+
+  it("shows Safari-specific message for Event errors on Safari UA", async () => {
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+      configurable: true,
+    });
+    const eventError = { type: "error" };
+    mockCreateFromOptions.mockRejectedValue(eventError);
+
+    const { getOrCreateInference, onStatusChange } = require("@/lib/mediapipe/engine");
+    let lastStatus: Record<string, unknown> = {};
+    onStatusChange((s: Record<string, unknown>) => { lastStatus = s; });
+
+    await expect(getOrCreateInference()).rejects.toBe(eventError);
+    expect(lastStatus.error).toContain("Safari");
+    expect(lastStatus.error).toContain("iOS 26");
+  });
+
   it("emits generic error for non-OOM failures", async () => {
     mockCreateFromOptions.mockRejectedValue(new Error("Model download failed: 404"));
 
@@ -257,7 +289,7 @@ describe("getOrCreateInference", () => {
     onStatusChange((s: Record<string, unknown>) => { lastStatus = s; });
 
     await expect(getOrCreateInference()).rejects.toThrow("Model download failed: 404");
-    expect(lastStatus.error).toBe("Error: Model download failed: 404");
+    expect(lastStatus.error).toBe("Model download failed: 404");
     expect(lastStatus.error).not.toContain("Memory error");
     expect(lastStatus.loading).toBe(false);
     expect(lastStatus.modelId).toBe("gemma-3-1b");

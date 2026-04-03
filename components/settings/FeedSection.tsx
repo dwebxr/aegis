@@ -129,7 +129,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
     } else {
       const { isWebGPUUsable } = await import("@/lib/mediapipe/engine");
       if (!(await isWebGPUUsable())) {
-        addNotification("WebGPU not available — see chrome://gpu", "error");
+        addNotification("WebGPU not available. Chrome on Android recommended. iOS requires Safari 26+.", "error");
         return;
       }
       const updated = { ...mediapipeConfig, enabled: true };
@@ -533,7 +533,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
           </div>
         )}
         <div className="text-tiny text-disabled mt-2 leading-tight">
-          Run AI scoring on mobile via MediaPipe LLM Inference (Gemma). Requires WebGPU. Default: Gemma 3 1B (~700MB). No data leaves your device.
+          Run AI scoring on mobile via MediaPipe LLM Inference (Gemma). Requires WebGPU (Chrome on Android, or Safari 26+ on iOS). Default: Gemma 3 1B (~700MB). No data leaves your device.
         </div>
       </div>}
     </>

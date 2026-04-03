@@ -24,15 +24,37 @@ export function isWebGPUAvailable(): boolean {
 }
 
 export async function isWebGPUUsable(): Promise<boolean> {
-  if (!isWebGPUAvailable()) return false;
+  if (!isWebGPUAvailable()) {
+    emitStatus({ available: false, error: "WebGPU not available" });
+    return false;
+  }
   const gpu = navigator.gpu;
   if (!gpu) return false;
   const adapter = await gpu.requestAdapter();
-  const usable = adapter !== null;
-  if (usable) {
-    emitStatus({ available: true });
+  if (!adapter) {
+    emitStatus({ available: false, error: "No GPU adapter found" });
+    return false;
   }
-  return usable;
+  emitStatus({ available: true });
+  return true;
+}
+
+/** Extract a useful message from any thrown value (Error, Event, string, etc.) */
+function describeError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  // WebGPU/wasm failures often throw Event objects instead of Error instances
+  if (err && typeof err === "object" && "type" in err) {
+    const event = err as { type: string; message?: string };
+    const detail = event.message || event.type;
+    // Safari/iOS WebGPU: insufficient maxStorageBufferBindingSize or missing compute shaders
+    const isSafari = typeof navigator !== "undefined" && /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+    if (isSafari) {
+      return `Browser not supported: Safari's WebGPU lacks features required by MediaPipe. Use Chrome on Android, or wait for iOS 26+ Safari. (${detail})`;
+    }
+    return `WebGPU/wasm error: ${detail}`;
+  }
+  return String(err);
 }
 
 export async function getOrCreateInference(): Promise<LlmInference> {
@@ -46,7 +68,6 @@ export async function getOrCreateInference(): Promise<LlmInference> {
 
   inferencePromise = (async () => {
     if (!(await isWebGPUUsable())) {
-      emitStatus({ available: false, error: "WebGPU not available — no GPU adapter found" });
       throw new Error("WebGPU not available");
     }
 
@@ -75,7 +96,7 @@ export async function getOrCreateInference(): Promise<LlmInference> {
       emitStatus({ loaded: true, loading: false, modelId: selectedId });
       return inference;
     } catch (err) {
-      const msg = String(err);
+      const msg = describeError(err);
       // Gemma 3n E2B / Gemma 4 E2B known issue: Array buffer allocation failed
       if (
         msg.includes("Array buffer allocation failed") ||
@@ -94,7 +115,7 @@ export async function getOrCreateInference(): Promise<LlmInference> {
   })();
 
   inferencePromise.catch((err) => {
-    console.warn("[mediapipe] Engine creation failed:", String(err));
+    console.warn("[mediapipe] Engine creation failed:", describeError(err));
     inferencePromise = null;
   });
 
