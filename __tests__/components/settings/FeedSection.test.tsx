@@ -400,6 +400,7 @@ describe("FeedSection — mobile", () => {
     const html = renderToStaticMarkup(<FeedSection mobile />);
     expect(html).toContain("Filter Mode");
     expect(html).toContain("AI Scoring");
-    expect(html).toContain("Browser AI");
+    expect(html).toContain("Mobile AI (MediaPipe)");
+    expect(html).not.toContain("Browser AI");
   });
 });

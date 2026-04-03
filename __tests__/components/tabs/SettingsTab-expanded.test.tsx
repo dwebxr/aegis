@@ -389,11 +389,10 @@ describe("SettingsTab — Browser AI (WebLLM) section (Feeds sub-tab)", () => {
     expect(html).toContain("4GB");
   });
 
-  it("renders in mobile mode without errors", () => {
-    mockWebLLMEnabled = true;
+  it("renders in mobile mode without errors — shows MediaPipe instead of WebLLM", () => {
     const html = renderToStaticMarkup(<SettingsTab mobile initialSubTab="feeds" />);
-    expect(html).toContain("Browser AI");
-    expect(html).toContain("Enabled");
+    expect(html).toContain("Mobile AI (MediaPipe)");
+    expect(html).not.toContain("Browser AI");
   });
 });
 

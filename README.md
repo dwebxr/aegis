@@ -9,8 +9,17 @@
 
 ## Latest Updates (April 2026)
 
+### Mobile AI Scoring (MediaPipe LLM Inference)
+- **6,426 tests, 365 suites** — zero failures, zero skipped
+- **MediaPipe LLM Inference**: on-device AI scoring for mobile via WebGPU, using Google's `@mediapipe/tasks-genai` SDK
+- **Dual model**: Gemma 3 1B (700MB, default) or Gemma 4 E2B (2GB, optional) — selectable in Settings > Feeds on mobile
+- **OOM handling**: Gemma 4 E2B "Array buffer allocation failed" detected with actionable guidance to switch to Gemma 3 1B
+- **Mobile/desktop split**: mobile users see MediaPipe card, desktop users see WebLLM card — mutual exclusion in scoring cascade
+- **Scoring cascade**: MediaPipe at Tier 1 (mobile), WebLLM at Tier 1 (desktop), `else if` prevents both racing for WebGPU
+
 ### Content Translation (Multi-Backend)
-- **6,356 tests, 363 suites** — zero failures, zero skipped
+- **4 translation backends**: IC LLM (on-chain, free, ideal for PWA/mobile), Ollama (local), WebLLM (browser), Claude BYOK (cloud premium)
+
 - **4 translation backends**: IC LLM (on-chain, free, ideal for PWA/mobile), Ollama (local), WebLLM (browser), Claude BYOK (cloud premium)
 - **Auto cascade**: tries enabled backends in order (Ollama → WebLLM → IC LLM → BYOK → Server Claude), falls back gracefully
 - **3 translation policies**: Manual (button per post), High quality (auto-translate above score threshold), All posts
@@ -134,7 +143,7 @@ Aegis has two independent axes: **authentication state** (Demo vs Logged-in) and
 
 - **Demo**: Open the app without logging in. You get 3 preset RSS feeds scored with heuristic filters. Source management is disabled. Great for trying Aegis without commitment. Pro mode selector is locked.
 - **Lite**: Login and select "Lite" in Settings > Feeds. Full source management with heuristic-only scoring. No API calls, $0 cost. WoT and serendipity disabled.
-- **Pro**: Login and select "Pro" in Settings > Feeds. **Requires at least one AI scoring engine** (Ollama, Browser AI, or BYOK API key) to be configured in Settings > Feeds. Full AI scoring pipeline (Ollama → WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
+- **Pro**: Login and select "Pro" in Settings > Feeds. **Requires at least one AI scoring engine** (Ollama, Browser AI, or BYOK API key) to be configured in Settings > Feeds. Full AI scoring pipeline (Ollama → MediaPipe/WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
 
 Users switch between Lite and Pro in Settings > Feeds (with AI engine status indicators). The Dashboard displays the current mode as a read-only badge — clicking it navigates to Settings. Pro is gated behind AI scoring availability — if no AI engine is configured, the Pro button shows "AI setup required" and auto-falls back to Lite. Demo mode is automatic when not logged in — logging in clears demo content and enables full source management.
 
@@ -143,16 +152,17 @@ Users switch between Lite and Pro in Settings > Feeds (with AI engine status ind
 | Engine | Tier | Where | Cost | When used |
 |--------|------|-------|------|-----------|
 | Ollama / OpenAI-compatible | 0th\* | Local server (user-hosted) | Free | **Opt-in** — enable in Settings > Feeds; tried first when active |
-| WebLLM (Llama 3.1 8B q4f16) | 1st\* | Browser-local (WebGPU) | Free | **Opt-in** — enable in Settings > Feeds; tried when Ollama inactive/fails |
+| MediaPipe (Gemma 3 1B / Gemma 4 E2B) | 1st\* | Browser-local (WebGPU) | Free | **Opt-in** — mobile only; enable in Settings > Feeds |
+| WebLLM (Llama 3.1 8B q4f16) | 1st\* | Browser-local (WebGPU) | Free | **Opt-in** — desktop only; enable in Settings > Feeds |
 | Anthropic Claude (BYOK) | 2nd | Off-chain (Vercel) | User's API key | When user sets own API key in Settings > Feeds |
 | IC LLM (Llama 3.1 8B) | 3rd | On-chain (IC canister) | Free | Default for authenticated users |
 | Anthropic Claude (server key) | 3.5th | Off-chain (Vercel) | Free during alpha | Non-BYOK users when IC LLM fails (future Pro subscription) |
 | Heuristic filter | 4th | Client-side | Free | Fallback when all LLM tiers fail |
 
-\*Ollama and WebLLM are **off by default**. When neither is enabled, the chain starts at Tier 2 (BYOK) or Tier 3 (IC LLM).
+\*Ollama, MediaPipe, and WebLLM are **off by default**. MediaPipe and WebLLM are mutually exclusive (shared WebGPU); mobile shows MediaPipe, desktop shows WebLLM.
 
-BYOK users: Ollama\* → WebLLM\* → BYOK Claude → IC LLM → Heuristic. 
-Non-BYOK users: Ollama\* → WebLLM\* → IC LLM → Server Claude → Heuristic.
+BYOK users: Ollama\* → MediaPipe\*/WebLLM\* → BYOK Claude → IC LLM → Heuristic. 
+Non-BYOK users: Ollama\* → MediaPipe\*/WebLLM\* → IC LLM → Server Claude → Heuristic.
 
 ### Publishing & D2A
 
@@ -179,6 +189,7 @@ Non-BYOK users: Ollama\* → WebLLM\* → IC LLM → Server Claude → Heuristic
 | Push Notifications | IC canister + browser | No (browser-specific) |
 | Local LLM (Ollama) | localStorage only | No (browser-specific) |
 | Browser AI (WebLLM) | localStorage only | No (browser-specific) |
+| Mobile AI (MediaPipe) | localStorage only | No (browser-specific) |
 | Interests & Preferences | IC canister + localStorage cache | Yes |
 | Agent Profile (Kind 0) | Nostr relays + localStorage cache | Yes (via relays) |
 
@@ -218,7 +229,7 @@ Browser                                  Internet Computer (Mainnet)
             ▼
    Scoring Pipeline (fallback chain):
    0.  Ollama / OpenAI-compatible (local server, if enabled)
-   1.  WebLLM (browser-local via WebGPU, if enabled)
+   1.  MediaPipe (Gemma 3 1B/4 E2B, mobile) or WebLLM (Llama 3.1 8B, desktop)
    1.5 IC LLM (Llama 3.1 8B, free, on-chain)
    2.  Anthropic Claude (premium, V/C/L) or BYOK
    3.  Heuristic fallback (client-side)
@@ -246,11 +257,15 @@ When enabled in Settings > Feeds, **Ollama** (or any OpenAI-compatible local LLM
 
 If Ollama is not enabled or fails, the system falls through to Tier 1.
 
-### Tier 1: WebLLM Browser-Local Scoring (Free, Privacy-First)
+### Tier 1: Browser-Local Scoring (Free, Privacy-First)
 
-When enabled in Settings > Feeds, **WebLLM** (Llama 3.1 8B q4f16 via WebGPU) is tried next. It runs entirely in the browser: no API calls, no data leaves the device. The model downloads once on first use (~4 GB) and scores locally thereafter. Requires a WebGPU-capable browser.
+**Desktop — WebLLM**: Llama 3.1 8B q4f16 via WebGPU. Model downloads once on first use (~4 GB).
 
-If WebLLM is not enabled or fails, the system falls through to Tier 2.
+**Mobile — MediaPipe LLM Inference**: Gemma 3 1B (default, ~700MB) or Gemma 4 E2B (optional, ~2GB) via `@mediapipe/tasks-genai`. Model selectable in Settings > Feeds. Gemma 4 E2B may fail with "Array buffer allocation failed" on low-memory devices — the UI shows actionable guidance to switch to Gemma 3 1B.
+
+Both run entirely in the browser: no API calls, no data leaves the device. MediaPipe and WebLLM are mutually exclusive (they share WebGPU). Requires a WebGPU-capable browser.
+
+If neither is enabled or both fail, the system falls through to Tier 2.
 
 ### Tier 2: Claude API BYOK (User's Own Key)
 
@@ -744,7 +759,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 
 ### Multi-Tier AI Scoring Pipeline
 - **Tier 0**: Ollama / OpenAI-compatible — free, local server, zero latency (when enabled)
-- **Tier 1**: WebLLM (Llama 3.1 8B q4f16) — free, browser-local via WebGPU, no data leaves device (when enabled)
+- **Tier 1**: MediaPipe (Gemma 3 1B / 4 E2B, mobile) or WebLLM (Llama 3.1 8B, desktop) — free, browser-local via WebGPU, no data leaves device (when enabled)
 - **Tier 2**: Claude API BYOK — premium V/C/L scoring with user's own API key
 - **Tier 3**: IC LLM (Llama 3.1 8B) — free, fully on-chain, no API key
 - **Tier 3.5**: Claude API server key — free during alpha (future Pro subscription)

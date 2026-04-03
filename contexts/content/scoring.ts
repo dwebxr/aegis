@@ -6,6 +6,7 @@ import { errMsg } from "@/lib/utils/errors";
 import { withTimeout } from "@/lib/utils/timeout";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
+import { isMediaPipeEnabled } from "@/lib/mediapipe/storage";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
 import { computeScoringCacheKey, computeProfileHash, lookupScoringCache, storeScoringCache } from "@/lib/scoring/cache";
 
@@ -49,6 +50,12 @@ async function tryWebLLM(text: string, topics: string[]): Promise<AnalyzeRespons
   return { ...r, scoredByAI: true, scoringEngine: "webllm" as const };
 }
 
+async function tryMediaPipe(text: string, topics: string[]): Promise<AnalyzeResponse> {
+  const { scoreWithMediaPipe } = await import("@/lib/mediapipe/engine");
+  const r = await scoreWithMediaPipe(text, topics);
+  return { ...r, scoredByAI: true, scoringEngine: "mediapipe" as const };
+}
+
 async function tryBYOK(text: string, uc: UserContext | null | undefined, key: string): Promise<AnalyzeResponse> {
   const data = await fetchAnalyze(text, uc, key);
   if (!data) throw new Error("BYOK failed");
@@ -80,7 +87,11 @@ export async function runScoringCascade(
       localTiers.push(Sentry.startSpan({ name: "scoring.ollama", op: "scoring.tier" }, () => tryOllama(text, topics)));
       tierNames.push("ollama");
     }
-    if (isWebLLMEnabled()) {
+    // WebLLM and MediaPipe share WebGPU — use one, not both
+    if (isMediaPipeEnabled()) {
+      localTiers.push(Sentry.startSpan({ name: "scoring.mediapipe", op: "scoring.tier" }, () => tryMediaPipe(text, topics)));
+      tierNames.push("mediapipe");
+    } else if (isWebLLMEnabled()) {
       localTiers.push(Sentry.startSpan({ name: "scoring.webllm", op: "scoring.tier" }, () => tryWebLLM(text, topics)));
       tierNames.push("webllm");
     }

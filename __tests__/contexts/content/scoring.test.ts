@@ -6,7 +6,13 @@
 // Mock external dependencies before imports
 jest.mock("@/lib/apiKey/storage", () => ({ getUserApiKey: jest.fn(() => null) }));
 jest.mock("@/lib/webllm/storage", () => ({ isWebLLMEnabled: jest.fn(() => false) }));
+jest.mock("@/lib/mediapipe/storage", () => ({ isMediaPipeEnabled: jest.fn(() => false) }));
 jest.mock("@/lib/ollama/storage", () => ({ isOllamaEnabled: jest.fn(() => false) }));
+
+const mockScoreWithMediaPipe = jest.fn();
+jest.mock("@/lib/mediapipe/engine", () => ({
+  scoreWithMediaPipe: (...args: unknown[]) => mockScoreWithMediaPipe(...args),
+}));
 jest.mock("@/lib/scoring/cache", () => ({
   computeProfileHash: jest.fn(() => "hash"),
   computeScoringCacheKey: jest.fn(() => "key"),
@@ -24,6 +30,7 @@ const originalFetch = global.fetch;
 import { runScoringCascade } from "@/contexts/content/scoring";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
+import { isMediaPipeEnabled } from "@/lib/mediapipe/storage";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
 import { lookupScoringCache, storeScoringCache } from "@/lib/scoring/cache";
 
@@ -227,5 +234,52 @@ describe("runScoringCascade", () => {
 
     await runScoringCascade("text", null, actorRef, false);
     expect(storeScoringCache).toHaveBeenCalledWith("key", "hash", expect.objectContaining({ scoringEngine: "claude-server" }));
+  });
+
+  it("uses MediaPipe tier when enabled", async () => {
+    (isMediaPipeEnabled as jest.Mock).mockReturnValue(true);
+    mockScoreWithMediaPipe.mockResolvedValueOnce({
+      vSignal: 7, cContext: 6, lSlop: 3,
+      originality: 7, insight: 6, credibility: 8,
+      composite: 6.5, verdict: "quality",
+      reason: "MediaPipe scored", topics: ["tech"],
+    });
+
+    const result = await runScoringCascade("test text", null, actorRef, false);
+    expect(result.scoringEngine).toBe("mediapipe");
+    expect(result.scoredByAI).toBe(true);
+    expect(result.originality).toBe(7);
+  });
+
+  it("prefers MediaPipe over WebLLM when both enabled (shared WebGPU)", async () => {
+    (isMediaPipeEnabled as jest.Mock).mockReturnValue(true);
+    (isWebLLMEnabled as jest.Mock).mockReturnValue(true);
+    mockScoreWithMediaPipe.mockResolvedValueOnce({
+      vSignal: 7, cContext: 6, lSlop: 3,
+      originality: 7, insight: 6, credibility: 8,
+      composite: 6.5, verdict: "quality",
+      reason: "MediaPipe scored", topics: ["tech"],
+    });
+
+    const result = await runScoringCascade("test text", null, actorRef, false);
+    expect(result.scoringEngine).toBe("mediapipe");
+    // WebLLM engine module should not have been imported
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("falls through MediaPipe failure to server Claude", async () => {
+    (isMediaPipeEnabled as jest.Mock).mockReturnValue(true);
+    mockScoreWithMediaPipe.mockRejectedValueOnce(new Error("Array buffer allocation failed"));
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        originality: 6, insight: 5, credibility: 7, composite: 6,
+        verdict: "quality", reason: "Server fallback", topics: [],
+      }),
+    });
+
+    const result = await runScoringCascade("test text", null, actorRef, false);
+    expect(result.scoringEngine).toBe("claude-server");
   });
 });

@@ -1,10 +1,11 @@
 import type { Verdict } from "@/lib/types/content";
 
-export type ScoringEngine = "ollama" | "webllm" | "claude-byok" | "claude-ic" | "claude-server" | "heuristic";
+export type ScoringEngine = "ollama" | "webllm" | "mediapipe" | "claude-byok" | "claude-ic" | "claude-server" | "heuristic";
 
 export const ENGINE_LABELS: Record<ScoringEngine, string> = {
   "ollama": "Ollama",
   "webllm": "WebLLM",
+  "mediapipe": "MediaPipe",
   "claude-byok": "Claude (BYOK)",
   "claude-ic": "IC LLM",
   "claude-server": "Claude (Server)",

@@ -7,6 +7,9 @@ import { FilterModeSelector } from "@/components/filtering/FilterModeSelector";
 import { getUserApiKey, setUserApiKey, clearUserApiKey, maskApiKey } from "@/lib/apiKey/storage";
 import { isWebLLMEnabled, setWebLLMEnabled } from "@/lib/webllm/storage";
 import type { WebLLMStatus } from "@/lib/webllm/types";
+import { getMediaPipeConfig, setMediaPipeConfig, setMediaPipeEnabled } from "@/lib/mediapipe/storage";
+import type { MediaPipeConfig, MediaPipeStatus, MediaPipeModelId } from "@/lib/mediapipe/types";
+import { MEDIAPIPE_MODELS } from "@/lib/mediapipe/types";
 import { getOllamaConfig, setOllamaConfig } from "@/lib/ollama/storage";
 import type { OllamaConfig, OllamaStatus } from "@/lib/ollama/types";
 import { DEFAULT_OLLAMA_CONFIG } from "@/lib/ollama/types";
@@ -50,6 +53,11 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
   const [webllmStatus, setWebllmStatus] = useState<WebLLMStatus>({
     available: false, loaded: false, loading: false, progress: 0,
   });
+  const [mediapipeConfig, setMediapipeConfigState] = useState<MediaPipeConfig>(() => getMediaPipeConfig());
+  const [mediapipeStatus, setMediapipeStatus] = useState<MediaPipeStatus>({
+    available: false, loaded: false, loading: false,
+  });
+  const mediapipeOn = mediapipeConfig.enabled;
   const [ollamaConfig, setOllamaConfigState] = useState<OllamaConfig>(() => getOllamaConfig());
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus>({
     connected: false, loading: false, models: [],
@@ -91,6 +99,57 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
       addNotification("Browser AI enabled", "success");
     }
   }, [webllmOn, addNotification]);
+
+  // MediaPipe status subscription
+  useEffect(() => {
+    if (!mediapipeOn) return;
+    let unsub: (() => void) | null = null;
+    (async () => {
+      const { onStatusChange, isWebGPUUsable } = await import("@/lib/mediapipe/engine");
+      if (!(await isWebGPUUsable())) {
+        setMediaPipeEnabled(false);
+        setMediapipeConfigState(prev => ({ ...prev, enabled: false }));
+        setMediapipeStatus({ available: false, loaded: false, loading: false });
+        return;
+      }
+      unsub = onStatusChange(setMediapipeStatus);
+    })();
+    return () => { unsub?.(); };
+  }, [mediapipeOn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleMediaPipeToggle = useCallback(async () => {
+    if (mediapipeOn) {
+      const updated = { ...mediapipeConfig, enabled: false };
+      setMediaPipeConfig(updated);
+      setMediapipeConfigState(updated);
+      const { destroyInference } = await import("@/lib/mediapipe/engine");
+      await destroyInference();
+      setMediapipeStatus({ available: false, loaded: false, loading: false });
+      addNotification("Mobile AI disabled", "success");
+    } else {
+      const { isWebGPUUsable } = await import("@/lib/mediapipe/engine");
+      if (!(await isWebGPUUsable())) {
+        addNotification("WebGPU not available — see chrome://gpu", "error");
+        return;
+      }
+      const updated = { ...mediapipeConfig, enabled: true };
+      setMediaPipeConfig(updated);
+      setMediapipeConfigState(updated);
+      addNotification("Mobile AI enabled", "success");
+    }
+  }, [mediapipeOn, mediapipeConfig, addNotification]);
+
+  const handleMediaPipeModelChange = useCallback(async (modelId: MediaPipeModelId) => {
+    const updated = { ...mediapipeConfig, modelId };
+    setMediaPipeConfig(updated);
+    setMediapipeConfigState(updated);
+    if (mediapipeStatus.loaded) {
+      const { destroyInference } = await import("@/lib/mediapipe/engine");
+      await destroyInference();
+      setMediapipeStatus(prev => ({ ...prev, loaded: false, modelId }));
+      addNotification(`Switched to ${MEDIAPIPE_MODELS[modelId].label} — will download on next use`, "success");
+    }
+  }, [mediapipeConfig, mediapipeStatus.loaded, addNotification]);
 
   const handleOllamaToggle = useCallback(async () => {
     const newEnabled = !ollamaConfig.enabled;
@@ -185,10 +244,11 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
         <div className="mt-3 flex flex-col gap-1">
           {([
             { label: "Local LLM (Ollama)", on: ollamaConfig.enabled },
-            { label: "Browser AI (WebLLM)", on: webllmOn },
+            ...(!mobile ? [{ label: "Browser AI (WebLLM)", on: webllmOn }] : []),
+            ...(mobile ? [{ label: "Mobile AI (MediaPipe)", on: mediapipeOn }] : []),
             { label: "API Key (BYOK)", on: hasApiKey },
             { label: "IC LLM (D2A Agent)", on: agentEnabled },
-          ] as const).map(e => (
+          ] as { label: string; on: boolean }[]).map(e => (
             <div key={e.label} className="flex items-center gap-2">
               <div className={statusDot(e.on)} />
               <span className={cn("text-caption", e.on ? "text-secondary-foreground" : "text-disabled")}>
@@ -357,7 +417,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
         </div>
       </div>
 
-      <div className={cardClass(mobile)}>
+      {!mobile && <div className={cardClass(mobile)}>
         <div className={sectionTitleClass}>Browser AI</div>
         <div className="flex items-center gap-2 mb-3">
           <button
@@ -404,7 +464,78 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
         <div className="text-tiny text-disabled mt-2 leading-tight">
           Run AI scoring locally via WebGPU (Llama 3.1 8B). Requires a WebGPU-capable browser and ~4GB download. No data leaves your device.
         </div>
-      </div>
+      </div>}
+
+      {mobile && <div className={cardClass(mobile)}>
+        <div className={sectionTitleClass}>Mobile AI (MediaPipe)</div>
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            data-testid="aegis-settings-mediapipe-toggle"
+            onClick={handleMediaPipeToggle}
+            className={toggleBase(mediapipeOn)}
+          >
+            <div style={toggleKnob(mediapipeOn)} />
+          </button>
+          <span className={cn("text-caption font-semibold", mediapipeOn ? "text-cyan-400" : "text-disabled")}>
+            {mediapipeOn ? "Enabled" : "Disabled"}
+          </span>
+        </div>
+
+        {mediapipeOn && (
+          <div className="flex flex-col gap-3">
+            <div>
+              <div className="text-tiny text-disabled mb-1">Model</div>
+              <select
+                data-testid="aegis-settings-mediapipe-model"
+                value={mediapipeConfig.modelId}
+                onChange={e => handleMediaPipeModelChange(e.target.value as MediaPipeModelId)}
+                className="w-full px-3 py-1 bg-overlay border border-subtle rounded-sm text-foreground text-caption font-mono outline-none"
+              >
+                {Object.entries(MEDIAPIPE_MODELS).map(([id, m]) => (
+                  <option key={id} value={id}>
+                    {m.label} (~{m.sizeEstimateMB}MB)
+                  </option>
+                ))}
+              </select>
+              <div className="text-tiny text-disabled mt-1">
+                {MEDIAPIPE_MODELS[mediapipeConfig.modelId].description}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "size-[7px] rounded-full shrink-0",
+                mediapipeStatus.loaded ? "bg-emerald-400"
+                  : mediapipeStatus.loading ? "bg-amber-400"
+                  : mediapipeStatus.available ? "bg-muted-foreground"
+                  : "bg-red-400"
+              )} />
+              <span className="text-caption text-secondary-foreground">
+                {mediapipeStatus.error ? `Error: ${mediapipeStatus.error}`
+                  : mediapipeStatus.loaded ? `${MEDIAPIPE_MODELS[mediapipeConfig.modelId].label} ready`
+                  : mediapipeStatus.loading ? `Downloading ${MEDIAPIPE_MODELS[mediapipeConfig.modelId].label}...`
+                  : mediapipeStatus.available ? "WebGPU available — model loads on first score"
+                  : "WebGPU not available"}
+              </span>
+            </div>
+
+            {mediapipeStatus.loading && (
+              <div className="h-1 rounded-sm bg-overlay overflow-hidden">
+                <div className="h-full w-1/3 rounded-sm bg-gradient-to-r from-violet-500 to-fuchsia-500 animate-pulse" />
+              </div>
+            )}
+
+            {mediapipeStatus.error && mediapipeStatus.error.includes("Memory error") && (
+              <div className="text-tiny text-amber-400 leading-tight bg-amber-400/[0.05] p-2 rounded-sm border border-amber-400/10">
+                This model is too large for your device. Switch to <strong>Gemma 3 1B</strong> for a lighter alternative.
+              </div>
+            )}
+          </div>
+        )}
+        <div className="text-tiny text-disabled mt-2 leading-tight">
+          Run AI scoring on mobile via MediaPipe LLM Inference (Gemma). Requires WebGPU. Default: Gemma 3 1B (~700MB). No data leaves your device.
+        </div>
+      </div>}
     </>
   );
 };

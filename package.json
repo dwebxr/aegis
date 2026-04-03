@@ -23,6 +23,7 @@
     "@dfinity/identity": "2.4.1",
     "@dfinity/principal": "2.4.1",
     "@extractus/article-extractor": "8.0.20",
+    "@mediapipe/tasks-genai": "0.10.27",
     "@mlc-ai/web-llm": "0.2.80",
     "@noble/hashes": "2.0.1",
     "@sentry/nextjs": "^10.42.0",
