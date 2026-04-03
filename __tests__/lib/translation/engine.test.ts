@@ -30,6 +30,8 @@ function mockResponse(body: unknown, init?: { status?: number }): { ok: boolean;
 // Mock external dependencies before importing engine
 let mockOllamaEnabled = false;
 let mockWebLLMEnabled = false;
+let mockMediaPipeEnabled = false;
+let mockMediaPipeLoaded = false;
 let mockApiKey: string | null = null;
 
 jest.mock("@/lib/ollama/storage", () => ({
@@ -58,6 +60,17 @@ jest.mock("@/lib/webllm/engine", () => ({
   isWebLLMLoaded: () => mockWebLLMEnabled,
 }));
 
+jest.mock("@/lib/mediapipe/storage", () => ({
+  isMediaPipeEnabled: () => mockMediaPipeEnabled,
+}));
+
+jest.mock("@/lib/mediapipe/engine", () => ({
+  getOrCreateInference: () => Promise.resolve({
+    generateResponse: () => Promise.resolve("MediaPipeで翻訳されました"),
+  }),
+  isMediaPipeLoaded: () => mockMediaPipeLoaded,
+}));
+
 jest.mock("@/lib/utils/timeout", () => ({
   withTimeout: (p: Promise<unknown>) => p,
 }));
@@ -72,6 +85,8 @@ beforeEach(() => {
   localStorage.clear();
   mockOllamaEnabled = false;
   mockWebLLMEnabled = false;
+  mockMediaPipeEnabled = false;
+  mockMediaPipeLoaded = false;
   mockApiKey = null;
   globalThis.fetch = origFetch;
 });
@@ -139,6 +154,32 @@ describe("translateContent", () => {
     const r = expectResult(result);
     expect(r.translatedText).toBe("WebLLMで翻訳されました");
     expect(expectResult(result).backend).toBe("webllm");
+  });
+
+  it("calls MediaPipe for 'browser' backend when MediaPipe is enabled", async () => {
+    mockMediaPipeEnabled = true;
+    const result = await translateContent({
+      text: "Hello",
+      targetLanguage: "ja",
+      backend: "browser",
+    });
+
+    const r = expectResult(result);
+    expect(r.translatedText).toBe("MediaPipeで翻訳されました");
+    expect(r.backend).toBe("mediapipe");
+  });
+
+  it("falls back to WebLLM for 'browser' backend when MediaPipe is disabled", async () => {
+    mockMediaPipeEnabled = false;
+    const result = await translateContent({
+      text: "Hello",
+      targetLanguage: "ja",
+      backend: "browser",
+    });
+
+    const r = expectResult(result);
+    expect(r.translatedText).toBe("WebLLMで翻訳されました");
+    expect(r.backend).toBe("webllm");
   });
 
   it("calls /api/translate for 'cloud' backend with BYOK key", async () => {
@@ -320,6 +361,51 @@ describe("translateContent", () => {
       });
 
       expect(expectResult(result).backend).toBe("ollama");
+    });
+
+    it("uses MediaPipe in auto cascade when enabled and loaded", async () => {
+      mockMediaPipeEnabled = true;
+      mockMediaPipeLoaded = true;
+      globalThis.fetch = jest.fn().mockRejectedValue(new Error("no server"));
+
+      const result = await translateContent({
+        text: "MediaPipe auto test",
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      expect(expectResult(result).backend).toBe("mediapipe");
+    });
+
+    it("skips MediaPipe in auto cascade when enabled but not loaded", async () => {
+      mockMediaPipeEnabled = true;
+      mockMediaPipeLoaded = false;
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "サーバー翻訳" });
+      });
+
+      const result = await translateContent({
+        text: "Skip unloaded MediaPipe",
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      // Should fall through to server Claude, not trigger MediaPipe download
+      expect(expectResult(result).backend).toBe("claude-server");
+    });
+
+    it("prefers MediaPipe over WebLLM in auto cascade (mutual exclusion)", async () => {
+      mockMediaPipeEnabled = true;
+      mockMediaPipeLoaded = true;
+      mockWebLLMEnabled = true;
+
+      const result = await translateContent({
+        text: "MediaPipe vs WebLLM",
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      expect(expectResult(result).backend).toBe("mediapipe");
     });
 
     it("falls back to WebLLM when Ollama fails", async () => {

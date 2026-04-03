@@ -115,6 +115,17 @@ describe("isWebGPUUsable", () => {
     expect(await isWebGPUUsable()).toBe(false);
   });
 
+  it("returns false when navigator.gpu exists but is null", async () => {
+    // "gpu" in navigator is true, but navigator.gpu is null
+    Object.defineProperty(navigator, "gpu", { value: null, configurable: true });
+    const { isWebGPUUsable, onStatusChange } = require("@/lib/mediapipe/engine");
+    let lastStatus: Record<string, unknown> = {};
+    onStatusChange((s: Record<string, unknown>) => { lastStatus = s; });
+
+    expect(await isWebGPUUsable()).toBe(false);
+    expect(lastStatus.error).toBe("WebGPU not available");
+  });
+
   it("emits available: true when usable", async () => {
     const { isWebGPUUsable, onStatusChange } = require("@/lib/mediapipe/engine");
     let lastStatus: Record<string, unknown> = {};
@@ -293,6 +304,17 @@ describe("getOrCreateInference", () => {
     expect(lastStatus.error).not.toContain("Memory error");
     expect(lastStatus.loading).toBe(false);
     expect(lastStatus.modelId).toBe("gemma-3-1b");
+  });
+
+  it("handles string thrown as error", async () => {
+    mockCreateFromOptions.mockRejectedValue("raw string error");
+
+    const { getOrCreateInference, onStatusChange } = require("@/lib/mediapipe/engine");
+    let lastStatus: Record<string, unknown> = {};
+    onStatusChange((s: Record<string, unknown>) => { lastStatus = s; });
+
+    await expect(getOrCreateInference()).rejects.toBe("raw string error");
+    expect(lastStatus.error).toBe("raw string error");
   });
 
   it("allows retry after failure (inferencePromise is cleared)", async () => {
