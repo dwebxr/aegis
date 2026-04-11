@@ -63,6 +63,8 @@ function loadStore(): CacheStore {
   try {
     raw = localStorage.getItem(LS_KEY);
   } catch (err) {
+    // Expected in Safari private mode — keep at debug so it doesn't
+    // spam the console on every lookup.
     console.debug("[translation-cache] getItem denied:", err instanceof Error ? err.message : err);
     return {};
   }
@@ -71,12 +73,16 @@ function loadStore(): CacheStore {
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    console.debug("[translation-cache] corrupt JSON, clearing:", err instanceof Error ? err.message : err);
+    // Corrupt JSON is a genuine anomaly (mid-write truncation, user
+    // tamper, schema migration bug) — surface at warn so devs see it.
+    console.warn("[translation-cache] corrupt JSON, clearing blob:", err instanceof Error ? err.message : err);
     safeRemove();
     return {};
   }
   if (!isCacheStoreShape(parsed)) {
-    console.debug("[translation-cache] wrong shape, clearing");
+    // Wrong shape is also a genuine anomaly — either old schema or
+    // tampered data. Warn-level so it's visible by default.
+    console.warn("[translation-cache] wrong shape, clearing blob");
     safeRemove();
     return {};
   }
@@ -108,7 +114,10 @@ function saveStore(store: CacheStore): void {
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(halved));
     } catch (retryErr) {
-      console.debug(
+      // Halved retry failing means the user's localStorage is
+      // essentially full and cache persistence is unrecoverable for
+      // this session. Warn-level so the anomaly is visible.
+      console.warn(
         "[translation-cache] halved retry also failed, clearing blob:",
         retryErr instanceof Error ? retryErr.message : retryErr,
       );
