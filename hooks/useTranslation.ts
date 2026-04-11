@@ -8,7 +8,18 @@ import type { ContentItem } from "@/lib/types/content";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 
-const MAX_CONCURRENT = 3;
+/**
+ * Maximum number of items being translated in parallel by the
+ * auto-translate effect. Empirically verified (2026-04-12) that the
+ * DFINITY LLM canister rejects the 3rd concurrent call from a single
+ * caller with `IC LLM translation failed` in ~2 seconds. With
+ * MAX_CONCURRENT=3 we were guaranteed to fail one of every three items
+ * the moment they hit IC LLM. With MAX_CONCURRENT=2 the IC LLM canister
+ * is happy and items pace themselves naturally. This was the root cause
+ * of the systematic IC LLM failure that plagued the user across the
+ * previous nine hotfixes.
+ */
+const MAX_CONCURRENT = 2;
 const RETRY_INTERVAL_MS = 60_000;
 
 /**

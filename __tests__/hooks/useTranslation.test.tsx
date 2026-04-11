@@ -279,16 +279,18 @@ describe("useTranslation — auto policies", () => {
     expect(mockTranslateContent).not.toHaveBeenCalled();
   });
 
-  it("policy=all auto-translates pending items respecting concurrency limit (3)", async () => {
+  it("policy=all auto-translates pending items respecting concurrency limit (2)", async () => {
+    // Concurrency cap is 2 (DFINITY LLM canister rejects the 3rd parallel
+    // call from a single caller — see hotfix 10 in useTranslation.ts).
     setPolicy("all");
     mockTranslateContent.mockImplementation(() => new Promise(() => {})); // never resolves
     const items = [makeItem("a"), makeItem("b"), makeItem("c"), makeItem("d"), makeItem("e")];
     const { wrapper } = harness(items);
     renderHook(wrapper);
-    await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBe(3));
-    // Wait a tick — should still be 3, not more
+    await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBe(2));
+    // Wait a tick — should still be 2, not more
     await new Promise(r => setTimeout(r, 20));
-    expect(mockTranslateContent.mock.calls.length).toBe(3);
+    expect(mockTranslateContent.mock.calls.length).toBe(2);
   });
 
   it("policy=high_quality only translates items meeting minScore", async () => {
