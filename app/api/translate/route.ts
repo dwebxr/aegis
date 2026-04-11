@@ -6,12 +6,11 @@ export const maxDuration = 30;
 export async function POST(request: NextRequest) {
   // 60 req/60s per IP. Translation is per-item and a power user with a
   // briefing of 50+ articles can easily exceed 10/60s during a single
-  // page load. The daily Anthropic call cap is enforced separately on
-  // /api/analyze (this endpoint serves both BYOK and server-paid keys).
+  // page load.
   const rateLimited = await distributedRateLimit(request, 60, 60);
   if (rateLimited) return rateLimited;
 
-  const bodyErr = await checkBodySize(request, 32_000);
+  const bodyErr = checkBodySize(request, 32_000);
   if (bodyErr) return bodyErr;
 
   const body = await request.json();
@@ -20,11 +19,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });
   }
 
+  // BYOK-only: the operator's Anthropic key is NEVER used for
+  // translation. The client-side `translateContent` in
+  // `lib/translation/engine.ts` removed claude-server from the auto
+  // cascade in hotfix 17 and made `backend: "cloud"` require a user
+  // API key — this route enforces the same invariant at the boundary
+  // so a malicious or regressed client cannot burn the operator's
+  // budget by hitting the endpoint directly.
   const userKey = request.headers.get("x-user-api-key");
-  const apiKey = userKey?.startsWith("sk-ant-") ? userKey : process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "No API key available" }, { status: 503 });
+  if (!userKey || !userKey.startsWith("sk-ant-")) {
+    return NextResponse.json(
+      { error: "Translation requires an Anthropic API key in the x-user-api-key header (BYOK)." },
+      { status: 401 },
+    );
   }
+  const apiKey = userKey;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
