@@ -49,18 +49,22 @@ export interface ValidationResult {
 /**
  * Lower / upper bounds for the output-to-input length ratio. Translation
  * length varies a lot across language pairs:
- *   - en → ja: typical 0.5–1.5 (Japanese is character-dense)
+ *   - en → ja: typical 0.3–0.8 (Japanese is character-dense AND Claude
+ *     often compresses boilerplate-heavy English into a much shorter
+ *     Japanese summary)
  *   - ja → en: typical 1.5–3.0
  *   - en → fr / de / es: typical 0.9–1.4
  *
  * The bounds are deliberately wide to avoid rejecting legitimate
- * translations. Llama 3.1 8B can produce extremely terse Japanese for
- * short inputs (e.g. a 100-char English headline → "アップルが発表" =
- * 7 chars, ratio 0.07), so MIN_RATIO needs to be VERY low. The kana
- * presence check + identical-to-input check are the real safety nets;
- * the ratio bounds catch only obvious noise.
+ * translations. Claude (our sole translator in the auto cascade after
+ * hotfix 13) observed in production returning ratios as low as 0.04
+ * for news-article-shaped English input where most of the text was
+ * boilerplate / metadata / URLs and only a sentence or two carried
+ * real meaning. Those translations are legitimate — the kana check,
+ * meta-commentary check, and identical-to-input check are the real
+ * safety nets; the ratio bounds catch only obvious runaway noise.
  */
-const MIN_RATIO = 0.05;
+const MIN_RATIO = 0.02;
 const MAX_RATIO = 5.0;
 
 /**

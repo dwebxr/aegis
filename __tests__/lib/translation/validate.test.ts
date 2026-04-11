@@ -112,9 +112,9 @@ describe("validateTranslation — non-Japanese targets skip kana check", () => {
 });
 
 describe("validateTranslation — length ratio", () => {
-  it("rejects output much shorter than input (ratio < 0.05)", () => {
-    const input = "a".repeat(200);
-    const output = "あ".repeat(5); // ratio 0.025
+  it("rejects output much shorter than input (ratio < 0.02)", () => {
+    const input = "a".repeat(1000);
+    const output = "あ".repeat(5); // ratio 0.005
     const r = validateTranslation(output, "ja", input);
     expect(r.valid).toBe(false);
     expect(r.reason).toMatch(/too short/);
@@ -140,18 +140,28 @@ describe("validateTranslation — length ratio", () => {
     expect(r.valid).toBe(true);
   });
 
-  it("accepts terse Llama 3.1 8B output where ratio is ~0.17", () => {
-    // Real-world Llama failure mode: 100-char headline → 17-char terse Japanese.
-    // Old MIN_RATIO=0.2 wrongly rejected these. New MIN_RATIO=0.05 accepts.
+  it("accepts terse Llama 3.1 8B output where ratio is ~0.19", () => {
     const input = "Apple announced a new MacBook with the M5 chip and improved battery life today.";
     const output = "アップルが新製品発表しました。"; // 15 chars, ratio ~0.19
     const r = validateTranslation(output, "ja", input);
     expect(r.valid).toBe(true);
   });
 
-  it("accepts the boundary ratio of exactly 0.05", () => {
-    const input = "x".repeat(200);
-    const output = "あ".repeat(10); // ratio 0.05
+  it("accepts very terse Claude output where ratio is ~0.04", () => {
+    // Real-world claude-server failure mode (build 2be91af, 2026-04-12):
+    // a 200-char boilerplate-heavy English input compressed into a
+    // short-but-kana-containing Japanese summary. Pre-hotfix-15 with
+    // MIN_RATIO=0.05 the cascade rejected this; with MIN_RATIO=0.02
+    // the terse-but-valid translation passes and the user sees text.
+    const input = "a".repeat(200);
+    const output = "アップル発表"; // 6 chars, ratio 0.03 (above new 0.02 floor)
+    const r = validateTranslation(output, "ja", input);
+    expect(r.valid).toBe(true);
+  });
+
+  it("accepts the boundary ratio of exactly 0.02", () => {
+    const input = "x".repeat(500);
+    const output = "あ".repeat(10); // ratio 0.02
     const r = validateTranslation(output, "ja", input);
     expect(r.valid).toBe(true);
   });
