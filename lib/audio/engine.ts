@@ -72,6 +72,8 @@ interface Session {
   voice: SpeechSynthesisVoice | undefined;
   trackIndex: number;
   chunkIndex: number;
+  /** Last index for which we pushed metadata to MediaSession; -1 = never. */
+  lastMetadataIndex: number;
   /** Resolved when paused; recreated when resume() is called. */
   pauseGate: { promise: Promise<void>; release: () => void } | null;
   /** Cleanup function for MediaSession handlers. */
@@ -101,7 +103,18 @@ function emitFromSession(s: Session, status: PlayerStatusSnapshot["status"], err
     error,
   });
   setMediaSessionPlaybackState(status);
-  setMediaSessionMetadata(currentTrack, s.trackIndex, s.tracks.length);
+  // Only refresh OS-level metadata when the track actually changes; it does
+  // not need to fire on every chunk.
+  if (s.lastMetadataIndex !== s.trackIndex) {
+    s.lastMetadataIndex = s.trackIndex;
+    setMediaSessionMetadata(currentTrack, s.trackIndex, s.tracks.length);
+  }
+}
+
+function failSession(s: Session, message: string): void {
+  s.detachMediaSession();
+  if (session && session.id === s.id) session = null;
+  emitter.emit({ ...INITIAL_SNAPSHOT, status: "error", error: message, rate: s.prefs.rate });
 }
 
 async function runSession(s: Session): Promise<void> {
@@ -127,11 +140,7 @@ async function runSession(s: Session): Promise<void> {
         });
       } catch (err) {
         if (err instanceof CancelledError) return;
-        emitter.emit({
-          status: "error",
-          error: errMsg(err),
-        });
-        setMediaSessionPlaybackState("idle");
+        failSession(s, errMsg(err));
         return;
       }
 
@@ -152,14 +161,19 @@ async function runSession(s: Session): Promise<void> {
   if (session && session.id === s.id) session = null;
 }
 
-function teardown(reason: "stop" | "error" | "restart"): void {
-  if (!session) return;
-  const old = session;
-  session = null;
-  old.controller.abort();
-  old.pauseGate?.release();
-  old.detachMediaSession();
-  cancelSpeech();
+function teardown(reason: "stop" | "restart"): void {
+  if (session) {
+    const old = session;
+    session = null;
+    old.controller.abort();
+    old.pauseGate?.release();
+    old.detachMediaSession();
+    cancelSpeech();
+  }
+  // stop() (and the test reset that calls it) always returns the emitter to
+  // its idle baseline, even if a previous failSession had already cleared
+  // the session field — otherwise lingering "error" status would leak
+  // across calls.
   if (reason === "stop") {
     emitter.emit({ ...INITIAL_SNAPSHOT });
   }
@@ -216,6 +230,7 @@ export async function startBriefingPlayback(
     voice,
     trackIndex: 0,
     chunkIndex: 0,
+    lastMetadataIndex: -1,
     pauseGate: null,
     detachMediaSession: () => {},
   };

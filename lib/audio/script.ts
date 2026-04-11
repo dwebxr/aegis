@@ -25,6 +25,7 @@ import type { ContentItem } from "@/lib/types/content";
 import type { TranslationLanguage } from "@/lib/translation/types";
 import type { AudioTrack, AudioPrefs, TrackSource } from "./types";
 import { chunkText } from "./chunker";
+import { detectLanguage } from "@/lib/ingestion/langDetect";
 
 const TITLE_MAX_CHARS = 80;
 const BODY_MAX_CHARS = 500;
@@ -32,26 +33,16 @@ const BODY_MAX_CHARS = 500;
 /** Pause-marker inserted between title and body. Renders as a brief silence. */
 const TITLE_BODY_SEPARATOR = " — ";
 
-function quickDetectLang(text: string): TranslationLanguage {
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
-    if (
-      (code >= 0x3040 && code <= 0x309f) // hiragana
-      || (code >= 0x30a0 && code <= 0x30ff) // katakana
-      || (code >= 0xff66 && code <= 0xff9f) // halfwidth katakana
-    ) {
-      return "ja";
-    }
-  }
-  return "en";
-}
-
 function pickSpokenText(item: ContentItem, prefs: AudioPrefs): { text: string; lang: TranslationLanguage } {
   if (prefs.preferTranslated && item.translation?.translatedText) {
-    const lang = item.translation.targetLanguage as TranslationLanguage;
-    return { text: item.translation.translatedText, lang };
+    return {
+      text: item.translation.translatedText,
+      lang: item.translation.targetLanguage as TranslationLanguage,
+    };
   }
-  return { text: item.text, lang: quickDetectLang(item.text) };
+  // detectLanguage may return "unknown"; fall back to English for audio purposes.
+  const detected = detectLanguage(item.text);
+  return { text: item.text, lang: detected === "ja" ? "ja" : "en" };
 }
 
 function buildTitle(text: string): string {

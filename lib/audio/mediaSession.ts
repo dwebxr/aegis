@@ -33,13 +33,8 @@ interface MediaSessionLike {
 function getMediaSession(): MediaSessionLike | null {
   if (typeof navigator === "undefined") return null;
   const ms = (navigator as Navigator & { mediaSession?: MediaSessionLike }).mediaSession;
-  if (!ms) return null;
-  if (typeof globalThis.MediaMetadata !== "function") return null;
+  if (!ms || typeof globalThis.MediaMetadata !== "function") return null;
   return ms;
-}
-
-export function isMediaSessionAvailable(): boolean {
-  return getMediaSession() !== null;
 }
 
 const ALBUM_LABEL = "Aegis Briefing";

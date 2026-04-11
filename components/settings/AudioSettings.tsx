@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAudioBriefing } from "@/hooks/useAudioBriefing";
-import { loadVoices, isWebSpeechAvailable } from "@/lib/audio/webspeech";
+import { loadVoices } from "@/lib/audio/webspeech";
 import { cardClass, sectionTitleClass } from "./styles";
 
 interface AudioSettingsProps {
@@ -61,7 +61,7 @@ export const AudioSettings: React.FC<AudioSettingsProps> = ({ mobile }) => {
     <div className={cardClass(mobile)}>
       <div className={sectionTitleClass}>Audio Briefing</div>
 
-      {!isWebSpeechAvailable() ? (
+      {!available ? (
         <div className="text-tiny text-disabled leading-tight">
           Audio playback is not available in this browser. The Web Speech API is missing —
           try Chrome, Edge, Safari, or Firefox.

@@ -10,11 +10,10 @@
  *
  * Adding a new language: create a `lib/ingestion/heuristics/<lang>.ts`
  * exporting `score<Lang>(text): LanguageSignals`, register it in the
- * dispatcher below, and teach `langDetect.ts` to recognize it.
+ * dispatch below, and teach `langDetect.ts` to recognize it.
  */
 import { clamp } from "@/lib/utils/math";
 import { detectLanguage, type SupportedLang } from "./langDetect";
-import type { LanguageSignals } from "./heuristics/types";
 import { scoreEnglish } from "./heuristics/en";
 import { scoreJapanese } from "./heuristics/ja";
 
@@ -34,28 +33,18 @@ export interface HeuristicOptions {
   lang?: SupportedLang;
 }
 
-function applySignals(signals: LanguageSignals): { originality: number; insight: number; credibility: number } {
-  return {
-    originality: clamp(5 + signals.originality, 0, 10),
-    insight: clamp(5 + signals.insight, 0, 10),
-    credibility: clamp(5 + signals.credibility, 0, 10),
-  };
-}
-
-function dispatch(text: string, lang: SupportedLang): LanguageSignals {
-  if (lang === "ja") return scoreJapanese(text);
-  // "en" and "unknown" both fall back to the English module so that
-  // pre-existing behaviour is preserved for ASCII-dominant inputs and any
-  // text where detection isn't confident.
-  return scoreEnglish(text);
-}
-
 export function heuristicScores(text: string, options?: HeuristicOptions): HeuristicScores {
   const lang = options?.lang ?? detectLanguage(text);
-  const signals = dispatch(text, lang);
-  const { originality, insight, credibility } = applySignals(signals);
+  // "en" and "unknown" both fall back to the English module so pre-existing
+  // behaviour is preserved for ASCII-dominant inputs and any text where
+  // detection isn't confident.
+  const signals = lang === "ja" ? scoreJapanese(text) : scoreEnglish(text);
 
+  const originality = clamp(5 + signals.originality, 0, 10);
+  const insight = clamp(5 + signals.insight, 0, 10);
+  const credibility = clamp(5 + signals.credibility, 0, 10);
   const composite = parseFloat((originality * 0.4 + insight * 0.35 + credibility * 0.25).toFixed(1));
+
   const reason = signals.reasons.length > 0
     ? `Heuristic (AI unavailable): ${signals.reasons.join(", ")}.`
     : "Heuristic (AI unavailable): no strong signals detected.";

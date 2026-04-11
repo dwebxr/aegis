@@ -10,56 +10,40 @@
  *
  * Algorithm:
  *   1. If the input is already short enough, return it as a single chunk.
- *   2. Otherwise split on sentence terminators that exist in both Latin
- *      and Japanese: `.`, `!`, `?`, `。`, `！`, `？`. Keep the terminator
- *      attached to the preceding sentence so the TTS engine renders the
- *      correct prosody.
- *   3. Greedily pack sentences into chunks no larger than `maxChars`.
- *   4. If a single sentence is itself longer than `maxChars`, fall back to
- *      a soft split on commas (`,`, `、`) and finally on whitespace, so
- *      that no chunk ever exceeds the hard limit.
- *
- * The function never produces empty chunks and always preserves the
- * original character order; concatenating the result with no separator
- * yields the input modulo collapsed runs of whitespace at chunk boundaries.
+ *   2. Split on sentence terminators that exist in both Latin and Japanese:
+ *      `.`, `!`, `?`, `。`, `！`, `？`. The terminator stays attached to
+ *      the preceding sentence so prosody is preserved.
+ *   3. Greedily pack sentences into chunks ≤ maxChars.
+ *   4. If a single sentence is itself too long, soft-split on commas
+ *      (`,`, `、`, `;`) and finally on whitespace, so no chunk ever
+ *      exceeds the hard limit.
  */
 
 const DEFAULT_MAX_CHARS = 150;
 
-/** Sentence-terminator regex covering ASCII and full-width forms. */
 const SENTENCE_SPLIT = /([.!?。！？]+["'\u201D\u2019\uFF02\uFF07]?)\s*/u;
-
-/** Soft-split candidates within a long sentence. */
 const SOFT_SPLIT = /([,、，;；])\s*/u;
 
-function splitKeepingDelimiter(text: string, delimiterRegex: RegExp): string[] {
-  // Use a global form so that `String.split` returns the matched delimiter
-  // alongside the surrounding text. We then re-attach the delimiter to the
-  // *preceding* segment so prosody is preserved.
-  const flags = delimiterRegex.flags.includes("g")
-    ? delimiterRegex.flags
-    : `${delimiterRegex.flags}g`;
-  const re = new RegExp(delimiterRegex.source, flags);
-  const parts = text.split(re);
+function splitWithDelimiter(text: string, delimiter: RegExp): string[] {
+  // String.split with a capturing-group regex returns the matched delimiters
+  // interleaved with the surrounding text. We re-attach each delimiter to the
+  // *preceding* segment so the speech engine renders the correct prosody.
+  const parts = text.split(delimiter);
   const out: string[] = [];
   for (let i = 0; i < parts.length; i += 2) {
-    const body = parts[i] ?? "";
-    const delim = parts[i + 1] ?? "";
-    const combined = (body + delim).trim();
+    const combined = ((parts[i] ?? "") + (parts[i + 1] ?? "")).trim();
     if (combined.length > 0) out.push(combined);
   }
   return out;
 }
 
 function hardSplit(text: string, maxChars: number): string[] {
-  // Last-resort whitespace-based split for sentences without commas. This
-  // walks the string and emits chunks at word boundaries that fit within
-  // maxChars. If a single token exceeds maxChars (e.g. a long URL), the
-  // token is forcibly split at maxChars to guarantee the invariant.
+  // Last-resort whitespace-based split. Walks the string and emits chunks at
+  // word boundaries that fit within maxChars. Tokens larger than maxChars
+  // (e.g. long URLs) are forcibly cut to guarantee the invariant.
   const out: string[] = [];
-  const tokens = text.split(/\s+/).filter(t => t.length > 0);
   let current = "";
-  for (const token of tokens) {
+  for (const token of text.split(/\s+/).filter(t => t.length > 0)) {
     if (token.length > maxChars) {
       if (current.length > 0) {
         out.push(current);
@@ -82,46 +66,36 @@ function hardSplit(text: string, maxChars: number): string[] {
   return out;
 }
 
+/**
+ * Greedy packer step. Returns the new value of `current`; pushes onto `out`
+ * when the candidate exceeds the limit and a non-empty `current` must flush.
+ */
+function packGreedily(out: string[], current: string, piece: string, maxChars: number): string {
+  const candidate = current.length === 0 ? piece : `${current} ${piece}`;
+  if (candidate.length > maxChars) {
+    if (current.length > 0) out.push(current);
+    return piece;
+  }
+  return candidate;
+}
+
+/** Soft-split + hard-split a sentence that is itself longer than maxChars. */
+function expandOversized(sentence: string, maxChars: number): string[] {
+  const expanded: string[] = [];
+  for (const part of splitWithDelimiter(sentence, SOFT_SPLIT)) {
+    if (part.length > maxChars) expanded.push(...hardSplit(part, maxChars));
+    else expanded.push(part);
+  }
+  return expanded;
+}
+
 function packSentences(sentences: string[], maxChars: number): string[] {
   const out: string[] = [];
   let current = "";
   for (const sentence of sentences) {
-    // If even a single sentence is too long, soft-split it then hard-split
-    // any remaining oversized fragments. The resulting fragments are
-    // packed back into the same flow as if they were independent sentences.
-    if (sentence.length > maxChars) {
-      if (current.length > 0) {
-        out.push(current);
-        current = "";
-      }
-      const softParts = splitKeepingDelimiter(sentence, SOFT_SPLIT);
-      const expanded: string[] = [];
-      for (const part of softParts) {
-        if (part.length > maxChars) {
-          expanded.push(...hardSplit(part, maxChars));
-        } else {
-          expanded.push(part);
-        }
-      }
-      // Re-pack the expanded fragments greedily.
-      for (const fragment of expanded) {
-        const candidate = current.length === 0 ? fragment : `${current} ${fragment}`;
-        if (candidate.length > maxChars) {
-          if (current.length > 0) out.push(current);
-          current = fragment;
-        } else {
-          current = candidate;
-        }
-      }
-      continue;
-    }
-
-    const candidate = current.length === 0 ? sentence : `${current} ${sentence}`;
-    if (candidate.length > maxChars) {
-      out.push(current);
-      current = sentence;
-    } else {
-      current = candidate;
+    const pieces = sentence.length > maxChars ? expandOversized(sentence, maxChars) : [sentence];
+    for (const piece of pieces) {
+      current = packGreedily(out, current, piece, maxChars);
     }
   }
   if (current.length > 0) out.push(current);
@@ -139,8 +113,6 @@ export function chunkText(text: string, maxChars: number = DEFAULT_MAX_CHARS): s
   if (trimmed.length === 0) return [];
   if (trimmed.length <= maxChars) return [trimmed];
 
-  const sentences = splitKeepingDelimiter(trimmed, SENTENCE_SPLIT);
-  // If sentence splitting failed to produce multiple parts (e.g. text with no
-  // terminators at all), packSentences will fall through to soft+hard split.
+  const sentences = splitWithDelimiter(trimmed, SENTENCE_SPLIT);
   return packSentences(sentences.length > 0 ? sentences : [trimmed], maxChars);
 }

@@ -37,13 +37,10 @@ export function getAudioPrefs(): AudioPrefs {
   }
 }
 
-export function setAudioPrefs(prefs: AudioPrefs): void {
-  if (typeof globalThis.localStorage === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-}
-
 export function updateAudioPrefs(patch: Partial<AudioPrefs>): AudioPrefs {
   const next = { ...getAudioPrefs(), ...patch };
-  setAudioPrefs(next);
+  if (typeof globalThis.localStorage !== "undefined") {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  }
   return next;
 }

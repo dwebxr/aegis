@@ -32,13 +32,13 @@
  */
 
 import type { LanguageSignals } from "./types";
-import { emptySignals, mergeSignals } from "./types";
+import { emptySignals } from "./types";
 import { commonSignals } from "./common";
 import { SLOP_TERMS_JA, QUALITY_TERMS_JA } from "./dictionaries/ja";
 
 const FULLWIDTH_ALNUM_REGEX = /[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]/g;
 const DECORATION_REGEX = /[【】〈〉「」『』〔〕《》〖〗]/g;
-const EMPHATIC_PUNCT_REGEX = /[！？]{2,}|！[！？]|[!?]{2,}/;
+const EMPHATIC_PUNCT_REGEX = /[！？]{2,}|[!?]{2,}/;
 
 function countOccurrences(text: string, terms: ReadonlyArray<string>): number {
   let n = 0;
@@ -126,5 +126,10 @@ export function scoreJapanese(text: string): LanguageSignals {
   // no notion of whitespace-separated words.
   const common = commonSignals(text, Math.max(charCount, 1));
 
-  return mergeSignals(signals, common);
+  return {
+    originality: signals.originality + common.originality,
+    insight: signals.insight + common.insight,
+    credibility: signals.credibility + common.credibility,
+    reasons: [...signals.reasons, ...common.reasons],
+  };
 }
