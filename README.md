@@ -9,6 +9,19 @@
 
 ## Latest Updates (April 2026)
 
+### Production Hardening & Test Coverage Push
+- **6,809 tests, 393 suites** — zero failures, zero skipped
+- **Coverage**: lines 92.11% / functions 82.94% / branches 82.20% — verified in CI
+- **Newly tested in isolation** (previously 0%): `usePushNotification`, `useTranslation`, `AgentContext`, `BriefingClassificationBadge`, `D2ABadge`, `TrustTierBadge`, `NotificationToast`, `CommentInput`, `GroupCard`, `GroupFeedView`, `button`, `InfoTooltip`, `CollapsibleSection`, `useAudioBriefing`, `lib/audio/{mediaSession,storage,engine-active-session}`, `pushToken`, `migrate-environment`
+- **AudioBriefingPlayer engine**: 64% → **98% lines / 91% functions** — added defer-mode mock and MediaSession action handler tests that drive OS-level play/pause/next/prev/stop callbacks through the engine
+- **AudioSettings + AudioBriefingPlayer UI**: 53/15% → **100% / 100%** — voice picker, rate buttons, checkboxes, all control surface buttons
+- **npm audit cleanup**: 13 vulns → 4 low (dev-only). All critical (axios, handlebars) and high (lodash, next, path-to-regexp, picomatch) resolved via `npm audit fix`
+- **`.env.example` bug fix**: `ANTHROPIC_DAILY_BUDGET` was documented as `USD ($5.00)` but the implementation uses `parseInt()` and treats it as a call count. Copying the example would cap the app at **5 calls/day**. Now correctly documented as integer count, default 500.
+- **`ROLLBACK.md`**: documented Vercel `vercel rollback url|deploymentId` (verified syntax via `--help`), IC canister wasm rollback procedure with `stable var` constraints (M0169), incident response order
+- **`PRE_DEPLOY.md`**: pre-deploy checklist enumerating required + advisory env vars with current production state verified via live `/api/health` probe (`sentryDsn: missing`, `kvStore: missing`)
+- **CI workflow**: removed stale "Next.js 14 GHSA" comment (project is on Next.js 15.5.x)
+- **mockSpeech.ts**: extended with `deferMode` + `_completeActive()` + `_activeText()` test seams so engine tests can observe mid-session state without races
+
 ### Mobile AI Scoring (MediaPipe LLM Inference)
 - **6,435 tests, 365 suites** — zero failures, zero skipped
 - **MediaPipe LLM Inference**: on-device AI scoring for mobile via WebGPU, using Google's `@mediapipe/tasks-genai` SDK
@@ -946,7 +959,7 @@ When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (f
 | Deploy | Vercel (frontend), IC mainnet (backend) |
 | CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
 | Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (5628 unit/integration tests, 324 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
+| Test | Jest + ts-jest (6809 unit/integration tests, 393 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
 
 ## Project Structure
 
@@ -1106,7 +1119,7 @@ aegis/
 │   ├── usePushNotification.ts          # Web Push subscription management
 │   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
 │   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 5628 Jest tests across 324 suites
+├── __tests__/                           # 6809 Jest tests across 393 suites
 ├── e2e/                                 # Playwright E2E tests (299 tests, 12 specs)
 ├── canisters/
 │   └── aegis_backend/
@@ -1115,6 +1128,8 @@ aegis/
 │       ├── ledger.mo                    # ICRC-1/2 ICP Ledger + CMC interface module
 │       └── aegis_backend.did            # Candid interface
 ├── .github/workflows/ci.yml             # GitHub Actions CI (lint → test → security audit → build)
+├── ROLLBACK.md                          # Vercel + IC canister rollback procedures
+├── PRE_DEPLOY.md                        # Pre-deployment env var checklist
 ├── instrumentation-client.ts             # Sentry client-side init + navigation instrumentation
 ├── sentry.server.config.ts              # Sentry server-side init (auth header/cookie scrubbing)
 ├── sentry.edge.config.ts                # Sentry edge runtime init (auth header/cookie scrubbing)
@@ -1143,7 +1158,7 @@ npm run dev
 ### Tests
 
 ```bash
-npm test              # Jest unit + integration tests (5628 tests)
+npm test              # Jest unit + integration tests (6809 tests, 393 suites)
 npm run test:watch    # Watch mode
 npx playwright test   # E2E tests — requires dev server (npm run dev)
 ```

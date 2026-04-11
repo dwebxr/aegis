@@ -56,6 +56,13 @@ class MockSpeechSynthesis {
   /** When set, every utterance fires onerror with this code instead of completing. */
   errorMode: string | null = null;
 
+  /**
+   * When true, `speak()` fires `onstart` but holds the utterance until
+   * `_completeActive()` is called. Lets tests inspect mid-session state
+   * (pause/next/prev/setRate) without races.
+   */
+  deferMode = false;
+
   getVoices(): MockVoice[] {
     return this.voices;
   }
@@ -91,8 +98,27 @@ class MockSpeechSynthesis {
   /** Test helpers (not part of the real API). */
   _flushAll(): void {
     while (this.queue.length > 0 || this.active) {
+      if (this.active && this.deferMode) {
+        // In defer mode, _flushAll only flushes utterances that started.
+        // Caller drives completion via _completeActive().
+        return;
+      }
       this.flush();
     }
+  }
+
+  /** Completes the currently-held utterance in defer mode. */
+  _completeActive(): void {
+    const u = this.active;
+    if (!u) return;
+    this.active = null;
+    u.onend?.({});
+    this.flush();
+  }
+
+  /** Inspect the currently-held utterance text in defer mode. */
+  _activeText(): string | null {
+    return this.active?.text ?? null;
   }
 
   _fireVoicesChanged(): void {
@@ -112,6 +138,10 @@ class MockSpeechSynthesis {
       this.active = null;
       next.onerror?.({ error: code });
       this.flush();
+      return;
+    }
+    if (this.deferMode) {
+      // Hold the utterance — the test must call _completeActive() to advance.
       return;
     }
     // Synchronously complete so engine.runSession proceeds without timers.

@@ -19,8 +19,6 @@ export const MEDIAPIPE_MODELS: Record<MediaPipeModelId, MediaPipeModelDef> = {
     label: "Gemma 4 E2B",
     description: "Multimodal, powerful. May fail on low-memory devices.",
     sizeEstimateMB: 2004,
-    // TODO: 2026-04-03 リリース直後。URL が変更される可能性あり。
-    // 最新は https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm を確認
     taskFileUrl:
       "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task",
   },

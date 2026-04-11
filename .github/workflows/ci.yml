@@ -42,9 +42,6 @@ jobs:
       - run: npm audit --audit-level=critical
         name: Security audit (critical — blocks deployment)
 
-      # Known HIGH: Next.js 14 GHSA-9g9p-9gw9-jx7f + GHSA-h25m-26qc-wcjf
-      # Not exploitable: no remotePatterns configured, no "use server" directives.
-      # Will resolve when migrating to Next.js 15+.
       - run: npm audit --audit-level=high
         name: Security audit (high — advisory)
         continue-on-error: true
