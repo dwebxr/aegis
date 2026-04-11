@@ -79,7 +79,10 @@ function setPolicy(policy: TranslationPolicy, opts: Partial<{ minScore: number; 
   };
 }
 
-function harness(initialItems: ContentItem[], syncStatus: "idle" | "syncing" | "synced" | "offline" = "offline") {
+function harness(initialItems: ContentItem[], syncStatus: "idle" | "syncing" | "synced" | "offline" = "idle") {
+  // Default syncStatus is "idle" so existing tests behave as if the IC
+  // actor is ready and the cold-start gate doesn't suppress translation.
+  // Cold-start race tests pass an explicit "offline" override.
   const patchItem = jest.fn();
   const items = [...initialItems];
   const actorRef = { current: null } as React.MutableRefObject<unknown>;
@@ -321,10 +324,30 @@ describe("useTranslation — language change resets attempted set", () => {
   });
 });
 
-describe("useTranslation — actor-ready retry", () => {
-  it("clears failed set + retries when syncStatus transitions out of 'offline'", async () => {
+describe("useTranslation — isReady gate (cold-start race protection)", () => {
+  it("does NOT auto-translate when authenticated and syncStatus is 'offline'", async () => {
     setPolicy("all", { targetLanguage: "ja" });
-    mockTranslateContent.mockRejectedValueOnce(new Error("ic-llm: actor not ready"));
+    mockIsAuthenticated = true;
+
+    const patchItem = jest.fn();
+    const items = [makeItem("a"), makeItem("b")];
+    const actorRef = { current: null } as React.MutableRefObject<unknown>;
+    const wrapperFn = () =>
+      useTranslation(
+        items,
+        patchItem,
+        actorRef as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>,
+        "offline",
+      );
+    renderHook(wrapperFn);
+    await new Promise(r => setTimeout(r, 30));
+    expect(mockTranslateContent).not.toHaveBeenCalled();
+  });
+
+  it("starts translating when syncStatus transitions out of 'offline'", async () => {
+    setPolicy("all", { targetLanguage: "ja" });
+    mockIsAuthenticated = true;
+    mockTranslateContent.mockResolvedValue(makeResult({ targetLanguage: "ja" }));
 
     const patchItem = jest.fn();
     const items = [makeItem("a")];
@@ -339,29 +362,74 @@ describe("useTranslation — actor-ready retry", () => {
       );
     const { rerender } = renderHook(wrapperFn);
 
-    // Initial run with syncStatus="offline" — auto-translate fires, fails,
-    // item is added to failed set.
-    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
+    // Initially nothing fires
     await new Promise(r => setTimeout(r, 20));
+    expect(mockTranslateContent).not.toHaveBeenCalled();
 
-    // Sync status transitions to "idle" (actor became ready). The hook
-    // should clear the failed set, bump retryTick, and re-run the effect.
-    mockTranslateContent.mockResolvedValueOnce(makeResult({ targetLanguage: "ja" }));
+    // syncStatus → idle (actor ready) — effect should now run
     currentSyncStatus = "idle";
     rerender();
-
-    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(patchItem).toHaveBeenCalled());
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
   });
 
-  it("does NOT clear failed set when syncStatus transitions between non-offline states", async () => {
+  it("auto-translates immediately for anonymous users (no actor expected)", async () => {
     setPolicy("all", { targetLanguage: "ja" });
-    mockTranslateContent.mockRejectedValueOnce(new Error("validation: no kana"));
+    mockIsAuthenticated = false;
+    mockTranslateContent.mockResolvedValue(makeResult({ targetLanguage: "ja" }));
 
     const patchItem = jest.fn();
     const items = [makeItem("a")];
     const actorRef = { current: null } as React.MutableRefObject<unknown>;
-    let currentSyncStatus: "idle" | "syncing" | "synced" | "offline" = "idle";
+    const wrapperFn = () =>
+      useTranslation(
+        items,
+        patchItem,
+        actorRef as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>,
+        "offline",
+      );
+    renderHook(wrapperFn);
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
+  });
+
+  it("falls back to ready=true after the actor-ready timeout if syncStatus stays offline", async () => {
+    setPolicy("all", { targetLanguage: "ja" });
+    mockIsAuthenticated = true;
+    mockTranslateContent.mockResolvedValue(makeResult({ targetLanguage: "ja" }));
+
+    const patchItem = jest.fn();
+    const items = [makeItem("a")];
+    const actorRef = { current: null } as React.MutableRefObject<unknown>;
+    const wrapperFn = () =>
+      useTranslation(
+        items,
+        patchItem,
+        actorRef as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>,
+        "offline",
+      );
+    renderHook(wrapperFn);
+
+    // Before the timeout, no translation
+    expect(mockTranslateContent).not.toHaveBeenCalled();
+
+    // Wait past the 5-second fallback timer (real timer, no fake-timer
+    // interaction with waitFor which is fragile under jsdom).
+    await waitFor(
+      () => expect(mockTranslateContent).toHaveBeenCalled(),
+      { timeout: 7_000 },
+    );
+  }, 10_000);
+
+  it("clears BOTH failed and skip sets when transitioning out of offline", async () => {
+    setPolicy("all", { targetLanguage: "ja" });
+    mockIsAuthenticated = true;
+    // First call: skip outcome (could happen via smart-model exception
+    // during a manual click before isReady).
+    mockTranslateContent.mockResolvedValueOnce("skip");
+
+    const patchItem = jest.fn();
+    const items = [makeItem("a")];
+    const actorRef = { current: null } as React.MutableRefObject<unknown>;
+    let currentSyncStatus: "idle" | "syncing" | "synced" | "offline" = "offline";
     const wrapperFn = () =>
       useTranslation(
         items,
@@ -369,17 +437,20 @@ describe("useTranslation — actor-ready retry", () => {
         actorRef as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>,
         currentSyncStatus,
       );
-    const { rerender } = renderHook(wrapperFn);
+    const { rerender, result } = renderHook(wrapperFn);
 
+    // Manual translate while offline — pollutes the skip set
+    await act(async () => {
+      result.current.translateItem("a");
+    });
     await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
-    await new Promise(r => setTimeout(r, 20));
 
-    // idle → synced is not a "actor became ready" transition
-    currentSyncStatus = "synced";
+    // Actor ready — should clear skip set and re-attempt the item
+    mockTranslateContent.mockResolvedValueOnce(makeResult({ targetLanguage: "ja" }));
+    currentSyncStatus = "idle";
     rerender();
-    await new Promise(r => setTimeout(r, 30));
-
-    expect(mockTranslateContent).toHaveBeenCalledTimes(1); // not retried
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(patchItem).toHaveBeenCalled());
   });
 });
 
