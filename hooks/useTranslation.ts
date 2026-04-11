@@ -38,7 +38,7 @@ export function useTranslation(
 
   const prefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
 
-  // Refs for stable access inside async functions without re-renders
+  // Refs let async callbacks read live values without re-creating on every render.
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
   const authRef = useRef(isAuthenticated);
@@ -48,7 +48,7 @@ export function useTranslation(
   const notifyRef = useRef(addNotification);
   notifyRef.current = addNotification;
 
-  // Track attempted items to avoid infinite retry (keyed by target language)
+  // Attempted-item sets, keyed by target language so a language switch resets them.
   const attemptedRef = useRef<{ lang: string; skip: Set<string>; failed: Set<string> }>({
     lang: "", skip: new Set(), failed: new Set(),
   });
@@ -56,10 +56,9 @@ export function useTranslation(
     attemptedRef.current = { lang: prefs.targetLanguage, skip: new Set(), failed: new Set() };
   }
 
-  // Active translation count for concurrency control
   const activeRef = useRef(0);
 
-  // Bumped to force effect re-run after clearing the failed set
+  // Bumped to force the auto-translate effect to re-run after clearing the failed set.
   const [retryTick, setRetryTick] = useState(0);
 
   // Gates auto-translate until the IC actor is ready (authenticated
@@ -98,10 +97,8 @@ export function useTranslation(
     setTranslatingIds(prev => new Set(prev).add(item.id));
     activeRef.current++;
 
-    // translateContent returns a TranslationResult on success, "skip"
-    // when the content is untranslatable or already in the target
-    // language, and throws with a diagnostic message on transport
-    // failure. The "failed" notification is debounced to once per
+    // translateContent returns TranslationResult | "skip" on success,
+    // throws on transport failure. Failure notifications debounce per
     // language so a broken infra path doesn't spam the user.
     let outcome: Awaited<ReturnType<typeof translateContent>> | null = null;
     try {
@@ -154,10 +151,8 @@ export function useTranslation(
 
     if (pending.length === 0) return;
 
-    // Launch up to MAX_CONCURRENT, respecting active count
     const slots = Math.max(0, MAX_CONCURRENT - activeRef.current);
-    const batch = pending.slice(0, slots);
-    for (const item of batch) {
+    for (const item of pending.slice(0, slots)) {
       void runTranslation(item);
     }
   }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, translatingIds, runTranslation, retryTick, isReady]);
@@ -183,14 +178,15 @@ export function useTranslation(
     }
   }, [syncStatus]);
 
-  // Clear failed set periodically to allow retry (every 60s)
-  // Bump retryTick so the auto-translate effect re-runs after clearing.
+  // Periodic retry: clear the failed set every RETRY_INTERVAL_MS so
+  // transient infra problems get a second chance. retryTick forces
+  // the auto-translate effect to re-evaluate.
   useEffect(() => {
     const interval = setInterval(() => {
       if (attemptedRef.current.failed.size > 0) {
         attemptedRef.current.failed.clear();
-        failNotifiedLangRef.current = "";           // allow notification again
-        setRetryTick(t => t + 1);                   // trigger effect re-run
+        failNotifiedLangRef.current = "";
+        setRetryTick(t => t + 1);
       }
     }, RETRY_INTERVAL_MS);
     return () => clearInterval(interval);

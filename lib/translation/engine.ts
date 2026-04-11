@@ -28,10 +28,12 @@ import { errMsg } from "@/lib/utils/errors";
 // latter is a deterministic server response.
 const TRANSIENT_FETCH_ERROR_RE = /Load failed|Failed to fetch|NetworkError|network request failed/i;
 
-// Used at the end of the auto cascade to decide whether to throw a
-// user-visible error (transport problem, retry after 60s) or silently
-// skip (validator rejection, retry is pointless).
-const TRANSPORT_ERROR_RE = /HTTP \d+|aborted|Load failed|Failed to fetch|NetworkError|network request failed|timeout|ECONNREFUSED/i;
+// Failure reasons that are REAL infrastructure problems (vs canister
+// application-level errors like "IC LLM translation failed"). When a
+// cascade-exhausted failure set matches only this pattern we throw a
+// user-visible notification; otherwise we silent-skip since retrying
+// the same canister with the same content won't change the outcome.
+const INFRA_ERROR_RE = /HTTP \d+|aborted|Load failed|Failed to fetch|NetworkError|network request failed|timeout|ECONNREFUSED/i;
 
 // — Individual backend callers —
 
@@ -178,29 +180,19 @@ export interface TranslateOptions {
   isAuthenticated?: boolean;
 }
 
-// Outcome of parsing + validating a single backend response. The
-// explicit-backend path and the auto-cascade loop both dispatch on
-// this so neither has to re-parse the raw response.
 type BackendOutcome =
   | { kind: "ok"; parsed: { text: string; reason?: string } }
   | { kind: "skip" }
   | { kind: "failed"; reason: string };
 
-/**
- * Skip promotion predicate: when a validator rejection is a definitive
- * "this content is not translatable" verdict, we promote the failure
- * to a skip instead of falling through and retrying. Two cases:
- *
- *   1. BYOK Claude returned text with no Japanese kana for a ja
- *      target — Claude considered the input untranslatable (URL,
- *      code, already-Japanese-but-unrecognised).
- *   2. Any backend echoed the input verbatim — same signal as
- *      ALREADY_IN_TARGET in a different shape.
- *
- * Without these promotions the item would bounce between the failed
- * and retry sets on the 60-second interval forever, burning API
- * cycles on content the model has already said it cannot translate.
- */
+// Validator rejections that are definitive verdicts "this content is
+// not translatable" — promoted to skip instead of falling through so
+// the 60s retry loop doesn't burn API cycles on doomed items:
+//
+//   - BYOK Claude returning no-kana for a ja target (URL / code /
+//     already-Japanese-but-unrecognised)
+//   - Any backend echoing the input verbatim (same signal as
+//     ALREADY_IN_TARGET in a different shape)
 function isDefinitiveUntranslatable(
   attemptName: string,
   reason: string,
@@ -219,11 +211,8 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
 
   const prompt = buildTranslationPrompt(text, targetLanguage, reason);
 
-  // Parse + validate a raw backend response. Empty / unparseable /
-  // validator-rejected outputs are reported as `failed` so callers
-  // can decide whether to fall through (cascade) or surface the
-  // failure (explicit backend). Transport errors are NOT caught here
-  // — they bubble up to the caller.
+  // Parse + validate a raw backend response. Transport errors are
+  // NOT caught here — they bubble to the cascade loop.
   const evaluateRaw = (raw: string): BackendOutcome => {
     if (!raw) return { kind: "failed", reason: "empty response" };
     const parsed = parseTranslationResponse(raw, targetLanguage);
@@ -248,11 +237,6 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     return result;
   };
 
-  // Surface a validator-rejected outcome from explicit-backend mode as
-  // a thrown Error with an actionable message. Returning a generic
-  // "failed" was misleading because the notification then claimed "no
-  // backend available" when only the user's single chosen backend was
-  // tried.
   const explicitFail = (label: string, reason: string): string =>
     `${label} returned an unusable response (${reason}). Try switching to Auto in Settings → Translation Engine.`;
 
@@ -274,11 +258,9 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     return finalize(outcome.parsed, engineName);
   }
   if (backend === "cloud") {
-    // Cloud backend requires a user-provided Anthropic API key. Before
-    // hotfix 17 this silently fell back to the operator-hosted server
-    // key when BYOK was missing, which meant every user without a key
-    // burned the operator's Anthropic budget. Now the cost path is
-    // opt-in at account-setup level, not at runtime.
+    // Cloud requires BYOK — the operator's server Anthropic key is
+    // never used for translation (protected client-side here and at
+    // the /api/translate boundary).
     const key = getUserApiKey();
     if (!key) {
       throw new Error(
@@ -303,21 +285,12 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
 
   // — Auto cascade —
   //
-  // Composition (in order):
-  //   1. Ollama                  (local, user-configured)
-  //   2. MediaPipe | WebLLM      (browser WebGPU, mutually exclusive)
-  //   3. Claude BYOK             (user-provided API key)
-  //   4. IC LLM                  (free, authenticated users only)
-  //
-  // claude-server is NOT in the cascade. The operator-hosted Anthropic
-  // route is reachable only via explicit `backend: "cloud"` with a
-  // BYOK key, so anonymous / non-BYOK users never burn the operator's
-  // budget unintentionally.
-  //
-  // IC LLM sits at the back as the free authenticated fallback — its
-  // real-world success rate is ~42%, but the items it can't handle
-  // simply cascade-exhaust into the silent-skip path below, which is
-  // strictly better than showing a failure notification.
+  // Order: Ollama → (MediaPipe | WebLLM) → Claude BYOK → IC LLM.
+  // claude-server is intentionally absent — operator cost protection,
+  // enforced both here and at the /api/translate boundary. IC LLM sits
+  // at the back as the free authenticated fallback; its ~42%
+  // real-world success rate is fine because failures cascade-exhaust
+  // into the silent-skip path below.
   const attempts: Array<{ name: string; fn: () => Promise<string> }> = [];
 
   if (isOllamaEnabled()) {
@@ -342,12 +315,11 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
 
   const itemHint = text.slice(0, 60);
 
-  // Empty cascade: user has no configured backend (anonymous + no
-  // local + no BYOK, or authenticated but breaker open). Silent skip
-  // — no error notification, no retry, the item renders in its
-  // original language. The actor-ready hook clears the skip set when
+  // Empty cascade: no configured backend (anonymous + no local + no
+  // BYOK, or authenticated but breaker open). Silent skip — the
+  // actor-ready hook in useTranslation will clear the skip set when
   // the IC actor becomes available, so items stranded at cold start
-  // get a second chance once ic-llm enters the cascade.
+  // retry once ic-llm enters the cascade.
   if (attempts.length === 0) {
     recordTranslationAttempt({
       itemHint, targetLanguage, backend: "auto",
@@ -358,7 +330,6 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   }
 
   const failures: Array<{ name: string; reason: string }> = [];
-  let transportFailureCount = 0;
 
   for (const attempt of attempts) {
     const startedAt = Date.now();
@@ -369,7 +340,6 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
       const reason = errMsg(err);
       console.warn(`[translate] ${attempt.name} transport error:`, reason);
       failures.push({ name: attempt.name, reason });
-      transportFailureCount += 1;
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "transport-error", reason, elapsedMs: Date.now() - startedAt,
@@ -410,16 +380,14 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     });
   }
 
-  // Cascade exhausted. If every attempt was a transport-level
-  // failure, throw so the user sees a "Translation failed" notification
-  // (and the 60s retry loop will try again — infra problems are often
-  // transient). If any attempt failed at the validator, silent-skip
-  // — content-level problems won't be fixed by retrying the same
-  // input against the same backends. The breaker-gate + transport
-  // regex must match the set of failure-reason shapes we actually
-  // emit above.
+  // Cascade exhausted. Throw a user-visible notification only when
+  // every failure looks like real infrastructure trouble (HTTP error,
+  // network failure, timeout, abort). Canister application-level
+  // rejections ("IC LLM translation failed") and validator rejections
+  // silent-skip — retrying the same input against the same backends
+  // in 60s won't change the outcome.
   const summary = failures.map(f => `${f.name}: ${f.reason}`).join(" | ");
-  if (transportFailureCount === failures.length && failures.every(f => TRANSPORT_ERROR_RE.test(f.reason))) {
+  if (failures.length > 0 && failures.every(f => INFRA_ERROR_RE.test(f.reason))) {
     throw new Error(
       failures.length === 1
         ? `Translation backend failed — ${summary}`
