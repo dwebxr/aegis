@@ -54,11 +54,13 @@ export interface ValidationResult {
  *   - en → fr / de / es: typical 0.9–1.4
  *
  * The bounds are deliberately wide to avoid rejecting legitimate
- * translations. Anything outside [0.2, 5.0] is almost certainly broken
- * (e.g. an empty string, a one-word echo, or a paragraph of self-talk
- * appended after the actual translation).
+ * translations. Llama 3.1 8B can produce extremely terse Japanese for
+ * short inputs (e.g. a 100-char English headline → "アップルが発表" =
+ * 7 chars, ratio 0.07), so MIN_RATIO needs to be VERY low. The kana
+ * presence check + identical-to-input check are the real safety nets;
+ * the ratio bounds catch only obvious noise.
  */
-const MIN_RATIO = 0.2;
+const MIN_RATIO = 0.05;
 const MAX_RATIO = 5.0;
 
 /**

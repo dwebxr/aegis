@@ -112,9 +112,9 @@ describe("validateTranslation — non-Japanese targets skip kana check", () => {
 });
 
 describe("validateTranslation — length ratio", () => {
-  it("rejects output much shorter than input (ratio < 0.2)", () => {
+  it("rejects output much shorter than input (ratio < 0.05)", () => {
     const input = "a".repeat(200);
-    const output = "あ".repeat(5);
+    const output = "あ".repeat(5); // ratio 0.025
     const r = validateTranslation(output, "ja", input);
     expect(r.valid).toBe(false);
     expect(r.reason).toMatch(/too short/);
@@ -140,9 +140,18 @@ describe("validateTranslation — length ratio", () => {
     expect(r.valid).toBe(true);
   });
 
-  it("accepts the boundary ratio of exactly 0.2", () => {
-    const input = "x".repeat(100);
-    const output = "あ".repeat(20);
+  it("accepts terse Llama 3.1 8B output where ratio is ~0.17", () => {
+    // Real-world Llama failure mode: 100-char headline → 17-char terse Japanese.
+    // Old MIN_RATIO=0.2 wrongly rejected these. New MIN_RATIO=0.05 accepts.
+    const input = "Apple announced a new MacBook with the M5 chip and improved battery life today.";
+    const output = "アップルが新製品発表しました。"; // 15 chars, ratio ~0.19
+    const r = validateTranslation(output, "ja", input);
+    expect(r.valid).toBe(true);
+  });
+
+  it("accepts the boundary ratio of exactly 0.05", () => {
+    const input = "x".repeat(200);
+    const output = "あ".repeat(10); // ratio 0.05
     const r = validateTranslation(output, "ja", input);
     expect(r.valid).toBe(true);
   });

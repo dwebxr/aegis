@@ -52,6 +52,12 @@ async function translateWithMediaPipe(prompt: string): Promise<string> {
 }
 
 async function translateWithClaude(prompt: string, apiKey?: string | null): Promise<string> {
+  // 20s budget covers a normal Vercel warm-instance Claude call (~3-8s) +
+  // a cold-start function spin-up (~5-10s). 30s was too generous and made
+  // the cascade hang on slow connections (the user's iPhone was waiting
+  // 30+ seconds before falling through to the next backend or surfacing
+  // the error). 20s is the sweet spot — gives Vercel + Anthropic enough
+  // time but doesn't strand items if something goes wrong.
   const res = await fetch("/api/translate", {
     method: "POST",
     headers: {
@@ -59,7 +65,7 @@ async function translateWithClaude(prompt: string, apiKey?: string | null): Prom
       ...(apiKey ? { "x-user-api-key": apiKey } : {}),
     },
     body: JSON.stringify({ prompt }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`Translate API HTTP ${res.status}`);
   const data = await res.json();
