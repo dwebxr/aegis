@@ -9,6 +9,26 @@
 
 ## Latest Updates (April 2026)
 
+### Translation Subsystem Rebuild (17 hotfixes + LARP audit + prod-readiness)
+- **399 suites / 7,029 tests** — zero failures, zero skipped
+- **BYOK-only translation cost model**: operator's `ANTHROPIC_API_KEY` is **never** used for translation, enforced at both the client cascade and the `/api/translate` server boundary. Anonymous POSTs to `/api/translate` return 401. Verified in `__tests__/api/translate.test.ts` (11 tests) and `scripts/smoke-test.sh` (live production probe: 11/11 pass)
+- **Auto-cascade redesign**: Ollama → MediaPipe/WebLLM → Claude BYOK → IC LLM. `claude-server` removed from the cascade entirely — users who want Claude quality must provide their own key, everyone else falls back to free on-device / on-chain paths. Silent-skip when the cascade is empty (no error notification for users who haven't configured anything)
+- **Production debug log**: localStorage-backed rolling log of the last 50 translation attempts with per-backend outcome, elapsed time, reason. Surfaced in Settings → Translation with `Copy log` button for iPhone PWA users who can't open the browser console
+- **IC LLM concurrency gate** (`lib/ic/icLlmConcurrency.ts`): empirically verified the DFINITY LLM canister rejects the 3rd concurrent inter-canister call from a single caller with `IC LLM translation failed` in ~1.5s. FIFO semaphore caps in-flight at 2, shared across `analyzeOnChain` (scoring) and `translateOnChain` (translation) call sites
+- **IC LLM circuit breaker** (`lib/ic/icLlmCircuitBreaker.ts`): 3 consecutive transport failures → breaker opens for 60s → half-open probe cycle. Keeps cascade from burning 8s per-item on a flaky canister. Shared state across scoring and translation
+- **Japanese-specific output validation**: kana presence check (hiragana / katakana / half-width / phonetic extensions / CJK ideographs — but requires ≥1 kana for ja target), meta-commentary prefix detection + stripping, length-ratio bounds (`MIN_RATIO=0.02` / `MAX_RATIO=5.0`), identical-to-input detection. Promotes `no-kana` (for claude-byok) and `identical-to-input` (for any backend) to `skip` so untranslatable content doesn't retry forever
+- **Claude transient-fetch retry**: iOS Safari's `TypeError: Load failed` during wifi→cellular transitions, Chrome's `Failed to fetch`, Firefox's `NetworkError when attempting to fetch resource` — all retried once with 500ms backoff. AbortError and HTTP errors are NOT retried (self-inflicted / deterministic)
+- **Translation cache resilience**: SHA-256 keyed localStorage store with runtime shape validation (rejects arrays / wrong-shape blobs), corrupt-JSON recovery, Safari private-mode `QuotaExceededError` handling with halve-and-retry fallback, silent degradation on `crypto.subtle` failure
+- **Sentry span annotations** (race-free): `translateContent` wraps the cascade in `Sentry.startSpan` and writes annotations directly to the span object via `span.setAttribute` — not to the forked scope via `Sentry.setTag`. Browser-side concurrent translations no longer race on scope mutation. Error paths carry tags on the `captureException` event itself, not on the scope
+- **Real-SDK Sentry type compatibility test**: imports `Span`, `StartSpanOptions`, `CaptureContext` from the real `@sentry/nextjs` (not the mock) and exercises the shapes engine.ts uses. Catches SDK API regressions at TypeScript compile time in CI
+- **`@sentry/nextjs`**: 10.42.0 → 10.48.0
+- **Validator test coverage**: half-width katakana, phonetic extensions, CJK kanji+kana, surrogate-pair emoji, full-width whitespace, exact `RATIO_MIN_INPUT_LENGTH=30` boundary, case-insensitive meta-commentary, return-shape invariants across all failure classes
+- **Engine test coverage**: cascade ordering (ollama → claude-byok → ic-llm), mixed soft-fail + success, definitive untranslatable promotion, circuit breaker integration, semaphore-gated parallel cascade (4 concurrent), transport-only vs mixed-failure distinction, debug log entry shape
+- **Circuit breaker coverage**: closed → open → half-open → closed lifecycle, exact `OPEN_DURATION_MS` boundary, full-lifecycle integration, idempotent state queries
+- **Semaphore coverage**: 20-parallel peak-observed cap verification, throw-releases-slot, FIFO queue depth observable under contention
+- **`scripts/smoke-test.sh`**: executable bash script that probes `/api/health`, `/api/translate` BYOK enforcement (anon / empty / wrong-prefix 401s), landing page, `/manifest.json`. Makes **no writes**, safe to run from any machine. `BASE_URL=https://staging scripts/smoke-test.sh` for non-prod targets
+- **`PRE_DEPLOY.md` updates**: automated smoke test section, "Translation endpoint: BYOK-only" contract, "Sentry trace sampling" rationale (`tracesSampleRate: 0.1` with escalation procedure), "Known accepted limitations" (4 LOW dev-dep vulnerabilities in jsdom chain, task #32 Qwen3 cycle verification deferred — both with verification commands)
+
 ### Production Hardening & Test Coverage Push
 - **6,809 tests, 393 suites** — zero failures, zero skipped
 - **Coverage**: lines 92.11% / functions 82.94% / branches 82.20% — verified in CI
@@ -32,17 +52,15 @@
 - **Translation integration**: MediaPipe as translation backend (browser mode on mobile), `isMediaPipeLoaded()` check prevents unintended model downloads in auto-cascade
 - **Translation Off**: new policy option to fully disable translation (no buttons, no auto-translate) — for devices where no backend is available
 
-### Content Translation (Multi-Backend)
+### Content Translation (Multi-Backend) — initial release
 - **4 translation backends**: IC LLM (on-chain, free, ideal for PWA/mobile), Ollama (local), WebLLM (browser), Claude BYOK (cloud premium)
-
-- **4 translation backends**: IC LLM (on-chain, free, ideal for PWA/mobile), Ollama (local), WebLLM (browser), Claude BYOK (cloud premium)
-- **Auto cascade**: tries enabled backends in order (Ollama → WebLLM → IC LLM → BYOK → Server Claude), falls back gracefully
+- **Auto cascade**: tries enabled backends in order, falls back gracefully. *Rebuilt in the April update above — see the Translation Subsystem Rebuild section for the current cascade composition and BYOK enforcement*
 - **3 translation policies**: Manual (button per post), High quality (auto-translate above score threshold), All posts
 - **Settings → General → Translation**: language selector (10 languages incl. Japanese), policy pills, min-score slider, backend selector
 - **Translate button** on every ContentCard across Dashboard, Briefing, and D2A tabs
 - **Translation cache**: SHA-256 keyed localStorage cache (200 entries, 7-day TTL), skips already-translated and same-language content
 - **Canister endpoint**: `translateOnChain` — generic LLM prompt via `mo:llm`, 8000 char cap, authenticated
-- **API route**: `/api/translate` with BYOK support, rate-limited (10 req/60s)
+- **API route**: `/api/translate` with BYOK support, rate-limited (60 req/60s per IP)
 
 ### OPML Import / Export
 - **OPML import**: Import feeds from Feedly, Inoreader, or any RSS reader — parses nested folder structures, validates URLs (http/https only, 2048 char limit), deduplicates against existing sources, 500 feed / 1 MB file limits
