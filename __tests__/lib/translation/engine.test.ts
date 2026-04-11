@@ -613,27 +613,31 @@ describe("translateContent", () => {
       expect(r.backend).toBe("claude-server");
     });
 
-    it("auto cascade throws diagnostic error when ALL backends produce invalid output", async () => {
+    it("auto cascade throws diagnostic error when both backends fail with non-skip reasons", async () => {
       mockOllamaEnabled = false;
       mockApiKey = null;
       const mockTranslate = jest.fn().mockResolvedValue({
         ok: "English only output without any kana characters",
       });
       const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
-      globalThis.fetch = jest.fn().mockImplementation(async () => {
-        return mockResponse({ translation: "Also English without kana from server" });
+      // claude-server returns HTTP 502 (transport error, not validator
+      // rejection — so the smart-model "skip" exception does NOT apply).
+      globalThis.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: () => Promise.resolve({ error: "upstream" }),
+        text: () => Promise.resolve("upstream"),
       });
 
-      // Both ic-llm and claude-server return outputs the validator
-      // rejects (no kana for ja target). Cascade exhausts and throws
-      // with both backend names + reasons in the error message.
+      // ic-llm rejected by validator (no kana), claude-server failed
+      // transport. Cascade exhausts and throws with both names + reasons.
       await expect(translateContent({
         text: "Apple announced a new product today.",
         targetLanguage: "ja",
         backend: "auto",
         actorRef,
         isAuthenticated: true,
-      })).rejects.toThrow(/All 2 translation backends failed.*ic-llm.*no kana.*claude-server.*no kana/);
+      })).rejects.toThrow(/All 2 translation backends failed.*ic-llm.*no kana.*claude-server.*HTTP 502/);
     });
 
     it("explicit IC backend throws with named reason on validator rejection", async () => {
@@ -721,6 +725,55 @@ describe("translateContent", () => {
       // Only called once — not retried because the error doesn't match the
       // transient-failure pattern.
       expect(mockTranslate).toHaveBeenCalledTimes(1);
+    });
+
+    it("auto cascade promotes claude-server no-kana for ja target to 'skip' (smart-model exception)", async () => {
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+      const mockTranslate = jest.fn().mockResolvedValue({
+        ok: "Apple announced a new product (no kana from IC LLM)",
+      });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      // Claude server returns text without kana — likely the input is
+      // untranslatable (URL, code, single token). The cascade should
+      // treat this as "skip" rather than throw.
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "https://example.com/some-url" });
+      });
+
+      const result = await translateContent({
+        text: "https://example.com/some-url",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(result).toBe("skip");
+    });
+
+    it("auto cascade does NOT promote IC LLM no-kana to skip (only Claude is trusted)", async () => {
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+      const mockTranslate = jest.fn().mockResolvedValue({
+        ok: "English without kana from the 8B model",
+      });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      // After IC LLM rejection, the cascade falls through to claude-server.
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "Appleが新製品を発表しました。" });
+      });
+
+      const result = await translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      const r = expectResult(result);
+      expect(r.backend).toBe("claude-server");
     });
 
     it("auto cascade short-circuits on ALREADY_IN_TARGET (does not retry later backends)", async () => {

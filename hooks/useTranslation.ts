@@ -20,6 +20,7 @@ export function useTranslation(
   items: ContentItem[],
   patchItem: (id: string, patch: Partial<ContentItem>) => void,
   actorRef: React.MutableRefObject<_SERVICE | null>,
+  syncStatus: "idle" | "syncing" | "synced" | "offline" = "offline",
 ): UseTranslationReturn {
   const { profile } = usePreferences();
   const { isAuthenticated } = useAuth();
@@ -136,6 +137,28 @@ export function useTranslation(
       void runTranslation(item);
     }
   }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, translatingIds, runTranslation, retryTick]);
+
+  // Clear failed set when the IC actor becomes ready. The most common
+  // failure mode for the user is: page loads → useTranslation effect
+  // fires immediately with actorRef.current === null (actor not yet
+  // created) → cascade only includes claude-server → claude-server hits
+  // rate limit or returns no-kana for some items → those items go into
+  // attemptedRef.failed and are stuck for 60s.
+  //
+  // When syncStatus transitions out of "offline" (actor was just created
+  // by ContentContext), wipe the failed set and bump retryTick so the
+  // auto-translate effect re-runs with IC LLM now in the cascade. This
+  // recovers from the cold-start race within seconds instead of minutes.
+  const prevSyncStatusRef = useRef<typeof syncStatus>("offline");
+  useEffect(() => {
+    const prev = prevSyncStatusRef.current;
+    prevSyncStatusRef.current = syncStatus;
+    if (prev === "offline" && syncStatus !== "offline" && attemptedRef.current.failed.size > 0) {
+      attemptedRef.current.failed.clear();
+      failNotifiedLangRef.current = "";
+      setRetryTick(t => t + 1);
+    }
+  }, [syncStatus]);
 
   // Clear failed set periodically to allow retry (every 60s)
   // Bump retryTick so the auto-translate effect re-runs after clearing.

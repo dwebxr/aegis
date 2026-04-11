@@ -276,6 +276,23 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
       // disagree, so propagate immediately rather than retrying.
       return "skip";
     }
+    // Smart-model exception: if Claude (server or BYOK) returns a ja-target
+    // output without kana, the input is almost certainly untranslatable
+    // (URL, code block, single token, emoji, language the model doesn't
+    // recognise). Claude is reliable enough that we trust this signal —
+    // promote to "skip" so the item is added to the skip set and stops
+    // trying to translate. For weaker models (Llama 3.1 8B / Ollama /
+    // WebLLM), no-kana is more likely a real model failure and we let the
+    // cascade fall through to try a stronger backend.
+    const isSmartModel = attempt.name === "claude-server" || attempt.name === "claude-byok";
+    if (
+      outcome.kind === "failed" &&
+      isSmartModel &&
+      targetLanguage === "ja" &&
+      /no kana/.test(outcome.reason)
+    ) {
+      return "skip";
+    }
     // outcome.kind === "failed" — log, record, and try the next backend
     console.warn(`[translate] ${attempt.name} rejected:`, outcome.reason);
     failures.push({ name: attempt.name, reason: outcome.reason });

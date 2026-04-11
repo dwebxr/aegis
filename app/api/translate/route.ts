@@ -4,7 +4,11 @@ import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
-  const rateLimited = await distributedRateLimit(request, 10, 60);
+  // 60 req/60s per IP. Translation is per-item and a power user with a
+  // briefing of 50+ articles can easily exceed 10/60s during a single
+  // page load. The daily Anthropic call cap is enforced separately on
+  // /api/analyze (this endpoint serves both BYOK and server-paid keys).
+  const rateLimited = await distributedRateLimit(request, 60, 60);
   if (rateLimited) return rateLimited;
 
   const bodyErr = await checkBodySize(request, 32_000);

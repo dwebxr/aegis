@@ -63,7 +63,7 @@ function AegisAppInner() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
   const { content, isAnalyzing, syncStatus, cacheChecked, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, pendingCount, clearDemoContent, patchItem, actorRef } = useContent();
-  const { translateItem: rawTranslateItem, isItemTranslating } = useTranslation(content, patchItem, actorRef);
+  const { translateItem: rawTranslateItem, isItemTranslating } = useTranslation(content, patchItem, actorRef, syncStatus);
   const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile } = usePreferences();
   const translationOff = (profile.translationPrefs?.policy ?? "manual") === "off";
