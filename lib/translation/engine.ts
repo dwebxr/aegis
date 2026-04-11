@@ -1,6 +1,7 @@
 import type { TranslationLanguage, TranslationBackend, TranslationResult } from "./types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { buildTranslationPrompt, parseTranslationResponse } from "./prompt";
+import { validateTranslation } from "./validate";
 import { lookupTranslation, storeTranslation } from "./cache";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
@@ -91,6 +92,16 @@ export interface TranslateOptions {
   isAuthenticated?: boolean;
 }
 
+/**
+ * Outcome of validating a single backend response. Discriminated union so
+ * the explicit-backend code path and the auto-cascade loop can both
+ * dispatch on it cleanly without re-parsing.
+ */
+type BackendOutcome =
+  | { kind: "ok"; parsed: { text: string; reason?: string } }
+  | { kind: "skip" }
+  | { kind: "failed"; reason: string };
+
 export async function translateContent(opts: TranslateOptions): Promise<TranslationResult | "skip" | "failed"> {
   const { text, reason, targetLanguage, backend, actorRef, isAuthenticated } = opts;
 
@@ -99,77 +110,118 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
 
   const prompt = buildTranslationPrompt(text, targetLanguage, reason);
 
-  let raw = "";
-  let usedBackend = "";
-
-  if (backend === "local") {
-    raw = await translateWithOllama(prompt);
-    usedBackend = "ollama";
-  } else if (backend === "browser") {
-    if (isMediaPipeEnabled()) {
-      raw = await translateWithMediaPipe(prompt);
-      usedBackend = "mediapipe";
-    } else {
-      raw = await translateWithWebLLM(prompt);
-      usedBackend = "webllm";
+  /**
+   * Parse + validate a raw backend response. Empty / unparseable / validator-
+   * rejected outputs are reported as `failed` so callers can decide whether
+   * to fall through (cascade) or surface the failure (explicit backend).
+   * Transport errors are NOT caught here — they bubble up to the caller.
+   */
+  const evaluateRaw = (raw: string): BackendOutcome => {
+    if (!raw) return { kind: "failed", reason: "empty response" };
+    const parsed = parseTranslationResponse(raw);
+    if (!parsed) return { kind: "skip" };
+    const validation = validateTranslation(parsed.text, targetLanguage, text);
+    if (!validation.valid) {
+      return { kind: "failed", reason: validation.reason ?? "validation failed" };
     }
-  } else if (backend === "cloud") {
-    const key = getUserApiKey();
-    raw = await translateWithClaude(prompt, key);
-    usedBackend = key ? "claude-byok" : "claude-server";
-  } else if (backend === "ic") {
-    if (!actorRef || !isAuthenticated) throw new Error("IC requires authentication");
-    raw = await translateWithIC(prompt, actorRef);
-    usedBackend = "ic-llm";
-  } else {
-    const attempts: Array<{ name: string; fn: () => Promise<string> }> = [];
-
-    if (isOllamaEnabled()) {
-      attempts.push({ name: "ollama", fn: () => translateWithOllama(prompt) });
-    }
-    if (isMediaPipeEnabled() && isMediaPipeLoaded()) {
-      attempts.push({ name: "mediapipe", fn: () => translateWithMediaPipe(prompt) });
-    } else if (isWebLLMEnabled() && isWebLLMLoaded()) {
-      attempts.push({ name: "webllm", fn: () => translateWithWebLLM(prompt) });
-    }
-    if (actorRef?.current && isAuthenticated) {
-      attempts.push({ name: "ic-llm", fn: () => withTimeout(
-        translateWithIC(prompt, actorRef), 5_000, "IC LLM auto-cascade timeout",
-      ) });
-    }
-    const byokKey = getUserApiKey();
-    if (byokKey) {
-      attempts.push({ name: "claude-byok", fn: () => translateWithClaude(prompt, byokKey) });
-    }
-    // Server Claude as last resort
-    attempts.push({ name: "claude-server", fn: () => translateWithClaude(prompt, null) });
-
-    for (const attempt of attempts) {
-      try {
-        raw = await attempt.fn();
-        usedBackend = attempt.name;
-        break;
-      } catch (err) {
-        console.debug(`[translate] ${attempt.name} failed:`, errMsg(err));
-      }
-    }
-
-    if (!usedBackend) return "failed";
-  }
-
-  if (!raw) return "failed";
-
-  const parsed = parseTranslationResponse(raw);
-  if (!parsed) return "skip";
-
-  const result: TranslationResult = {
-    translatedText: parsed.text,
-    translatedReason: parsed.reason,
-    targetLanguage,
-    backend: usedBackend,
-    generatedAt: Date.now(),
+    return { kind: "ok", parsed };
   };
 
-  await storeTranslation(text, result);
-  return result;
+  const finalize = async (
+    parsed: { text: string; reason?: string },
+    usedBackend: string,
+  ): Promise<TranslationResult> => {
+    const result: TranslationResult = {
+      translatedText: parsed.text,
+      translatedReason: parsed.reason,
+      targetLanguage,
+      backend: usedBackend,
+      generatedAt: Date.now(),
+    };
+    await storeTranslation(text, result);
+    return result;
+  };
+
+  // — Explicit backend selection: a failed/skip outcome surfaces directly. —
+  if (backend === "local") {
+    const outcome = evaluateRaw(await translateWithOllama(prompt));
+    if (outcome.kind === "skip") return "skip";
+    if (outcome.kind === "failed") return "failed";
+    return finalize(outcome.parsed, "ollama");
+  }
+  if (backend === "browser") {
+    if (isMediaPipeEnabled()) {
+      const outcome = evaluateRaw(await translateWithMediaPipe(prompt));
+      if (outcome.kind === "skip") return "skip";
+      if (outcome.kind === "failed") return "failed";
+      return finalize(outcome.parsed, "mediapipe");
+    }
+    const outcome = evaluateRaw(await translateWithWebLLM(prompt));
+    if (outcome.kind === "skip") return "skip";
+    if (outcome.kind === "failed") return "failed";
+    return finalize(outcome.parsed, "webllm");
+  }
+  if (backend === "cloud") {
+    const key = getUserApiKey();
+    const outcome = evaluateRaw(await translateWithClaude(prompt, key));
+    if (outcome.kind === "skip") return "skip";
+    if (outcome.kind === "failed") return "failed";
+    return finalize(outcome.parsed, key ? "claude-byok" : "claude-server");
+  }
+  if (backend === "ic") {
+    if (!actorRef || !isAuthenticated) throw new Error("IC requires authentication");
+    const outcome = evaluateRaw(await translateWithIC(prompt, actorRef));
+    if (outcome.kind === "skip") return "skip";
+    if (outcome.kind === "failed") return "failed";
+    return finalize(outcome.parsed, "ic-llm");
+  }
+
+  // — Auto cascade: try each backend in order, fall through on validator
+  //   rejection so a low-quality IC LLM output is replaced by Claude. —
+  const attempts: Array<{ name: string; fn: () => Promise<string> }> = [];
+
+  if (isOllamaEnabled()) {
+    attempts.push({ name: "ollama", fn: () => translateWithOllama(prompt) });
+  }
+  if (isMediaPipeEnabled() && isMediaPipeLoaded()) {
+    attempts.push({ name: "mediapipe", fn: () => translateWithMediaPipe(prompt) });
+  } else if (isWebLLMEnabled() && isWebLLMLoaded()) {
+    attempts.push({ name: "webllm", fn: () => translateWithWebLLM(prompt) });
+  }
+  if (actorRef?.current && isAuthenticated) {
+    attempts.push({ name: "ic-llm", fn: () => withTimeout(
+      translateWithIC(prompt, actorRef), 5_000, "IC LLM auto-cascade timeout",
+    ) });
+  }
+  const byokKey = getUserApiKey();
+  if (byokKey) {
+    attempts.push({ name: "claude-byok", fn: () => translateWithClaude(prompt, byokKey) });
+  }
+  // Server Claude as last resort
+  attempts.push({ name: "claude-server", fn: () => translateWithClaude(prompt, null) });
+
+  let firstSkip = false;
+  for (const attempt of attempts) {
+    let raw: string;
+    try {
+      raw = await attempt.fn();
+    } catch (err) {
+      console.debug(`[translate] ${attempt.name} transport error:`, errMsg(err));
+      continue;
+    }
+    const outcome = evaluateRaw(raw);
+    if (outcome.kind === "ok") {
+      return finalize(outcome.parsed, attempt.name);
+    }
+    if (outcome.kind === "skip") {
+      // ALREADY_IN_TARGET is a definitive answer — no later backend can
+      // disagree, so propagate immediately rather than retrying.
+      firstSkip = true;
+      break;
+    }
+    // outcome.kind === "failed" — log and try the next backend
+    console.debug(`[translate] ${attempt.name} rejected:`, outcome.reason);
+  }
+
+  return firstSkip ? "skip" : "failed";
 }

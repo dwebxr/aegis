@@ -1,7 +1,7 @@
 import { buildTranslationPrompt, parseTranslationResponse } from "@/lib/translation/prompt";
 
 describe("buildTranslationPrompt", () => {
-  it("includes target language name", () => {
+  it("includes target language name (Japanese template)", () => {
     const prompt = buildTranslationPrompt("Hello world", "ja");
     expect(prompt).toContain("Japanese");
   });
@@ -11,7 +11,7 @@ describe("buildTranslationPrompt", () => {
     expect(prompt).toContain("Test article content");
   });
 
-  it("truncates text to maxLength", () => {
+  it("truncates text to maxLength when explicit", () => {
     const longText = "a".repeat(5000);
     const prompt = buildTranslationPrompt(longText, "de", undefined, 100);
     expect(prompt).toContain("a".repeat(100));
@@ -23,11 +23,20 @@ describe("buildTranslationPrompt", () => {
     expect(prompt).toContain("ALREADY_IN_TARGET");
   });
 
-  it("uses default maxLength of 3000", () => {
-    const text = "Q".repeat(4000);
+  it("byte budget keeps full prompt under 9000 bytes for ASCII inputs", () => {
+    const text = "Q".repeat(20_000);
     const prompt = buildTranslationPrompt(text, "ko");
-    const qCount = (prompt.match(/Q/g) ?? []).length;
-    expect(qCount).toBe(3000);
+    const bytes = new TextEncoder().encode(prompt).length;
+    expect(bytes).toBeLessThanOrEqual(9000);
+  });
+
+  it("byte budget keeps full prompt under 9000 bytes for Japanese inputs (3 bytes/char)", () => {
+    // Japanese characters are 3 bytes each in UTF-8 — a 5000-char input
+    // would be 15000 bytes if not truncated. The budget should clamp it.
+    const text = "あ".repeat(5000);
+    const prompt = buildTranslationPrompt(text, "en");
+    const bytes = new TextEncoder().encode(prompt).length;
+    expect(bytes).toBeLessThanOrEqual(9000);
   });
 
   it("works for all supported languages", () => {
@@ -36,6 +45,44 @@ describe("buildTranslationPrompt", () => {
       const prompt = buildTranslationPrompt("test", code);
       expect(prompt.length).toBeGreaterThan(50);
     }
+  });
+
+  describe("Japanese specialization", () => {
+    it("uses 敬体 / です・ます調 instructions for ja target", () => {
+      const prompt = buildTranslationPrompt("Apple announced a new product.", "ja");
+      expect(prompt).toContain("敬体");
+      expect(prompt).toContain("です");
+    });
+
+    it("includes katakana proper-noun rule for ja target", () => {
+      const prompt = buildTranslationPrompt("Apple released news.", "ja");
+      expect(prompt).toContain("カタカナ");
+      expect(prompt).toContain("アップル");
+    });
+
+    it("includes few-shot example for ja target", () => {
+      const prompt = buildTranslationPrompt("Apple released news.", "ja");
+      expect(prompt).toContain("Appleは10月15日");
+      expect(prompt).toContain("M5チップ");
+    });
+
+    it("does NOT use Japanese-specific rules for other targets", () => {
+      const fr = buildTranslationPrompt("Apple released news.", "fr");
+      expect(fr).not.toContain("敬体");
+      expect(fr).not.toContain("カタカナ");
+    });
+
+    it("ja template uses JSON output format when reason is provided", () => {
+      const prompt = buildTranslationPrompt("Apple released news.", "ja", "High insight");
+      expect(prompt).toContain("JSON");
+      expect(prompt).toContain("translated reason here");
+    });
+
+    it("ja template uses plain output format when reason is omitted", () => {
+      const prompt = buildTranslationPrompt("Apple released news.", "ja");
+      expect(prompt).not.toContain("JSON");
+      expect(prompt).not.toContain("Reason:");
+    });
   });
 
   it("includes reason in prompt when provided", () => {

@@ -229,7 +229,7 @@ describe("translateContent", () => {
   });
 
   it("calls IC actor for 'ic' backend with authentication", async () => {
-    const mockTranslate = jest.fn().mockResolvedValue({ ok: "IC翻訳結果" });
+    const mockTranslate = jest.fn().mockResolvedValue({ ok: "ICで翻訳しました" });
     const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
 
     const result = await translateContent({
@@ -241,7 +241,7 @@ describe("translateContent", () => {
     });
 
     const r = expectResult(result);
-    expect(r.translatedText).toBe("IC翻訳結果");
+    expect(r.translatedText).toBe("ICで翻訳しました");
     expect(expectResult(result).backend).toBe("ic-llm");
     expect(mockTranslate).toHaveBeenCalled();
   });
@@ -350,7 +350,7 @@ describe("translateContent", () => {
       mockOllamaEnabled = true;
       globalThis.fetch = jest.fn().mockImplementation(async () => {
         return mockResponse({
-          choices: [{ message: { content: "Ollama自動翻訳" } }],
+          choices: [{ message: { content: "Ollamaで自動翻訳しました" } }],
         });
       });
 
@@ -444,7 +444,7 @@ describe("translateContent", () => {
       mockOllamaEnabled = false;
       mockWebLLMEnabled = false;
       mockApiKey = null;
-      const mockTranslate = jest.fn().mockResolvedValue({ ok: "IC自動翻訳" });
+      const mockTranslate = jest.fn().mockResolvedValue({ ok: "ICで自動翻訳しました" });
       const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
 
       // Mock server Claude to fail so IC gets tried
@@ -532,6 +532,120 @@ describe("translateContent", () => {
       });
 
       expect(result).toBe("skip");
+    });
+  });
+
+  describe("validator integration — auto cascade fall-through", () => {
+    it("auto cascade falls through to next backend when output fails kana check", async () => {
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+      // IC LLM returns English (no kana) → validator rejects → cascade falls
+      // through to server Claude which returns valid Japanese.
+      const mockTranslate = jest.fn().mockResolvedValue({
+        ok: "Apple announced a new product (no kana, validator rejects this)",
+      });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "Appleが新製品を発表しました。" });
+      });
+
+      const result = await translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      const r = expectResult(result);
+      expect(r.backend).toBe("claude-server");
+      expect(r.translatedText).toBe("Appleが新製品を発表しました。");
+      expect(mockTranslate).toHaveBeenCalled();
+    });
+
+    it("auto cascade falls through when output is meta-commentary", async () => {
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+      const mockTranslate = jest.fn().mockResolvedValue({
+        ok: "Here is the translation: アップルが新製品を発表しました。",
+      });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "Appleが新製品を発表しました。" });
+      });
+
+      const result = await translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      const r = expectResult(result);
+      expect(r.backend).toBe("claude-server");
+    });
+
+    it("auto cascade returns 'failed' when ALL backends produce invalid output", async () => {
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+      const mockTranslate = jest.fn().mockResolvedValue({
+        ok: "English only output without any kana characters",
+      });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "Also English without kana from server" });
+      });
+
+      const result = await translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(result).toBe("failed");
+    });
+
+    it("explicit IC backend returns 'failed' on validator rejection (does not throw)", async () => {
+      const mockTranslate = jest.fn().mockResolvedValue({
+        ok: "English without any kana for ja target",
+      });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      const result = await translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "ic",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(result).toBe("failed");
+    });
+
+    it("auto cascade short-circuits on ALREADY_IN_TARGET (does not retry later backends)", async () => {
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+      const mockTranslate = jest.fn().mockResolvedValue({ ok: "ALREADY_IN_TARGET" });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      const claudeMock = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "should never be called" });
+      });
+      globalThis.fetch = claudeMock;
+
+      const result = await translateContent({
+        text: "既に日本語のテキスト",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(result).toBe("skip");
+      expect(mockTranslate).toHaveBeenCalled();
+      expect(claudeMock).not.toHaveBeenCalled();
     });
   });
 });
