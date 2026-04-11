@@ -257,6 +257,16 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   // no actionable information when debugging production issues.
   const failures: Array<{ name: string; reason: string }> = [];
 
+  // Track which "preferred" backends were actually tried in this cascade.
+  // The smart-model skip exception (below) should only fire when the
+  // user's expected on-device / on-chain backends had their chance —
+  // otherwise a cold-start cascade where actor wasn't ready yet would
+  // silently skip items that the actor-ready retry would have rescued.
+  const icLlmInCascade = attempts.some(a => a.name === "ic-llm");
+  const localBackendInCascade = attempts.some(
+    a => a.name === "ollama" || a.name === "mediapipe" || a.name === "webllm",
+  );
+
   for (const attempt of attempts) {
     let raw: string;
     try {
@@ -277,17 +287,27 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
       return "skip";
     }
     // Smart-model exception: if Claude (server or BYOK) returns a ja-target
-    // output without kana, the input is almost certainly untranslatable
-    // (URL, code block, single token, emoji, language the model doesn't
-    // recognise). Claude is reliable enough that we trust this signal —
-    // promote to "skip" so the item is added to the skip set and stops
-    // trying to translate. For weaker models (Llama 3.1 8B / Ollama /
-    // WebLLM), no-kana is more likely a real model failure and we let the
-    // cascade fall through to try a stronger backend.
+    // output without kana AND every preferred backend the user has
+    // available was already tried in this cascade, the input is almost
+    // certainly untranslatable (URL, code block, single token, emoji,
+    // language the model doesn't recognise). Promote to "skip" to stop
+    // pestering the user about the item.
+    //
+    // The "preferred backend was tried" gate is critical: during a
+    // cold-start cascade where actorRef.current is still null (IC actor
+    // hasn't been created yet) ic-llm is NOT in the attempts list, so
+    // claude-server is the only thing that runs. Without this gate the
+    // smart-model exception silently skips items that the actor-ready
+    // retry hook would have successfully translated via IC LLM seconds
+    // later. The same logic applies if the user has WebLLM/Ollama/
+    // MediaPipe enabled but they aren't loaded yet — let the cascade
+    // fall to "failed" so the retry hook gets a chance.
     const isSmartModel = attempt.name === "claude-server" || attempt.name === "claude-byok";
+    const preferredBackendTried = icLlmInCascade || localBackendInCascade;
     if (
       outcome.kind === "failed" &&
       isSmartModel &&
+      preferredBackendTried &&
       targetLanguage === "ja" &&
       /no kana/.test(outcome.reason)
     ) {

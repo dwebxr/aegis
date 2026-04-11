@@ -727,7 +727,7 @@ describe("translateContent", () => {
       expect(mockTranslate).toHaveBeenCalledTimes(1);
     });
 
-    it("auto cascade promotes claude-server no-kana for ja target to 'skip' (smart-model exception)", async () => {
+    it("auto cascade promotes claude-server no-kana to 'skip' ONLY when ic-llm was tried", async () => {
       mockOllamaEnabled = false;
       mockApiKey = null;
       const mockTranslate = jest.fn().mockResolvedValue({
@@ -735,8 +735,8 @@ describe("translateContent", () => {
       });
       const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
       // Claude server returns text without kana — likely the input is
-      // untranslatable (URL, code, single token). The cascade should
-      // treat this as "skip" rather than throw.
+      // untranslatable (URL, code, single token). With ic-llm in the
+      // cascade (authenticated + actor ready), this is treated as skip.
       globalThis.fetch = jest.fn().mockImplementation(async () => {
         return mockResponse({ translation: "https://example.com/some-url" });
       });
@@ -750,6 +750,30 @@ describe("translateContent", () => {
       });
 
       expect(result).toBe("skip");
+    });
+
+    it("auto cascade does NOT promote claude-server no-kana to skip when ic-llm was NOT in cascade (cold-start)", async () => {
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+      // Cold-start scenario: user is authenticated but actorRef.current
+      // is still null because createBackendActorAsync hasn't resolved yet.
+      // The cascade only includes claude-server. Claude returns no-kana.
+      // The conditional skip exception should NOT fire because the user's
+      // preferred backend (ic-llm) never got a chance — instead the
+      // cascade should throw so the actor-ready retry hook can re-run
+      // it once the actor is ready.
+      const actorRef = { current: null } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "Apple announced a new product." });
+      });
+
+      await expect(translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      })).rejects.toThrow(/Translation backend failed.*claude-server.*no kana/);
     });
 
     it("auto cascade does NOT promote IC LLM no-kana to skip (only Claude is trusted)", async () => {
