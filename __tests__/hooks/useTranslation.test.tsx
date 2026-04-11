@@ -230,6 +230,29 @@ describe("useTranslation — outcome handling", () => {
       );
     });
   });
+
+  it("does NOT also fire the auto-translate fallback notification when translateContent threw", async () => {
+    setPolicy("manual");
+    mockTranslateContent.mockRejectedValueOnce(new Error("IC LLM unavailable (retried once)"));
+    const { wrapper } = harness([makeItem("a")]);
+    const { result } = renderHook(wrapper);
+
+    await act(async () => {
+      result.current.translateItem("a");
+    });
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.stringMatching(/Translation failed: IC LLM unavailable/),
+        "error",
+      );
+    });
+    // The "no translation backend available" message must NOT fire — that
+    // one only makes sense after the auto cascade exhausted every option.
+    expect(mockAddNotification).not.toHaveBeenCalledWith(
+      expect.stringMatching(/no translation backend available/),
+      "error",
+    );
+  });
 });
 
 describe("useTranslation — auto policies", () => {

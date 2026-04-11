@@ -66,12 +66,20 @@ async function translateWithClaude(prompt: string, apiKey?: string | null): Prom
   return data.translation?.trim() ?? "";
 }
 
-async function translateWithIC(
+/**
+ * The DFINITY LLM canister is a free shared service backed by AI workers
+ * polling a queue. When the queue is busy or a worker drops a request, the
+ * call returns `#err("IC LLM translation failed")`. These failures are
+ * transient — a retry a second later usually succeeds. We try once more
+ * with a short backoff before propagating the error.
+ *
+ * The error message is rewritten to be operator-friendly so users see why
+ * the translation failed and not the raw canister `Debug.print` string.
+ */
+async function callIC(
+  actor: _SERVICE,
   prompt: string,
-  actorRef: React.MutableRefObject<_SERVICE | null>,
 ): Promise<string> {
-  const actor = actorRef.current;
-  if (!actor) throw new Error("IC actor not available");
   const result = await withTimeout(
     actor.translateOnChain(prompt),
     30_000,
@@ -79,6 +87,34 @@ async function translateWithIC(
   );
   if ("err" in result) throw new Error(result.err);
   return result.ok.trim();
+}
+
+async function translateWithIC(
+  prompt: string,
+  actorRef: React.MutableRefObject<_SERVICE | null>,
+): Promise<string> {
+  const actor = actorRef.current;
+  if (!actor) throw new Error("IC actor not available");
+
+  try {
+    return await callIC(actor, prompt);
+  } catch (err) {
+    const message = errMsg(err);
+    // Only retry on the canister's transient failure marker. Timeouts and
+    // empty-response errors get the same retry — they're symptomatic of
+    // the same queue-saturation issue. Auth and timeout-of-the-wrapper
+    // errors should NOT be retried.
+    if (!/IC LLM translation failed|IC LLM returned empty response/.test(message)) {
+      throw err;
+    }
+    console.debug("[translate] IC LLM transient failure, retrying once after 1s:", message);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      return await callIC(actor, prompt);
+    } catch (retryErr) {
+      throw new Error(`IC LLM unavailable (retried once): ${errMsg(retryErr)}`);
+    }
+  }
 }
 
 // — Main translation function —
@@ -189,8 +225,12 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     attempts.push({ name: "webllm", fn: () => translateWithWebLLM(prompt) });
   }
   if (actorRef?.current && isAuthenticated) {
+    // 15s budget for IC LLM in auto cascade: covers a normal call (~2s) +
+    // one retry (~1s backoff + ~5s) + slack for the larger Japanese prompt
+    // template that takes the model longer to process. Server Claude is the
+    // next attempt and will fire if this budget is exceeded.
     attempts.push({ name: "ic-llm", fn: () => withTimeout(
-      translateWithIC(prompt, actorRef), 5_000, "IC LLM auto-cascade timeout",
+      translateWithIC(prompt, actorRef), 15_000, "IC LLM auto-cascade timeout",
     ) });
   }
   const byokKey = getUserApiKey();

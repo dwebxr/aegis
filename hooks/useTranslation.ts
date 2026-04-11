@@ -70,10 +70,17 @@ export function useTranslation(
     activeRef.current++;
 
     let outcome: Awaited<ReturnType<typeof translateContent>> = "failed";
+    let alreadyNotified = false;
     try {
       outcome = await translateContent(opts);
     } catch (err) {
+      // Explicit backend modes (ic, local, browser, cloud) propagate
+      // transport errors as throws. Surface the actual reason to the user
+      // instead of the generic "no backend available" message that follows
+      // — that one only makes sense when the auto cascade exhausted every
+      // option, not when one explicit backend hit a transient failure.
       notifyRef.current(`Translation failed: ${errMsg(err)}`, "error");
+      alreadyNotified = true;
     }
 
     activeRef.current--;
@@ -90,7 +97,7 @@ export function useTranslation(
     } else {
       attemptedRef.current.failed.add(item.id);
       // Notify once per target language so the user knows auto-translate isn't working
-      if (failNotifiedLangRef.current !== prefsRef.current.targetLanguage) {
+      if (!alreadyNotified && failNotifiedLangRef.current !== prefsRef.current.targetLanguage) {
         failNotifiedLangRef.current = prefsRef.current.targetLanguage;
         notifyRef.current("Auto-translate: no translation backend available. Check Settings → Translation Engine.", "error");
       }

@@ -625,6 +625,78 @@ describe("translateContent", () => {
       expect(result).toBe("failed");
     });
 
+    it("translateWithIC retries once on transient 'IC LLM translation failed' error", async () => {
+      const mockTranslate = jest.fn()
+        .mockResolvedValueOnce({ err: "IC LLM translation failed" })
+        .mockResolvedValueOnce({ ok: "リトライ後の翻訳が成功しました" });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      const result = await translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "ic",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      const r = expectResult(result);
+      expect(r.translatedText).toBe("リトライ後の翻訳が成功しました");
+      expect(r.backend).toBe("ic-llm");
+      expect(mockTranslate).toHaveBeenCalledTimes(2);
+    });
+
+    it("translateWithIC retries once on 'IC LLM returned empty response' error", async () => {
+      const mockTranslate = jest.fn()
+        .mockResolvedValueOnce({ err: "IC LLM returned empty response" })
+        .mockResolvedValueOnce({ ok: "リトライ後の翻訳です" });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      const result = await translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "ic",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(expectResult(result).backend).toBe("ic-llm");
+      expect(mockTranslate).toHaveBeenCalledTimes(2);
+    });
+
+    it("translateWithIC propagates failure when retry also fails", async () => {
+      const mockTranslate = jest.fn()
+        .mockResolvedValue({ err: "IC LLM translation failed" });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      await expect(translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "ic",
+        actorRef,
+        isAuthenticated: true,
+      })).rejects.toThrow(/IC LLM unavailable.*retried once/);
+
+      expect(mockTranslate).toHaveBeenCalledTimes(2);
+    });
+
+    it("translateWithIC does NOT retry on auth errors", async () => {
+      const mockTranslate = jest.fn()
+        .mockResolvedValue({ err: "Authentication required" });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      await expect(translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "ic",
+        actorRef,
+        isAuthenticated: true,
+      })).rejects.toThrow(/Authentication required/);
+
+      // Only called once — not retried because the error doesn't match the
+      // transient-failure pattern.
+      expect(mockTranslate).toHaveBeenCalledTimes(1);
+    });
+
     it("auto cascade short-circuits on ALREADY_IN_TARGET (does not retry later backends)", async () => {
       mockOllamaEnabled = false;
       mockApiKey = null;
