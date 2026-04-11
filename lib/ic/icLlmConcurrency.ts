@@ -1,33 +1,18 @@
 /**
  * Shared concurrency gate for all calls to the DFINITY LLM canister
- * routed through the Aegis backend canister.
+ * (`w36hm-eqaaa-aaaal-qr76a-cai`) routed through the Aegis backend.
  *
- * Empirically verified (2026-04-12) that the DFINITY LLM canister
- * `w36hm-eqaaa-aaaal-qr76a-cai` rejects the 3rd concurrent inter-
- * canister call from a single caller (our Aegis backend) with
- * `IC LLM translation failed` after about 1.5 seconds. This limit is
- * NOT documented in the LLM canister README — discovered by binary
- * search of parallel `dfx canister call` requests:
+ * Empirically verified that the LLM canister rejects the 3rd concurrent
+ * inter-canister call from a single caller with `IC LLM translation
+ * failed` in ~1.5s. Not documented in the LLM canister README —
+ * discovered by binary search of parallel dfx calls. The Aegis backend
+ * has two methods that call `LLM.prompt` (`analyzeOnChain` for scoring,
+ * `translateOnChain` for translation), so without coordination 2
+ * parallel translations + 1 background scoring will drop one request.
  *
- *   1 parallel: succeeds
- *   2 parallel: both succeed
- *   3 parallel: 2 fast-fail in ~2s, 1 succeeds
- *
- * The Aegis backend canister has TWO methods that call LLM.prompt:
- *
- *   - analyzeOnChain (content scoring, called from contexts/content/scoring.ts)
- *   - translateOnChain (called from lib/translation/engine.ts)
- *
- * Without coordination, the auto-translate effect can fire 2 parallel
- * translateOnChain calls at the same moment a background scheduler
- * fires an analyzeOnChain — total 3 in flight, one is guaranteed to
- * fail. The user perceives this as random translation failures.
- *
- * This module exposes `withIcLlmSlot()`: an async wrapper that
- * acquires one of the 2 available slots before invoking the supplied
- * function and releases it on completion. Callers waiting for a slot
- * are queued FIFO and resume in order. The slot is held for the
- * duration of the inner-canister call (typically 5-10 seconds).
+ * `withIcLlmSlot()` acquires one of `MAX_CONCURRENT_IC_LLM` slots
+ * before invoking `fn` and releases on completion (even on throw).
+ * Waiting callers queue FIFO.
  */
 
 const MAX_CONCURRENT_IC_LLM = 2;

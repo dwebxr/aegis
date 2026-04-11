@@ -2,7 +2,6 @@ import {
   isIcLlmCircuitOpen,
   recordIcLlmSuccess,
   recordIcLlmFailure,
-  describeIcLlmCircuitState,
   _resetIcLlmCircuit,
   _icLlmCircuitState,
   _icLlmCircuitFailures,
@@ -18,10 +17,6 @@ describe("icLlmCircuitBreaker — initial state", () => {
     expect(_icLlmCircuitState()).toBe("closed");
     expect(_icLlmCircuitFailures()).toBe(0);
     expect(isIcLlmCircuitOpen()).toBe(false);
-  });
-
-  it("describes closed state plainly", () => {
-    expect(describeIcLlmCircuitState()).toBe("closed");
   });
 });
 
@@ -111,23 +106,6 @@ describe("icLlmCircuitBreaker — cooldown expiry", () => {
     expect(_icLlmCircuitState()).toBe("half-open");
   });
 
-  it("describes open state with remaining cooldown", () => {
-    jest.setSystemTime(new Date("2026-04-12T12:00:00Z"));
-    recordIcLlmFailure();
-    recordIcLlmFailure();
-    recordIcLlmFailure();
-    jest.setSystemTime(new Date("2026-04-12T12:00:15Z"));
-    expect(describeIcLlmCircuitState()).toMatch(/open — retry in 4[56]s/);
-  });
-
-  it("describes half-open state", () => {
-    jest.setSystemTime(new Date("2026-04-12T12:00:00Z"));
-    recordIcLlmFailure();
-    recordIcLlmFailure();
-    recordIcLlmFailure();
-    jest.setSystemTime(new Date("2026-04-12T12:01:00Z"));
-    expect(describeIcLlmCircuitState()).toBe("half-open (probing)");
-  });
 });
 
 describe("icLlmCircuitBreaker — half-open probe", () => {

@@ -8,32 +8,16 @@ import type { ContentItem } from "@/lib/types/content";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 
-/**
- * Maximum number of items being translated in parallel by the auto-
- * translate effect.
- *
- * Pre-hotfix-13 this was capped at 2 because the DFINITY LLM canister
- * rejected the 3rd concurrent call from a single caller. Hotfix 13
- * removed ic-llm from the translation cascade entirely — claude-server
- * (Vercel / Anthropic) is the only translator for most users, and it
- * is comfortable handling more than 2 in-flight requests. The /api/
- * translate rate limit is 60 req/min, and at ~5s per call, 4 in-flight
- * produces ~0.8 req/sec — well under the limit. Bumping to 4 halves
- * feed-translation wall-clock time with no downside.
- *
- * Scoring still uses the DFINITY LLM canister and is still gated by
- * `withIcLlmSlot` in contexts/content/scoring.ts — that limit is
- * unaffected by this constant.
- */
+// Parallel in-flight translations. Bounded by the /api/translate rate
+// limit (60/min) — at ~5s per call, 4 in-flight produces ~0.8 req/sec,
+// well under the cap. Scoring has its own IC-LLM concurrency gate in
+// `contexts/content/scoring.ts` and is unaffected by this constant.
 const MAX_CONCURRENT = 4;
 const RETRY_INTERVAL_MS = 60_000;
 
-/**
- * Maximum time to wait for the IC actor to be created before falling back
- * to running auto-translate without IC LLM in the cascade. If the actor
- * creation hangs (network issues, II problems, etc.), we don't want to
- * leave the user with completely no translations forever.
- */
+// Cap on how long we wait for the IC actor before starting auto-
+// translate without it in the cascade. Prevents stranding items if
+// actor creation hangs (bad network, II problems, etc.).
 const ACTOR_READY_TIMEOUT_MS = 5_000;
 
 interface UseTranslationReturn {
@@ -78,44 +62,22 @@ export function useTranslation(
   // Bumped to force effect re-run after clearing the failed set
   const [retryTick, setRetryTick] = useState(0);
 
-  // True once the cascade is fully populated (or the timeout fired). For
-  // anonymous users this is true immediately. For authenticated users this
-  // becomes true when syncStatus leaves "offline" (ContentContext finished
-  // creating the IC actor) OR after ACTOR_READY_TIMEOUT_MS, whichever
-  // comes first.
-  //
-  // Why this exists: without it, the auto-translate effect fires the
-  // moment items load from the IDB cache (within ~10 ms of mount). At
-  // that point ContentContext has not yet created the IC actor, so the
-  // cascade attempts list is built without ic-llm. The cascade then runs
-  // against claude-server only, which fails for items where Claude
-  // returns no-kana (URLs, code, borderline content), throws, and the
-  // user sees "Translation failed: ... claude-server: no kana" as a
-  // false positive — once the actor was ready, IC LLM would have
-  // produced a valid Japanese translation for many of those items.
-  //
-  // Gating the effect on isReady eliminates the cold-start race entirely.
+  // Gates auto-translate until the IC actor is ready (authenticated
+  // users) or immediately (anonymous users). Without the gate, the
+  // effect fires the moment items load from IDB — before ContentContext
+  // has created the actor — and ic-llm is absent from the cascade.
+  // Items that would have succeeded via ic-llm are then mis-skipped by
+  // the downstream backends. ACTOR_READY_TIMEOUT_MS is the fallback so
+  // a hung actor creation doesn't strand items forever.
   const [isReady, setIsReady] = useState<boolean>(() => !isAuthenticated);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      // Anonymous user — cascade only ever has claude-server (and
-      // optionally local backends), there's no actor to wait for.
+    if (!isAuthenticated || syncStatus !== "offline") {
       setIsReady(true);
       return;
     }
-    if (syncStatus !== "offline") {
-      // Actor was created by ContentContext — cascade can include ic-llm.
-      setIsReady(true);
-      return;
-    }
-    // Authenticated user but actor not yet ready. Reset isReady to false
-    // (in case isAuthenticated just changed) and start a fallback timer
-    // so we don't strand items if actor creation never completes.
     setIsReady(false);
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, ACTOR_READY_TIMEOUT_MS);
+    const timer = setTimeout(() => setIsReady(true), ACTOR_READY_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [isAuthenticated, syncStatus]);
 
@@ -136,16 +98,11 @@ export function useTranslation(
     setTranslatingIds(prev => new Set(prev).add(item.id));
     activeRef.current++;
 
-    // translateContent surfaces failures in two ways:
-    //  - returns "skip" when the model declared the content is already in
-    //    the target language (ALREADY_IN_TARGET)
-    //  - throws an Error with a diagnostic message when every backend
-    //    in the cascade (or the chosen explicit backend) failed
-    //  - returns a TranslationResult on success
-    // We no longer special-case a "failed" return value because the
-    // engine now throws with a specific reason instead. The legacy generic
-    // "no translation backend available" notification was confusing
-    // because it gave no information about which backend or why.
+    // translateContent returns a TranslationResult on success, "skip"
+    // when the content is untranslatable or already in the target
+    // language, and throws with a diagnostic message on transport
+    // failure. The "failed" notification is debounced to once per
+    // language so a broken infra path doesn't spam the user.
     let outcome: Awaited<ReturnType<typeof translateContent>> | null = null;
     try {
       outcome = await translateContent(opts);
@@ -169,7 +126,6 @@ export function useTranslation(
     } else if (outcome === "skip") {
       attemptedRef.current.skip.add(item.id);
     }
-    // Errors were already notified inside the catch block above.
   }, [actorRef]);
 
   const translateItem = useCallback((itemId: string) => {
@@ -206,18 +162,11 @@ export function useTranslation(
     }
   }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, translatingIds, runTranslation, retryTick, isReady]);
 
-  // Clear failed AND skip sets when the IC actor becomes ready. With the
-  // isReady gate above, the auto-translate effect should never run during
-  // the cold-start window, so this shouldn't fire in practice. But if a
+  // Clear failed AND skip sets when the IC actor becomes ready. The
+  // isReady gate above normally prevents cold-start misfires, but a
   // manual translateItem call (e.g. user clicked the Translate button)
-  // ran during cold start AND the cascade promoted to skip via the
-  // smart-model exception with a degraded backend list, the item would
-  // be stranded. This hook recovers from that case too.
-  //
-  // The skip set is also cleared because the smart-model skip was the
-  // only way for items to enter the skip set during cold start; legitimate
-  // ALREADY_IN_TARGET skips are rare during cold start (the LLM hasn't
-  // had a chance to respond yet for most items).
+  // can still bypass the gate and get stranded on a degraded cascade.
+  // Clearing both sets gives those items a second chance.
   const prevSyncStatusRef = useRef<typeof syncStatus>("offline");
   useEffect(() => {
     const prev = prevSyncStatusRef.current;

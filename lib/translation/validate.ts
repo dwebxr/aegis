@@ -46,24 +46,13 @@ export interface ValidationResult {
   reason?: string;
 }
 
-/**
- * Lower / upper bounds for the output-to-input length ratio. Translation
- * length varies a lot across language pairs:
- *   - en → ja: typical 0.3–0.8 (Japanese is character-dense AND Claude
- *     often compresses boilerplate-heavy English into a much shorter
- *     Japanese summary)
- *   - ja → en: typical 1.5–3.0
- *   - en → fr / de / es: typical 0.9–1.4
- *
- * The bounds are deliberately wide to avoid rejecting legitimate
- * translations. Claude (our sole translator in the auto cascade after
- * hotfix 13) observed in production returning ratios as low as 0.04
- * for news-article-shaped English input where most of the text was
- * boilerplate / metadata / URLs and only a sentence or two carried
- * real meaning. Those translations are legitimate — the kana check,
- * meta-commentary check, and identical-to-input check are the real
- * safety nets; the ratio bounds catch only obvious runaway noise.
- */
+// Lower / upper bounds for the output-to-input length ratio. Typical
+// en → ja is 0.3–0.8 (Japanese is character-dense AND models often
+// compress boilerplate-heavy English); en → fr/de/es is 0.9–1.4; ja →
+// en is 1.5–3.0. Production claude output has been observed as low as
+// 0.04 on boilerplate-heavy articles, so MIN_RATIO is permissive.
+// The kana check, meta-commentary check, and identical-to-input check
+// are the real safety nets — this ratio catches only runaway noise.
 const MIN_RATIO = 0.02;
 const MAX_RATIO = 5.0;
 
