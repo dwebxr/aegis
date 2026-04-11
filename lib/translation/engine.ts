@@ -4,6 +4,7 @@ import { buildTranslationPrompt, parseTranslationResponse } from "./prompt";
 import { validateTranslation } from "./validate";
 import { lookupTranslation, storeTranslation } from "./cache";
 import { recordTranslationAttempt } from "./debugLog";
+import { withIcLlmSlot } from "@/lib/ic/icLlmConcurrency";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isWebLLMLoaded } from "@/lib/webllm/engine";
@@ -88,11 +89,16 @@ async function callIC(
   actor: _SERVICE,
   prompt: string,
 ): Promise<string> {
-  const result = await withTimeout(
+  // Wrap the inter-canister call in the shared concurrency gate so we
+  // never exceed the DFINITY LLM canister's per-caller limit (currently
+  // 2). Without the gate, parallel translateOnChain calls compete with
+  // background analyzeOnChain (scoring) calls and the LLM canister
+  // rejects the 3rd in-flight request — see lib/ic/icLlmConcurrency.ts.
+  const result = await withIcLlmSlot(() => withTimeout(
     actor.translateOnChain(prompt),
     30_000,
     "IC LLM translation timeout",
-  );
+  ));
   if ("err" in result) throw new Error(result.err);
   return result.ok.trim();
 }

@@ -9,6 +9,7 @@ import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isMediaPipeEnabled } from "@/lib/mediapipe/storage";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
 import { computeScoringCacheKey, computeProfileHash, lookupScoringCache, storeScoringCache } from "@/lib/scoring/cache";
+import { withIcLlmSlot } from "@/lib/ic/icLlmConcurrency";
 
 async function fetchAnalyze(
   text: string,
@@ -111,15 +112,19 @@ export async function runScoringCascade(
       }
     }
 
-    // Tier 3: IC LLM via canister (free, on-chain)
+    // Tier 3: IC LLM via canister (free, on-chain). The withIcLlmSlot
+    // wrapper enforces the 2-concurrent ceiling shared with translateOnChain
+    // — see lib/ic/icLlmConcurrency.ts. Without it, scoring + translation
+    // running in parallel would push the LLM canister past its per-caller
+    // limit and items would fail with "IC LLM translation failed".
     if (!result && actorRef.current && isAuthenticated) {
       try {
         result = await Sentry.startSpan({ name: "scoring.ic-llm", op: "scoring.tier" }, async () => {
-          const icResult = await withTimeout(
+          const icResult = await withIcLlmSlot(() => withTimeout(
             actorRef.current!.analyzeOnChain(text.slice(0, 3000), topics),
             10_000,
             "IC LLM timeout (10s)",
-          );
+          ));
           if ("ok" in icResult) {
             const a = icResult.ok;
             return {
