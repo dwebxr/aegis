@@ -198,9 +198,11 @@ describe("useTranslation — outcome handling", () => {
     expect(patchItem).not.toHaveBeenCalled();
   });
 
-  it('"failed" outcome notifies user once per language and adds id to failed set', async () => {
+  it("translateContent throw notifies user once per language with diagnostic message", async () => {
     setPolicy("all", { targetLanguage: "ja" });
-    mockTranslateContent.mockResolvedValue("failed");
+    mockTranslateContent.mockRejectedValue(
+      new Error("All 2 translation backends failed — ic-llm: timeout | claude-server: HTTP 502"),
+    );
 
     const items = [makeItem("a"), makeItem("b")];
     const { wrapper } = harness(items);
@@ -210,8 +212,9 @@ describe("useTranslation — outcome handling", () => {
     await new Promise(r => setTimeout(r, 20));
 
     const errCalls = mockAddNotification.mock.calls.filter(c => c[1] === "error");
+    // Once per target language, regardless of how many items failed
     expect(errCalls.length).toBe(1);
-    expect(errCalls[0][0]).toMatch(/Auto-translate/);
+    expect(errCalls[0][0]).toMatch(/Translation failed.*All 2 translation backends failed/);
   });
 
   it("notifies user on synchronous translateContent throw", async () => {
@@ -231,7 +234,7 @@ describe("useTranslation — outcome handling", () => {
     });
   });
 
-  it("does NOT also fire the auto-translate fallback notification when translateContent threw", async () => {
+  it("does NOT show the legacy 'no translation backend available' notification anymore", async () => {
     setPolicy("manual");
     mockTranslateContent.mockRejectedValueOnce(new Error("IC LLM unavailable (retried once)"));
     const { wrapper } = harness([makeItem("a")]);
@@ -246,8 +249,7 @@ describe("useTranslation — outcome handling", () => {
         "error",
       );
     });
-    // The "no translation backend available" message must NOT fire — that
-    // one only makes sense after the auto cascade exhausted every option.
+    // The legacy generic message must never fire — it gave no useful info.
     expect(mockAddNotification).not.toHaveBeenCalledWith(
       expect.stringMatching(/no translation backend available/),
       "error",
@@ -305,7 +307,7 @@ describe("useTranslation — auto policies", () => {
 describe("useTranslation — language change resets attempted set", () => {
   it("changing targetLanguage clears the failed/skip set so previously failed items can retry", async () => {
     setPolicy("all", { targetLanguage: "ja" });
-    mockTranslateContent.mockResolvedValueOnce("failed");
+    mockTranslateContent.mockRejectedValueOnce(new Error("ic-llm: timeout"));
     const items = [makeItem("a")];
     const { wrapper } = harness(items);
     const { rerender } = renderHook(wrapper);

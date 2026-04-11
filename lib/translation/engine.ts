@@ -250,13 +250,21 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   // Server Claude as last resort
   attempts.push({ name: "claude-server", fn: () => translateWithClaude(prompt, null) });
 
-  let firstSkip = false;
+  // Collect per-attempt failure reasons. When the cascade exhausts every
+  // backend we throw an error containing the full diagnostic so the user
+  // (and operators) see WHICH backend failed and WHY. Without this the
+  // notification was just "no translation backend available" which gives
+  // no actionable information when debugging production issues.
+  const failures: Array<{ name: string; reason: string }> = [];
+
   for (const attempt of attempts) {
     let raw: string;
     try {
       raw = await attempt.fn();
     } catch (err) {
-      console.debug(`[translate] ${attempt.name} transport error:`, errMsg(err));
+      const reason = errMsg(err);
+      console.warn(`[translate] ${attempt.name} transport error:`, reason);
+      failures.push({ name: attempt.name, reason });
       continue;
     }
     const outcome = evaluateRaw(raw);
@@ -266,12 +274,21 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     if (outcome.kind === "skip") {
       // ALREADY_IN_TARGET is a definitive answer — no later backend can
       // disagree, so propagate immediately rather than retrying.
-      firstSkip = true;
-      break;
+      return "skip";
     }
-    // outcome.kind === "failed" — log and try the next backend
-    console.debug(`[translate] ${attempt.name} rejected:`, outcome.reason);
+    // outcome.kind === "failed" — log, record, and try the next backend
+    console.warn(`[translate] ${attempt.name} rejected:`, outcome.reason);
+    failures.push({ name: attempt.name, reason: outcome.reason });
   }
 
-  return firstSkip ? "skip" : "failed";
+  // Cascade exhausted. Throw with a diagnostic message so useTranslation's
+  // catch surfaces "Translation failed: <details>" to the user. This
+  // replaces the legacy "failed" return that triggered the misleading
+  // "no translation backend available" notification.
+  const summary = failures.map(f => `${f.name}: ${f.reason}`).join(" | ");
+  throw new Error(
+    failures.length === 1
+      ? `Translation backend failed — ${summary}`
+      : `All ${failures.length} translation backends failed — ${summary}`,
+  );
 }

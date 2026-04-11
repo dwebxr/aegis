@@ -69,18 +69,25 @@ export function useTranslation(
     setTranslatingIds(prev => new Set(prev).add(item.id));
     activeRef.current++;
 
-    let outcome: Awaited<ReturnType<typeof translateContent>> = "failed";
-    let alreadyNotified = false;
+    // translateContent surfaces failures in two ways:
+    //  - returns "skip" when the model declared the content is already in
+    //    the target language (ALREADY_IN_TARGET)
+    //  - throws an Error with a diagnostic message when every backend
+    //    in the cascade (or the chosen explicit backend) failed
+    //  - returns a TranslationResult on success
+    // We no longer special-case a "failed" return value because the
+    // engine now throws with a specific reason instead. The legacy generic
+    // "no translation backend available" notification was confusing
+    // because it gave no information about which backend or why.
+    let outcome: Awaited<ReturnType<typeof translateContent>> | null = null;
     try {
       outcome = await translateContent(opts);
     } catch (err) {
-      // Explicit backend modes (ic, local, browser, cloud) propagate
-      // transport errors as throws. Surface the actual reason to the user
-      // instead of the generic "no backend available" message that follows
-      // — that one only makes sense when the auto cascade exhausted every
-      // option, not when one explicit backend hit a transient failure.
-      notifyRef.current(`Translation failed: ${errMsg(err)}`, "error");
-      alreadyNotified = true;
+      attemptedRef.current.failed.add(item.id);
+      if (failNotifiedLangRef.current !== prefsRef.current.targetLanguage) {
+        failNotifiedLangRef.current = prefsRef.current.targetLanguage;
+        notifyRef.current(`Translation failed: ${errMsg(err)}`, "error");
+      }
     }
 
     activeRef.current--;
@@ -90,18 +97,12 @@ export function useTranslation(
       return next;
     });
 
-    if (typeof outcome === "object") {
+    if (outcome && typeof outcome === "object") {
       patchRef.current(item.id, { translation: outcome });
     } else if (outcome === "skip") {
       attemptedRef.current.skip.add(item.id);
-    } else {
-      attemptedRef.current.failed.add(item.id);
-      // Notify once per target language so the user knows auto-translate isn't working
-      if (!alreadyNotified && failNotifiedLangRef.current !== prefsRef.current.targetLanguage) {
-        failNotifiedLangRef.current = prefsRef.current.targetLanguage;
-        notifyRef.current("Auto-translate: no translation backend available. Check Settings → Translation Engine.", "error");
-      }
     }
+    // Errors were already notified inside the catch block above.
   }, [actorRef]);
 
   const translateItem = useCallback((itemId: string) => {

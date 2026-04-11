@@ -460,19 +460,20 @@ describe("translateContent", () => {
       expect(mockTranslate).toHaveBeenCalled();
     });
 
-    it("returns null when all backends fail", async () => {
+    it("throws diagnostic error when all backends fail in auto cascade", async () => {
       mockOllamaEnabled = false;
       mockWebLLMEnabled = false;
       mockApiKey = null;
       globalThis.fetch = jest.fn().mockRejectedValue(new Error("All failed"));
 
-      const result = await translateContent({
+      // Auto cascade only tries claude-server here (no IC actor, no
+      // BYOK key, no local backends enabled). After exhausting, it
+      // throws with the failure reason from the last attempt.
+      await expect(translateContent({
         text: "All fail test",
         targetLanguage: "ja",
         backend: "auto",
-      });
-
-      expect(result).toBe("failed");
+      })).rejects.toThrow(/Translation backend failed.*claude-server.*All failed/);
     });
   });
 
@@ -612,7 +613,7 @@ describe("translateContent", () => {
       expect(r.backend).toBe("claude-server");
     });
 
-    it("auto cascade returns 'failed' when ALL backends produce invalid output", async () => {
+    it("auto cascade throws diagnostic error when ALL backends produce invalid output", async () => {
       mockOllamaEnabled = false;
       mockApiKey = null;
       const mockTranslate = jest.fn().mockResolvedValue({
@@ -623,15 +624,16 @@ describe("translateContent", () => {
         return mockResponse({ translation: "Also English without kana from server" });
       });
 
-      const result = await translateContent({
+      // Both ic-llm and claude-server return outputs the validator
+      // rejects (no kana for ja target). Cascade exhausts and throws
+      // with both backend names + reasons in the error message.
+      await expect(translateContent({
         text: "Apple announced a new product today.",
         targetLanguage: "ja",
         backend: "auto",
         actorRef,
         isAuthenticated: true,
-      });
-
-      expect(result).toBe("failed");
+      })).rejects.toThrow(/All 2 translation backends failed.*ic-llm.*no kana.*claude-server.*no kana/);
     });
 
     it("explicit IC backend throws with named reason on validator rejection", async () => {
