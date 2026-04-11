@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
-import type { _SERVICE } from "@/lib/ic/declarations";
+import type { _SERVICE, OnChainAnalysis, Result } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 import { withTimeout } from "@/lib/utils/timeout";
 import { getUserApiKey } from "@/lib/apiKey/storage";
@@ -10,6 +10,11 @@ import { isMediaPipeEnabled } from "@/lib/mediapipe/storage";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
 import { computeScoringCacheKey, computeProfileHash, lookupScoringCache, storeScoringCache } from "@/lib/scoring/cache";
 import { withIcLlmSlot } from "@/lib/ic/icLlmConcurrency";
+import {
+  isIcLlmCircuitOpen,
+  recordIcLlmSuccess,
+  recordIcLlmFailure,
+} from "@/lib/ic/icLlmCircuitBreaker";
 
 async function fetchAnalyze(
   text: string,
@@ -117,14 +122,31 @@ export async function runScoringCascade(
     // — see lib/ic/icLlmConcurrency.ts. Without it, scoring + translation
     // running in parallel would push the LLM canister past its per-caller
     // limit and items would fail with "IC LLM translation failed".
-    if (!result && actorRef.current && isAuthenticated) {
+    //
+    // The circuit breaker (lib/ic/icLlmCircuitBreaker.ts) tracks
+    // consecutive transport-level failures across BOTH analyze and
+    // translate. When it is open we skip this tier entirely and fall
+    // through to the server Claude tier — no point burning 10s on a
+    // call we know will fail.
+    if (!result && actorRef.current && isAuthenticated && !isIcLlmCircuitOpen()) {
       try {
         result = await Sentry.startSpan({ name: "scoring.ic-llm", op: "scoring.tier" }, async () => {
-          const icResult = await withIcLlmSlot(() => withTimeout(
-            actorRef.current!.analyzeOnChain(text.slice(0, 3000), topics),
-            10_000,
-            "IC LLM timeout (10s)",
-          ));
+          let icResult: Result<OnChainAnalysis, string>;
+          try {
+            icResult = await withIcLlmSlot(() => withTimeout(
+              actorRef.current!.analyzeOnChain(text.slice(0, 3000), topics),
+              10_000,
+              "IC LLM timeout (10s)",
+            ));
+          } catch (err) {
+            recordIcLlmFailure();
+            throw err;
+          }
+          if ("err" in icResult) {
+            recordIcLlmFailure();
+          } else {
+            recordIcLlmSuccess();
+          }
           if ("ok" in icResult) {
             const a = icResult.ok;
             return {

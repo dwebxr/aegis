@@ -33,10 +33,15 @@ import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isMediaPipeEnabled } from "@/lib/mediapipe/storage";
 import { isOllamaEnabled } from "@/lib/ollama/storage";
 import { lookupScoringCache, storeScoringCache } from "@/lib/scoring/cache";
+import { _resetIcLlmCircuit } from "@/lib/ic/icLlmCircuitBreaker";
 
 beforeEach(() => {
   jest.clearAllMocks();
   global.fetch = mockFetch;
+  // Module-level breaker state leaks between tests when earlier tests
+  // simulate ic-llm failures. Reset so each test starts with a closed
+  // breaker.
+  _resetIcLlmCircuit();
 });
 
 afterAll(() => {
@@ -187,6 +192,71 @@ describe("runScoringCascade", () => {
 
     const result = await runScoringCascade("test text", null, actorRefWithActor, true);
     expect(result.scoringEngine).toBe("claude-server");
+  });
+
+  it("skips IC LLM tier entirely when circuit breaker is open", async () => {
+    const { recordIcLlmFailure, _icLlmCircuitState } = await import("@/lib/ic/icLlmCircuitBreaker");
+    // Trip the breaker before the scoring cascade runs
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    expect(_icLlmCircuitState()).toBe("open");
+
+    const analyzeSpy = jest.fn().mockResolvedValue({
+      ok: {
+        originality: 9, insight: 9, credibility: 9, compositeScore: 9,
+        verdict: { quality: null }, reason: "should not be called", topics: [],
+        vSignal: [], cContext: [], lSlop: [],
+      },
+    });
+    const actorRefWithActor = { current: { analyzeOnChain: analyzeSpy } as unknown as import("@/lib/ic/declarations")._SERVICE };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ originality: 5, insight: 5, credibility: 5, composite: 5, verdict: "quality", reason: "Server", topics: [] }),
+    });
+
+    const result = await runScoringCascade("gated text", null, actorRefWithActor, true);
+    expect(analyzeSpy).not.toHaveBeenCalled();
+    expect(result.scoringEngine).toBe("claude-server");
+  });
+
+  it("IC LLM transport throw trips the circuit breaker counter", async () => {
+    const { _icLlmCircuitFailures } = await import("@/lib/ic/icLlmCircuitBreaker");
+    (getUserApiKey as jest.Mock).mockReturnValue(null);
+    const mockActor = {
+      analyzeOnChain: jest.fn().mockRejectedValue(new Error("Call failed: timeout")),
+    };
+    const actorRefWithActor = { current: mockActor as unknown as import("@/lib/ic/declarations")._SERVICE };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ originality: 5, insight: 5, credibility: 5, composite: 5, verdict: "quality", reason: "Server", topics: [] }),
+    });
+
+    await runScoringCascade("failing text", null, actorRefWithActor, true);
+    expect(_icLlmCircuitFailures()).toBe(1);
+  });
+
+  it("IC LLM success from scoring resets the circuit breaker counter", async () => {
+    const { recordIcLlmFailure, _icLlmCircuitFailures } = await import("@/lib/ic/icLlmCircuitBreaker");
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    expect(_icLlmCircuitFailures()).toBe(2);
+
+    const mockActor = {
+      analyzeOnChain: jest.fn().mockResolvedValue({
+        ok: {
+          originality: 8, insight: 7, credibility: 9, compositeScore: 8,
+          verdict: { quality: null }, reason: "healthy", topics: ["x"],
+          vSignal: [], cContext: [], lSlop: [],
+        },
+      }),
+    };
+    const actorRefWithActor = { current: mockActor as unknown as import("@/lib/ic/declarations")._SERVICE };
+
+    await runScoringCascade("healthy text", null, actorRefWithActor, true);
+    expect(_icLlmCircuitFailures()).toBe(0);
   });
 
   it("passes userContext to fetch analyze", async () => {

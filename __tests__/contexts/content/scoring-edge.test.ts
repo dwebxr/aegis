@@ -33,10 +33,12 @@ import { isOllamaEnabled } from "@/lib/ollama/storage";
 import { scoreWithOllama } from "@/lib/ollama/engine";
 import { scoreWithWebLLM } from "@/lib/webllm/engine";
 import { storeScoringCache } from "@/lib/scoring/cache";
+import { _resetIcLlmCircuit } from "@/lib/ic/icLlmCircuitBreaker";
 
 beforeEach(() => {
   jest.clearAllMocks();
   global.fetch = mockFetch;
+  _resetIcLlmCircuit();
 });
 
 afterAll(() => {

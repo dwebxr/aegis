@@ -78,6 +78,7 @@ jest.mock("@/lib/utils/timeout", () => ({
 import { translateContent } from "@/lib/translation/engine";
 import { storeTranslation } from "@/lib/translation/cache";
 import type { TranslationResult } from "@/lib/translation/types";
+import { _resetIcLlmCircuit } from "@/lib/ic/icLlmCircuitBreaker";
 
 const origFetch = globalThis.fetch;
 
@@ -89,6 +90,11 @@ beforeEach(() => {
   mockMediaPipeLoaded = false;
   mockApiKey = null;
   globalThis.fetch = origFetch;
+  // Circuit breaker state is a module-level singleton. Previous tests in
+  // this file simulate consecutive ic-llm failures that trip the breaker
+  // open — without resetting, later tests would find the cascade
+  // skipping ic-llm entirely. Reset on every test.
+  _resetIcLlmCircuit();
 });
 
 afterAll(() => {
@@ -821,6 +827,114 @@ describe("translateContent", () => {
       expect(result).toBe("skip");
       expect(mockTranslate).toHaveBeenCalled();
       expect(claudeMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("circuit breaker integration", () => {
+    it("cascade skips ic-llm entirely when breaker is open", async () => {
+      // Trip the breaker: 3 consecutive ic-llm failures
+      const failingTranslate = jest.fn().mockResolvedValue({ err: "IC LLM translation failed" });
+      const actorRef = { current: { translateOnChain: failingTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      const claudeMock = jest.fn().mockImplementation(async () => mockResponse({
+        translation: "クロードで翻訳",
+      }));
+      globalThis.fetch = claudeMock;
+
+      for (let i = 0; i < 3; i++) {
+        await translateContent({
+          text: `Trip ${i} ${Math.random()}`,
+          targetLanguage: "ja",
+          backend: "auto",
+          actorRef,
+          isAuthenticated: true,
+        });
+      }
+      expect(failingTranslate).toHaveBeenCalledTimes(3);
+
+      // Next cascade: should skip ic-llm entirely
+      failingTranslate.mockClear();
+      const result = await translateContent({
+        text: "After breaker tripped",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(failingTranslate).not.toHaveBeenCalled();
+      expect(expectResult(result).backend).toBe("claude-server");
+    });
+
+    it("skip is recorded in the translation debug log with circuit description", async () => {
+      const { getTranslationDebugLog } = await import("@/lib/translation/debugLog");
+      const { recordIcLlmFailure } = await import("@/lib/ic/icLlmCircuitBreaker");
+      recordIcLlmFailure();
+      recordIcLlmFailure();
+      recordIcLlmFailure();
+
+      const actorRef = { current: { translateOnChain: jest.fn() } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn().mockResolvedValue(mockResponse({ translation: "翻訳" }));
+
+      await translateContent({
+        text: "Breaker skip should log an entry",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      const entries = getTranslationDebugLog();
+      const skipEntry = entries.find(e => e.backend === "ic-llm" && e.outcome === "skip");
+      expect(skipEntry).toBeDefined();
+      expect(skipEntry!.reason).toMatch(/circuit open/);
+      expect(skipEntry!.elapsedMs).toBe(0);
+    });
+
+    it("successful ic-llm call closes the breaker after a partial failure streak", async () => {
+      const { _icLlmCircuitFailures, _icLlmCircuitState } = await import("@/lib/ic/icLlmCircuitBreaker");
+
+      // Two ic-llm failures (below threshold of 3), then one success
+      const mockTranslate = jest.fn()
+        .mockResolvedValueOnce({ err: "IC LLM translation failed" })
+        .mockResolvedValueOnce({ err: "IC LLM translation failed" })
+        .mockResolvedValueOnce({ ok: "成功した翻訳結果" });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn().mockResolvedValue(mockResponse({ translation: "フォールバック" }));
+
+      await translateContent({ text: "fail 1", targetLanguage: "ja", backend: "auto", actorRef, isAuthenticated: true });
+      await translateContent({ text: "fail 2", targetLanguage: "ja", backend: "auto", actorRef, isAuthenticated: true });
+      expect(_icLlmCircuitFailures()).toBe(2);
+      expect(_icLlmCircuitState()).toBe("closed");
+
+      const result = await translateContent({ text: "succeed", targetLanguage: "ja", backend: "auto", actorRef, isAuthenticated: true });
+      expect(expectResult(result).backend).toBe("ic-llm");
+      expect(_icLlmCircuitFailures()).toBe(0);
+      expect(_icLlmCircuitState()).toBe("closed");
+    });
+
+    it("validator rejection does not count as a breaker failure", async () => {
+      const { _icLlmCircuitFailures } = await import("@/lib/ic/icLlmCircuitBreaker");
+
+      // IC returns a raw string but no kana → validator rejects
+      const mockTranslate = jest.fn().mockResolvedValue({ ok: "Hello world (no kana)" });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn().mockResolvedValue(mockResponse({ translation: "クロードで翻訳しました" }));
+
+      await translateContent({ text: "validator rejects", targetLanguage: "ja", backend: "auto", actorRef, isAuthenticated: true });
+
+      // Canister returned ok — breaker saw success, counter is 0
+      expect(_icLlmCircuitFailures()).toBe(0);
+    });
+
+    it("ic-llm transport throw records a failure", async () => {
+      const { _icLlmCircuitFailures } = await import("@/lib/ic/icLlmCircuitBreaker");
+      const mockTranslate = jest.fn().mockRejectedValue(new Error("Call failed: canister trap"));
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn().mockResolvedValue(mockResponse({ translation: "クロード" }));
+
+      await translateContent({ text: "throw", targetLanguage: "ja", backend: "auto", actorRef, isAuthenticated: true });
+      expect(_icLlmCircuitFailures()).toBe(1);
     });
   });
 });

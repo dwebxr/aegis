@@ -5,6 +5,12 @@ import { validateTranslation } from "./validate";
 import { lookupTranslation, storeTranslation } from "./cache";
 import { recordTranslationAttempt } from "./debugLog";
 import { withIcLlmSlot } from "@/lib/ic/icLlmConcurrency";
+import {
+  isIcLlmCircuitOpen,
+  recordIcLlmSuccess,
+  recordIcLlmFailure,
+  describeIcLlmCircuitState,
+} from "@/lib/ic/icLlmCircuitBreaker";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isWebLLMLoaded } from "@/lib/webllm/engine";
@@ -94,12 +100,28 @@ async function callIC(
   // 2). Without the gate, parallel translateOnChain calls compete with
   // background analyzeOnChain (scoring) calls and the LLM canister
   // rejects the 3rd in-flight request — see lib/ic/icLlmConcurrency.ts.
-  const result = await withIcLlmSlot(() => withTimeout(
-    actor.translateOnChain(prompt),
-    30_000,
-    "IC LLM translation timeout",
-  ));
-  if ("err" in result) throw new Error(result.err);
+  //
+  // Transport-level outcomes (including `#err` variants) feed the
+  // circuit breaker so the cascade can skip ic-llm entirely once it
+  // enters a failing streak. A successful raw response (even if the
+  // output later fails our validator) resets the breaker — the
+  // canister was healthy, the content was the problem.
+  let result: { ok: string } | { err: string };
+  try {
+    result = await withIcLlmSlot(() => withTimeout(
+      actor.translateOnChain(prompt),
+      30_000,
+      "IC LLM translation timeout",
+    ));
+  } catch (err) {
+    recordIcLlmFailure();
+    throw err;
+  }
+  if ("err" in result) {
+    recordIcLlmFailure();
+    throw new Error(result.err);
+  }
+  recordIcLlmSuccess();
   return result.ok.trim();
 }
 
@@ -287,6 +309,21 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   );
 
   for (const attempt of attempts) {
+    // Circuit breaker: when ic-llm has been failing, the cascade skips
+    // it entirely for the cooldown window and moves straight to
+    // claude-server. We record the skip in the debug log so the user
+    // can see why (and how long until the next probe) rather than
+    // silently dropping the attempt.
+    if (attempt.name === "ic-llm" && isIcLlmCircuitOpen()) {
+      recordTranslationAttempt({
+        itemHint, targetLanguage, backend: "ic-llm",
+        outcome: "skip",
+        reason: `circuit ${describeIcLlmCircuitState()}`,
+        elapsedMs: 0,
+      });
+      continue;
+    }
+
     const startedAt = Date.now();
     let raw: string;
     try {
