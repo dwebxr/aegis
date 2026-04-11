@@ -1016,4 +1016,486 @@ describe("translateContent", () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe("auto cascade ordering & mixed outcomes", () => {
+    it("tries ollama BEFORE claude-byok when both are configured", async () => {
+      mockOllamaEnabled = true;
+      mockApiKey = "sk-ant-test-key";
+      const callOrder: string[] = [];
+      globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("11434")) {
+          callOrder.push("ollama");
+          return mockResponse({ choices: [{ message: { content: "オラマで翻訳しました。" } }] });
+        }
+        callOrder.push("claude");
+        return mockResponse({ translation: "should not be called" });
+      });
+
+      const result = await translateContent({
+        text: "Apple announced a new product.",
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      expect(expectResult(result).backend).toBe("ollama");
+      expect(callOrder).toEqual(["ollama"]);
+    });
+
+    it("tries claude-byok BEFORE ic-llm when both are in cascade", async () => {
+      const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
+      mockApiKey = "sk-ant-test-key";
+      const icCalls = jest.fn();
+      const actorRef = {
+        current: {
+          translateOnChain: jest.fn().mockImplementation(async () => {
+            icCalls();
+            return { ok: "should not be called" };
+          }),
+        },
+      } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn().mockResolvedValue(
+        mockResponse({ translation: "クロードで翻訳しました。" }),
+      );
+
+      const result = await translateContent({
+        text: "Apple announced a new product.",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(expectResult(result).backend).toBe("claude-byok");
+      expect(icCalls).not.toHaveBeenCalled();
+    });
+
+    it("falls through ollama (soft validator fail) to claude-byok (success)", async () => {
+      mockOllamaEnabled = true;
+      mockApiKey = "sk-ant-test-key";
+      globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("11434")) {
+          // Ollama returns English — no-kana validator failure, but ollama
+          // is not the smart-model claude-byok so this is NOT promoted to
+          // skip. Cascade falls through to claude-byok.
+          return mockResponse({ choices: [{ message: { content: "English with no kana" } }] });
+        }
+        return mockResponse({ translation: "アップルが新製品を発表しました。" });
+      });
+
+      const result = await translateContent({
+        text: "Apple announced a new product.",
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      const r = expectResult(result);
+      expect(r.backend).toBe("claude-byok");
+      expect(r.translatedText).toBe("アップルが新製品を発表しました。");
+    });
+
+    it("ollama soft-fail + claude-byok no-kana promotes to skip (smart-model exception fires)", async () => {
+      mockOllamaEnabled = true;
+      mockApiKey = "sk-ant-test-key";
+      globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("11434")) {
+          return mockResponse({ choices: [{ message: { content: "Ollama English output" } }] });
+        }
+        return mockResponse({ translation: "Claude also returned English output" });
+      });
+
+      const result = await translateContent({
+        text: "Apple announced a new product.",
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      // Ollama's no-kana is NOT promoted (not a smart model), cascade
+      // continues. Claude-byok's no-kana IS promoted → skip.
+      expect(result).toBe("skip");
+    });
+
+    it("identical-to-input from ic-llm promotes to skip", async () => {
+      const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
+      const url = "https://example.com/some-very-long-url-path/to/an/article";
+      const actorRef = {
+        current: {
+          translateOnChain: jest.fn().mockResolvedValue({ ok: url }),
+        },
+      } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      const result = await translateContent({
+        text: url,
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(result).toBe("skip");
+    });
+
+    it("empty raw response from a cascade backend is NOT promoted to skip, falls through", async () => {
+      mockOllamaEnabled = true;
+      mockApiKey = "sk-ant-test-key";
+      globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("11434")) {
+          return mockResponse({ choices: [{ message: { content: "" } }] });
+        }
+        return mockResponse({ translation: "アップルが新製品を発表しました。" });
+      });
+
+      const result = await translateContent({
+        text: "Apple announced a new product.",
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      // Empty response is a "failed" outcome with reason "empty response" —
+      // not one of the definitive skip promotions — so cascade continues.
+      expect(expectResult(result).backend).toBe("claude-byok");
+    });
+
+    it("records ic-llm success to breaker when it wins the auto cascade", async () => {
+      const { _resetIcLlmCircuit, _icLlmCircuitFailures } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
+      // Pre-seed two failures
+      const { recordIcLlmFailure } = await import("@/lib/ic/icLlmCircuitBreaker");
+      recordIcLlmFailure();
+      recordIcLlmFailure();
+      expect(_icLlmCircuitFailures()).toBe(2);
+
+      const actorRef = {
+        current: {
+          translateOnChain: jest.fn().mockResolvedValue({ ok: "ICで翻訳しました。" }),
+        },
+      } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn();
+
+      const result = await translateContent({
+        text: "Apple announced.",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(expectResult(result).backend).toBe("ic-llm");
+      // Breaker counter reset on success
+      expect(_icLlmCircuitFailures()).toBe(0);
+    });
+
+    it("records ic-llm failure to breaker when it fails in auto cascade", async () => {
+      const { _resetIcLlmCircuit, _icLlmCircuitFailures } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
+
+      const actorRef = {
+        current: {
+          translateOnChain: jest.fn().mockResolvedValue({ err: "IC LLM translation failed" }),
+        },
+      } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn();
+
+      await translateContent({
+        text: "Apple announced.",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      // Single ic-llm transport failure increments the breaker counter
+      expect(_icLlmCircuitFailures()).toBe(1);
+    });
+
+    it("silently skips when cascade has ONE transport failure AND ONE validator failure", async () => {
+      mockOllamaEnabled = true;
+      mockApiKey = "sk-ant-test-key";
+      globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("11434")) {
+          // Ollama transport failure (network-style)
+          throw new TypeError("Load failed");
+        }
+        // Claude returns a meta-commentary output the validator rejects
+        // with a reason that is NOT in the transport-error regex.
+        return mockResponse({ translation: "Here is the translation: something English" });
+      });
+
+      const result = await translateContent({
+        text: "Apple announced a new product.",
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      // Mixed transport + validator failure — silent skip (not throw).
+      // Load failed × 2 (retry) fired on ollama, claude rejected by
+      // validator (meta-commentary). Validator failure is in the
+      // failures list, so not ALL failures are transport → silent skip.
+      expect(result).toBe("skip");
+    });
+
+    it("throws diagnostic when cascade has only transport failures (no validator fails)", async () => {
+      mockOllamaEnabled = true;
+      mockApiKey = "sk-ant-test-key";
+      globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("11434")) {
+          throw new TypeError("Load failed");
+        }
+        // Claude also transport-fails
+        return {
+          ok: false,
+          status: 503,
+          json: () => Promise.resolve({ error: "service unavailable" }),
+          text: () => Promise.resolve("service unavailable"),
+        };
+      });
+
+      await expect(translateContent({
+        text: "Apple announced a new product.",
+        targetLanguage: "ja",
+        backend: "auto",
+      })).rejects.toThrow(/All 2 translation backends failed.*ollama.*claude-byok/);
+    });
+
+    it("cascade silent-skip records 'cascade exhausted (validator)' in debug log", async () => {
+      const { getTranslationDebugLog, clearTranslationDebugLog } = await import("@/lib/translation/debugLog");
+      clearTranslationDebugLog();
+      mockOllamaEnabled = true;
+      mockApiKey = "sk-ant-test-key";
+      // Target fr so the ja-specific no-kana promotion doesn't apply.
+      // Both backends return output that blows the MAX_RATIO ceiling
+      // (ratio > 5.0 for a short input) — a validator rejection with
+      // reason "too long", which is NOT one of the promoted-to-skip
+      // classes, AND not in TRANSPORT_ERROR_RE. The cascade must
+      // exhaust all attempts and fall into the silent-skip branch.
+      const shortInput = "Apple product."; // 14 chars, too short for >= 30 — wait, let me lift
+      const longInput = "Apple announced a new product today at their annual keynote."; // 60 chars
+      const hugeOutput = "x".repeat(longInput.length * 6); // ratio > 5.0
+      globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("11434")) {
+          return mockResponse({ choices: [{ message: { content: hugeOutput } }] });
+        }
+        return mockResponse({ translation: hugeOutput });
+      });
+      void shortInput;
+
+      const result = await translateContent({
+        text: longInput,
+        targetLanguage: "fr",
+        backend: "auto",
+      });
+
+      expect(result).toBe("skip");
+      const log = getTranslationDebugLog();
+      const autoSkipEntry = log.find(e => e.backend === "auto" && e.outcome === "skip");
+      expect(autoSkipEntry).toBeDefined();
+      expect(autoSkipEntry!.reason).toMatch(/cascade exhausted/);
+      expect(autoSkipEntry!.reason).toMatch(/too long/);
+    });
+
+    it("empty-cascade silent skip records 'no configured translation backend' in debug log", async () => {
+      const { getTranslationDebugLog, clearTranslationDebugLog } = await import("@/lib/translation/debugLog");
+      clearTranslationDebugLog();
+      mockOllamaEnabled = false;
+      mockWebLLMEnabled = false;
+      mockMediaPipeEnabled = false;
+      mockApiKey = null;
+
+      const result = await translateContent({
+        text: "Unique text for empty cascade test " + Math.random(),
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      expect(result).toBe("skip");
+      const log = getTranslationDebugLog();
+      const autoSkipEntry = log.find(e => e.backend === "auto" && e.outcome === "skip");
+      expect(autoSkipEntry).toBeDefined();
+      expect(autoSkipEntry!.reason).toMatch(/no configured translation backend/);
+    });
+
+    it("debug log itemHint is truncated to 60 characters", async () => {
+      const { getTranslationDebugLog, clearTranslationDebugLog } = await import("@/lib/translation/debugLog");
+      clearTranslationDebugLog();
+      mockOllamaEnabled = true;
+      mockApiKey = null;
+      globalThis.fetch = jest.fn().mockImplementation(async () => mockResponse({
+        choices: [{ message: { content: "アップルが新製品を発表しました。" } }],
+      }));
+
+      const longText = "This is a very long article title that should get truncated in the debug log because it exceeds the 60-character limit.";
+
+      await translateContent({
+        text: longText,
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      const log = getTranslationDebugLog();
+      const entry = log.find(e => e.outcome === "ok");
+      expect(entry).toBeDefined();
+      expect(entry!.itemHint.length).toBeLessThanOrEqual(60);
+      expect(longText.startsWith(entry!.itemHint)).toBe(true);
+    });
+  });
+
+  describe("auto cascade — cache interaction", () => {
+    it("returns cached translation without calling any backend", async () => {
+      const { storeTranslation } = await import("@/lib/translation/cache");
+      const text = "Cached auto cascade test " + Math.random();
+      const cached = {
+        translatedText: "キャッシュ済み翻訳",
+        targetLanguage: "ja" as const,
+        backend: "previously-cached",
+        generatedAt: Date.now(),
+      };
+      await storeTranslation(text, cached);
+
+      mockOllamaEnabled = true;
+      mockApiKey = "sk-ant-test-key";
+      const fetchSpy = jest.fn();
+      globalThis.fetch = fetchSpy;
+
+      const result = await translateContent({
+        text,
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      expect(result).toEqual(cached);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("integration: concurrent translateContent + semaphore + breaker", () => {
+    it("4 parallel authenticated translations all succeed via ic-llm through the semaphore", async () => {
+      const { _resetIcLlmCircuit, _icLlmCircuitFailures } = await import("@/lib/ic/icLlmCircuitBreaker");
+      const { _icLlmInFlight, _icLlmWaiting, _resetIcLlmConcurrency } = await import("@/lib/ic/icLlmConcurrency");
+      _resetIcLlmCircuit();
+      _resetIcLlmConcurrency();
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+
+      let peakInFlight = 0;
+      const actorRef = {
+        current: {
+          translateOnChain: jest.fn().mockImplementation(async () => {
+            peakInFlight = Math.max(peakInFlight, _icLlmInFlight());
+            await new Promise(r => setTimeout(r, 10));
+            return { ok: "ICで翻訳しました。" };
+          }),
+        },
+      } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn();
+
+      const results = await Promise.all(
+        Array.from({ length: 4 }, (_, i) =>
+          translateContent({
+            text: `Parallel item ${i}: ${Math.random()}`,
+            targetLanguage: "ja",
+            backend: "auto",
+            actorRef,
+            isAuthenticated: true,
+          }),
+        ),
+      );
+
+      // All four succeeded via ic-llm
+      for (const r of results) {
+        expect(expectResult(r).backend).toBe("ic-llm");
+      }
+      // Semaphore cap was respected — never more than 2 in flight
+      expect(peakInFlight).toBeLessThanOrEqual(2);
+      // Queue fully drained
+      expect(_icLlmInFlight()).toBe(0);
+      expect(_icLlmWaiting()).toBe(0);
+      // Circuit breaker saw all successes — counter stays at 0
+      expect(_icLlmCircuitFailures()).toBe(0);
+    });
+
+    it("breaker trips after 3 consecutive failures in parallel cascade calls", async () => {
+      const { _resetIcLlmCircuit, _icLlmCircuitState } = await import("@/lib/ic/icLlmCircuitBreaker");
+      const { _resetIcLlmConcurrency } = await import("@/lib/ic/icLlmConcurrency");
+      _resetIcLlmCircuit();
+      _resetIcLlmConcurrency();
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+
+      const actorRef = {
+        current: {
+          translateOnChain: jest.fn().mockResolvedValue({ err: "IC LLM translation failed" }),
+        },
+      } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      globalThis.fetch = jest.fn();
+
+      // Three sequential calls (use await to keep them sequential so
+      // the breaker counter increments deterministically)
+      for (let i = 0; i < 3; i++) {
+        const r = await translateContent({
+          text: `Failing item ${i}`,
+          targetLanguage: "ja",
+          backend: "auto",
+          actorRef,
+          isAuthenticated: true,
+        });
+        expect(r).toBe("skip"); // transport-error on ic-llm → silent skip (cascade-exhausted)
+      }
+
+      expect(_icLlmCircuitState()).toBe("open");
+
+      // Next call should skip ic-llm entirely (breaker open) → empty
+      // cascade → silent skip
+      const icSpy = actorRef.current!.translateOnChain as jest.Mock;
+      icSpy.mockClear();
+      const r = await translateContent({
+        text: "After breaker open",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+      expect(r).toBe("skip");
+      expect(icSpy).not.toHaveBeenCalled();
+      _resetIcLlmCircuit();
+    });
+  });
+
+  describe("isTransientFetchError classification", () => {
+    // Drive the classifier through translateWithClaude → retry path.
+    it.each([
+      ["Load failed", true],
+      ["Failed to fetch", true],
+      ["NetworkError when attempting to fetch resource", true],
+      ["network request failed", true],
+    ])("classifies '%s' as transient (retries once)", async (msg, _shouldRetry) => {
+      mockApiKey = "sk-ant-test-key";
+      let callCount = 0;
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        callCount += 1;
+        if (callCount === 1) throw new Error(msg);
+        return mockResponse({ translation: "アップルが発表しました。" });
+      });
+
+      await translateContent({
+        text: "Apple announced a new product.",
+        targetLanguage: "ja",
+        backend: "cloud",
+      });
+      expect(callCount).toBe(2);
+    });
+
+    it("does NOT classify an error with 'aborted' in the message as transient", async () => {
+      mockApiKey = "sk-ant-test-key";
+      const fetchMock = jest.fn().mockRejectedValue(new Error("signal is aborted without reason"));
+      globalThis.fetch = fetchMock;
+
+      await expect(translateContent({
+        text: "Apple announced.",
+        targetLanguage: "ja",
+        backend: "cloud",
+      })).rejects.toThrow(/aborted/);
+      expect(fetchMock).toHaveBeenCalledTimes(1); // no retry
+    });
+  });
 });

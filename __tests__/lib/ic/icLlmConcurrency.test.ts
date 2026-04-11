@@ -117,4 +117,84 @@ describe("withIcLlmSlot — concurrency gate", () => {
     expect(_icLlmInFlight()).toBe(0);
     expect(_icLlmWaiting()).toBe(0);
   });
+
+  it("never exceeds MAX_CONCURRENT_IC_LLM in-flight under concurrent load", async () => {
+    let peakInFlight = 0;
+    const tasks = Array.from({ length: 20 }, (_, i) =>
+      withIcLlmSlot(async () => {
+        peakInFlight = Math.max(peakInFlight, _icLlmInFlight());
+        await new Promise(r => setTimeout(r, 3));
+        return i;
+      }),
+    );
+    await Promise.all(tasks);
+    // Observed peak in-flight must never exceed the cap
+    expect(peakInFlight).toBeLessThanOrEqual(2);
+    // And must have reached the cap at least once (proves we weren't
+    // serialising on accident)
+    expect(peakInFlight).toBe(2);
+  });
+
+  it("a throwing task releases its slot so later tasks still run", async () => {
+    const order: string[] = [];
+    const s1 = withIcLlmSlot(async () => {
+      order.push("s1-start");
+      await new Promise(r => setTimeout(r, 2));
+      throw new Error("s1 exploded");
+    });
+    const s2 = withIcLlmSlot(async () => {
+      order.push("s2-start");
+      await new Promise(r => setTimeout(r, 2));
+      return "s2-done";
+    });
+    const s3 = withIcLlmSlot(async () => {
+      order.push("s3-start");
+      return "s3-done";
+    });
+
+    await expect(s1).rejects.toThrow(/s1 exploded/);
+    await expect(s2).resolves.toBe("s2-done");
+    await expect(s3).resolves.toBe("s3-done");
+    // All three must have started — s1's throw must not have blocked
+    // s3's slot acquisition.
+    expect(order).toContain("s1-start");
+    expect(order).toContain("s2-start");
+    expect(order).toContain("s3-start");
+    expect(_icLlmInFlight()).toBe(0);
+    expect(_icLlmWaiting()).toBe(0);
+  });
+
+  it("_icLlmWaiting reports the exact queue depth during contention", async () => {
+    // All five tasks hold their slot until explicitly resolved so the
+    // queue depth is observable instead of chain-draining instantly.
+    const resolvers: Array<() => void> = [];
+    const makeHeld = () => withIcLlmSlot(() => new Promise<string>(resolve => {
+      resolvers.push(() => resolve("done"));
+    }));
+    const [s1, s2, s3, s4, s5] = [makeHeld(), makeHeld(), makeHeld(), makeHeld(), makeHeld()];
+
+    await new Promise(r => setTimeout(r, 0));
+    expect(_icLlmInFlight()).toBe(2);
+    expect(_icLlmWaiting()).toBe(3);
+
+    // Release s1 → s3 acquires the freed slot → waiting drops to 2
+    resolvers[0]();
+    await new Promise(r => setTimeout(r, 0));
+    expect(_icLlmInFlight()).toBe(2);
+    expect(_icLlmWaiting()).toBe(2);
+
+    // Release s2 → s4 acquires → waiting drops to 1
+    resolvers[1]();
+    await new Promise(r => setTimeout(r, 0));
+    expect(_icLlmWaiting()).toBe(1);
+
+    // Drain the rest in any order
+    resolvers[2]();
+    resolvers[3]();
+    await new Promise(r => setTimeout(r, 0));
+    expect(_icLlmWaiting()).toBe(0);
+    resolvers[4]();
+    await Promise.all([s1, s2, s3, s4, s5]);
+    expect(_icLlmInFlight()).toBe(0);
+  });
 });

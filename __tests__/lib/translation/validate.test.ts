@@ -181,3 +181,136 @@ describe("validateTranslation — identical-to-input check", () => {
     expect(r.reason).toMatch(/identical/);
   });
 });
+
+describe("validateTranslation — Unicode edge cases for ja kana check", () => {
+  const enInput = "Apple announced a new MacBook with the M5 chip today.";
+
+  it("accepts half-width katakana (U+FF66..U+FF9F)", () => {
+    // "アップルデス" in half-width
+    const r = validateTranslation("ｱｯﾌﾟﾙﾃﾞｽ", "ja", enInput);
+    expect(r.valid).toBe(true);
+  });
+
+  it("accepts katakana phonetic extensions (U+31F0..U+31FF)", () => {
+    // Leading "アップル" then a phonetic-extension codepoint (ㇸ U+31F8).
+    const r = validateTranslation("アップルㇸ発表", "ja", enInput);
+    expect(r.valid).toBe(true);
+  });
+
+  it("accepts mixed kana + kanji (typical real-world Japanese)", () => {
+    const r = validateTranslation("アップルが新製品を発表しました。", "ja", enInput);
+    expect(r.valid).toBe(true);
+  });
+
+  it("accepts kana mixed with ASCII punctuation and numbers", () => {
+    const r = validateTranslation("Apple・M5搭載の新型MacBook(2025年10月)を発表", "ja", enInput);
+    expect(r.valid).toBe(true);
+  });
+
+  it("accepts emoji-prefixed Japanese output", () => {
+    const r = validateTranslation("🎉 アップルが新型MacBookを発表しました。", "ja", enInput);
+    expect(r.valid).toBe(true);
+  });
+
+  it("rejects pure CJK Unified Ideographs (kanji only, no kana) for ja target", () => {
+    // 林檎社 means "Apple Inc" but has no kana — mirrors a real Llama
+    // failure mode where the model compresses input to kanji-only.
+    const r = validateTranslation("林檎社新型発表", "ja", enInput);
+    expect(r.valid).toBe(false);
+    expect(r.reason).toMatch(/no kana/);
+  });
+
+  it("rejects text with full-width space but no kana", () => {
+    const r = validateTranslation("Apple　released　news", "ja", enInput);
+    expect(r.valid).toBe(false);
+    expect(r.reason).toMatch(/no kana/);
+  });
+
+  it("surrogate-pair emoji in input does NOT break ratio calculation", () => {
+    // "🍎" is a surrogate pair — JS string length counts 2 code units
+    const input = "🍎 Apple announced a new MacBook M5 chip. " + "x".repeat(100);
+    const output = "🎉 アップルが新型MacBook M5を発表しました。";
+    const r = validateTranslation(output, "ja", input);
+    expect(r.valid).toBe(true);
+  });
+});
+
+describe("validateTranslation — RATIO_MIN_INPUT_LENGTH boundary", () => {
+  // 30 chars is the cutoff — below it, ratio check is skipped.
+  it("skips ratio check for input at 29 chars (below boundary)", () => {
+    const input = "x".repeat(29);
+    // 1 char of kana — ratio 1/29 ≈ 0.034 would pass anyway, but
+    // short-input rule should exempt it regardless.
+    const r = validateTranslation("あ", "ja", input);
+    expect(r.valid).toBe(true);
+  });
+
+  it("applies ratio check at exactly 30 chars (boundary)", () => {
+    const input = "x".repeat(30);
+    const output = "あ".repeat(1); // ratio 0.033 — above MIN_RATIO=0.02
+    const r = validateTranslation(output, "ja", input);
+    expect(r.valid).toBe(true);
+  });
+
+  it("applies ratio check at 31 chars and rejects below floor", () => {
+    // Input well above MIN_RATIO_INPUT_LENGTH, output would be below
+    // 0.02 ratio — validator rejects.
+    const input = "a".repeat(1000);
+    const output = "あ".repeat(15); // 0.015 < 0.02
+    const r = validateTranslation(output, "ja", input);
+    expect(r.valid).toBe(false);
+    expect(r.reason).toMatch(/too short/);
+  });
+});
+
+describe("validateTranslation — meta-commentary edge cases", () => {
+  it("accepts text that CONTAINS the word 'translation' mid-sentence", () => {
+    // Meta-commentary patterns are anchored at the start of the
+    // trimmed string. A valid Japanese translation that mentions the
+    // English word "translation" somewhere in its body must not trip.
+    const input = "The translation feature is now available.";
+    const r = validateTranslation("翻訳機能が利用可能になりました。", "ja", input);
+    expect(r.valid).toBe(true);
+  });
+
+  it("rejects meta-commentary even with leading whitespace", () => {
+    const r = validateTranslation(
+      "   \n  Here is the translation: アップルが発表",
+      "ja",
+      "Apple announced a new product.",
+    );
+    expect(r.valid).toBe(false);
+    expect(r.reason).toMatch(/meta-commentary/);
+  });
+
+  it("case-insensitive meta-commentary detection", () => {
+    const r = validateTranslation("HERE IS THE TRANSLATION: アップル", "ja", "Apple");
+    expect(r.valid).toBe(false);
+    expect(r.reason).toMatch(/meta-commentary/);
+  });
+});
+
+describe("validateTranslation — return shape invariants", () => {
+  it("always sets `reason` when valid is false", () => {
+    const cases: Array<[string, string]> = [
+      ["", "some input"],
+      ["   ", "some input"],
+      ["Here is the translation: x", "Apple announced"],
+      ["Apple announced", "Apple announced"],
+      ["No kana here", "a".repeat(100)],
+      ["あ", "x".repeat(5000)], // too short
+    ];
+    for (const [output, input] of cases) {
+      const r = validateTranslation(output, "ja", input);
+      expect(r.valid).toBe(false);
+      expect(typeof r.reason).toBe("string");
+      expect(r.reason!.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("never sets `reason` when valid is true", () => {
+    const r = validateTranslation("アップル発表", "ja", "Apple announced a new thing.");
+    expect(r.valid).toBe(true);
+    expect(r.reason).toBeUndefined();
+  });
+});

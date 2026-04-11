@@ -178,3 +178,102 @@ describe("icLlmCircuitBreaker — reset seam", () => {
     expect(isIcLlmCircuitOpen()).toBe(false);
   });
 });
+
+describe("icLlmCircuitBreaker — exact boundary timing", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  function trip(): void {
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+  }
+
+  it("at exactly OPEN_DURATION_MS elapsed, transitions to half-open (>= comparison)", () => {
+    jest.setSystemTime(new Date("2026-04-12T12:00:00.000Z"));
+    trip();
+    // Exactly 60_000 ms later — the condition is `>=` so this is the
+    // first moment the breaker should allow a probe through.
+    jest.setSystemTime(new Date("2026-04-12T12:01:00.000Z"));
+    expect(isIcLlmCircuitOpen()).toBe(false);
+    expect(_icLlmCircuitState()).toBe("half-open");
+  });
+
+  it("at OPEN_DURATION_MS - 1 ms elapsed, still open", () => {
+    jest.setSystemTime(new Date("2026-04-12T12:00:00.000Z"));
+    trip();
+    jest.setSystemTime(new Date("2026-04-12T12:00:59.999Z"));
+    expect(isIcLlmCircuitOpen()).toBe(true);
+    expect(_icLlmCircuitState()).toBe("open");
+  });
+
+  it("at zero elapsed (Date.now() === openedAt), still open", () => {
+    jest.setSystemTime(new Date("2026-04-12T12:00:00.000Z"));
+    trip();
+    // No time has passed since the trip — breaker is definitely open.
+    expect(isIcLlmCircuitOpen()).toBe(true);
+    expect(_icLlmCircuitState()).toBe("open");
+  });
+});
+
+describe("icLlmCircuitBreaker — failure accumulation beyond threshold", () => {
+  it("extra failures after threshold still increment the counter but keep the state open", () => {
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    expect(_icLlmCircuitState()).toBe("open");
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    expect(_icLlmCircuitState()).toBe("open");
+    expect(_icLlmCircuitFailures()).toBe(5);
+  });
+});
+
+describe("icLlmCircuitBreaker — full lifecycle integration", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it("closed → open → half-open → closed → open via full failure-recover-fail cycle", () => {
+    jest.setSystemTime(new Date("2026-04-12T12:00:00Z"));
+
+    // Initial state
+    expect(_icLlmCircuitState()).toBe("closed");
+
+    // 3 failures → open
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    expect(_icLlmCircuitState()).toBe("open");
+
+    // Wait cooldown
+    jest.setSystemTime(new Date("2026-04-12T12:01:00Z"));
+    expect(isIcLlmCircuitOpen()).toBe(false);
+    expect(_icLlmCircuitState()).toBe("half-open");
+
+    // Probe succeeds → closed
+    recordIcLlmSuccess();
+    expect(_icLlmCircuitState()).toBe("closed");
+    expect(_icLlmCircuitFailures()).toBe(0);
+
+    // New failure round → open again
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    expect(_icLlmCircuitState()).toBe("open");
+  });
+
+  it("isIcLlmCircuitOpen query is idempotent and does not advance state", () => {
+    jest.setSystemTime(new Date("2026-04-12T12:00:00Z"));
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+    recordIcLlmFailure();
+
+    // Call the query many times before cooldown expires — state must
+    // not drift.
+    for (let i = 0; i < 100; i++) {
+      expect(isIcLlmCircuitOpen()).toBe(true);
+    }
+    expect(_icLlmCircuitState()).toBe("open");
+    expect(_icLlmCircuitFailures()).toBe(3);
+  });
+});
