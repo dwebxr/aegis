@@ -5,12 +5,13 @@ import { validateTranslation } from "./validate";
 import { lookupTranslation, storeTranslation } from "./cache";
 import { recordTranslationAttempt } from "./debugLog";
 import { withIcLlmSlot } from "@/lib/ic/icLlmConcurrency";
-import {
-  isIcLlmCircuitOpen,
-  recordIcLlmSuccess,
-  recordIcLlmFailure,
-  describeIcLlmCircuitState,
-} from "@/lib/ic/icLlmCircuitBreaker";
+// Circuit breaker is still consulted by `callIC` (which reports per-
+// call outcomes) — even though auto cascade no longer tries ic-llm,
+// the explicit `backend: "ic"` path benefits from the breaker state
+// being accurate across sessions. `isIcLlmCircuitOpen` /
+// `describeIcLlmCircuitState` are no longer used here because the
+// cascade doesn't contain ic-llm to gate.
+import { recordIcLlmSuccess, recordIcLlmFailure } from "@/lib/ic/icLlmCircuitBreaker";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isWebLLMLoaded } from "@/lib/webllm/engine";
@@ -59,13 +60,12 @@ async function translateWithMediaPipe(prompt: string): Promise<string> {
   return raw.trim();
 }
 
-async function translateWithClaude(prompt: string, apiKey?: string | null): Promise<string> {
+async function callClaudeOnce(prompt: string, apiKey?: string | null): Promise<string> {
   // 12s budget — Vercel warm Claude calls return in 3-6 seconds, cold
   // starts add 3-5s. The user reported the previous 20s timeout was
   // still hanging the cascade on iPhone PWA, so we tighten further. The
   // user sees "Translation failed: ... Fetch is aborted" faster, but
-  // also recovers faster (the next item in the queue starts processing
-  // immediately instead of waiting another 8 seconds).
+  // also recovers faster.
   const res = await fetch("/api/translate", {
     method: "POST",
     headers: {
@@ -78,6 +78,46 @@ async function translateWithClaude(prompt: string, apiKey?: string | null): Prom
   if (!res.ok) throw new Error(`Translate API HTTP ${res.status}`);
   const data = await res.json();
   return data.translation?.trim() ?? "";
+}
+
+/**
+ * iOS Safari / iPhone PWA sometimes throws a `TypeError: Load failed`
+ * from `fetch()` when the app transitions state (wifi → cellular, tab
+ * backgrounded, Service Worker intercept races, etc.). It's a transient
+ * network-layer failure — the request never reached Vercel — and the
+ * same call succeeds on a 500ms retry. Other browsers use slightly
+ * different messages (`Failed to fetch`, `NetworkError when attempting
+ * to fetch resource`, `network request failed`) but the same recovery
+ * works.
+ *
+ * We do NOT retry:
+ *   - Timeout aborts (`AbortError`): we asked for the cancellation by
+ *     wiring `AbortSignal.timeout(12_000)`, so retrying wastes another
+ *     12 seconds the user was already waiting for.
+ *   - HTTP errors (429, 5xx): these are deterministic server responses;
+ *     the retry would hit the same limit or error.
+ *
+ * Only one retry is attempted. If the second call also fails, the
+ * error propagates.
+ */
+const TRANSIENT_FETCH_ERROR_RE = /Load failed|Failed to fetch|NetworkError|network request failed/i;
+
+function isTransientFetchError(err: unknown): boolean {
+  if (err instanceof Error && err.name === "AbortError") return false;
+  const msg = errMsg(err);
+  if (/AbortError|aborted|signal is aborted/i.test(msg)) return false;
+  return TRANSIENT_FETCH_ERROR_RE.test(msg);
+}
+
+async function translateWithClaude(prompt: string, apiKey?: string | null): Promise<string> {
+  try {
+    return await callClaudeOnce(prompt, apiKey);
+  } catch (err) {
+    if (!isTransientFetchError(err)) throw err;
+    console.debug("[translate] claude-server transient fetch error, retrying once after 500ms:", errMsg(err));
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return callClaudeOnce(prompt, apiKey);
+  }
 }
 
 /**
@@ -263,7 +303,20 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   }
 
   // — Auto cascade: try each backend in order, fall through on validator
-  //   rejection so a low-quality IC LLM output is replaced by Claude. —
+  //   rejection so a low-quality Ollama output is replaced by Claude. —
+  //
+  // IC LLM is intentionally NOT in this cascade anymore. Production
+  // diagnostics (build 442edda, 2026-04-12) showed ic-llm success rate
+  // at ~42% with a per-call cost of 7-8s regardless of outcome. On a
+  // failure the cascade paid 8s on ic-llm then another 4s on
+  // claude-server — for a value (free canister translation) that the
+  // 58% failure path undid. The expected-value math favors going
+  // claude-server direct: ~4s per item instead of ~10s per item.
+  //
+  // IC LLM is still available via the explicit `backend: "ic"` path
+  // (users who manually pick it in Settings → Translation Engine) and
+  // via the scoring cascade (`contexts/content/scoring.ts`) where its
+  // 7-8s latency happens in background and is acceptable.
   const attempts: Array<{ name: string; fn: () => Promise<string> }> = [];
 
   if (isOllamaEnabled()) {
@@ -274,56 +327,20 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   } else if (isWebLLMEnabled() && isWebLLMLoaded()) {
     attempts.push({ name: "webllm", fn: () => translateWithWebLLM(prompt) });
   }
-  if (actorRef?.current && isAuthenticated) {
-    // 8s budget for IC LLM in auto cascade — no retry (the cascade is the
-    // retry mechanism). A normal Llama 3.1 8B call returns in 2-5 seconds;
-    // 8s gives slack without stranding the user. If IC LLM hangs or fails,
-    // we want claude-server to fire ASAP rather than after a 15s wait.
-    attempts.push({ name: "ic-llm", fn: () => withTimeout(
-      translateWithIC(prompt, actorRef, false), 8_000, "IC LLM auto-cascade timeout",
-    ) });
-  }
   const byokKey = getUserApiKey();
   if (byokKey) {
     attempts.push({ name: "claude-byok", fn: () => translateWithClaude(prompt, byokKey) });
   }
-  // Server Claude as last resort
+  // Server Claude as last resort (and the only attempt for most users)
   attempts.push({ name: "claude-server", fn: () => translateWithClaude(prompt, null) });
 
   // Collect per-attempt failure reasons. When the cascade exhausts every
   // backend we throw an error containing the full diagnostic so the user
-  // (and operators) see WHICH backend failed and WHY. Without this the
-  // notification was just "no translation backend available" which gives
-  // no actionable information when debugging production issues.
+  // (and operators) see WHICH backend failed and WHY.
   const failures: Array<{ name: string; reason: string }> = [];
   const itemHint = text.slice(0, 60);
 
-  // Track which "preferred" backends were actually tried in this cascade.
-  // The smart-model skip exception (below) should only fire when the
-  // user's expected on-device / on-chain backends had their chance —
-  // otherwise a cold-start cascade where actor wasn't ready yet would
-  // silently skip items that the actor-ready retry would have rescued.
-  const icLlmInCascade = attempts.some(a => a.name === "ic-llm");
-  const localBackendInCascade = attempts.some(
-    a => a.name === "ollama" || a.name === "mediapipe" || a.name === "webllm",
-  );
-
   for (const attempt of attempts) {
-    // Circuit breaker: when ic-llm has been failing, the cascade skips
-    // it entirely for the cooldown window and moves straight to
-    // claude-server. We record the skip in the debug log so the user
-    // can see why (and how long until the next probe) rather than
-    // silently dropping the attempt.
-    if (attempt.name === "ic-llm" && isIcLlmCircuitOpen()) {
-      recordTranslationAttempt({
-        itemHint, targetLanguage, backend: "ic-llm",
-        outcome: "skip",
-        reason: `circuit ${describeIcLlmCircuitState()}`,
-        elapsedMs: 0,
-      });
-      continue;
-    }
-
     const startedAt = Date.now();
     let raw: string;
     try {
@@ -357,15 +374,23 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
       });
       return "skip";
     }
-    // Smart-model exception: see hotfix 5 commit message for full
-    // rationale. Only fires when the user's preferred backend already had
-    // its chance.
+    // Smart-model exception: when Claude (the only trusted translator
+    // in the cascade) returns output with no Japanese kana for a ja
+    // target, we treat that as a definitive verdict that the content
+    // is untranslatable — URL, code block, already-Japanese-but-not-
+    // recognized-as-such, etc. — and promote the failure to a skip.
+    // Without this promotion the item would retry forever every
+    // minute (useTranslation clears the failed set on interval).
+    //
+    // Hotfix 5 previously gated this on a "preferred backend tried"
+    // check because a cold-start cascade might run claude-server alone
+    // before IC LLM was ready. That gate is gone: IC LLM is no longer
+    // in the auto cascade at all, so Claude's verdict is authoritative
+    // by construction.
     const isSmartModel = attempt.name === "claude-server" || attempt.name === "claude-byok";
-    const preferredBackendTried = icLlmInCascade || localBackendInCascade;
     if (
       outcome.kind === "failed" &&
       isSmartModel &&
-      preferredBackendTried &&
       targetLanguage === "ja" &&
       /no kana/.test(outcome.reason)
     ) {
