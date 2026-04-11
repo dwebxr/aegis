@@ -154,7 +154,7 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
    */
   const evaluateRaw = (raw: string): BackendOutcome => {
     if (!raw) return { kind: "failed", reason: "empty response" };
-    const parsed = parseTranslationResponse(raw);
+    const parsed = parseTranslationResponse(raw, targetLanguage);
     if (!parsed) return { kind: "skip" };
     const validation = validateTranslation(parsed.text, targetLanguage, text);
     if (!validation.valid) {

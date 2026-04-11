@@ -180,3 +180,106 @@ describe("parseTranslationResponse — meta-prefix stripping", () => {
     expect(result!.text).toBe("アップルが新製品を発表しました。");
   });
 });
+
+describe("parseTranslationResponse — trailing noise (Llama 3.1 8B real outputs)", () => {
+  it("strips trailing (Note: ...) commentary after a Japanese paragraph", () => {
+    const raw = `アップルは新製品を発表しました。
+
+(Note: I used the polite form です to match the news article tone)`;
+    const result = parseTranslationResponse(raw, "ja");
+    expect(result?.text).toBe("アップルは新製品を発表しました。");
+  });
+
+  it("strips the real news7 output: Japanese + (Note:) + breakdown bullet list", () => {
+    const raw = `IBMは、カオス量子コンピュータを発表しました。
+
+(Note: I used the polite form "です" to match the tone of a news article)
+
+Here is the breakdown:
+
+* Quantum -> カオス量子
+* computing -> (no translation needed, as it's not a proper noun)
+* breakthrough -> ANNOUNCEMENT
+* IBM -> IBM
+* announces -> 発表します
+* 1000 -> 一千
+* qubit -> キュビット
+* processor -> プロセッサ`;
+    const result = parseTranslationResponse(raw, "ja");
+    expect(result?.text).toBe("IBMは、カオス量子コンピュータを発表しました。");
+  });
+
+  it("preserves a multi-paragraph Japanese translation (no false-positive trim)", () => {
+    const raw = `アップルは新製品を発表しました。
+
+新型MacBookはM5チップを搭載し、バッテリー寿命が向上しています。`;
+    const result = parseTranslationResponse(raw, "ja");
+    expect(result?.text).toContain("新製品を発表しました");
+    expect(result?.text).toContain("バッテリー寿命");
+    // Both paragraphs preserved
+    expect(result?.text.split(/\n\s*\n/)).toHaveLength(2);
+  });
+
+  it("strips trailing English commentary even without parenthetical marker", () => {
+    const raw = `アップルは新製品を発表しました。
+
+I translated this from English. The original was about Apple's MacBook.`;
+    const result = parseTranslationResponse(raw, "ja");
+    expect(result?.text).toBe("アップルは新製品を発表しました。");
+  });
+
+  it("strips trailing 'Here is the breakdown:' even when Japanese is in bullet items", () => {
+    const raw = `アップルは新製品を発表しました。
+
+Here is the breakdown:
+
+* Apple -> アップル
+* announced -> 発表しました
+* product -> 新製品`;
+    const result = parseTranslationResponse(raw, "ja");
+    // Even though the bullet items contain kana, the cascade walk stops
+    // when "Here is the breakdown:" is recognised as commentary.
+    expect(result?.text).toBe("アップルは新製品を発表しました。");
+  });
+
+  it("strips 'Let me know if you have questions' style trailing", () => {
+    const raw = `アップルは新製品を発表しました。
+
+Let me know if you have any questions about the translation.`;
+    const result = parseTranslationResponse(raw, "ja");
+    expect(result?.text).toBe("アップルは新製品を発表しました。");
+  });
+
+  it("does NOT trim non-ja-target outputs", () => {
+    const raw = `Apple announced a new product today.
+
+This is the second paragraph that would normally be stripped for ja target.`;
+    const result = parseTranslationResponse(raw, "en");
+    // For en target, no kana-based trim — both paragraphs survive
+    expect(result?.text).toContain("Apple announced");
+    expect(result?.text).toContain("second paragraph");
+  });
+
+  it("returns the original text when nothing survives the filter (validator catches it)", () => {
+    const raw = `(Note: I cannot translate this)
+
+Sorry.`;
+    const result = parseTranslationResponse(raw, "ja");
+    // Nothing survives — pass through original so validator gives the
+    // right rejection reason instead of us silently producing empty.
+    expect(result?.text).toBe(raw.trim());
+  });
+
+  it("strips trailing noise inside JSON text and reason fields", () => {
+    const raw = `{"text":"アップルは発表しました。\\n\\n(Note: 敬体を使用)","reason":"高品質\\n\\nHere is the breakdown: 高 -> high"}`;
+    const result = parseTranslationResponse(raw, "ja");
+    expect(result?.text).toBe("アップルは発表しました。");
+    expect(result?.reason).toBe("高品質");
+  });
+
+  it("plain Japanese without trailing noise passes through unchanged", () => {
+    const raw = "アップルは新製品を発表しました。";
+    const result = parseTranslationResponse(raw, "ja");
+    expect(result?.text).toBe("アップルは新製品を発表しました。");
+  });
+});

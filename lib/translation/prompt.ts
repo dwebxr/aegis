@@ -149,6 +149,7 @@ Rules:
 - Code blocks (lines starting with \`\`\` or indented 4 spaces): keep unchanged
 - Numbers and dates: convert to natural Japanese (October 15 → 10月15日)
 - Respond ONLY with a JSON object, no markdown fences or extra text
+- Do NOT add (Note:) parentheses, "Here is the breakdown:" lists, word-by-word translations, or any explanation. Stop immediately after the JSON object.
 
 Example input text: "Apple announced a new MacBook with the M5 chip on October 15."
 Example input reason: "High insight, novel hardware launch"
@@ -173,6 +174,7 @@ Rules:
 - Code blocks (lines starting with \`\`\` or indented 4 spaces): keep unchanged
 - Numbers and dates: convert to natural Japanese (October 15 → 10月15日)
 - Provide ONLY the translated text — no explanations, notes, or labels
+- Do NOT add (Note:) parentheses, "Here is the breakdown:" lists, word-by-word translations, or any explanation. Stop immediately after the translated paragraph.
 
 Example:
 Input: "Apple announced a new MacBook with the M5 chip on October 15."
@@ -198,6 +200,7 @@ Rules:
 - Code blocks (lines starting with \`\`\` or indented 4 spaces): keep unchanged
 - Numbers and dates: convert to natural Japanese (October 15 → 10月15日)
 - Respond ONLY with a JSON object, no markdown fences or extra text
+- Do NOT add (Note:) parentheses, "Here is the breakdown:" lists, word-by-word translations, or any explanation. Stop immediately after the JSON object.
 
 Example input text: "Apple announced a new MacBook with the M5 chip on October 15."
 Example input reason: "High insight, novel hardware launch"
@@ -224,6 +227,7 @@ Rules:
 - Code blocks (lines starting with \`\`\` or indented 4 spaces): keep unchanged
 - Numbers and dates: convert to natural Japanese (October 15 → 10月15日)
 - Provide ONLY the translated text — no explanations, notes, or labels
+- Do NOT add (Note:) parentheses, "Here is the breakdown:" lists, word-by-word translations, or any explanation. Stop immediately after the translated paragraph.
 
 Example:
 Input: "Apple announced a new MacBook with the M5 chip on October 15."
@@ -293,9 +297,145 @@ function stripLeadingMeta(text: string): string {
   return stripped;
 }
 
-export function parseTranslationResponse(raw: string): { text: string; reason?: string } | null {
+/**
+ * Classify a paragraph as "Japanese-looking" or "Latin-commentary-looking".
+ * Japanese-looking means majority of non-whitespace characters are kana,
+ * kanji (CJK ideographs), or katakana. Latin-commentary-looking means
+ * majority Latin letters / digits / punctuation. The threshold is 50%.
+ *
+ * We can't import from lib/ingestion/langDetect because that helper
+ * requires a 4-character minimum and validation must work on
+ * arbitrarily short paragraph fragments.
+ */
+function isJapaneseLooking(text: string): boolean {
+  let cjkCount = 0;
+  let latinCount = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code <= 0x20) continue; // skip whitespace
+    if (
+      (code >= 0x3040 && code <= 0x309f) || // hiragana
+      (code >= 0x30a0 && code <= 0x30ff) || // katakana
+      (code >= 0x31f0 && code <= 0x31ff) || // katakana phonetic ext
+      (code >= 0xff66 && code <= 0xff9f) || // half-width katakana
+      (code >= 0x3400 && code <= 0x4dbf) || // CJK ext A
+      (code >= 0x4e00 && code <= 0x9fff)    // CJK unified ideographs (kanji)
+    ) {
+      cjkCount += 1;
+    } else if ((code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a)) {
+      latinCount += 1;
+    }
+  }
+  // No CJK at all → not Japanese
+  if (cjkCount === 0) return false;
+  // CJK present and outnumbers Latin (or there's no Latin) → Japanese
+  return cjkCount >= latinCount;
+}
+
+/**
+ * Patterns that mark the START of a Llama 3.1 8B "commentary block" — the
+ * model's tendency on short inputs is to translate, then add an English
+ * explanation, often after a blank line. Recognising these as
+ * commentary lets us cut them even if the paragraph also happens to
+ * contain a stray kana character.
+ */
+const COMMENTARY_START_PATTERNS: ReadonlyArray<RegExp> = [
+  /^\(?\s*note\s*[:：]/i,
+  /^here\s+(?:is|are)\b/i,
+  /^let\s+me\s+(?:know|explain)\b/i,
+  /^i\s+(?:used|chose|translated|hope|think|believe)\b/i,
+  /^(?:please\s+)?note\s+that\b/i,
+  /^the\s+(?:translation|original|text|word|phrase)\b/i,
+  /^[*-]\s+\w/, // markdown bullet list (e.g. "* Quantum -> カオス量子")
+  /^breakdown\s*[:：]/i,
+  /^explanation\s*[:：]/i,
+  /^translation\s*notes?\s*[:：]/i,
+];
+
+function looksLikeCommentary(paragraph: string): boolean {
+  const head = paragraph.trimStart();
+  return COMMENTARY_START_PATTERNS.some(re => re.test(head));
+}
+
+/**
+ * Strip trailing English commentary that Llama 3.1 8B (and other weak
+ * models) append after a valid Japanese translation. The model will
+ * frequently produce:
+ *
+ *   IBMは、量子コンピュータを発表しました。
+ *
+ *   (Note: I used the polite form "です" to match the news article tone)
+ *
+ *   Here is the breakdown:
+ *
+ *   * Quantum -> 量子
+ *   * computing -> コンピューティング
+ *   ...
+ *
+ * The first paragraph is a perfectly good translation. The rest is meta
+ * the user doesn't want to see and inflates the length-ratio so the
+ * validator rejects the whole thing.
+ *
+ * The cleanup splits the output on `\n\n` and walks paragraphs from the
+ * top. A paragraph is kept iff it contains at least one kana character
+ * AND does not start with a known commentary marker. The first
+ * paragraph that fails either check ends the translated section — every
+ * paragraph after that point is dropped.
+ *
+ * Why "from the top, stop on first failure" instead of "filter all":
+ * once Llama starts adding commentary, EVERYTHING after it is commentary
+ * (including the bullet list which might contain Japanese fragments
+ * like "* Quantum -> 量子コンピュータ"). A scattershot filter would
+ * preserve those fragments and produce garbled output.
+ *
+ * Only applies to ja target — for other languages, the kana signal
+ * doesn't help and we leave the output as-is (Claude server is
+ * reliable enough for ASCII targets).
+ */
+function stripTrailingNoise(text: string, targetLanguage: string): string {
+  if (targetLanguage !== "ja") return text;
+  if (text.length === 0) return text;
+
+  const paragraphs = text.split(/\n\s*\n+/);
+  if (paragraphs.length === 1) return text;
+
+  const kept: string[] = [];
+  for (const paragraph of paragraphs) {
+    const trimmed = paragraph.trim();
+    if (trimmed.length === 0) continue;
+    // Commentary marker (Note:, Here is the breakdown:, * bullet, etc.)
+    // — this paragraph and everything after it is meta. Stop.
+    if (looksLikeCommentary(trimmed)) break;
+    // Japanese-looking paragraph (kana, kanji, or both, more CJK than
+    // Latin) — keep it.
+    if (isJapaneseLooking(trimmed)) {
+      kept.push(trimmed);
+      continue;
+    }
+    // Not Japanese-looking. If we already kept Japanese paragraphs, this
+    // is trailing English commentary — stop. If we haven't kept anything
+    // yet, the leading paragraph is itself broken; keep scanning forward
+    // in case a later paragraph has the real translation.
+    if (kept.length > 0) break;
+  }
+
+  // If nothing survived the filter (all paragraphs were commentary or
+  // empty), return the original — the validator will reject it cleanly
+  // with the right reason instead of us silently producing an empty
+  // string.
+  if (kept.length === 0) return text;
+  return kept.join("\n\n");
+}
+
+export function parseTranslationResponse(
+  raw: string,
+  targetLanguage: string = "ja",
+): { text: string; reason?: string } | null {
   const trimmed = raw.trim();
   if (trimmed === "ALREADY_IN_TARGET") return null;
+
+  const cleanup = (s: string): string =>
+    stripTrailingNoise(stripLeadingMeta(s), targetLanguage);
 
   // Try the JSON path first (it's the requested format when reason is set).
   const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
@@ -304,14 +444,15 @@ export function parseTranslationResponse(raw: string): { text: string; reason?: 
       const parsed = JSON.parse(jsonMatch[0]);
       if (typeof parsed.text === "string") {
         return {
-          text: stripLeadingMeta(parsed.text),
-          reason: typeof parsed.reason === "string" ? stripLeadingMeta(parsed.reason) : undefined,
+          text: cleanup(parsed.text),
+          reason: typeof parsed.reason === "string" ? cleanup(parsed.reason) : undefined,
         };
       }
     } catch { /* fall through to plain text */ }
   }
 
-  // Plain-text path: strip a leading meta-prefix so a "Translation: <body>"
-  // response surfaces as just <body>. The validator runs on the result.
-  return { text: stripLeadingMeta(trimmed) };
+  // Plain-text path: strip leading meta then trailing commentary so a
+  // "Translation: <body>\n\n(Note: ...)" response surfaces as just <body>.
+  // The validator runs on the cleaned result.
+  return { text: cleanup(trimmed) };
 }
