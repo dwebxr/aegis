@@ -9,17 +9,23 @@ import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 
 /**
- * Maximum number of items being translated in parallel by the
- * auto-translate effect. Empirically verified (2026-04-12) that the
- * DFINITY LLM canister rejects the 3rd concurrent call from a single
- * caller with `IC LLM translation failed` in ~2 seconds. With
- * MAX_CONCURRENT=3 we were guaranteed to fail one of every three items
- * the moment they hit IC LLM. With MAX_CONCURRENT=2 the IC LLM canister
- * is happy and items pace themselves naturally. This was the root cause
- * of the systematic IC LLM failure that plagued the user across the
- * previous nine hotfixes.
+ * Maximum number of items being translated in parallel by the auto-
+ * translate effect.
+ *
+ * Pre-hotfix-13 this was capped at 2 because the DFINITY LLM canister
+ * rejected the 3rd concurrent call from a single caller. Hotfix 13
+ * removed ic-llm from the translation cascade entirely — claude-server
+ * (Vercel / Anthropic) is the only translator for most users, and it
+ * is comfortable handling more than 2 in-flight requests. The /api/
+ * translate rate limit is 60 req/min, and at ~5s per call, 4 in-flight
+ * produces ~0.8 req/sec — well under the limit. Bumping to 4 halves
+ * feed-translation wall-clock time with no downside.
+ *
+ * Scoring still uses the DFINITY LLM canister and is still gated by
+ * `withIcLlmSlot` in contexts/content/scoring.ts — that limit is
+ * unaffected by this constant.
  */
-const MAX_CONCURRENT = 2;
+const MAX_CONCURRENT = 4;
 const RETRY_INTERVAL_MS = 60_000;
 
 /**

@@ -279,18 +279,24 @@ describe("useTranslation — auto policies", () => {
     expect(mockTranslateContent).not.toHaveBeenCalled();
   });
 
-  it("policy=all auto-translates pending items respecting concurrency limit (2)", async () => {
-    // Concurrency cap is 2 (DFINITY LLM canister rejects the 3rd parallel
-    // call from a single caller — see hotfix 10 in useTranslation.ts).
+  it("policy=all auto-translates pending items respecting concurrency limit (4)", async () => {
+    // Concurrency cap is 4. Pre-hotfix-14 it was 2 to respect the
+    // DFINITY LLM canister's per-caller limit; hotfix 13 removed
+    // ic-llm from the auto cascade, so that constraint is gone and 4
+    // in-flight claude-server calls fit comfortably under the 60/min
+    // rate limit on /api/translate.
     setPolicy("all");
     mockTranslateContent.mockImplementation(() => new Promise(() => {})); // never resolves
-    const items = [makeItem("a"), makeItem("b"), makeItem("c"), makeItem("d"), makeItem("e")];
+    const items = [
+      makeItem("a"), makeItem("b"), makeItem("c"), makeItem("d"),
+      makeItem("e"), makeItem("f"), makeItem("g"),
+    ];
     const { wrapper } = harness(items);
     renderHook(wrapper);
-    await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBe(2));
-    // Wait a tick — should still be 2, not more
+    await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBe(4));
+    // Wait a tick — should still be 4, not more
     await new Promise(r => setTimeout(r, 20));
-    expect(mockTranslateContent.mock.calls.length).toBe(2);
+    expect(mockTranslateContent.mock.calls.length).toBe(4);
   });
 
   it("policy=high_quality only translates items meeting minScore", async () => {

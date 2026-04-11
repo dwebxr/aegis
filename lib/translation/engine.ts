@@ -61,11 +61,16 @@ async function translateWithMediaPipe(prompt: string): Promise<string> {
 }
 
 async function callClaudeOnce(prompt: string, apiKey?: string | null): Promise<string> {
-  // 12s budget — Vercel warm Claude calls return in 3-6 seconds, cold
-  // starts add 3-5s. The user reported the previous 20s timeout was
-  // still hanging the cascade on iPhone PWA, so we tighten further. The
-  // user sees "Translation failed: ... Fetch is aborted" faster, but
-  // also recovers faster.
+  // 25s budget — warm Claude calls return in 3-6 seconds, production
+  // telemetry shows the slowest successful cross-language translation
+  // (Chinese → Japanese) at ~9s, and cold-start Vercel functions add
+  // another 5-10s on top. Hotfix 13 removed IC LLM from the auto
+  // cascade, so claude-server is the only translator for most users —
+  // there is no fallback to move on to, and timing out fast no longer
+  // buys us anything. Budgeting 25s covers the cold-start tail without
+  // stranding items that would otherwise succeed. If even 25s is not
+  // enough the user probably has bigger connectivity problems than we
+  // can compensate for here.
   const res = await fetch("/api/translate", {
     method: "POST",
     headers: {
@@ -73,7 +78,7 @@ async function callClaudeOnce(prompt: string, apiKey?: string | null): Promise<s
       ...(apiKey ? { "x-user-api-key": apiKey } : {}),
     },
     body: JSON.stringify({ prompt }),
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(25_000),
   });
   if (!res.ok) throw new Error(`Translate API HTTP ${res.status}`);
   const data = await res.json();
