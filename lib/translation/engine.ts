@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import type { Span } from "@sentry/nextjs";
 import type { TranslationLanguage, TranslationBackend, TranslationResult } from "./types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { buildTranslationPrompt, parseTranslationResponse } from "./prompt";
@@ -206,17 +207,32 @@ function isDefinitiveUntranslatable(
 
 export async function translateContent(opts: TranslateOptions): Promise<TranslationResult | "skip"> {
   return Sentry.startSpan(
-    { name: "translate.content", op: "translate", attributes: { "translate.backend": opts.backend, "translate.target": opts.targetLanguage } },
-    async () => translateContentInner(opts),
+    {
+      name: "translate.content",
+      op: "translate",
+      attributes: {
+        "translate.backend": opts.backend,
+        "translate.target": opts.targetLanguage,
+      },
+    },
+    // Pass the span through so annotations go on THIS specific span
+    // (span.setAttribute) rather than on the forked scope (Sentry.setTag).
+    // Under concurrent browser-side translations, scope-based tagging races
+    // between callbacks; span-direct annotation is race-free because each
+    // call writes to its own span object.
+    async (span) => translateContentInner(opts, span),
   );
 }
 
-async function translateContentInner(opts: TranslateOptions): Promise<TranslationResult | "skip"> {
+async function translateContentInner(
+  opts: TranslateOptions,
+  span: Span,
+): Promise<TranslationResult | "skip"> {
   const { text, reason, targetLanguage, backend, actorRef, isAuthenticated } = opts;
 
   const cached = await lookupTranslation(text, targetLanguage);
   if (cached) {
-    Sentry.setTag("translate.result", "cache-hit");
+    span.setAttribute("translate.result", "cache-hit");
     return cached;
   }
 
@@ -245,8 +261,8 @@ async function translateContentInner(opts: TranslateOptions): Promise<Translatio
       generatedAt: Date.now(),
     };
     await storeTranslation(text, result);
-    Sentry.setTag("translate.result", "ok");
-    Sentry.setTag("translate.backend", usedBackend);
+    span.setAttribute("translate.result", "ok");
+    span.setAttribute("translate.backend", usedBackend);
     return result;
   };
 
@@ -334,7 +350,7 @@ async function translateContentInner(opts: TranslateOptions): Promise<Translatio
   // the IC actor becomes available, so items stranded at cold start
   // retry once ic-llm enters the cascade.
   if (attempts.length === 0) {
-    Sentry.setTag("translate.result", "empty-cascade");
+    span.setAttribute("translate.result", "empty-cascade");
     recordTranslationAttempt({
       itemHint, targetLanguage, backend: "auto",
       outcome: "skip", reason: "no configured translation backend",
@@ -402,19 +418,25 @@ async function translateContentInner(opts: TranslateOptions): Promise<Translatio
   // in 60s won't change the outcome.
   const summary = failures.map(f => `${f.name}: ${f.reason}`).join(" | ");
   if (failures.length > 0 && failures.every(f => INFRA_ERROR_RE.test(f.reason))) {
-    Sentry.setTag("translate.result", "infra-error");
+    span.setAttribute("translate.result", "infra-error");
     const error = new Error(
       failures.length === 1
         ? `Translation backend failed — ${summary}`
         : `All ${failures.length} translation backends failed — ${summary}`,
     );
+    // captureException carries its own tags + context scoped to this
+    // specific event — no interaction with span attributes or current
+    // scope, so safe to use alongside span.setAttribute.
     Sentry.captureException(error, {
-      tags: { "translate.target": targetLanguage },
+      tags: {
+        "translate.result": "infra-error",
+        "translate.target": targetLanguage,
+      },
       contexts: { translate: { failures, attempts: attempts.length } },
     });
     throw error;
   }
-  Sentry.setTag("translate.result", "cascade-skip");
+  span.setAttribute("translate.result", "cascade-skip");
   recordTranslationAttempt({
     itemHint, targetLanguage, backend: "auto",
     outcome: "skip",
