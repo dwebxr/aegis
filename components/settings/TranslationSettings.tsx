@@ -24,11 +24,11 @@ const POLICY_OPTIONS: ReadonlyArray<{ value: TranslationPolicy; label: string; d
 ];
 
 const BACKEND_OPTIONS: ReadonlyArray<{ value: TranslationBackend; label: string; desc: string }> = [
-  { value: "auto", label: "Auto", desc: "Use best available engine" },
-  { value: "ic", label: "IC LLM", desc: "On-chain Llama 3.1 — free, no device load" },
+  { value: "auto", label: "Auto", desc: "Local → Browser → Claude (BYOK if set) → IC LLM. Free paths first; no server costs." },
+  { value: "ic", label: "IC LLM", desc: "On-chain Llama 3.1 — free, sign-in required, ~42% success rate" },
   { value: "browser", label: "Browser", desc: "In-browser via WebGPU (MediaPipe on mobile, WebLLM on desktop)" },
   { value: "local", label: "Local", desc: "Ollama — local server" },
-  { value: "cloud", label: "Cloud", desc: "Claude API — highest quality" },
+  { value: "cloud", label: "Cloud", desc: "Claude API (requires your own Anthropic API key in BYOK settings)" },
 ];
 
 interface TranslationSettingsProps {

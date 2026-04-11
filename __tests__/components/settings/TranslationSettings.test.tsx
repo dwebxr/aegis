@@ -131,7 +131,7 @@ describe("TranslationSettings", () => {
   it("shows description for active backend", () => {
     mockPrefs = { targetLanguage: "en", policy: "manual", backend: "ic", minScore: 6 };
     render(<TranslationSettings />);
-    expect(screen.getByText("On-chain Llama 3.1 — free, no device load")).toBeTruthy();
+    expect(screen.getByText(/On-chain Llama 3.1 — free, sign-in required/)).toBeTruthy();
   });
 
   it("preserves other prefs when changing one field", () => {

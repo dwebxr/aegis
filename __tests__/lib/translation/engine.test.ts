@@ -209,20 +209,22 @@ describe("translateContent", () => {
     expect(capturedHeaders["x-user-api-key"]).toBe("sk-ant-test-key");
   });
 
-  it("uses 'claude-server' backend when no BYOK key for cloud", async () => {
+  it("throws with BYOK-required error when 'cloud' is picked without a user API key", async () => {
+    // Hotfix 17: claude-server is no longer reachable via the 'cloud'
+    // backend without an explicit BYOK key. Previously this silently
+    // burned the operator's Anthropic budget on every user without a
+    // key; now it throws an actionable error telling the user how to
+    // either configure BYOK or pick a different engine.
     mockApiKey = null;
-    globalThis.fetch = jest.fn().mockImplementation(async () => {
-      return mockResponse({ translation: "サーバー翻訳" });
-    });
+    const fetchMock = jest.fn();
+    globalThis.fetch = fetchMock;
 
-    const result = await translateContent({
+    await expect(translateContent({
       text: "Hello",
       targetLanguage: "ja",
       backend: "cloud",
-    });
-
-    const r = expectResult(result);
-    expect(r.backend).toBe("claude-server");
+    })).rejects.toThrow(/Claude \(Cloud\) requires an Anthropic API key/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("throws for 'ic' backend without authentication", async () => {
@@ -337,7 +339,8 @@ describe("translateContent", () => {
     })).rejects.toThrow("Ollama HTTP 500");
   });
 
-  it("throws on Claude API HTTP error", async () => {
+  it("throws on Claude API HTTP error when cloud is picked with BYOK", async () => {
+    mockApiKey = "sk-ant-test-key";
     globalThis.fetch = jest.fn().mockImplementation(async () => {
       return mockResponse({}, { status: 429 });
     });
@@ -381,12 +384,17 @@ describe("translateContent", () => {
       expect(expectResult(result).backend).toBe("mediapipe");
     });
 
-    it("skips MediaPipe in auto cascade when enabled but not loaded", async () => {
+    it("skips MediaPipe in auto cascade when enabled but not loaded (silent skip, no MediaPipe download)", async () => {
       mockMediaPipeEnabled = true;
       mockMediaPipeLoaded = false;
-      globalThis.fetch = jest.fn().mockImplementation(async () => {
-        return mockResponse({ translation: "サーバー翻訳" });
-      });
+      mockOllamaEnabled = false;
+      mockWebLLMEnabled = false;
+      mockApiKey = null;
+      // With no loaded local backend and no BYOK, the cascade is empty
+      // post-hotfix-17 (claude-server no longer a free fallback) →
+      // silent skip, no MediaPipe download triggered.
+      const fetchSpy = jest.fn();
+      globalThis.fetch = fetchSpy;
 
       const result = await translateContent({
         text: "Skip unloaded MediaPipe",
@@ -394,8 +402,8 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      // Should fall through to server Claude, not trigger MediaPipe download
-      expect(expectResult(result).backend).toBe("claude-server");
+      expect(result).toBe("skip");
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
     it("prefers MediaPipe over WebLLM in auto cascade (mutual exclusion)", async () => {
@@ -427,62 +435,118 @@ describe("translateContent", () => {
       expect(expectResult(result).translatedText).toBe("WebLLMで翻訳されました");
     });
 
-    it("falls through to server Claude when all local backends fail", async () => {
+    it("silently skips when no backends are configured (anonymous user, no local, no BYOK)", async () => {
       mockOllamaEnabled = false;
       mockWebLLMEnabled = false;
+      mockMediaPipeEnabled = false;
       mockApiKey = null;
-      globalThis.fetch = jest.fn().mockImplementation(async () => {
-        return mockResponse({ translation: "サーバーフォールバック" });
-      });
+      const fetchSpy = jest.fn();
+      globalThis.fetch = fetchSpy;
 
       const result = await translateContent({
-        text: "Server fallback",
+        text: "Nothing configured",
         targetLanguage: "ja",
         backend: "auto",
       });
 
-      expect(expectResult(result).backend).toBe("claude-server");
+      // Empty cascade → silent skip → user sees original text, no
+      // error notification, no API hit
+      expect(result).toBe("skip");
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it("does NOT include ic-llm in auto cascade even when authenticated", async () => {
-      // Hotfix 13 removed ic-llm from the auto cascade entirely.
-      // Production showed a ~42% success rate at ~8s per call, pushing
-      // the per-item expected value to ~10s — worse than 3-5s of
-      // going claude-server direct. IC LLM remains available via the
-      // explicit `backend: "ic"` path and inside the scoring tier.
+    it("uses ic-llm in auto cascade for authenticated users with no other backends", async () => {
+      // Hotfix 17: IC LLM is the authenticated-user fallback in the
+      // auto cascade. Claude-server is NOT in the auto cascade (cost
+      // control), and IC LLM offers free on-chain translation for
+      // the ~42% of items it can handle.
+      const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
       mockOllamaEnabled = false;
       mockWebLLMEnabled = false;
       mockApiKey = null;
-      const icMock = jest.fn().mockResolvedValue({ ok: "IC should NOT be called" });
+      const icMock = jest.fn().mockResolvedValue({ ok: "ICで翻訳しました" });
       const actorRef = { current: { translateOnChain: icMock } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
-      globalThis.fetch = jest.fn().mockImplementation(async () => mockResponse({ translation: "クロードで翻訳" }));
+      const fetchSpy = jest.fn();
+      globalThis.fetch = fetchSpy;
 
       const result = await translateContent({
-        text: "Auto should skip ic-llm",
+        text: "Auto should use ic-llm for authenticated users",
         targetLanguage: "ja",
         backend: "auto",
         actorRef,
         isAuthenticated: true,
       });
 
-      expect(expectResult(result).backend).toBe("claude-server");
-      expect(icMock).not.toHaveBeenCalled();
+      expect(expectResult(result).backend).toBe("ic-llm");
+      expect(icMock).toHaveBeenCalled();
+      // Confirm claude-server was NOT consulted — no fetch to /api/translate
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it("throws diagnostic error when all backends fail in auto cascade", async () => {
+    it("does NOT include ic-llm in auto cascade for anonymous users", async () => {
       mockOllamaEnabled = false;
       mockWebLLMEnabled = false;
       mockApiKey = null;
-      globalThis.fetch = jest.fn().mockRejectedValue(new Error("All failed"));
+      const icMock = jest.fn().mockResolvedValue({ ok: "IC should NOT be called" });
+      const actorRef = { current: { translateOnChain: icMock } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
 
-      // Auto cascade only tries claude-server here (no IC actor, no
-      // BYOK key, no local backends enabled). After exhausting, it
-      // throws with the failure reason from the last attempt.
+      const result = await translateContent({
+        text: "Anonymous auto",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: false,
+      });
+
+      expect(result).toBe("skip");
+      expect(icMock).not.toHaveBeenCalled();
+    });
+
+    it("does NOT include ic-llm in auto cascade when circuit breaker is open", async () => {
+      const { recordIcLlmFailure, _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
+      recordIcLlmFailure();
+      recordIcLlmFailure();
+      recordIcLlmFailure();
+
+      mockOllamaEnabled = false;
+      mockWebLLMEnabled = false;
+      mockApiKey = null;
+      const icMock = jest.fn();
+      const actorRef = { current: { translateOnChain: icMock } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      const result = await translateContent({
+        text: "Breaker open",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expect(result).toBe("skip");
+      expect(icMock).not.toHaveBeenCalled();
+      _resetIcLlmCircuit();
+    });
+
+    it("throws diagnostic error when all backends in auto cascade fail with transport errors", async () => {
+      const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
+      mockOllamaEnabled = true;
+      mockWebLLMEnabled = false;
+      mockApiKey = null;
+      // Ollama throws a recognizable network-level error (iOS Safari's
+      // `TypeError: Load failed` matches the transport-error regex) so
+      // the cascade treats it as a real infrastructure problem and
+      // throws — giving the user visibility rather than silently
+      // marking the item unreachable.
+      globalThis.fetch = jest.fn().mockRejectedValue(new TypeError("Load failed"));
+
       await expect(translateContent({
         text: "All fail test",
         targetLanguage: "ja",
         backend: "auto",
-      })).rejects.toThrow(/Translation backend failed.*claude-server.*All failed/);
+      })).rejects.toThrow(/Translation backend failed.*ollama.*Load failed/);
     });
   });
 
@@ -544,11 +608,11 @@ describe("translateContent", () => {
   });
 
   describe("validator integration — auto cascade fall-through", () => {
-    it("auto cascade falls through from ollama to claude-server on validator rejection", async () => {
+    it("auto cascade falls through from ollama to claude-byok on validator rejection", async () => {
       mockOllamaEnabled = true;
-      mockApiKey = null;
+      mockApiKey = "sk-ant-test-key";
       // Ollama returns English (no kana) → validator rejects → cascade
-      // falls through to claude-server which returns valid Japanese.
+      // falls through to claude-byok which returns valid Japanese.
       globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
         if (url.includes("11434")) {
           return mockResponse({ choices: [{ message: { content: "English without any kana" } }] });
@@ -563,7 +627,7 @@ describe("translateContent", () => {
       });
 
       const r = expectResult(result);
-      expect(r.backend).toBe("claude-server");
+      expect(r.backend).toBe("claude-byok");
       expect(r.translatedText).toBe("Appleが新製品を発表しました。");
     });
 
@@ -596,7 +660,7 @@ describe("translateContent", () => {
 
     it("auto cascade still falls through when local backend returns unrecoverable English (no kana)", async () => {
       mockOllamaEnabled = true;
-      mockApiKey = null;
+      mockApiKey = "sk-ant-test-key";
       globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
         if (url.includes("11434")) {
           return mockResponse({ choices: [{ message: { content: "I cannot translate this text into Japanese for you." } }] });
@@ -611,19 +675,19 @@ describe("translateContent", () => {
       });
 
       const r = expectResult(result);
-      expect(r.backend).toBe("claude-server");
+      expect(r.backend).toBe("claude-byok");
     });
 
-    it("auto cascade throws diagnostic error when both backends fail with non-skip reasons", async () => {
+    it("auto cascade throws diagnostic error when both transport attempts fail", async () => {
       mockOllamaEnabled = true;
-      mockApiKey = null;
-      // Ollama rejected by validator (no kana), claude-server throws HTTP 502.
-      // No smart-model no-kana promotion applies because it's a transport
-      // error, not a validator rejection. Cascade exhausts and throws with
-      // both names + reasons.
+      mockApiKey = "sk-ant-test-key";
+      // Ollama throws a network error, claude-byok throws HTTP 502 —
+      // both are transport-level failures, so the cascade should
+      // surface the error (not silent-skip) so the user knows
+      // their backends are broken.
       globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
         if (url.includes("11434")) {
-          return mockResponse({ choices: [{ message: { content: "English without any kana" } }] });
+          throw new Error("Load failed");
         }
         return {
           ok: false,
@@ -637,7 +701,27 @@ describe("translateContent", () => {
         text: "Apple announced a new product today.",
         targetLanguage: "ja",
         backend: "auto",
-      })).rejects.toThrow(/All 2 translation backends failed.*ollama.*no kana.*claude-server.*HTTP 502/);
+      })).rejects.toThrow(/All 2 translation backends failed.*ollama.*claude-byok.*HTTP 502/);
+    });
+
+    it("auto cascade silently skips when a validator rejection is the only outcome (non-transport)", async () => {
+      mockOllamaEnabled = true;
+      mockApiKey = null;
+      // Ollama returns meta-commentary that the validator rejects.
+      // There's no BYOK and no IC actor, so the cascade ends with a
+      // single validator-level failure. Hotfix 17: silent skip to
+      // stop the retry-loop waste on untranslatable content.
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({ choices: [{ message: { content: "Here is the translation of the text that I am not going to translate" } }] });
+      });
+
+      const result = await translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      expect(result).toBe("skip");
     });
 
     it("explicit IC backend throws with named reason on validator rejection", async () => {
@@ -727,18 +811,14 @@ describe("translateContent", () => {
       expect(mockTranslate).toHaveBeenCalledTimes(1);
     });
 
-    it("auto cascade promotes claude-server no-kana to 'skip' for ja target", async () => {
+    it("auto cascade promotes claude-byok no-kana to 'skip' for ja target", async () => {
       mockOllamaEnabled = false;
-      mockApiKey = null;
-      // Claude server returns text without kana for a ja target —
-      // e.g. the input was a URL, code block, or already-Japanese content
-      // the model didn't recognize as such. Treat this as a definitive
-      // "untranslatable" verdict and promote the failure to skip so the
-      // retry loop doesn't keep banging on the same item every minute.
-      //
-      // Hotfix 13 dropped the preferredBackendTried gate because ic-llm
-      // is no longer in the auto cascade — claude-server is the only
-      // trusted model by construction.
+      mockApiKey = "sk-ant-test-key";
+      // Claude-byok returns text without kana for a ja target — e.g.
+      // input was a URL / code / already-Japanese content the model
+      // didn't recognize. Treat this as a definitive untranslatable
+      // verdict and promote to skip so the retry loop doesn't keep
+      // banging on the same item.
       globalThis.fetch = jest.fn().mockImplementation(async () => {
         return mockResponse({ translation: "https://example.com/some-url" });
       });
@@ -747,31 +827,6 @@ describe("translateContent", () => {
         text: "https://example.com/some-url",
         targetLanguage: "ja",
         backend: "auto",
-      });
-
-      expect(result).toBe("skip");
-    });
-
-    it("auto cascade promotes claude-server no-kana to 'skip' even with no other backends (cold-start)", async () => {
-      mockOllamaEnabled = false;
-      mockApiKey = null;
-      // Previous cold-start gate (hotfix 5) withheld the skip promotion
-      // when ic-llm was absent from the cascade, so actor-ready retry
-      // could rescue items once IC was reachable. Hotfix 13 removed
-      // ic-llm from the cascade entirely, so that rescue path is gone
-      // and the gate was removed — no-kana from claude-server is now
-      // treated as definitive on the first try.
-      const actorRef = { current: null } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
-      globalThis.fetch = jest.fn().mockImplementation(async () => {
-        return mockResponse({ translation: "Apple announced a new product." });
-      });
-
-      const result = await translateContent({
-        text: "Apple announced a new product today.",
-        targetLanguage: "ja",
-        backend: "auto",
-        actorRef,
-        isAuthenticated: true,
       });
 
       expect(result).toBe("skip");
@@ -799,15 +854,12 @@ describe("translateContent", () => {
       expect(claudeCalls).not.toHaveBeenCalled();
     });
 
-    it("auto cascade promotes 'identical to input' to skip for any target language", async () => {
-      // Claude-server sometimes echoes the input verbatim when the
-      // content is a URL, bare filename, code block, or text it
-      // considers untranslatable. Before hotfix 16 this exhausted
-      // the cascade (no ic-llm to fall through to), burned API cycles
-      // on every 60s retry, and kept the user from seeing the item.
-      // Now it's treated as a definitive untranslatable verdict.
+    it("auto cascade promotes 'identical to input' to skip for any target language (via claude-byok)", async () => {
+      // Claude-byok echoes input verbatim for URLs / filenames /
+      // untranslatable content. Hotfix 16 promoted this to skip so
+      // the retry loop doesn't burn API on doomed calls.
       mockOllamaEnabled = false;
-      mockApiKey = null;
+      mockApiKey = "sk-ant-test-key";
       globalThis.fetch = jest.fn().mockImplementation(async () => {
         return mockResponse({ translation: "https://example.com/foo/bar" });
       });
@@ -821,9 +873,9 @@ describe("translateContent", () => {
       expect(result).toBe("skip");
     });
 
-    it("auto cascade promotes 'identical to input' to skip for non-ja targets too (fr)", async () => {
+    it("auto cascade promotes 'identical to input' to skip for non-ja targets too (fr, via claude-byok)", async () => {
       mockOllamaEnabled = false;
-      mockApiKey = null;
+      mockApiKey = "sk-ant-test-key";
       globalThis.fetch = jest.fn().mockImplementation(async () => {
         return mockResponse({ translation: "function foo() { return 42; }" });
       });
@@ -861,9 +913,13 @@ describe("translateContent", () => {
     });
   });
 
-  describe("claude-server transient fetch retry", () => {
+  describe("claude-byok transient fetch retry", () => {
+    // Hotfix 17: auto cascade no longer reaches claude-server. These
+    // retry tests now drive the path via `backend: "cloud"` with a
+    // BYOK key configured, which exercises the same `translateWithClaude`
+    // → `callClaudeOnce` retry wrapper.
     it("retries once when fetch throws 'Load failed' (iOS Safari transient)", async () => {
-      mockApiKey = null;
+      mockApiKey = "sk-ant-test-key";
       let callCount = 0;
       globalThis.fetch = jest.fn().mockImplementation(async () => {
         callCount += 1;
@@ -876,15 +932,15 @@ describe("translateContent", () => {
       const result = await translateContent({
         text: "Apple announced a new product today.",
         targetLanguage: "ja",
-        backend: "auto",
+        backend: "cloud",
       });
 
-      expect(expectResult(result).backend).toBe("claude-server");
+      expect(expectResult(result).backend).toBe("claude-byok");
       expect(callCount).toBe(2);
     });
 
     it("retries once on 'Failed to fetch' (Chrome/Edge network error)", async () => {
-      mockApiKey = null;
+      mockApiKey = "sk-ant-test-key";
       let callCount = 0;
       globalThis.fetch = jest.fn().mockImplementation(async () => {
         callCount += 1;
@@ -895,14 +951,14 @@ describe("translateContent", () => {
       const result = await translateContent({
         text: "Apple announced",
         targetLanguage: "ja",
-        backend: "auto",
+        backend: "cloud",
       });
-      expect(expectResult(result).backend).toBe("claude-server");
+      expect(expectResult(result).backend).toBe("claude-byok");
       expect(callCount).toBe(2);
     });
 
     it("retries once on 'NetworkError when attempting to fetch resource' (Firefox)", async () => {
-      mockApiKey = null;
+      mockApiKey = "sk-ant-test-key";
       let callCount = 0;
       globalThis.fetch = jest.fn().mockImplementation(async () => {
         callCount += 1;
@@ -910,12 +966,12 @@ describe("translateContent", () => {
         return mockResponse({ translation: "Appleが新製品を発表しました。" });
       });
 
-      await translateContent({ text: "foo", targetLanguage: "ja", backend: "auto" });
+      await translateContent({ text: "foo", targetLanguage: "ja", backend: "cloud" });
       expect(callCount).toBe(2);
     });
 
     it("does NOT retry on AbortError (the timeout we explicitly wired)", async () => {
-      mockApiKey = null;
+      mockApiKey = "sk-ant-test-key";
       const abortErr = new Error("The operation was aborted");
       abortErr.name = "AbortError";
       const fetchMock = jest.fn().mockRejectedValue(abortErr);
@@ -924,13 +980,13 @@ describe("translateContent", () => {
       await expect(translateContent({
         text: "Apple announced a new product today.",
         targetLanguage: "ja",
-        backend: "auto",
+        backend: "cloud",
       })).rejects.toThrow(/aborted/);
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     it("does NOT retry on HTTP 429 rate-limit (deterministic server response)", async () => {
-      mockApiKey = null;
+      mockApiKey = "sk-ant-test-key";
       const fetchMock = jest.fn().mockResolvedValue({
         ok: false,
         status: 429,
@@ -942,20 +998,20 @@ describe("translateContent", () => {
       await expect(translateContent({
         text: "Apple announced a new product today.",
         targetLanguage: "ja",
-        backend: "auto",
+        backend: "cloud",
       })).rejects.toThrow(/HTTP 429/);
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     it("propagates the error when BOTH attempts throw transient fetch errors", async () => {
-      mockApiKey = null;
+      mockApiKey = "sk-ant-test-key";
       const fetchMock = jest.fn().mockRejectedValue(new TypeError("Load failed"));
       globalThis.fetch = fetchMock;
 
       await expect(translateContent({
         text: "Apple announced a new product today.",
         targetLanguage: "ja",
-        backend: "auto",
+        backend: "cloud",
       })).rejects.toThrow(/Load failed/);
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });

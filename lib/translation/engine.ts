@@ -5,13 +5,18 @@ import { validateTranslation } from "./validate";
 import { lookupTranslation, storeTranslation } from "./cache";
 import { recordTranslationAttempt } from "./debugLog";
 import { withIcLlmSlot } from "@/lib/ic/icLlmConcurrency";
-// Circuit breaker is still consulted by `callIC` (which reports per-
-// call outcomes) — even though auto cascade no longer tries ic-llm,
-// the explicit `backend: "ic"` path benefits from the breaker state
-// being accurate across sessions. `isIcLlmCircuitOpen` /
-// `describeIcLlmCircuitState` are no longer used here because the
-// cascade doesn't contain ic-llm to gate.
-import { recordIcLlmSuccess, recordIcLlmFailure } from "@/lib/ic/icLlmCircuitBreaker";
+// Circuit breaker state is updated by `callIC` (which reports each
+// per-call outcome) and queried at cascade-setup time via
+// `isIcLlmCircuitOpen` so we don't even PUSH ic-llm into the attempts
+// list when the canister has been failing. When the breaker is open,
+// the cascade composition for an authenticated user with no other
+// configured backends collapses to empty → silent skip → zero user-
+// visible errors.
+import {
+  isIcLlmCircuitOpen,
+  recordIcLlmSuccess,
+  recordIcLlmFailure,
+} from "@/lib/ic/icLlmCircuitBreaker";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
 import { isWebLLMLoaded } from "@/lib/webllm/engine";
@@ -291,10 +296,21 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   }
   if (backend === "cloud") {
     const key = getUserApiKey();
+    // Cloud backend requires a user-provided Anthropic API key (BYOK).
+    // Previously this fell back to the operator-hosted claude-server
+    // path when BYOK was missing, which meant every user without a
+    // configured key silently burned the operator's Anthropic budget.
+    // Require BYOK explicitly so the cost path is opt-in at the
+    // account-setup level, not at the runtime level.
+    if (!key) {
+      throw new Error(
+        "Claude (Cloud) requires an Anthropic API key. Add one in Settings → API Key (BYOK), or pick IC LLM / Browser / Local in Translation Engine.",
+      );
+    }
     const outcome = evaluateRaw(await translateWithClaude(prompt, key));
     if (outcome.kind === "skip") return "skip";
-    if (outcome.kind === "failed") throw new Error(explicitFailMessage(key ? "Claude (BYOK)" : "Claude (server)", outcome.reason));
-    return finalize(outcome.parsed, key ? "claude-byok" : "claude-server");
+    if (outcome.kind === "failed") throw new Error(explicitFailMessage("Claude (BYOK)", outcome.reason));
+    return finalize(outcome.parsed, "claude-byok");
   }
   if (backend === "ic") {
     if (!actorRef || !isAuthenticated) throw new Error("IC requires authentication");
@@ -308,20 +324,36 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   }
 
   // — Auto cascade: try each backend in order, fall through on validator
-  //   rejection so a low-quality Ollama output is replaced by Claude. —
+  //   rejection so a low-quality Ollama output is replaced by a later
+  //   backend. Cascade composition:
   //
-  // IC LLM is intentionally NOT in this cascade anymore. Production
-  // diagnostics (build 442edda, 2026-04-12) showed ic-llm success rate
-  // at ~42% with a per-call cost of 7-8s regardless of outcome. On a
-  // failure the cascade paid 8s on ic-llm then another 4s on
-  // claude-server — for a value (free canister translation) that the
-  // 58% failure path undid. The expected-value math favors going
-  // claude-server direct: ~4s per item instead of ~10s per item.
+  //     1. Ollama              (local, user-configured)
+  //     2. MediaPipe / WebLLM  (browser WebGPU, mutually exclusive)
+  //     3. Claude BYOK         (user-provided Anthropic API key)
+  //     4. IC LLM              (free, authenticated users only)
   //
-  // IC LLM is still available via the explicit `backend: "ic"` path
-  // (users who manually pick it in Settings → Translation Engine) and
-  // via the scoring cascade (`contexts/content/scoring.ts`) where its
-  // 7-8s latency happens in background and is acceptable.
+  // claude-server is intentionally NOT in the auto cascade. Hotfix 13
+  // had removed IC LLM because cascading through it wasted 8s on a
+  // 58% failure rate before reaching claude-server; hotfix 17 removes
+  // claude-server entirely because it was costing the operator real
+  // Anthropic budget on every anonymous user's every item, while
+  // giving users no way to opt in/out at the account level. Users
+  // who explicitly want Claude quality must provide their own API
+  // key (BYOK) — that's what the "Cloud" Translation Engine option
+  // is for now, and it throws with an actionable message if no key
+  // is configured.
+  //
+  // IC LLM is back in the cascade as the free, authenticated-user
+  // fallback. Its production success rate sits around 42%, which is
+  // strictly better than the "nothing" alternative when the user has
+  // no local backend and no BYOK. Items that IC LLM can't translate
+  // cascade-exhaust and fall into the skip set — silently, with no
+  // error notification, because "cascade empty" is not a bug when
+  // the user hasn't configured any paid/local path.
+  //
+  // The circuit breaker gate still applies: if IC LLM has tripped
+  // open in the scoring path (or in a prior translation batch), it's
+  // skipped from the cascade entirely until the cooldown expires.
   const attempts: Array<{ name: string; fn: () => Promise<string> }> = [];
 
   if (isOllamaEnabled()) {
@@ -336,14 +368,34 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   if (byokKey) {
     attempts.push({ name: "claude-byok", fn: () => translateWithClaude(prompt, byokKey) });
   }
-  // Server Claude as last resort (and the only attempt for most users)
-  attempts.push({ name: "claude-server", fn: () => translateWithClaude(prompt, null) });
+  if (actorRef?.current && isAuthenticated && !isIcLlmCircuitOpen()) {
+    // 8s budget — normal Llama 3.1 8B responses come back in 2-5s,
+    // 8s covers the slower tail without stranding the user. No retry
+    // on transient `IC LLM translation failed` errors (the cascade
+    // itself is the retry mechanism — on exhaustion we silent-skip).
+    attempts.push({ name: "ic-llm", fn: () => withTimeout(
+      translateWithIC(prompt, actorRef, false), 8_000, "IC LLM auto-cascade timeout",
+    ) });
+  }
 
-  // Collect per-attempt failure reasons. When the cascade exhausts every
-  // backend we throw an error containing the full diagnostic so the user
-  // (and operators) see WHICH backend failed and WHY.
   const failures: Array<{ name: string; reason: string }> = [];
   const itemHint = text.slice(0, 60);
+
+  // Empty cascade = user has no configured backend (anonymous + no
+  // local + no BYOK, or circuit breaker open for authenticated users).
+  // Return "skip" silently so the item shows the original text without
+  // an error notification. useTranslation's auto-translate effect will
+  // NOT retry items in the skip set, and the actor-ready hook clears
+  // the skip set when the IC actor becomes available (so items that
+  // could be translated later get a second chance).
+  if (attempts.length === 0) {
+    recordTranslationAttempt({
+      itemHint, targetLanguage, backend: "auto",
+      outcome: "skip", reason: "no configured translation backend",
+      elapsedMs: 0,
+    });
+    return "skip";
+  }
 
   for (const attempt of attempts) {
     const startedAt = Date.now();
@@ -397,7 +449,7 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     // Without these promotions the item bounces between failed and
     // retry every 60 seconds forever, burning Anthropic API cycles on
     // content the model has already told us it cannot translate.
-    const isSmartModel = attempt.name === "claude-server" || attempt.name === "claude-byok";
+    const isSmartModel = attempt.name === "claude-byok";
     const isNoKanaForJa =
       isSmartModel && targetLanguage === "ja" && /no kana/.test(outcome.reason);
     const isIdenticalToInput = /identical to input/.test(outcome.reason);
@@ -417,14 +469,41 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     });
   }
 
-  // Cascade exhausted. Throw with a diagnostic message so useTranslation's
-  // catch surfaces "Translation failed: <details>" to the user. This
-  // replaces the legacy "failed" return that triggered the misleading
-  // "no translation backend available" notification.
+  // Cascade exhausted. Two cases:
+  //
+  //   1. All attempts failed with transport errors (network failures,
+  //      timeouts, HTTP 5xx / 429). This is a real problem the user
+  //      should know about — throw so useTranslation catches and shows
+  //      a "Translation failed" notification. After the 60-second
+  //      failed-set interval clears, the item will retry.
+  //
+  //   2. At least one attempt reached the validator and failed there
+  //      (validator rejection that wasn't promoted to skip by the
+  //      smart-model rules above — e.g. too-long output, meta-
+  //      commentary). Content-level validator failures are not going
+  //      to be fixed by retrying the same backend with the same input,
+  //      so we silent-skip rather than burning another round of API
+  //      cycles on the 60-second interval.
+  //
+  // This distinction keeps real infrastructure problems visible while
+  // preventing the "retry forever on untranslatable content" waste that
+  // motivated hotfix 16.
   const summary = failures.map(f => `${f.name}: ${f.reason}`).join(" | ");
-  throw new Error(
-    failures.length === 1
-      ? `Translation backend failed — ${summary}`
-      : `All ${failures.length} translation backends failed — ${summary}`,
+  const allTransportErrors = failures.every(f =>
+    /HTTP \d+|aborted|Load failed|Failed to fetch|NetworkError|network request failed|timeout|ECONNREFUSED/i.test(f.reason),
   );
+  if (allTransportErrors) {
+    throw new Error(
+      failures.length === 1
+        ? `Translation backend failed — ${summary}`
+        : `All ${failures.length} translation backends failed — ${summary}`,
+    );
+  }
+  recordTranslationAttempt({
+    itemHint, targetLanguage, backend: "auto",
+    outcome: "skip",
+    reason: `cascade exhausted (validator): ${summary}`,
+    elapsedMs: 0,
+  });
+  return "skip";
 }
