@@ -260,6 +260,90 @@ describe("mergePageIntoContent", () => {
     const result = mergePageIntoContent(page, []);
     expect(result).toHaveLength(1);
   });
+
+  it("preserves cached translation field when IC page lacks it", () => {
+    const translation = {
+      translatedText: "アップルが新製品を発表しました。",
+      targetLanguage: "ja",
+      backend: "ic-llm",
+      generatedAt: 1700000000000,
+    };
+    const existing = [makeItem({ id: "shared", translation })];
+    const page = [makeItem({ id: "shared", translation: undefined })];
+    const result = mergePageIntoContent(page, existing);
+    expect(result[0].translation).toEqual(translation);
+  });
+
+  it("preserves cached nostrPubkey field when IC page lacks it", () => {
+    const existing = [makeItem({ id: "shared", nostrPubkey: "npub1xyz" })];
+    const page = [makeItem({ id: "shared", nostrPubkey: undefined })];
+    const result = mergePageIntoContent(page, existing);
+    expect(result[0].nostrPubkey).toBe("npub1xyz");
+  });
+
+  it("preserves cached scoredByAI / scoringEngine when IC reload classifies as heuristic", () => {
+    // Real-world scenario: an item was originally scored by Claude server
+    // (cached.scoringEngine === "claude-server"), then re-loaded from IC
+    // where the reason field doesn't carry the engine annotation, so
+    // evalToContentItem falls back to "heuristic". The merge should not
+    // downgrade the engine attribution to heuristic in that case.
+    const existing = [makeItem({ id: "shared", scoredByAI: true, scoringEngine: "claude-server" })];
+    const page = [makeItem({ id: "shared", scoredByAI: false, scoringEngine: "heuristic" })];
+    const result = mergePageIntoContent(page, existing);
+    expect(result[0].scoringEngine).toBe("claude-server");
+    expect(result[0].scoredByAI).toBe(true);
+  });
+
+  it("preserves translation across multiple sequential page merges", () => {
+    const translation = {
+      translatedText: "翻訳済み",
+      targetLanguage: "ja",
+      backend: "ic-llm",
+      generatedAt: 1700000000000,
+    };
+    let state: ContentItem[] = [makeItem({ id: "a", translation })];
+    // Simulate three sequential IC pages each containing the same item
+    // (the loadFromICCanister loop calls mergePageIntoContent per page).
+    for (let i = 0; i < 3; i++) {
+      const page = [makeItem({ id: "a", translation: undefined })];
+      state = mergePageIntoContent(page, state);
+    }
+    expect(state[0].translation).toEqual(translation);
+  });
+
+  it("preserves translation on item A while picking up new item C in the same merge", () => {
+    const translation = {
+      translatedText: "翻訳",
+      targetLanguage: "ja",
+      backend: "ic-llm",
+      generatedAt: 1700000000000,
+    };
+    const existing = [
+      makeItem({ id: "a", translation }),
+      makeItem({ id: "b" }),
+    ];
+    const page = [
+      makeItem({ id: "a", translation: undefined }),
+      makeItem({ id: "c" }),
+    ];
+    const result = mergePageIntoContent(page, existing);
+    expect(result).toHaveLength(3);
+    const aResult = result.find(r => r.id === "a");
+    const cResult = result.find(r => r.id === "c");
+    expect(aResult?.translation).toEqual(translation);
+    expect(cResult?.translation).toBeUndefined();
+  });
+
+  it("does NOT override IC scoredByAI=true with cached heuristic value", () => {
+    // Inverse of the heuristic-fallback case: if IC has an explicit AI
+    // attribution and cache had heuristic, IC must win (it's the source of
+    // truth for newly-scored items).
+    const existing = [makeItem({ id: "shared", scoredByAI: false, scoringEngine: "heuristic" })];
+    const page = [makeItem({ id: "shared", scoredByAI: true, scoringEngine: "ic-llm" })];
+    const result = mergePageIntoContent(page, existing);
+    expect(result[0].scoringEngine).toBe("ic-llm");
+    expect(result[0].scoredByAI).toBe(true);
+  });
 });
 
 describe("syncToIC", () => {

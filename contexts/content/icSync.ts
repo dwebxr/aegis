@@ -85,6 +85,18 @@ export function mergePageIntoContent(
   const merged = pageItems.map(l => {
     const cached = cachedById.get(l.id);
     if (!cached) return l;
+    // Local-only fields that the IC canister does not store. Each ?? falls
+    // back to the cached value when the IC version lacks the field, which
+    // is the normal case (the canister has no schema for translation,
+    // nostrPubkey, vSignal/cContext/lSlop, platform). For scoringEngine
+    // we additionally treat "heuristic" as a downgrade and prefer the
+    // cached engine if it was a real AI tier — see the test
+    // "preserves cached scoredByAI / scoringEngine when IC reload
+    // classifies as heuristic".
+    const preferCachedEngine =
+      l.scoringEngine === "heuristic" &&
+      cached.scoringEngine !== undefined &&
+      cached.scoringEngine !== "heuristic";
     return {
       ...l,
       topics: l.topics ?? cached.topics,
@@ -93,6 +105,10 @@ export function mergePageIntoContent(
       lSlop: l.lSlop ?? cached.lSlop,
       imageUrl: l.imageUrl ?? cached.imageUrl,
       platform: l.platform ?? cached.platform,
+      translation: l.translation ?? cached.translation,
+      nostrPubkey: l.nostrPubkey ?? cached.nostrPubkey,
+      scoringEngine: preferCachedEngine ? cached.scoringEngine : l.scoringEngine,
+      scoredByAI: preferCachedEngine ? cached.scoredByAI : l.scoredByAI,
     };
   });
   const loadedIds = new Set(pageItems.map(l => l.id));
