@@ -148,6 +148,40 @@ export const XIcon: React.FC<IconProps> = ({ s = 20 }) => (
   </svg>
 );
 
+export const HeadphonesIcon: React.FC<IconProps> = ({ s = 20 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 18v-6a9 9 0 0118 0v6" />
+    <path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
+  </svg>
+);
+
+export const PlayIcon: React.FC<IconProps> = ({ s = 20 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+    <polygon points="6 3 20 12 6 21 6 3" />
+  </svg>
+);
+
+export const PauseIcon: React.FC<IconProps> = ({ s = 20 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+    <rect x="6" y="4" width="4" height="16" rx="0.5" />
+    <rect x="14" y="4" width="4" height="16" rx="0.5" />
+  </svg>
+);
+
+export const SkipPrevIcon: React.FC<IconProps> = ({ s = 20 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+    <polygon points="19 20 9 12 19 4 19 20" />
+    <line x1="5" y1="19" x2="5" y2="5" />
+  </svg>
+);
+
+export const SkipNextIcon: React.FC<IconProps> = ({ s = 20 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+    <polygon points="5 4 15 12 5 20 5 4" />
+    <line x1="19" y1="5" x2="19" y2="19" />
+  </svg>
+);
+
 const socialIconMap: Record<string, React.FC<IconProps>> = {
   discord: DiscordIcon,
   medium: MediumIcon,

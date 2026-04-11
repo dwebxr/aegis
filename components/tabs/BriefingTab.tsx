@@ -4,12 +4,15 @@ import { cn } from "@/lib/utils";
 import { typography } from "@/lib/design";
 import { ContentCard, YouTubePreview } from "@/components/ui/ContentCard";
 import { ShareBriefingModal } from "@/components/ui/ShareBriefingModal";
-import { ShareIcon, SearchIcon } from "@/components/icons";
+import { AudioBriefingPlayer } from "@/components/ui/AudioBriefingPlayer";
+import { ShareIcon, SearchIcon, HeadphonesIcon } from "@/components/icons";
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificationBadge";
 import { useContent } from "@/contexts/ContentContext";
+import { useAudioBriefing } from "@/hooks/useAudioBriefing";
+import type { TrackSource } from "@/lib/audio/types";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
@@ -46,6 +49,17 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const { syncBriefing } = useContent();
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
+
+  const audio = useAudioBriefing();
+  const handleListen = useCallback(() => {
+    const sources: TrackSource[] = briefing.priority.map(b => ({ item: b.item, isSerendipity: false }));
+    if (audio.prefs.includeSerendipity && briefing.serendipity) {
+      sources.push({ item: briefing.serendipity.item, isSerendipity: true });
+    }
+    if (sources.length === 0) return;
+    audio.start(sources);
+  }, [audio, briefing.priority, briefing.serendipity]);
+  const canListen = audio.available && audio.prefs.enabled && briefing.priority.length > 0;
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -156,6 +170,17 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 aria-label="Toggle search"
               >
                 <SearchIcon s={18} />
+              </button>
+            )}
+            {canListen && (
+              <button
+                data-testid="aegis-briefing-listen"
+                onClick={handleListen}
+                aria-label="Listen to briefing"
+                className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-md text-cyan-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-all duration-150 hover:border-cyan-400/25 hover:shadow-glow"
+              >
+                <HeadphonesIcon s={16} />
+                {!mobile && "Listen"}
               </button>
             )}
             {canShare && (
@@ -475,6 +500,8 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
           Aegis Score &rarr;
         </a>
       </div>
+
+      <AudioBriefingPlayer audio={audio} mobile={mobile} />
     </div>
   );
 };

@@ -14,6 +14,7 @@ import { getOllamaConfig, setOllamaConfig } from "@/lib/ollama/storage";
 import type { OllamaConfig, OllamaStatus } from "@/lib/ollama/types";
 import { DEFAULT_OLLAMA_CONFIG } from "@/lib/ollama/types";
 import { cardClass, sectionTitleClass, actionBtnClass, confirmBtnClass, cancelBtnClass } from "./styles";
+import { AudioSettings } from "./AudioSettings";
 
 interface FeedSectionProps {
   mobile?: boolean;
@@ -536,6 +537,8 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
           Run AI scoring on mobile via MediaPipe LLM Inference (Gemma). Requires WebGPU (Chrome on Android, or Safari 26+ on iOS). Default: Gemma 3 1B (~700MB). No data leaves your device.
         </div>
       </div>}
+
+      <AudioSettings mobile={mobile} />
     </>
   );
 };
