@@ -1,8 +1,22 @@
 /**
  * Heuristic text-quality scoring (no API call needed).
  * Used as fallback in /api/analyze and as pre-filter in ingestion.
+ *
+ * Multi-language dispatcher: detects the input language and applies the
+ * appropriate per-language signal set. English is preserved byte-for-byte
+ * with the legacy implementation; Japanese gets a dedicated rule set
+ * tailored to clickbait/quality vocabulary and punctuation patterns common
+ * in Japanese-language news and social posts.
+ *
+ * Adding a new language: create a `lib/ingestion/heuristics/<lang>.ts`
+ * exporting `score<Lang>(text): LanguageSignals`, register it in the
+ * dispatcher below, and teach `langDetect.ts` to recognize it.
  */
 import { clamp } from "@/lib/utils/math";
+import { detectLanguage, type SupportedLang } from "./langDetect";
+import type { LanguageSignals } from "./heuristics/types";
+import { scoreEnglish } from "./heuristics/en";
+import { scoreJapanese } from "./heuristics/ja";
 
 export interface HeuristicScores {
   originality: number;
@@ -11,52 +25,49 @@ export interface HeuristicScores {
   composite: number;
   verdict: "quality" | "slop";
   reason: string;
+  /** Language used to compute the signals (added in the multi-lang refactor). */
+  detectedLang?: SupportedLang;
 }
 
-export function heuristicScores(text: string): HeuristicScores {
-  const words = text.split(/\s+/).length;
-  const exclamationDensity = (text.match(/!/g) || []).length / Math.max(words, 1);
-  const emojiRegex = new RegExp("[\\u{1F600}-\\u{1F6FF}\\u{1F900}-\\u{1F9FF}\\u{2600}-\\u{26FF}\\u{2700}-\\u{27BF}]", "gu");
-  const emojiDensity = (text.match(emojiRegex) || []).length / Math.max(words, 1);
-  const capsRatio = (text.match(/[A-Z]/g) || []).length / Math.max(text.length, 1);
-  const hasLinks = /https?:\/\//.test(text);
-  const hasData = /\d+%|\$\d|[0-9]+\.[0-9]/.test(text);
+export interface HeuristicOptions {
+  /** Override automatic language detection. */
+  lang?: SupportedLang;
+}
 
-  let originality = 5;
-  let insight = 5;
-  let credibility = 5;
+function applySignals(signals: LanguageSignals): { originality: number; insight: number; credibility: number } {
+  return {
+    originality: clamp(5 + signals.originality, 0, 10),
+    insight: clamp(5 + signals.insight, 0, 10),
+    credibility: clamp(5 + signals.credibility, 0, 10),
+  };
+}
 
-  const signals: string[] = [];
-  if (exclamationDensity > 0.1) { originality -= 3; credibility -= 3; signals.push("excessive exclamation marks"); }
-  if (emojiDensity > 0.05) { originality -= 2; signals.push("high emoji density"); }
-  if (capsRatio > 0.3) { credibility -= 3; originality -= 2; signals.push("excessive caps"); }
-  if (words < 8) { insight -= 1; originality -= 1; signals.push("very short content"); }
-  if (words > 50) { insight += 1; }
-  if (words > 100) { insight += 1; originality += 1; signals.push("long-form content"); }
-  if (words > 200) { insight += 1; signals.push("detailed content"); }
-  if (hasLinks) { credibility += 2; signals.push("contains links"); }
-  if (hasData) { insight += 2; credibility += 1; signals.push("contains data/numbers"); }
-  const paragraphs = text.split(/\n\s*\n/).length;
-  if (paragraphs >= 3) { originality += 1; insight += 1; signals.push("structured paragraphs"); }
-  if (/\b(analysis|evidence|hypothesis|correlation|framework|methodology|dataset|benchmark|implementation|algorithm)\b/i.test(text)) {
-    insight += 1; credibility += 1; signals.push("analytical language");
-  }
-  if (/\b(according to|cited|source:)\b/i.test(text)) {
-    credibility += 2; signals.push("attribution present");
-  }
+function dispatch(text: string, lang: SupportedLang): LanguageSignals {
+  if (lang === "ja") return scoreJapanese(text);
+  // "en" and "unknown" both fall back to the English module so that
+  // pre-existing behaviour is preserved for ASCII-dominant inputs and any
+  // text where detection isn't confident.
+  return scoreEnglish(text);
+}
 
-  originality = clamp(originality, 0, 10);
-  insight = clamp(insight, 0, 10);
-  credibility = clamp(credibility, 0, 10);
+export function heuristicScores(text: string, options?: HeuristicOptions): HeuristicScores {
+  const lang = options?.lang ?? detectLanguage(text);
+  const signals = dispatch(text, lang);
+  const { originality, insight, credibility } = applySignals(signals);
 
   const composite = parseFloat((originality * 0.4 + insight * 0.35 + credibility * 0.25).toFixed(1));
-  const reason = signals.length > 0
-    ? `Heuristic (AI unavailable): ${signals.join(", ")}.`
+  const reason = signals.reasons.length > 0
+    ? `Heuristic (AI unavailable): ${signals.reasons.join(", ")}.`
     : "Heuristic (AI unavailable): no strong signals detected.";
+
   return {
-    originality, insight, credibility, composite,
+    originality,
+    insight,
+    credibility,
+    composite,
     verdict: composite >= 4 ? "quality" : "slop",
     reason,
+    detectedLang: lang,
   };
 }
 
