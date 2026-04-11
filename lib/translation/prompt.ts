@@ -260,22 +260,58 @@ export function buildTranslationPrompt(
   return buildGenericPrompt(charClipped, targetLanguage, reason, PROMPT_BUDGET_BYTES);
 }
 
+/**
+ * Patterns Llama 3.1 8B (and other small models) frequently prepend before
+ * the actual translation. Stripping these recovers a valid translation that
+ * the validator would otherwise reject as meta-commentary. The patterns are
+ * deliberately specific — we don't strip arbitrary prose, only known
+ * boilerplate followed by the real output.
+ */
+const META_PREFIX_STRIP: ReadonlyArray<RegExp> = [
+  /^here\s+(?:is|are)\s+(?:the\s+)?(?:translation|translated\s+text)(?:\s+(?:in|into)\s+\w+)?[:.\s]+/i,
+  /^the\s+(?:translation|translated\s+text)(?:\s+is)?[:.\s]+/i,
+  /^translation\s*[:：]\s*/i,
+  /^translated\s*(?:text|version)?\s*[:：]\s*/i,
+  /^(?:sure|certainly|of\s+course|okay)[!,.\s]+(?:here\s+(?:is|are)\s+(?:the\s+)?(?:translation|translated\s+text)(?:\s+(?:in|into)\s+\w+)?[:.\s]+)?/i,
+];
+
+function stripLeadingMeta(text: string): string {
+  let stripped = text.trimStart();
+  // Apply each pattern at most once. Keep stripping until no further pattern
+  // matches (handles "Sure! Here is the translation: ...").
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const pattern of META_PREFIX_STRIP) {
+      const next = stripped.replace(pattern, "");
+      if (next.length < stripped.length) {
+        stripped = next.trimStart();
+        changed = true;
+      }
+    }
+  }
+  return stripped;
+}
+
 export function parseTranslationResponse(raw: string): { text: string; reason?: string } | null {
   const trimmed = raw.trim();
   if (trimmed === "ALREADY_IN_TARGET") return null;
 
+  // Try the JSON path first (it's the requested format when reason is set).
   const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]);
       if (typeof parsed.text === "string") {
         return {
-          text: parsed.text,
-          reason: typeof parsed.reason === "string" ? parsed.reason : undefined,
+          text: stripLeadingMeta(parsed.text),
+          reason: typeof parsed.reason === "string" ? stripLeadingMeta(parsed.reason) : undefined,
         };
       }
     } catch { /* fall through to plain text */ }
   }
 
-  return { text: trimmed };
+  // Plain-text path: strip a leading meta-prefix so a "Translation: <body>"
+  // response surfaces as just <body>. The validator runs on the result.
+  return { text: stripLeadingMeta(trimmed) };
 }

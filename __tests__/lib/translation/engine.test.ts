@@ -262,20 +262,18 @@ describe("translateContent", () => {
     expect(result).toBe("skip");
   });
 
-  it("returns 'failed' when response is empty", async () => {
+  it("explicit backend throws with named reason when response is empty", async () => {
     globalThis.fetch = jest.fn().mockImplementation(async () => {
       return mockResponse({
         choices: [{ message: { content: "" } }],
       });
     });
 
-    const result = await translateContent({
+    await expect(translateContent({
       text: "Hello",
       targetLanguage: "ja",
       backend: "local",
-    });
-
-    expect(result).toBe("failed");
+    })).rejects.toThrow(/Ollama returned an unusable response.*empty response/);
   });
 
   it("caches successful translation result", async () => {
@@ -563,11 +561,39 @@ describe("translateContent", () => {
       expect(mockTranslate).toHaveBeenCalled();
     });
 
-    it("auto cascade falls through when output is meta-commentary", async () => {
+    it("auto cascade RECOVERS meta-prefix from IC LLM output instead of falling through", async () => {
       mockOllamaEnabled = false;
       mockApiKey = null;
       const mockTranslate = jest.fn().mockResolvedValue({
         ok: "Here is the translation: アップルが新製品を発表しました。",
+      });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+      const claudeMock = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "should not be called" });
+      });
+      globalThis.fetch = claudeMock;
+
+      const result = await translateContent({
+        text: "Apple announced a new product today.",
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      const r = expectResult(result);
+      // Meta-prefix is stripped by parseTranslationResponse, the validator
+      // accepts the recovered Japanese, and IC LLM "wins" the cascade.
+      expect(r.backend).toBe("ic-llm");
+      expect(r.translatedText).toBe("アップルが新製品を発表しました。");
+      expect(claudeMock).not.toHaveBeenCalled();
+    });
+
+    it("auto cascade still falls through when output is unrecoverable English (no kana)", async () => {
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+      const mockTranslate = jest.fn().mockResolvedValue({
+        ok: "I cannot translate this text into Japanese for you.",
       });
       const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
       globalThis.fetch = jest.fn().mockImplementation(async () => {
@@ -608,21 +634,19 @@ describe("translateContent", () => {
       expect(result).toBe("failed");
     });
 
-    it("explicit IC backend returns 'failed' on validator rejection (does not throw)", async () => {
+    it("explicit IC backend throws with named reason on validator rejection", async () => {
       const mockTranslate = jest.fn().mockResolvedValue({
         ok: "English without any kana for ja target",
       });
       const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
 
-      const result = await translateContent({
+      await expect(translateContent({
         text: "Apple announced a new product today.",
         targetLanguage: "ja",
         backend: "ic",
         actorRef,
         isAuthenticated: true,
-      });
-
-      expect(result).toBe("failed");
+      })).rejects.toThrow(/IC LLM returned an unusable response.*no kana.*switch.*Auto/i);
     });
 
     it("translateWithIC retries once on transient 'IC LLM translation failed' error", async () => {

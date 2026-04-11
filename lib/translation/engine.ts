@@ -178,37 +178,47 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
     return result;
   };
 
-  // — Explicit backend selection: a failed/skip outcome surfaces directly. —
+  /**
+   * Surface a validator-rejected outcome from explicit backend mode as a
+   * thrown Error with a clear, actionable message. Returning generic
+   * "failed" was misleading because the user-facing notification then
+   * said "no translation backend available" when in fact only the user's
+   * single chosen backend was tried.
+   */
+  const explicitFailMessage = (label: string, reason: string): string =>
+    `${label} returned an unusable response (${reason}). Try switching to Auto in Settings → Translation Engine.`;
+
+  // — Explicit backend selection: a failed outcome throws with the reason. —
   if (backend === "local") {
     const outcome = evaluateRaw(await translateWithOllama(prompt));
     if (outcome.kind === "skip") return "skip";
-    if (outcome.kind === "failed") return "failed";
+    if (outcome.kind === "failed") throw new Error(explicitFailMessage("Ollama", outcome.reason));
     return finalize(outcome.parsed, "ollama");
   }
   if (backend === "browser") {
     if (isMediaPipeEnabled()) {
       const outcome = evaluateRaw(await translateWithMediaPipe(prompt));
       if (outcome.kind === "skip") return "skip";
-      if (outcome.kind === "failed") return "failed";
+      if (outcome.kind === "failed") throw new Error(explicitFailMessage("MediaPipe", outcome.reason));
       return finalize(outcome.parsed, "mediapipe");
     }
     const outcome = evaluateRaw(await translateWithWebLLM(prompt));
     if (outcome.kind === "skip") return "skip";
-    if (outcome.kind === "failed") return "failed";
+    if (outcome.kind === "failed") throw new Error(explicitFailMessage("WebLLM", outcome.reason));
     return finalize(outcome.parsed, "webllm");
   }
   if (backend === "cloud") {
     const key = getUserApiKey();
     const outcome = evaluateRaw(await translateWithClaude(prompt, key));
     if (outcome.kind === "skip") return "skip";
-    if (outcome.kind === "failed") return "failed";
+    if (outcome.kind === "failed") throw new Error(explicitFailMessage(key ? "Claude (BYOK)" : "Claude (server)", outcome.reason));
     return finalize(outcome.parsed, key ? "claude-byok" : "claude-server");
   }
   if (backend === "ic") {
     if (!actorRef || !isAuthenticated) throw new Error("IC requires authentication");
     const outcome = evaluateRaw(await translateWithIC(prompt, actorRef));
     if (outcome.kind === "skip") return "skip";
-    if (outcome.kind === "failed") return "failed";
+    if (outcome.kind === "failed") throw new Error(explicitFailMessage("IC LLM", outcome.reason));
     return finalize(outcome.parsed, "ic-llm");
   }
 

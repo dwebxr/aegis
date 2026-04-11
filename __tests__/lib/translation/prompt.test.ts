@@ -143,3 +143,40 @@ describe("parseTranslationResponse", () => {
     expect(result).toBeNull();
   });
 });
+
+describe("parseTranslationResponse — meta-prefix stripping", () => {
+  it.each([
+    ["Here is the translation: アップルが新製品を発表しました。", "アップルが新製品を発表しました。"],
+    ["Here is the translation in Japanese: アップルが新製品を発表しました。", "アップルが新製品を発表しました。"],
+    ["The translation is: アップルが新製品を発表しました。", "アップルが新製品を発表しました。"],
+    ["Translation: アップルが新製品を発表しました。", "アップルが新製品を発表しました。"],
+    ["Translation:アップルが新製品を発表しました。", "アップルが新製品を発表しました。"],
+    ["Translated text: アップルが新製品を発表しました。", "アップルが新製品を発表しました。"],
+    ["Sure! アップルが新製品を発表しました。", "アップルが新製品を発表しました。"],
+    ["Certainly. アップルが新製品を発表しました。", "アップルが新製品を発表しました。"],
+    ["Of course! Here is the translation: アップルが新製品を発表しました。", "アップルが新製品を発表しました。"],
+    ["Sure! Here is the translation in Japanese: アップルが新製品を発表しました。", "アップルが新製品を発表しました。"],
+  ])("strips meta-prefix from %s", (input, expected) => {
+    const result = parseTranslationResponse(input);
+    expect(result).not.toBeNull();
+    expect(result!.text).toBe(expected);
+  });
+
+  it("strips meta-prefix from JSON text field", () => {
+    const json = '{"text":"Here is the translation: アップルが発表しました。","reason":"Translation: 新発表"}';
+    const result = parseTranslationResponse(json);
+    expect(result).not.toBeNull();
+    expect(result!.text).toBe("アップルが発表しました。");
+    expect(result!.reason).toBe("新発表");
+  });
+
+  it("does not strip mid-text meta words (only leading prefixes)", () => {
+    const result = parseTranslationResponse("アップルが発表しました。Translation note: see source.");
+    expect(result!.text).toBe("アップルが発表しました。Translation note: see source.");
+  });
+
+  it("plain Japanese without meta-prefix passes through unchanged", () => {
+    const result = parseTranslationResponse("アップルが新製品を発表しました。");
+    expect(result!.text).toBe("アップルが新製品を発表しました。");
+  });
+});
