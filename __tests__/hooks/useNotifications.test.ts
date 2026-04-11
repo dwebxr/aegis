@@ -71,8 +71,8 @@ describe("shouldSuppressDuplicate", () => {
 });
 
 describe("computeDismissDuration", () => {
-  it("returns 5000ms for error type", () => {
-    expect(computeDismissDuration("error")).toBe(5000);
+  it("returns 30000ms for error type (long enough for mobile users to read)", () => {
+    expect(computeDismissDuration("error")).toBe(30000);
   });
 
   it("returns 2500ms for success type", () => {
@@ -107,13 +107,13 @@ describe("auto-dismiss timing", () => {
     jest.useRealTimers();
   });
 
-  it("dismisses error after 5000ms using computeDismissDuration", () => {
+  it("dismisses error after 30000ms using computeDismissDuration", () => {
     jest.useFakeTimers();
     let dismissed = false;
     const duration = computeDismissDuration("error");
     const timer = setTimeout(() => { dismissed = true; }, duration);
 
-    jest.advanceTimersByTime(4999);
+    jest.advanceTimersByTime(29_999);
     expect(dismissed).toBe(false);
 
     jest.advanceTimersByTime(1);

@@ -24,7 +24,11 @@ export function shouldSuppressDuplicate(
 }
 
 export function computeDismissDuration(type: Notification["type"]): number {
-  return type === "error" ? 5000 : 2500;
+  // Errors stay on screen for 30 seconds so the user has time to read
+  // and copy them on mobile (where opening the browser console is not
+  // feasible). Info / success messages dismiss faster since they don't
+  // need to be acted on.
+  return type === "error" ? 30000 : 2500;
 }
 
 export function useNotifications() {

@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { cardClass, sectionTitleClass, pillBtnClass } from "./styles";
 import {
@@ -9,6 +9,12 @@ import {
   type TranslationPolicy,
   type TranslationBackend,
 } from "@/lib/translation/types";
+import {
+  formatDebugLog,
+  clearTranslationDebugLog,
+  getTranslationDebugLog,
+  type TranslationDebugEntry,
+} from "@/lib/translation/debugLog";
 
 const POLICY_OPTIONS: ReadonlyArray<{ value: TranslationPolicy; label: string; desc: string }> = [
   { value: "off", label: "Off", desc: "Translation disabled — no translate buttons or auto-translation" },
@@ -123,6 +129,123 @@ export const TranslationSettings: React.FC<TranslationSettingsProps> = ({ mobile
           <div className="text-tiny text-disabled mt-2 leading-normal">
             {BACKEND_OPTIONS.find(o => o.value === prefs.backend)?.desc}
           </div>
+        </div>
+      )}
+
+      <TranslationDebugPanel mobile={mobile} />
+    </div>
+  );
+};
+
+const APP_VERSION =
+  process.env.NEXT_PUBLIC_BUILD_SHA?.slice(0, 7) ||
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
+  "local";
+
+/**
+ * Diagnostic panel showing the last N translation attempts (per-item
+ * per-backend with timing + outcome). Mobile users — especially in
+ * standalone PWA mode — cannot easily open the browser console, so the
+ * cascade now writes its per-attempt diagnostics to localStorage and
+ * this panel surfaces them. The "Copy" button puts the formatted log on
+ * the clipboard so the user can paste it back to me for debugging.
+ */
+const TranslationDebugPanel: React.FC<{ mobile?: boolean }> = ({ mobile }) => {
+  const [entries, setEntries] = useState<TranslationDebugEntry[]>([]);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const refresh = () => setEntries(getTranslationDebugLog());
+    refresh();
+    const interval = setInterval(refresh, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleCopy = async () => {
+    const text = formatDebugLog(APP_VERSION);
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      // Fallback for browsers / contexts without clipboard API
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleClear = () => {
+    clearTranslationDebugLog();
+    setEntries([]);
+  };
+
+  return (
+    <div className="mt-6 pt-4 border-t border-subtle">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div className="text-caption font-semibold text-muted-foreground">
+          Translation Diagnostics
+        </div>
+        <div className="text-tiny font-mono text-disabled">build {APP_VERSION}</div>
+      </div>
+
+      <div className="text-tiny text-disabled mb-3 leading-normal">
+        The last {entries.length} translation attempts (per-item per-backend).
+        Copy this log and paste it if a translation problem persists.
+      </div>
+
+      <div className="flex gap-2 mb-3 flex-wrap">
+        <button
+          onClick={handleCopy}
+          className="px-3 py-1 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] bg-cyan-500/[0.09] border border-cyan-500/20 text-cyan-400"
+        >
+          {copied ? "Copied ✓" : "Copy log"}
+        </button>
+        <button
+          onClick={handleClear}
+          className="px-3 py-1 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] bg-transparent border border-subtle text-muted-foreground"
+        >
+          Clear
+        </button>
+      </div>
+
+      {entries.length === 0 ? (
+        <div className="text-tiny text-disabled italic">
+          No translation attempts recorded yet. Try translating an item.
+        </div>
+      ) : (
+        <div className={mobile ? "max-h-[240px] overflow-auto" : "max-h-[320px] overflow-auto"}>
+          {entries.slice().reverse().map((e, i) => (
+            <div
+              key={`${e.timestamp}-${i}`}
+              className="text-tiny font-mono py-1 border-b border-subtle last:border-b-0 leading-normal"
+            >
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-disabled">{e.timestamp.slice(11, 19)}</span>
+                <span className="text-cyan-400">[{e.backend}]</span>
+                <span
+                  className={
+                    e.outcome === "ok"
+                      ? "text-emerald-400"
+                      : e.outcome === "skip"
+                        ? "text-amber-400"
+                        : "text-red-400"
+                  }
+                >
+                  {e.outcome}
+                </span>
+                <span className="text-disabled">{e.elapsedMs}ms</span>
+              </div>
+              <div className="text-disabled truncate">{e.itemHint}</div>
+              {e.reason && <div className="text-red-400/70 break-words">{e.reason}</div>}
+            </div>
+          ))}
         </div>
       )}
     </div>

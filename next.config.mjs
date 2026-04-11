@@ -7,6 +7,12 @@ import withSerwist from "@serwist/next";
  */
 const nextConfig = {
   serverExternalPackages: ["ws"],
+  env: {
+    // Expose the Vercel build SHA to client code so the diagnostic panel
+    // can show which build the user is running. Falls back to "local"
+    // when the env var is not set (dev / non-Vercel build).
+    NEXT_PUBLIC_BUILD_SHA: process.env.VERCEL_GIT_COMMIT_SHA || "local",
+  },
   async headers() {
     return [
       {

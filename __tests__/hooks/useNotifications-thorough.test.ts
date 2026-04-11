@@ -63,8 +63,8 @@ describe("shouldSuppressDuplicate (pure function)", () => {
 });
 
 describe("computeDismissDuration (pure function)", () => {
-  it("returns 5000ms for error", () => {
-    expect(computeDismissDuration("error")).toBe(5000);
+  it("returns 30000ms for error", () => {
+    expect(computeDismissDuration("error")).toBe(30000);
   });
 
   it("returns 2500ms for success", () => {
@@ -119,12 +119,12 @@ describe("useNotifications hook", () => {
     expect(result.current.notifications).toHaveLength(0);
   });
 
-  it("auto-dismisses error after 5000ms", () => {
+  it("auto-dismisses error after 30000ms", () => {
     const { result } = renderHook(() => useNotifications());
     act(() => result.current.addNotification("Error", "error"));
     expect(result.current.notifications).toHaveLength(1);
 
-    act(() => { jest.advanceTimersByTime(4999); });
+    act(() => { jest.advanceTimersByTime(29_999); });
     expect(result.current.notifications).toHaveLength(1);
 
     act(() => { jest.advanceTimersByTime(2); });
@@ -157,7 +157,7 @@ describe("useNotifications hook", () => {
     });
     act(() => { jest.advanceTimersByTime(1000); });
     act(() => {
-      result.current.addNotification("Error1", "error");   // dismiss at 1000+5000=6000
+      result.current.addNotification("Error1", "error");   // dismiss at 1000+30000=31000
     });
     expect(result.current.notifications).toHaveLength(2);
 
@@ -165,7 +165,7 @@ describe("useNotifications hook", () => {
     expect(result.current.notifications).toHaveLength(1);
     expect(result.current.notifications[0].text).toBe("Error1");
 
-    act(() => { jest.advanceTimersByTime(3500); }); // at 6001: error dismissed
+    act(() => { jest.advanceTimersByTime(28_500); }); // at 31001: error dismissed
     expect(result.current.notifications).toHaveLength(0);
   });
 

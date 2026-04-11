@@ -50,8 +50,8 @@ describe("shouldSuppressDuplicate", () => {
 });
 
 describe("computeDismissDuration", () => {
-  it("returns 5000ms for error notifications", () => {
-    expect(computeDismissDuration("error")).toBe(5000);
+  it("returns 30000ms for error notifications", () => {
+    expect(computeDismissDuration("error")).toBe(30000);
   });
 
   it("returns 2500ms for success notifications", () => {
