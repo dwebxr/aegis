@@ -26,7 +26,11 @@ async function computeHash(text: string): Promise<string> {
 // Safari private mode / Storage Access API denials. Used by the
 // corruption-recovery paths below.
 function safeRemove(): void {
-  try { localStorage.removeItem(LS_KEY); } catch { /* private-mode / access-denied */ }
+  try {
+    localStorage.removeItem(LS_KEY);
+  } catch (err) {
+    console.debug("[translation-cache] removeItem denied:", err instanceof Error ? err.message : err);
+  }
 }
 
 // localStorage contents are tamper-able (user devtools, schema
@@ -58,18 +62,21 @@ function loadStore(): CacheStore {
   let raw: string | null;
   try {
     raw = localStorage.getItem(LS_KEY);
-  } catch {
+  } catch (err) {
+    console.debug("[translation-cache] getItem denied:", err instanceof Error ? err.message : err);
     return {};
   }
   if (!raw) return {};
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    console.debug("[translation-cache] corrupt JSON, clearing:", err instanceof Error ? err.message : err);
     safeRemove();
     return {};
   }
   if (!isCacheStoreShape(parsed)) {
+    console.debug("[translation-cache] wrong shape, clearing");
     safeRemove();
     return {};
   }
@@ -86,7 +93,11 @@ function saveStore(store: CacheStore): void {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(store));
     return;
-  } catch {
+  } catch (err) {
+    console.debug(
+      "[translation-cache] setItem failed, halving and retrying:",
+      err instanceof Error ? err.message : err,
+    );
     const entries = Object.entries(store).sort(
       ([, a], [, b]) => b.expiresAt - a.expiresAt,
     );
@@ -96,7 +107,11 @@ function saveStore(store: CacheStore): void {
     }
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(halved));
-    } catch {
+    } catch (retryErr) {
+      console.debug(
+        "[translation-cache] halved retry also failed, clearing blob:",
+        retryErr instanceof Error ? retryErr.message : retryErr,
+      );
       safeRemove();
     }
   }
@@ -108,7 +123,8 @@ export async function lookupTranslation(text: string, targetLang: string): Promi
   let hash: string;
   try {
     hash = await computeHash(text);
-  } catch {
+  } catch (err) {
+    console.debug("[translation-cache] computeHash failed on lookup:", err instanceof Error ? err.message : err);
     return null;
   }
   const key = cacheKey(hash, targetLang);
@@ -129,7 +145,8 @@ export async function storeTranslation(text: string, result: TranslationResult):
   let hash: string;
   try {
     hash = await computeHash(text);
-  } catch {
+  } catch (err) {
+    console.debug("[translation-cache] computeHash failed on store:", err instanceof Error ? err.message : err);
     return;
   }
   const key = cacheKey(hash, result.targetLanguage);

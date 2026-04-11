@@ -75,6 +75,17 @@ jest.mock("@/lib/utils/timeout", () => ({
   withTimeout: (p: Promise<unknown>) => p,
 }));
 
+// Real @sentry/nextjs expects a full Next.js instrumentation context;
+// stub the SDK surface so engine.ts can call startSpan / setTag /
+// captureException without the test needing a Sentry client.
+const mockSentrySetTag = jest.fn();
+const mockSentryCapture = jest.fn();
+jest.mock("@sentry/nextjs", () => ({
+  startSpan: jest.fn((_opts: unknown, fn: () => unknown) => fn()),
+  setTag: (...args: unknown[]) => mockSentrySetTag(...args),
+  captureException: (...args: unknown[]) => mockSentryCapture(...args),
+}));
+
 import { translateContent } from "@/lib/translation/engine";
 import { storeTranslation } from "@/lib/translation/cache";
 import type { TranslationResult } from "@/lib/translation/types";
@@ -95,6 +106,8 @@ beforeEach(() => {
   // open — without resetting, later tests would find the cascade
   // skipping ic-llm entirely. Reset on every test.
   _resetIcLlmCircuit();
+  mockSentrySetTag.mockClear();
+  mockSentryCapture.mockClear();
 });
 
 afterAll(() => {
@@ -1337,6 +1350,111 @@ describe("translateContent", () => {
       expect(entry).toBeDefined();
       expect(entry!.itemHint.length).toBeLessThanOrEqual(60);
       expect(longText.startsWith(entry!.itemHint)).toBe(true);
+    });
+  });
+
+  describe("Sentry monitoring integration", () => {
+    it("tags successful cache hits with translate.result=cache-hit", async () => {
+      const { storeTranslation } = await import("@/lib/translation/cache");
+      const text = "Sentry cache hit " + Math.random();
+      await storeTranslation(text, {
+        translatedText: "キャッシュ",
+        targetLanguage: "ja",
+        backend: "previously-cached",
+        generatedAt: Date.now(),
+      });
+      mockSentrySetTag.mockClear();
+
+      await translateContent({ text, targetLanguage: "ja", backend: "auto" });
+
+      const tagCalls = mockSentrySetTag.mock.calls.map(c => c[0]);
+      expect(tagCalls).toContain("translate.result");
+      const resultTag = mockSentrySetTag.mock.calls.find(c => c[0] === "translate.result");
+      expect(resultTag![1]).toBe("cache-hit");
+    });
+
+    it("tags successful translations with translate.result=ok and backend name", async () => {
+      mockOllamaEnabled = true;
+      mockApiKey = null;
+      globalThis.fetch = jest.fn().mockResolvedValue(mockResponse({
+        choices: [{ message: { content: "アップルが発表しました。" } }],
+      }));
+
+      await translateContent({ text: "Apple announced.", targetLanguage: "ja", backend: "auto" });
+
+      const resultTag = mockSentrySetTag.mock.calls.find(c => c[0] === "translate.result");
+      expect(resultTag![1]).toBe("ok");
+      const backendTag = mockSentrySetTag.mock.calls.find(c => c[0] === "translate.backend");
+      expect(backendTag![1]).toBe("ollama");
+    });
+
+    it("tags empty-cascade silent skip with translate.result=empty-cascade", async () => {
+      mockOllamaEnabled = false;
+      mockWebLLMEnabled = false;
+      mockApiKey = null;
+
+      await translateContent({
+        text: "No backend configured test " + Math.random(),
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      const resultTag = mockSentrySetTag.mock.calls.find(c => c[0] === "translate.result");
+      expect(resultTag![1]).toBe("empty-cascade");
+    });
+
+    it("captures cascade-exhausted infra errors to Sentry with failure context", async () => {
+      const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
+      mockOllamaEnabled = true;
+      mockApiKey = null;
+      globalThis.fetch = jest.fn().mockRejectedValue(new TypeError("Load failed"));
+
+      await expect(translateContent({
+        text: "Infra error test",
+        targetLanguage: "ja",
+        backend: "auto",
+      })).rejects.toThrow(/Translation backend failed/);
+
+      expect(mockSentryCapture).toHaveBeenCalledTimes(1);
+      const [err, ctx] = mockSentryCapture.mock.calls[0];
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toMatch(/Translation backend failed.*ollama.*Load failed/);
+      expect(ctx.tags["translate.target"]).toBe("ja");
+      expect(ctx.contexts.translate.failures).toBeDefined();
+      expect(ctx.contexts.translate.attempts).toBe(1);
+
+      const resultTag = mockSentrySetTag.mock.calls.find(c => c[0] === "translate.result");
+      expect(resultTag![1]).toBe("infra-error");
+    });
+
+    it("does NOT capture to Sentry when cascade silent-skips (validator rejections)", async () => {
+      mockOllamaEnabled = true;
+      mockApiKey = "sk-ant-test-key";
+      // Both backends return ratios that blow MAX_RATIO for fr target
+      // (no kana check, no ja-specific promotion, pure validator fail).
+      // Input must be ≥ RATIO_MIN_INPUT_LENGTH=30 chars to trip the
+      // ratio check at all.
+      const input = "Apple announced a new product line today at the keynote.";
+      const huge = "x".repeat(input.length * 6); // ratio > 5.0
+      globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("11434")) {
+          return mockResponse({ choices: [{ message: { content: huge } }] });
+        }
+        return mockResponse({ translation: huge });
+      });
+
+      const result = await translateContent({
+        text: input,
+        targetLanguage: "fr",
+        backend: "auto",
+      });
+
+      expect(result).toBe("skip");
+      expect(mockSentryCapture).not.toHaveBeenCalled();
+
+      const resultTag = mockSentrySetTag.mock.calls.find(c => c[0] === "translate.result");
+      expect(resultTag![1]).toBe("cascade-skip");
     });
   });
 

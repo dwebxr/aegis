@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import type { TranslationLanguage, TranslationBackend, TranslationResult } from "./types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { buildTranslationPrompt, parseTranslationResponse } from "./prompt";
@@ -204,10 +205,20 @@ function isDefinitiveUntranslatable(
 }
 
 export async function translateContent(opts: TranslateOptions): Promise<TranslationResult | "skip"> {
+  return Sentry.startSpan(
+    { name: "translate.content", op: "translate", attributes: { "translate.backend": opts.backend, "translate.target": opts.targetLanguage } },
+    async () => translateContentInner(opts),
+  );
+}
+
+async function translateContentInner(opts: TranslateOptions): Promise<TranslationResult | "skip"> {
   const { text, reason, targetLanguage, backend, actorRef, isAuthenticated } = opts;
 
   const cached = await lookupTranslation(text, targetLanguage);
-  if (cached) return cached;
+  if (cached) {
+    Sentry.setTag("translate.result", "cache-hit");
+    return cached;
+  }
 
   const prompt = buildTranslationPrompt(text, targetLanguage, reason);
 
@@ -234,6 +245,8 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
       generatedAt: Date.now(),
     };
     await storeTranslation(text, result);
+    Sentry.setTag("translate.result", "ok");
+    Sentry.setTag("translate.backend", usedBackend);
     return result;
   };
 
@@ -321,6 +334,7 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   // the IC actor becomes available, so items stranded at cold start
   // retry once ic-llm enters the cascade.
   if (attempts.length === 0) {
+    Sentry.setTag("translate.result", "empty-cascade");
     recordTranslationAttempt({
       itemHint, targetLanguage, backend: "auto",
       outcome: "skip", reason: "no configured translation backend",
@@ -388,12 +402,19 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
   // in 60s won't change the outcome.
   const summary = failures.map(f => `${f.name}: ${f.reason}`).join(" | ");
   if (failures.length > 0 && failures.every(f => INFRA_ERROR_RE.test(f.reason))) {
-    throw new Error(
+    Sentry.setTag("translate.result", "infra-error");
+    const error = new Error(
       failures.length === 1
         ? `Translation backend failed — ${summary}`
         : `All ${failures.length} translation backends failed — ${summary}`,
     );
+    Sentry.captureException(error, {
+      tags: { "translate.target": targetLanguage },
+      contexts: { translate: { failures, attempts: attempts.length } },
+    });
+    throw error;
   }
+  Sentry.setTag("translate.result", "cascade-skip");
   recordTranslationAttempt({
     itemHint, targetLanguage, backend: "auto",
     outcome: "skip",
