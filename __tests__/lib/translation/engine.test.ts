@@ -798,6 +798,67 @@ describe("translateContent", () => {
       expect(result).toBe("skip");
       expect(claudeCalls).not.toHaveBeenCalled();
     });
+
+    it("auto cascade promotes 'identical to input' to skip for any target language", async () => {
+      // Claude-server sometimes echoes the input verbatim when the
+      // content is a URL, bare filename, code block, or text it
+      // considers untranslatable. Before hotfix 16 this exhausted
+      // the cascade (no ic-llm to fall through to), burned API cycles
+      // on every 60s retry, and kept the user from seeing the item.
+      // Now it's treated as a definitive untranslatable verdict.
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "https://example.com/foo/bar" });
+      });
+
+      const result = await translateContent({
+        text: "https://example.com/foo/bar",
+        targetLanguage: "ja",
+        backend: "auto",
+      });
+
+      expect(result).toBe("skip");
+    });
+
+    it("auto cascade promotes 'identical to input' to skip for non-ja targets too (fr)", async () => {
+      mockOllamaEnabled = false;
+      mockApiKey = null;
+      globalThis.fetch = jest.fn().mockImplementation(async () => {
+        return mockResponse({ translation: "function foo() { return 42; }" });
+      });
+
+      const result = await translateContent({
+        text: "function foo() { return 42; }",
+        targetLanguage: "fr",
+        backend: "auto",
+      });
+
+      expect(result).toBe("skip");
+    });
+
+    it("auto cascade promotes 'identical to input' to skip even from a local backend", async () => {
+      mockOllamaEnabled = true;
+      mockApiKey = null;
+      const claudeCalls = jest.fn();
+      globalThis.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("11434")) {
+          return mockResponse({ choices: [{ message: { content: "https://example.com/foo" } }] });
+        }
+        claudeCalls();
+        return mockResponse({ translation: "should not be called" });
+      });
+
+      const result = await translateContent({
+        text: "https://example.com/foo",
+        targetLanguage: "fr",
+        backend: "auto",
+      });
+
+      expect(result).toBe("skip");
+      // Skip is definitive — later backends are not tried
+      expect(claudeCalls).not.toHaveBeenCalled();
+    });
   });
 
   describe("claude-server transient fetch retry", () => {

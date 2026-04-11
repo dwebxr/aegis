@@ -379,26 +379,29 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
       });
       return "skip";
     }
-    // Smart-model exception: when Claude (the only trusted translator
-    // in the cascade) returns output with no Japanese kana for a ja
-    // target, we treat that as a definitive verdict that the content
-    // is untranslatable — URL, code block, already-Japanese-but-not-
-    // recognized-as-such, etc. — and promote the failure to a skip.
-    // Without this promotion the item would retry forever every
-    // minute (useTranslation clears the failed set on interval).
+    // Definitive "untranslatable" verdicts that should short-circuit
+    // the cascade and land in the skip set instead of the failed set:
     //
-    // Hotfix 5 previously gated this on a "preferred backend tried"
-    // check because a cold-start cascade might run claude-server alone
-    // before IC LLM was ready. That gate is gone: IC LLM is no longer
-    // in the auto cascade at all, so Claude's verdict is authoritative
-    // by construction.
+    //   1. Smart-model no-kana for ja target — Claude returned English
+    //      meta-commentary or an echoed English fragment, meaning the
+    //      content is a URL / code / already-Japanese-but-unparsed.
+    //      (Hotfix 5 originally; hotfix 13 dropped the cold-start gate.)
+    //
+    //   2. Any backend returning output identical to the input — the
+    //      translator refused to translate, which is the same signal
+    //      as ALREADY_IN_TARGET just in a different shape. Claude does
+    //      this for URLs, code blocks, bare filenames, single tokens,
+    //      and already-Japanese text that ALREADY_IN_TARGET detection
+    //      missed. Retrying is pure waste.
+    //
+    // Without these promotions the item bounces between failed and
+    // retry every 60 seconds forever, burning Anthropic API cycles on
+    // content the model has already told us it cannot translate.
     const isSmartModel = attempt.name === "claude-server" || attempt.name === "claude-byok";
-    if (
-      outcome.kind === "failed" &&
-      isSmartModel &&
-      targetLanguage === "ja" &&
-      /no kana/.test(outcome.reason)
-    ) {
+    const isNoKanaForJa =
+      isSmartModel && targetLanguage === "ja" && /no kana/.test(outcome.reason);
+    const isIdenticalToInput = /identical to input/.test(outcome.reason);
+    if (outcome.kind === "failed" && (isNoKanaForJa || isIdenticalToInput)) {
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "skip", reason: `untranslatable: ${outcome.reason}`, elapsedMs,
