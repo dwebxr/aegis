@@ -1609,7 +1609,7 @@ describe("translateContent", () => {
 
       // Next call should skip ic-llm entirely (breaker open) → empty
       // cascade → silent skip
-      const icSpy = actorRef.current!.translateOnChain as jest.Mock;
+      const icSpy = actorRef.current!.translateOnChain as unknown as jest.Mock;
       icSpy.mockClear();
       const r = await translateContent({
         text: "After breaker open",

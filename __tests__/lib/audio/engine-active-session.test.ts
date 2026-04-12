@@ -66,7 +66,7 @@ function installMediaSession(): MockMS {
   return ms;
 }
 function uninstallMediaSession() {
-  delete (navigator as Navigator & { mediaSession?: unknown }).mediaSession;
+  delete (navigator as unknown as { mediaSession?: unknown }).mediaSession;
   delete (globalThis as unknown as { MediaMetadata?: unknown }).MediaMetadata;
 }
 

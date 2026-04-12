@@ -106,9 +106,9 @@ function installPushAPI() {
 }
 
 function uninstallPushAPI() {
-  delete (navigator as Navigator & { serviceWorker?: unknown }).serviceWorker;
-  delete (window as Window & { PushManager?: unknown }).PushManager;
-  delete (window as Window & { Notification?: unknown }).Notification;
+  delete (navigator as unknown as { serviceWorker?: unknown }).serviceWorker;
+  delete (window as unknown as { PushManager?: unknown }).PushManager;
+  delete (window as unknown as { Notification?: unknown }).Notification;
 }
 
 beforeEach(() => {
@@ -141,7 +141,7 @@ describe("usePushNotification — environment detection", () => {
   });
 
   it("reports isSupported=false when serviceWorker is missing", async () => {
-    delete (navigator as Navigator & { serviceWorker?: unknown }).serviceWorker;
+    delete (navigator as unknown as { serviceWorker?: unknown }).serviceWorker;
     const { result } = renderHook(() => usePushNotification());
     expect(result.current.isSupported).toBe(false);
   });

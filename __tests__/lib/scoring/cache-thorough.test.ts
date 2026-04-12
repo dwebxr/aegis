@@ -151,7 +151,7 @@ describe("getCache pre-init fallback", () => {
     const warnSpy = jest.spyOn(console, "warn").mockImplementation();
     const cached = lookupScoringCache("any:key", "key");
     expect(cached).toBeNull();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Pre-init localStorage parse failed"), expect.any(Error));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("localStorage parse failed"), expect.any(Error));
     warnSpy.mockRestore();
   });
 });

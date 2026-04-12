@@ -67,14 +67,16 @@ function briefingScore(item: ContentItem, prefs: UserPreferenceProfile, now?: nu
 function serendipityScore(item: ContentItem, prefs: UserPreferenceProfile): number {
   // High V_signal + low C_context = content outside user's bubble but still valuable
   const vSignal = item.vSignal ?? item.scores.composite;
-  const cContext = item.cContext ?? 5;
 
   const topicNovelty = item.topics?.reduce((sum, t) => {
     const affinity = prefs.topicAffinities[t] ?? 0;
     return sum + Math.max(0, 0.5 - affinity);
   }, 0) || 0;
 
-  const noveltyBonus = Math.max(0, 10 - cContext);
+  // noveltyBonus only when cContext was actually scored by AI — a missing
+  // cContext means the scoring engine didn't produce personalization data,
+  // so we can't infer novelty and default to 0 instead of a fake midpoint.
+  const noveltyBonus = item.cContext != null ? Math.max(0, 10 - item.cContext) : 0;
   return vSignal * 0.5 + noveltyBonus * 0.3 + topicNovelty * 0.2;
 }
 

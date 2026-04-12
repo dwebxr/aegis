@@ -6,7 +6,7 @@ import { useAuth } from "./AuthContext";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { relativeTime } from "@/lib/utils/scores";
 import { useNotify } from "./NotificationContext";
-import type { ContentItem } from "@/lib/types/content";
+import { type ContentItem, scoredItemFields } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import type { _SERVICE } from "@/lib/ic/declarations";
@@ -204,24 +204,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         source: meta?.sourceUrl ? "url" : "manual",
         sourceUrl: meta?.sourceUrl,
         imageUrl: meta?.imageUrl,
-        scores: {
-          originality: result.originality,
-          insight: result.insight,
-          credibility: result.credibility,
-          composite: result.composite,
-        },
-        verdict: result.verdict,
-        reason: result.reason,
-        createdAt: Date.now(),
-        validated: false,
-        flagged: false,
-        timestamp: "just now",
-        topics: result.topics,
-        vSignal: result.vSignal,
-        cContext: result.cContext,
-        lSlop: result.lSlop,
-        scoredByAI: result.scoringEngine !== "heuristic",
-        scoringEngine: result.scoringEngine,
+        ...scoredItemFields(result),
       };
       setContent(prev => truncatePreservingActioned([evaluation, ...prev]));
 

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import type { ContentItem } from "@/lib/types/content";
+import { type ContentItem, scoredItemFields } from "@/lib/types/content";
 import type { WoTGraph } from "@/lib/wot/types";
 import type { FilterConfig, FilteredItem, FilterPipelineResult, FilterPipelineStats } from "./types";
 import { calculateWoTScore, calculateWeightedScore, isWoTSerendipity } from "@/lib/wot/scorer";
@@ -86,20 +86,7 @@ export function scoreItemWithHeuristics(
     sourceUrl: raw.sourceUrl,
     imageUrl: raw.imageUrl,
     nostrPubkey: raw.nostrPubkey,
-    scores: {
-      originality: h.originality,
-      insight: h.insight,
-      credibility: h.credibility,
-      composite: h.composite,
-    },
-    verdict: h.verdict,
-    reason: h.reason,
-    createdAt: Date.now(),
-    validated: false,
-    flagged: false,
-    timestamp: "just now",
-    scoredByAI: false,
-    scoringEngine: "heuristic",
+    ...scoredItemFields({ ...h, scoringEngine: "heuristic" }),
     platform,
   };
 }

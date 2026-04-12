@@ -15,7 +15,7 @@ import {
   AUTO_RECOVERY_MS,
   BASE_CYCLE_MS,
 } from "./sourceState";
-import type { ContentItem } from "@/lib/types/content";
+import { type ContentItem, scoredItemFields } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { errMsg } from "@/lib/utils/errors";
@@ -56,12 +56,17 @@ export class IngestionScheduler {
   private dedup: ArticleDeduplicator;
   /** ETag / Last-Modified cache per source key */
   private httpCacheHeaders = new Map<string, { etag?: string; lastModified?: string }>();
+  private readonly fetchCallbacks: FetcherCallbacks;
 
   constructor(callbacks: SchedulerCallbacks) {
     this.callbacks = callbacks;
     this.dedup = new ArticleDeduplicator();
     const persisted = loadSourceStates();
     this.sourceStates = new Map(Object.entries(persisted));
+    this.fetchCallbacks = {
+      handleFetchError: (res, key) => this.handleFetchError(res, key),
+      recordSourceError: (key, error) => this.recordSourceError(key, error),
+    };
   }
 
   start(): void {
@@ -322,15 +327,8 @@ export class IngestionScheduler {
     });
   }
 
-  private get fetcherCallbacks(): FetcherCallbacks {
-    return {
-      handleFetchError: (res, key) => this.handleFetchError(res, key),
-      recordSourceError: (key, error) => this.recordSourceError(key, error),
-    };
-  }
-
   private async fetchSource(source: SchedulerSource, key: string): Promise<RawItem[]> {
-    const cb = this.fetcherCallbacks;
+    const cb = this.fetchCallbacks;
     switch (source.type) {
       case "rss":
         return fetchRSS(source.config.feedUrl, key, this.httpCacheHeaders, cb);
@@ -375,24 +373,7 @@ export class IngestionScheduler {
         sourceUrl: raw.sourceUrl,
         imageUrl: raw.imageUrl,
         nostrPubkey: raw.nostrPubkey,
-        scores: {
-          originality: result.originality,
-          insight: result.insight,
-          credibility: result.credibility,
-          composite: result.composite,
-        },
-        verdict: result.verdict,
-        reason: result.reason,
-        createdAt: Date.now(),
-        validated: false,
-        flagged: false,
-        timestamp: "just now",
-        topics: result.topics,
-        vSignal: result.vSignal,
-        cContext: result.cContext,
-        lSlop: result.lSlop,
-        scoredByAI: result.scoringEngine !== "heuristic",
-        scoringEngine: result.scoringEngine,
+        ...scoredItemFields(result),
         platform,
       };
     } catch (err) {

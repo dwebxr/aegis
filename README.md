@@ -9,6 +9,15 @@
 
 ## Latest Updates (April 2026)
 
+### Code Quality, Test Coverage & Production Readiness Sweep
+- **405 suites / 7,133 tests** — zero failures, zero skipped, **zero TypeScript errors**
+- **Refactoring**: extracted `scoredItemFields()` shared builder eliminating 3-site ContentItem construction duplication (ContentContext, scheduler, pipeline), `buildSourceConfig()` helper in SourceContext, `loadFromLocalStorage()` in scoring cache, cached `fetchCallbacks` in scheduler constructor
+- **LARP audit**: `cContext ?? 5` magic default in serendipity scoring replaced with explicit null check — items without AI-scored cContext no longer receive a fake midpoint novelty bonus; reputation save functions (`saveReputations`, `savePublishReputations`) now return `boolean` indicating persistence success
+- **Test coverage**: 77 new tests across 5 files — webspeech edge cases (voice loading timeout, iOS Safari fallback timer, abort signal, error variants, unlockSpeech), scoring cache flush (concurrent scheduling, TTL boundaries, FIFO pruning, corrupt entry recovery), scheduler error recovery (fetch errors, 429 rate limiting, missing scoreFn, heuristic fallback), offline action queue (SyncManager registration/failure, incrementRetries, concurrent operations, payload integrity), `scoredItemFields` (all scoring engines, boundary values, optional field presence)
+- **TypeScript cleanup**: resolved all 10 test-file type errors — `Navigator`/`delete` operator casts, `ScoringEngine` type mismatches (`"ic-llm"` → `"claude-ic"`), `StartSpanOptions` import path (`@sentry/core`), `ActorMethod` mock cast, webllm script-vs-module scope
+- **Hedge word fixes**: 3 error/warning messages changed from uncertain ("may be lost") to definitive ("will be lost") where the outcome is certain
+- **Production readiness verified**: build succeeds, 0 lint errors, all env vars externalized (22 via `process.env`), no hardcoded secrets in source or git history, Sentry 3-layer integration (client/server/edge), health endpoints at `/api/health` and `/api/d2a/health`, security headers (CSP/X-Frame-Options/Permissions-Policy), rate limiting on all API routes, 4 low-severity npm audit findings (test-only `jsdom` chain)
+
 ### Audio Briefing Player Fix (pause/resume + mobile layout)
 - **400 suites / 7,056 tests** — zero failures, zero skipped
 - **Pause/resume bug fix**: `runSession` loop died on pause because `cancelSpeech()` triggered `CancelledError` which unconditionally returned from the loop. Fixed with labeled `continue outer` that re-enters the loop and blocks at the pause gate until resume

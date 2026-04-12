@@ -100,7 +100,7 @@ export async function publishAgentProfile(
     const fetched = await fetchAgentProfile(pubkeyHex, urls);
     if (fetched) existing = fetched;
   } catch (err) {
-    console.warn("[agent-profile] Existing Kind 0 fetch failed — merging with empty, existing fields may be lost:", errMsg(err));
+    console.warn("[agent-profile] Existing Kind 0 fetch failed — merging with empty, existing fields will be overwritten:", errMsg(err));
   }
 
   const merged: Record<string, unknown> = { ...existing };

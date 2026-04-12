@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+export {}; // Ensure file is treated as a module to avoid TS2451
 
 // Module-level singletons in engine.ts persist across tests within the same
 // jest worker. We use jest.resetModules() + dynamic require to get a fresh

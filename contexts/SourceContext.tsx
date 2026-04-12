@@ -65,6 +65,15 @@ const SourceContext = createContext<SourceState>({
   getSchedulerSources: () => [],
 });
 
+function buildSourceConfig(s: SavedSource): Record<string, string> {
+  const config: Record<string, string> = {};
+  if (s.feedUrl) config.feedUrl = s.feedUrl;
+  if (s.relays) config.relays = s.relays.join(",");
+  if (s.fid) config.fid = String(s.fid);
+  if (s.username) config.username = s.username;
+  return config;
+}
+
 export function SourceProvider({ children }: { children: React.ReactNode }) {
   const { addNotification } = useNotify();
   const { isAuthenticated, identity, principalText } = useAuth();
@@ -252,12 +261,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     if (isDemoMode) return;
     const toRemove = sourcesRef.current.find(s => s.id === id);
     if (toRemove) {
-      const config: Record<string, string> = {};
-      if (toRemove.feedUrl) config.feedUrl = toRemove.feedUrl;
-      if (toRemove.relays) config.relays = toRemove.relays.join(",");
-      if (toRemove.fid) config.fid = String(toRemove.fid);
-      if (toRemove.username) config.username = toRemove.username;
-      resetSourceErrors(getSourceKey(toRemove.type, config));
+      resetSourceErrors(getSourceKey(toRemove.type, buildSourceConfig(toRemove)));
     }
     setSources(prev => {
       const next = prev.filter(s => s.id !== id);
@@ -301,10 +305,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     });
     saveToIC(toggled);
     if (toggled.enabled) {
-      const config: Record<string, string> = {};
-      if (toggled.feedUrl) config.feedUrl = toggled.feedUrl;
-      if (toggled.relays) config.relays = toggled.relays.join(",");
-      resetSourceErrors(getSourceKey(toggled.type, config));
+      resetSourceErrors(getSourceKey(toggled.type, buildSourceConfig(toggled)));
     }
   }, [persist, isDemoMode, saveToIC]);
 

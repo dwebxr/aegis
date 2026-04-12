@@ -119,9 +119,6 @@ export function computeTopicSpotlight(
   const top3Ids = new Set(top3.map(c => c.item.id));
   const qualityItems = content.filter(c => c.verdict === "quality" && !c.flagged && !top3Ids.has(c.id));
 
-  const dedupKeys = new Map<string, string>();
-  for (const c of qualityItems) dedupKeys.set(c.id, contentDedup(c));
-
   const topicPatterns = buildTopicPatternCache(highTopics);
 
   const usedIds = new Set<string>();
@@ -137,7 +134,7 @@ export function computeTopicSpotlight(
       });
     const topicItems: ContentItem[] = [];
     for (const c of sorted) {
-      const key = dedupKeys.get(c.id)!;
+      const key = contentDedup(c);
       if (usedKeys.has(key)) continue;
       usedKeys.add(key);
       usedIds.add(c.id);

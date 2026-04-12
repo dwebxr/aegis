@@ -79,6 +79,18 @@ function parseEntries(parsed: unknown): Map<string, ScoringCacheEntry> {
   return validated;
 }
 
+function loadFromLocalStorage(): Map<string, ScoringCacheEntry> {
+  if (typeof globalThis.localStorage !== "undefined") {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return parseEntries(JSON.parse(raw));
+    } catch (err) {
+      console.warn("[scoring-cache] localStorage parse failed:", err);
+    }
+  }
+  return new Map();
+}
+
 export async function initScoringCache(): Promise<void> {
   if (_memCache) return;
 
@@ -96,33 +108,12 @@ export async function initScoringCache(): Promise<void> {
   }
 
   _useIDB = false;
-  if (typeof globalThis.localStorage !== "undefined") {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        _memCache = parseEntries(JSON.parse(raw));
-        return;
-      }
-    } catch (err) {
-      console.warn("[scoring-cache] localStorage parse failed, starting fresh:", err);
-    }
-  }
-  _memCache = new Map();
+  _memCache = loadFromLocalStorage();
 }
 
 function getCache(): Map<string, ScoringCacheEntry> {
   if (_memCache) return _memCache;
-  if (typeof globalThis.localStorage !== "undefined") {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        return (_memCache = parseEntries(JSON.parse(raw)));
-      }
-    } catch (err) {
-      console.warn("[scoring-cache] Pre-init localStorage parse failed:", err);
-    }
-  }
-  return (_memCache = new Map());
+  return (_memCache = loadFromLocalStorage());
 }
 
 let _flushing = false;

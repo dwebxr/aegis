@@ -48,13 +48,15 @@ export function loadPublishReputations(): Map<string, PublishReputation> {
   }
 }
 
-export function savePublishReputations(map: Map<string, PublishReputation>): void {
-  if (typeof globalThis.localStorage === "undefined") return;
+export function savePublishReputations(map: Map<string, PublishReputation>): boolean {
+  if (typeof globalThis.localStorage === "undefined") return false;
   try {
     const store: SerializedStore = { version: 1, entries: Array.from(map.entries()) };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    return true;
   } catch (err) {
     console.warn("[publishGate] Failed to save reputations:", err);
+    return false;
   }
 }
 

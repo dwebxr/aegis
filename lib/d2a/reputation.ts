@@ -41,17 +41,19 @@ export function loadReputations(): Map<string, PeerReputation> {
   return (_memCache = new Map());
 }
 
-export function saveReputations(map: Map<string, PeerReputation>): void {
+export function saveReputations(map: Map<string, PeerReputation>): boolean {
   _memCache = map;
-  if (typeof globalThis.localStorage === "undefined") return;
+  if (typeof globalThis.localStorage === "undefined") return false;
   try {
     const store: SerializedReputationStore = {
       version: 1,
       peers: Array.from(map.entries()),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    return true;
   } catch (err) {
     console.warn("[d2a-reputation] Failed to persist reputations:", err);
+    return false;
   }
 }
 

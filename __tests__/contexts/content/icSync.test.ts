@@ -339,9 +339,9 @@ describe("mergePageIntoContent", () => {
     // attribution and cache had heuristic, IC must win (it's the source of
     // truth for newly-scored items).
     const existing = [makeItem({ id: "shared", scoredByAI: false, scoringEngine: "heuristic" })];
-    const page = [makeItem({ id: "shared", scoredByAI: true, scoringEngine: "ic-llm" })];
+    const page = [makeItem({ id: "shared", scoredByAI: true, scoringEngine: "claude-ic" })];
     const result = mergePageIntoContent(page, existing);
-    expect(result[0].scoringEngine).toBe("ic-llm");
+    expect(result[0].scoringEngine).toBe("claude-ic");
     expect(result[0].scoredByAI).toBe(true);
   });
 });

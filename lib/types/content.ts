@@ -27,6 +27,35 @@ export interface ContentEvaluation {
   validatedAt?: number;
 }
 
+/** Extract scoring-result fields from an AnalyzeResponse-shaped object into ContentItem fields. */
+export function scoredItemFields(result: {
+  originality: number; insight: number; credibility: number; composite: number;
+  verdict: Verdict; reason: string;
+  topics?: string[]; vSignal?: number; cContext?: number; lSlop?: number;
+  scoringEngine?: import("@/lib/scoring/types").ScoringEngine;
+}) {
+  return {
+    scores: {
+      originality: result.originality,
+      insight: result.insight,
+      credibility: result.credibility,
+      composite: result.composite,
+    },
+    verdict: result.verdict,
+    reason: result.reason,
+    createdAt: Date.now(),
+    validated: false as const,
+    flagged: false as const,
+    timestamp: "just now" as const,
+    topics: result.topics,
+    vSignal: result.vSignal,
+    cContext: result.cContext,
+    lSlop: result.lSlop,
+    scoredByAI: result.scoringEngine !== "heuristic",
+    scoringEngine: result.scoringEngine,
+  };
+}
+
 export interface ContentItem extends ContentEvaluation {
   nostrPubkey?: string;
   timestamp: string;

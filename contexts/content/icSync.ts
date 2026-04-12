@@ -134,7 +134,7 @@ export function syncToIC(
       addNotification("Saved locally \u2014 will sync when online", "info");
     } catch (qErr) {
       console.error("[content] Failed to enqueue offline action:", errMsg(qErr));
-      addNotification("Failed to save \u2014 changes may be lost", "error");
+      addNotification("Failed to save \u2014 changes will be lost", "error");
     }
   }).catch((unexpectedErr: unknown) => {
     // Safety net: catch any unexpected error in the rejection handler itself
@@ -235,7 +235,7 @@ export async function loadFromICCanister(
       if (BigInt(page.length) < PAGE_SIZE) break;
       offset += PAGE_SIZE;
       if (pageNum === MAX_PAGES - 1) {
-        console.warn(`[content] Pagination limit reached (${MAX_PAGES} pages). Some evaluations may not be loaded.`);
+        console.warn(`[content] Pagination limit reached (${MAX_PAGES} pages). Some evaluations were not loaded.`);
       }
     }
 

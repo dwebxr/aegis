@@ -17,7 +17,8 @@
  * No @sentry/nextjs initialization happens here; we only import types.
  */
 
-import type { Span, StartSpanOptions } from "@sentry/nextjs";
+import type { Span } from "@sentry/nextjs";
+import type { StartSpanOptions } from "@sentry/core";
 import * as Sentry from "@sentry/nextjs";
 
 describe("Sentry API compatibility (real SDK types)", () => {
