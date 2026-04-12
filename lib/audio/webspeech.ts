@@ -237,6 +237,30 @@ export function cancelSpeech(): void {
 }
 
 /**
+ * iOS Safari requires the first `speechSynthesis.speak()` call to occur
+ * synchronously within a user-gesture event handler. Calls from microtasks,
+ * timeouts, or promise continuations are silently blocked.
+ *
+ * This function speaks a zero-volume empty utterance to "unlock" the engine.
+ * After one successful speak in a gesture context, subsequent async speaks
+ * are permitted for the lifetime of the page.
+ *
+ * Call this at the top of every click handler that will eventually trigger
+ * `speakChunk` — before any awaits or state transitions.
+ *
+ * No-op when Web Speech API is unavailable. Harmless on non-Safari browsers
+ * (the empty utterance completes instantly).
+ */
+export function unlockSpeech(): void {
+  if (!isWebSpeechAvailable()) return;
+  const synth = globalThis.speechSynthesis;
+  const u = new globalThis.SpeechSynthesisUtterance("");
+  u.volume = 0;
+  u.lang = "en";
+  synth.speak(u);
+}
+
+/**
  * Test seam — clears the cached voice list. Tests that swap the
  * speechSynthesis mock between cases call this to force `loadVoices` to
  * re-read voices from the new mock.

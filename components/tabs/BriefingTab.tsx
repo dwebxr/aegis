@@ -5,7 +5,7 @@ import { typography } from "@/lib/design";
 import { ContentCard, YouTubePreview } from "@/components/ui/ContentCard";
 import { ShareBriefingModal } from "@/components/ui/ShareBriefingModal";
 import { AudioBriefingPlayer } from "@/components/ui/AudioBriefingPlayer";
-import { ShareIcon, SearchIcon, HeadphonesIcon } from "@/components/icons";
+import { ShareIcon, SearchIcon, HeadphonesIcon, PlayIcon, PauseIcon } from "@/components/icons";
 import { generateBriefing } from "@/lib/briefing/ranker";
 import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -13,6 +13,7 @@ import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificat
 import { useContent } from "@/contexts/ContentContext";
 import { useAudioBriefing } from "@/hooks/useAudioBriefing";
 import type { TrackSource } from "@/lib/audio/types";
+import { unlockSpeech } from "@/lib/audio/webspeech";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
@@ -51,15 +52,23 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
 
   const audio = useAudioBriefing();
+  const audioStatus = audio.status.status;
+  const isAudioActive = audioStatus === "playing" || audioStatus === "paused" || audioStatus === "loading";
+
   const handleListen = useCallback(() => {
+    if (audioStatus === "loading") return;
+    if (audioStatus === "playing") { audio.pause(); return; }
+    if (audioStatus === "paused") { unlockSpeech(); audio.resume(); return; }
+    // idle or error — start new session
+    unlockSpeech();
     const sources: TrackSource[] = briefing.priority.map(b => ({ item: b.item, isSerendipity: false }));
     if (audio.prefs.includeSerendipity && briefing.serendipity) {
       sources.push({ item: briefing.serendipity.item, isSerendipity: true });
     }
     if (sources.length === 0) return;
     audio.start(sources);
-  }, [audio, briefing.priority, briefing.serendipity]);
-  const canListen = audio.available && audio.prefs.enabled && briefing.priority.length > 0;
+  }, [audio, audioStatus, briefing.priority, briefing.serendipity]);
+  const canListen = audio.available && audio.prefs.enabled && (isAudioActive || briefing.priority.length > 0);
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -176,11 +185,20 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
               <button
                 data-testid="aegis-briefing-listen"
                 onClick={handleListen}
-                aria-label="Listen to briefing"
-                className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-md text-cyan-400 text-body-sm font-semibold cursor-pointer font-[inherit] transition-all duration-150 hover:border-cyan-400/25 hover:shadow-glow"
+                disabled={audioStatus === "loading"}
+                aria-label={audioStatus === "playing" ? "Pause briefing" : audioStatus === "paused" ? "Resume briefing" : "Listen to briefing"}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 bg-card border rounded-md text-body-sm font-semibold cursor-pointer font-[inherit] transition-all duration-150",
+                  audioStatus === "playing"
+                    ? "border-cyan-400/30 text-cyan-400 shadow-glow"
+                    : audioStatus === "paused"
+                      ? "border-amber-400/30 text-amber-400"
+                      : "border-border text-cyan-400 hover:border-cyan-400/25 hover:shadow-glow",
+                  audioStatus === "loading" && "opacity-50 cursor-not-allowed",
+                )}
               >
-                <HeadphonesIcon s={16} />
-                {!mobile && "Listen"}
+                {audioStatus === "playing" ? <PauseIcon s={16} /> : audioStatus === "paused" ? <PlayIcon s={16} /> : <HeadphonesIcon s={16} />}
+                {!mobile && (audioStatus === "playing" ? "Pause" : audioStatus === "paused" ? "Resume" : "Listen")}
               </button>
             )}
             {canShare && (

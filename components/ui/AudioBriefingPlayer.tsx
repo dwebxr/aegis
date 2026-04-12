@@ -9,7 +9,7 @@ import {
   XCloseIcon,
 } from "@/components/icons";
 import type { UseAudioBriefingResult } from "@/hooks/useAudioBriefing";
-import { loadVoices } from "@/lib/audio/webspeech";
+import { loadVoices, unlockSpeech } from "@/lib/audio/webspeech";
 
 const RATE_OPTIONS: ReadonlyArray<number> = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
@@ -55,7 +55,7 @@ export const AudioBriefingPlayer: React.FC<AudioBriefingPlayerProps> = ({ audio,
     : "";
 
   const onPlayPauseClick = () => {
-    if (isPaused) resume();
+    if (isPaused) { unlockSpeech(); resume(); }
     else if (status.status === "playing") pause();
   };
 
@@ -102,7 +102,7 @@ export const AudioBriefingPlayer: React.FC<AudioBriefingPlayerProps> = ({ audio,
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            onClick={prev}
+            onClick={() => { unlockSpeech(); prev(); }}
             disabled={isLoading || isError || status.trackIndex <= 0}
             aria-label="Previous article"
             className={cn(
@@ -128,7 +128,7 @@ export const AudioBriefingPlayer: React.FC<AudioBriefingPlayerProps> = ({ audio,
 
           <button
             type="button"
-            onClick={next}
+            onClick={() => { unlockSpeech(); next(); }}
             disabled={isLoading || isError || status.trackIndex >= status.trackCount - 1}
             aria-label="Next article"
             className={cn(

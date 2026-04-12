@@ -14,6 +14,7 @@ const mockLoadVoices = jest.fn().mockResolvedValue([
 jest.mock("@/lib/audio/webspeech", () => ({
   __esModule: true,
   loadVoices: () => mockLoadVoices(),
+  unlockSpeech: () => {},
 }));
 
 import React from "react";
