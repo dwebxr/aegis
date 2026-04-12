@@ -157,7 +157,7 @@ describe("AppShell — mobile layout", () => {
         <div>Content</div>
       </AppShell>,
     );
-    expect(html).toContain("pb-[100px]");
+    expect(html).toContain("pb-[var(--mobile-nav-h)]");
   });
 });
 

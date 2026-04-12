@@ -49,7 +49,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, onTabChange, chil
         data-testid="aegis-main-content"
         className={cn(
           "flex-1 overflow-auto overscroll-y-contain",
-          mobile ? "px-4 pt-4 pb-[100px]" : tablet ? "p-6" : "px-12 py-10"
+          mobile ? "px-4 pt-4 pb-[var(--mobile-nav-h)]" : tablet ? "p-6" : "px-12 py-10"
         )}
       >
         <PullToRefresh scrollRef={mainRef} enabled={mobile}>

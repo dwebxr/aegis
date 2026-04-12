@@ -226,6 +226,21 @@ describe("AudioBriefingPlayer — speed picker (desktop only)", () => {
   });
 });
 
+describe("AudioBriefingPlayer — mobile positioning", () => {
+  it("applies safe-area-aware bottom offset on mobile", () => {
+    render(<AudioBriefingPlayer audio={makeAudio()} mobile />);
+    const region = screen.getByLabelText("Audio briefing player");
+    expect(region.className).toContain("bottom-[calc(var(--mobile-nav-h)+0.75rem)]");
+  });
+
+  it("applies standard bottom offset on desktop", () => {
+    render(<AudioBriefingPlayer audio={makeAudio()} />);
+    const region = screen.getByLabelText("Audio briefing player");
+    expect(region.className).toContain("bottom-6");
+    expect(region.className).not.toContain("bottom-[calc(");
+  });
+});
+
 describe("AudioBriefingPlayer — voice label", () => {
   it("queries voices and displays voice label when voiceURI is set", async () => {
     const audio = makeAudio({

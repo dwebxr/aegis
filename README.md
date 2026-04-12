@@ -9,6 +9,15 @@
 
 ## Latest Updates (April 2026)
 
+### Audio Briefing Player Fix (pause/resume + mobile layout)
+- **400 suites / 7,056 tests** — zero failures, zero skipped
+- **Pause/resume bug fix**: `runSession` loop died on pause because `cancelSpeech()` triggered `CancelledError` which unconditionally returned from the loop. Fixed with labeled `continue outer` that re-enters the loop and blocks at the pause gate until resume
+- **Safari iOS compatibility**: Safari fires `onend` (not `onerror`) on `speechSynthesis.cancel()`, making `speakChunk` resolve instead of reject. Added `cancelGeneration` counter to detect cancellation regardless of browser behavior — interrupted chunks replay correctly on both Chrome and Safari
+- **Mobile player positioning**: player (`z-40`, `bottom-4`) was hidden behind MobileNav (`z-50`, `fixed bottom-0`). Repositioned above the nav using shared `--mobile-nav-h` CSS variable — referenced by both `AppShell` padding and player bottom offset, eliminating three independent magic numbers
+- **`skipEmit` dedup**: `pausePlayback`/`nextTrack`/`prevTrack` emit status before `cancelSpeech`, then `continue outer` re-entering the loop would emit again. `skipEmit` flag prevents the redundant emission
+- **`prevTrack` simplification**: two branches with identical post-logic (reset chunkIndex, cancel, emit) merged into one — 6 lines removed
+- **Safari `safariCancelMode`** mock added to `mockSpeech.ts` for testing the `onend`-on-cancel path
+
 ### Translation Subsystem Rebuild (17 hotfixes + LARP audit + prod-readiness)
 - **399 suites / 7,029 tests** — zero failures, zero skipped
 - **BYOK-only translation cost model**: operator's `ANTHROPIC_API_KEY` is **never** used for translation, enforced at both the client cascade and the `/api/translate` server boundary. Anonymous POSTs to `/api/translate` return 401. Verified in `__tests__/api/translate.test.ts` (11 tests) and `scripts/smoke-test.sh` (live production probe: 11/11 pass)

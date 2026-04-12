@@ -6,6 +6,13 @@
 /* Aegis uses data-theme attribute instead of .dark class */
 @custom-variant dark (&:is([data-theme="dark"] *));
 
+/* Mobile bottom nav height — shared by AppShell padding, AudioBriefingPlayer
+   positioning, and any future fixed-bottom element.  h-14 primary row (3.5rem)
+   + footer row (~2rem) + 0.25rem buffer + device safe-area. */
+:root {
+  --mobile-nav-h: calc(env(safe-area-inset-bottom, 8px) + 5.75rem);
+}
+
 /* ── Tailwind v4 Theme — Aegis Design System ───────────────── */
 @theme {
 

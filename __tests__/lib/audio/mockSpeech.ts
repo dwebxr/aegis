@@ -63,6 +63,9 @@ class MockSpeechSynthesis {
    */
   deferMode = false;
 
+  /** When true, cancel() fires onend instead of onerror (Safari iOS behaviour). */
+  safariCancelMode = false;
+
   getVoices(): MockVoice[] {
     return this.voices;
   }
@@ -77,9 +80,12 @@ class MockSpeechSynthesis {
     this.active = null;
     this.queue = [];
     if (interrupted) {
-      // Surface as an "interrupted" error so the wrapper translates it to
-      // CancelledError.
-      interrupted.onerror?.({ error: "interrupted" });
+      if (this.safariCancelMode) {
+        // Safari iOS fires onend instead of onerror on cancel().
+        interrupted.onend?.({});
+      } else {
+        interrupted.onerror?.({ error: "interrupted" });
+      }
     }
   }
 

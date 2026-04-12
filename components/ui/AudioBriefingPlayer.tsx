@@ -70,7 +70,7 @@ export const AudioBriefingPlayer: React.FC<AudioBriefingPlayerProps> = ({ audio,
         "fixed left-1/2 -translate-x-1/2 z-40 bg-card border border-border shadow-lg rounded-lg",
         "backdrop-blur-md",
         mobile
-          ? "bottom-4 w-[calc(100vw-1.5rem)] max-w-md px-3 py-3"
+          ? "bottom-[calc(var(--mobile-nav-h)+0.75rem)] w-[calc(100vw-1.5rem)] max-w-md px-3 py-3"
           : "bottom-6 w-[640px] max-w-[calc(100vw-3rem)] px-5 py-3",
       )}
     >

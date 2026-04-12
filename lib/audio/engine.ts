@@ -78,6 +78,12 @@ interface Session {
   pauseGate: { promise: Promise<void>; release: () => void } | null;
   /** Cleanup function for MediaSession handlers. */
   detachMediaSession: () => void;
+  /**
+   * Monotonic counter incremented before every cancelSpeech() call.
+   * Lets runSession detect cancellation even when Safari fires onend
+   * instead of onerror (making speakChunk resolve instead of reject).
+   */
+  cancelGeneration: number;
 }
 
 let session: Session | null = null;
@@ -118,9 +124,14 @@ function failSession(s: Session, message: string): void {
 }
 
 async function runSession(s: Session): Promise<void> {
-  while (s.trackIndex < s.tracks.length) {
+  // `continue outer` lets pause/next/prev re-read `track` after trackIndex
+  // changes. `skipEmit` avoids a redundant emission — the caller already
+  // emitted the correct status before cancelSpeech caused the re-entry.
+  let skipEmit = false;
+  outer: while (s.trackIndex < s.tracks.length) {
     const track = s.tracks[s.trackIndex];
-    emitFromSession(s, "playing");
+    if (!skipEmit) emitFromSession(s, s.pauseGate ? "paused" : "playing");
+    skipEmit = false;
 
     while (s.chunkIndex < track.chunks.length) {
       // Honour pause: block until resume() releases the gate.
@@ -130,6 +141,7 @@ async function runSession(s: Session): Promise<void> {
       }
 
       const chunk = track.chunks[s.chunkIndex];
+      const genBefore = s.cancelGeneration;
       try {
         await speakChunk({
           text: chunk,
@@ -139,16 +151,26 @@ async function runSession(s: Session): Promise<void> {
           signal: s.controller.signal,
         });
       } catch (err) {
-        if (err instanceof CancelledError) return;
+        if (err instanceof CancelledError) {
+          if (s.controller.signal.aborted) return; // real stop/restart
+          skipEmit = true;
+          continue outer; // pause or skip — re-read track from updated trackIndex
+        }
         failSession(s, errMsg(err));
         return;
       }
 
-      // The session may have advanced (next/prev) while we awaited speakChunk;
-      // detect that and skip ahead instead of incrementing past the new index.
       if (s.controller.signal.aborted) return;
+
+      // Safari iOS: cancel() fires onend instead of onerror, making
+      // speakChunk resolve normally. Detect via generation counter.
+      if (s.cancelGeneration !== genBefore) {
+        skipEmit = true;
+        continue outer;
+      }
+
       s.chunkIndex += 1;
-      emitFromSession(s, "playing");
+      emitFromSession(s, s.pauseGate ? "paused" : "playing");
     }
 
     s.trackIndex += 1;
@@ -233,6 +255,7 @@ export async function startBriefingPlayback(
     lastMetadataIndex: -1,
     pauseGate: null,
     detachMediaSession: () => {},
+    cancelGeneration: 0,
   };
 
   s.detachMediaSession = attachMediaSessionHandlers({
@@ -255,6 +278,7 @@ export function pausePlayback(): void {
   if (!session) return;
   if (session.pauseGate) return;
   session.pauseGate = makePauseGate();
+  session.cancelGeneration += 1;
   cancelSpeech();
   emitFromSession(session, "paused");
 }
@@ -273,20 +297,16 @@ export function nextTrack(): void {
   if (session.trackIndex >= session.tracks.length - 1) return;
   session.trackIndex += 1;
   session.chunkIndex = 0;
+  session.cancelGeneration += 1;
   cancelSpeech();
   emitFromSession(session, session.pauseGate ? "paused" : "playing");
 }
 
 export function prevTrack(): void {
   if (!session) return;
-  if (session.trackIndex <= 0) {
-    session.chunkIndex = 0;
-    cancelSpeech();
-    emitFromSession(session, session.pauseGate ? "paused" : "playing");
-    return;
-  }
-  session.trackIndex -= 1;
+  if (session.trackIndex > 0) session.trackIndex -= 1;
   session.chunkIndex = 0;
+  session.cancelGeneration += 1;
   cancelSpeech();
   emitFromSession(session, session.pauseGate ? "paused" : "playing");
 }
