@@ -1,0 +1,80 @@
+name: Release @aegis/d2a-client
+
+# Publishes the SDK to npm when packages/d2a-client/package.json's `version`
+# field changes on a push to main. Idempotent: if the version already exists
+# on npm, the publish step fails fast and no duplicate tag is created.
+#
+# Required repository secret: NPM_TOKEN — an npm automation token with
+# publish permission for the @aegis scope (see https://docs.npmjs.com/creating-and-viewing-access-tokens).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/d2a-client/**"
+      - ".github/workflows/release-sdk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create release tag
+  id-token: write   # npm provenance (--provenance)
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/d2a-client
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          scope: "@aegis"
+
+      - name: Read package version
+        id: pkg
+        run: echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Check if version is already on npm
+        id: check
+        run: |
+          if npm view "@aegis/d2a-client@${{ steps.pkg.outputs.version }}" version 2>/dev/null; then
+            echo "already-published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already-published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install
+        if: steps.check.outputs.already-published == 'false'
+        run: npm install --no-audit --no-fund
+
+      - name: Test
+        if: steps.check.outputs.already-published == 'false'
+        run: npm test
+
+      - name: Build
+        if: steps.check.outputs.already-published == 'false'
+        run: npm run build
+
+      - name: Publish
+        if: steps.check.outputs.already-published == 'false'
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Tag release
+        if: steps.check.outputs.already-published == 'false'
+        working-directory: ${{ github.workspace }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "d2a-client@${{ steps.pkg.outputs.version }}"
+          git push origin "d2a-client@${{ steps.pkg.outputs.version }}"

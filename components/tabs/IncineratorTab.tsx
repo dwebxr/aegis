@@ -24,7 +24,6 @@ const STAGES = [
   { id: "S1", name: "Heuristic Filter", activatable: true, colorClass: "text-purple-400" },
   { id: "S2", name: "Structural", activatable: true, colorClass: "text-sky-400" },
   { id: "S3", name: "LLM Score", activatable: true, colorClass: "text-amber-400" },
-  { id: "S4", name: "Cross-Valid", activatable: false, colorClass: "text-tertiary" },
 ] as const;
 
 export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onAnalyze, onPublishSignal, onUploadImage, nostrPubkey, icpBalance, stakingEnabled, publishGate, mobile }) => {
@@ -84,7 +83,7 @@ export const IncineratorTab: React.FC<IncineratorTabProps> = ({ isAnalyzing, onA
         isAnalyzing && "animate-glow-pulse"
       )}>
         <IncineratorViz active={isAnalyzing} mobile={mobile} />
-        <div className={cn("grid gap-2 mt-4", mobile ? "grid-cols-2" : "grid-cols-4")}>
+        <div className={cn("grid gap-2 mt-4", mobile ? "grid-cols-3" : "grid-cols-3")}>
           {STAGES.map(({ id, name, activatable, colorClass }) => {
             const active = activatable && isAnalyzing;
             return (

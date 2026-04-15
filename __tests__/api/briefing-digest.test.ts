@@ -78,7 +78,7 @@ describe("POST /api/briefing/digest", () => {
   });
 
   it("returns 502 and logs error when Anthropic returns non-OK", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 429 });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 429, text: () => Promise.resolve("rate limit") });
     const spy = jest.spyOn(console, "error").mockImplementation();
     const res = await POST(makeRequest({ articles: sampleArticles }));
     expect(res.status).toBe(502);

@@ -58,28 +58,28 @@ describe("IncineratorTab", () => {
     expect(screen.queryByTestId("manual-input")).toBeNull();
   });
 
-  it("renders all 4 pipeline stages", () => {
+  it("renders all 3 implemented pipeline stages", () => {
     render(<IncineratorTab isAnalyzing={false} onAnalyze={mockOnAnalyze} />);
     expect(screen.getByText("Heuristic Filter")).toBeInTheDocument();
     expect(screen.getByText("Structural")).toBeInTheDocument();
     expect(screen.getByText("LLM Score")).toBeInTheDocument();
-    expect(screen.getByText("Cross-Valid")).toBeInTheDocument();
+    // S4 Cross-Valid was a perpetually-IDLE placeholder; removed.
+    expect(screen.queryByText("Cross-Valid")).not.toBeInTheDocument();
   });
 
   it("shows IDLE for all stages when not analyzing", () => {
     const { container } = render(<IncineratorTab isAnalyzing={false} onAnalyze={mockOnAnalyze} />);
     const idleLabels = container.querySelectorAll(".uppercase");
     const texts = Array.from(idleLabels).map(el => el.textContent?.trim());
-    expect(texts.filter(t => t?.includes("IDLE"))).toHaveLength(4);
+    expect(texts.filter(t => t?.includes("IDLE"))).toHaveLength(3);
   });
 
-  it("shows ACTIVE for activatable stages when analyzing", () => {
+  it("shows ACTIVE for all stages when analyzing", () => {
     const { container } = render(<IncineratorTab isAnalyzing={true} onAnalyze={mockOnAnalyze} />);
     const labels = container.querySelectorAll(".uppercase");
     const texts = Array.from(labels).map(el => el.textContent?.trim());
-    // S1, S2, S3 are activatable → ACTIVE; S4 is not → IDLE
     expect(texts.filter(t => t?.includes("ACTIVE"))).toHaveLength(3);
-    expect(texts.filter(t => t?.includes("IDLE"))).toHaveLength(1);
+    expect(texts.filter(t => t?.includes("IDLE"))).toHaveLength(0);
   });
 
   it("passes active=true to IncineratorViz when analyzing", () => {

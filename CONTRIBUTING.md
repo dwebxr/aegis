@@ -117,11 +117,7 @@ Bad: `Update file`. Good: `fix(audio): kill runSession loop on pause via labeled
 
 ## Reporting a security issue
 
-Please **do not** open a public GitHub issue for a security vulnerability.
-
-Instead, use GitHub's private vulnerability reporting: <https://github.com/dwebxr/aegis/security/advisories/new>. Maintainers will acknowledge within 72 hours and aim to ship a fix within 14 days for high-severity issues. We follow a coordinated-disclosure approach: once the fix is shipped, we credit you in the advisory unless you prefer to remain anonymous.
-
-Out-of-scope (please do not report): denial-of-service via repeatedly hitting any unauthenticated endpoint, social engineering of operator accounts, vulnerabilities in third-party services we depend on (report those upstream).
+See [`SECURITY.md`](./SECURITY.md) for the full policy: response targets, scope, safe harbor, and the private vulnerability reporting URL.
 
 ## Code of Conduct
 

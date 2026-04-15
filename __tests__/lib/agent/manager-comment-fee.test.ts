@@ -10,6 +10,7 @@ import type { AgentState } from "@/lib/agent/types";
 import type { ContentItem } from "@/lib/types/content";
 import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import { createEmptyProfile } from "@/lib/preferences/types";
+import { mockWoTGraph } from "@/__tests__/__helpers__/mocks";
 
 // --- Mocks ---
 jest.mock("nostr-tools/pool", () => ({
@@ -57,7 +58,12 @@ jest.mock("@/lib/wot/scorer", () => ({
 const testSk = new Uint8Array(32).fill(1);
 const testPk = "abc123def456";
 
-function makeCallbacks(overrides: Record<string, unknown> = {}) {
+type AgentCallbacks = ConstructorParameters<typeof AgentManager>[2];
+
+/** Every callback is a jest.Mock so tests can inspect `.mock.calls`. */
+type MockedCallbacks = { [K in keyof AgentCallbacks]-?: jest.Mock };
+
+function makeCallbacks(overrides: Partial<MockedCallbacks> = {}): MockedCallbacks {
   return {
     onNewContent: jest.fn(),
     getContent: jest.fn().mockReturnValue([]),
@@ -84,16 +90,15 @@ describe("AgentManager", () => {
   describe("setWoTGraph", () => {
     it("stores the WoT graph for later use without throwing", () => {
       const callbacks = makeCallbacks();
-      const manager = new AgentManager(testSk, testPk, callbacks as any);
-      const graph = { follows: new Map(), followers: new Map(), rootPubkey: "root" };
-      expect(() => manager.setWoTGraph(graph as any)).not.toThrow();
+      const manager = new AgentManager(testSk, testPk, callbacks);
+      expect(() => manager.setWoTGraph(mockWoTGraph())).not.toThrow();
     });
 
     it("accepts null to clear the graph without throwing", () => {
       const callbacks = makeCallbacks();
-      const manager = new AgentManager(testSk, testPk, callbacks as any);
+      const manager = new AgentManager(testSk, testPk, callbacks);
       // Set a graph first, then clear it
-      manager.setWoTGraph({ follows: new Map(), followers: new Map(), rootPubkey: "r" } as any);
+      manager.setWoTGraph(mockWoTGraph());
       expect(() => manager.setWoTGraph(null)).not.toThrow();
     });
 
@@ -102,9 +107,8 @@ describe("AgentManager", () => {
       calculateWoTScore.mockReturnValue({ trustScore: 0.9, hopDistance: 1 });
 
       const callbacks = makeCallbacks();
-      const manager = new AgentManager(testSk, testPk, callbacks as any);
-      const graph = { follows: new Map(), followers: new Map(), rootPubkey: "root" };
-      manager.setWoTGraph(graph as any);
+      const manager = new AgentManager(testSk, testPk, callbacks);
+      manager.setWoTGraph(mockWoTGraph());
       await manager.start();
 
       // After setting graph, calculateWoTScore should be callable with that graph
@@ -118,7 +122,7 @@ describe("AgentManager", () => {
   describe("start and stop lifecycle", () => {
     it("starts and emits active state", async () => {
       const callbacks = makeCallbacks();
-      const manager = new AgentManager(testSk, testPk, callbacks as any);
+      const manager = new AgentManager(testSk, testPk, callbacks);
       await manager.start();
       expect(callbacks.onStateChange).toHaveBeenCalled();
       const lastState: AgentState = callbacks.onStateChange.mock.calls[callbacks.onStateChange.mock.calls.length - 1][0];
@@ -129,7 +133,7 @@ describe("AgentManager", () => {
 
     it("stop clears intervals and emits inactive state", async () => {
       const callbacks = makeCallbacks();
-      const manager = new AgentManager(testSk, testPk, callbacks as any);
+      const manager = new AgentManager(testSk, testPk, callbacks);
       await manager.start();
       manager.stop();
       const lastState: AgentState = callbacks.onStateChange.mock.calls[callbacks.onStateChange.mock.calls.length - 1][0];
@@ -138,7 +142,7 @@ describe("AgentManager", () => {
 
     it("calling start twice is idempotent", async () => {
       const callbacks = makeCallbacks();
-      const manager = new AgentManager(testSk, testPk, callbacks as any);
+      const manager = new AgentManager(testSk, testPk, callbacks);
       await manager.start();
       const callCount = callbacks.onStateChange.mock.calls.length;
       await manager.start(); // should be no-op
@@ -168,7 +172,7 @@ describe("AgentManager", () => {
       });
 
       const callbacks = makeCallbacks();
-      const manager = new AgentManager(testSk, testPk, callbacks as any);
+      const manager = new AgentManager(testSk, testPk, callbacks);
       await manager.start();
 
       // Access the subscription callback registered via pool.subscribe()
@@ -208,7 +212,7 @@ describe("AgentManager", () => {
       // Make initial presence broadcast fail
       broadcastPresence.mockRejectedValueOnce(new Error("relay offline"));
 
-      const manager = new AgentManager(testSk, testPk, callbacks as any);
+      const manager = new AgentManager(testSk, testPk, callbacks);
       await manager.start();
 
       // start() catches the error internally — verify manager is still active
@@ -238,7 +242,7 @@ describe("AgentManager", () => {
         ]),
       });
 
-      const manager = new AgentManager(testSk, testPk, callbacks as any);
+      const manager = new AgentManager(testSk, testPk, callbacks);
       await manager.start();
 
       // The d2aMatchCount should NOT increment if the callback fails
@@ -253,7 +257,7 @@ describe("AgentManager", () => {
   describe("activity log", () => {
     it("log entries have sequential IDs", async () => {
       const callbacks = makeCallbacks();
-      const manager = new AgentManager(testSk, testPk, callbacks as any);
+      const manager = new AgentManager(testSk, testPk, callbacks);
       await manager.start();
 
       const state: AgentState = callbacks.onStateChange.mock.calls[callbacks.onStateChange.mock.calls.length - 1][0];

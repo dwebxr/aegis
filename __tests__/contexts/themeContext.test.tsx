@@ -20,7 +20,7 @@ Object.defineProperty(globalThis, "localStorage", {
   writable: true,
 });
 
-type ThemeMode = "dark" | "light";
+import type { ThemeMode } from "@/contexts/ThemeContext";
 
 function loadPersistedTheme(): ThemeMode {
   if (typeof globalThis.localStorage === "undefined") return "dark";

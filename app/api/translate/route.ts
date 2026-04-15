@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { callAnthropic } from "@/lib/api/anthropic";
+import { requireUserByokKey } from "@/lib/api/byok";
 
 export const maxDuration = 30;
 
@@ -26,39 +28,28 @@ export async function POST(request: NextRequest) {
   // API key — this route enforces the same invariant at the boundary
   // so a malicious or regressed client cannot burn the operator's
   // budget by hitting the endpoint directly.
-  const userKey = request.headers.get("x-user-api-key");
-  if (!userKey || !userKey.startsWith("sk-ant-")) {
+  const apiKey = requireUserByokKey(request);
+  if (!apiKey) {
     return NextResponse.json(
       { error: "Translation requires an Anthropic API key in the x-user-api-key header (BYOK)." },
       { status: 401 },
     );
   }
-  const apiKey = userKey;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
-      messages: [{ role: "user", content: prompt }],
-    }),
-    signal: AbortSignal.timeout(25_000),
+  const res = await callAnthropic({
+    apiKey,
+    model: "claude-sonnet-4-20250514",
+    maxTokens: 4000,
+    messages: [{ role: "user", content: prompt }],
+    timeoutMs: 25_000,
   });
 
   if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    console.error("[translate] Claude API error:", res.status, errText.slice(0, 200));
+    console.error("[translate] Claude API error:", res.status, String(res.raw).slice(0, 200));
     return NextResponse.json({ error: `Claude API error: ${res.status}` }, { status: 502 });
   }
 
-  const data = await res.json();
-  const translation = data.content?.[0]?.text?.trim() ?? "";
-
+  const translation = res.text.trim();
   if (!translation) {
     return NextResponse.json({ error: "Empty response from Claude" }, { status: 502 });
   }

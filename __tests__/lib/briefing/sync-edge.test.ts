@@ -1,6 +1,7 @@
 import { briefingToD2AResponse, syncBriefingToCanister } from "@/lib/briefing/sync";
 import type { BriefingState } from "@/lib/briefing/types";
 import type { ContentItem } from "@/lib/types/content";
+import { mockBackendActor } from "@/__tests__/__helpers__/mocks";
 
 function makeContentItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
@@ -186,14 +187,14 @@ describe("syncBriefingToCanister — edge cases", () => {
   it("handles actor returning rejected promise (not Error)", async () => {
     const mockActor = { saveLatestBriefing: jest.fn().mockRejectedValue("string error") };
     const consoleSpy = jest.spyOn(console, "error").mockImplementation();
-    const result = await syncBriefingToCanister(mockActor as any, makeBriefingState());
+    const result = await syncBriefingToCanister(mockBackendActor(mockActor), makeBriefingState());
     expect(result).toBe(false);
     consoleSpy.mockRestore();
   });
 
   it("handles actor returning undefined", async () => {
     const mockActor = { saveLatestBriefing: jest.fn().mockResolvedValue(undefined) };
-    const result = await syncBriefingToCanister(mockActor as any, makeBriefingState());
+    const result = await syncBriefingToCanister(mockBackendActor(mockActor), makeBriefingState());
     // undefined is falsy, same as false
     expect(result).toBeFalsy();
   });
@@ -210,7 +211,7 @@ describe("syncBriefingToCanister — edge cases", () => {
     }));
     const state = makeBriefingState({ priority: items, totalItems: 200 });
     const mockActor = { saveLatestBriefing: jest.fn().mockResolvedValue(true) };
-    const result = await syncBriefingToCanister(mockActor as any, state);
+    const result = await syncBriefingToCanister(mockBackendActor(mockActor), state);
     expect(result).toBe(true);
     const json = mockActor.saveLatestBriefing.mock.calls[0][0];
     expect(JSON.parse(json).items).toHaveLength(50);
@@ -226,8 +227,8 @@ describe("syncBriefingToCanister — edge cases", () => {
     const state2 = makeBriefingState({ generatedAt: 2000 });
 
     const [r1, r2] = await Promise.all([
-      syncBriefingToCanister(mockActor as any, state1),
-      syncBriefingToCanister(mockActor as any, state2),
+      syncBriefingToCanister(mockBackendActor(mockActor), state1),
+      syncBriefingToCanister(mockBackendActor(mockActor), state2),
     ]);
     expect(r1).toBe(true);
     expect(r2).toBe(false);

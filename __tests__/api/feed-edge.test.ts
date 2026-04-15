@@ -85,6 +85,24 @@ describe("rate-limit boundary on /api/feed/rss", () => {
     const over = await RSS_GET(makeReq(`/api/feed/rss?principal=${PRINCIPAL}`));
     expect(over.status).toBe(429);
   });
+
+  it("per-principal cap (60/hour) returns 429 with resource-specific message even when per-IP is not exhausted", async () => {
+    (getLatestBriefing as jest.Mock).mockResolvedValue(briefing([item()]));
+    // Use a distinct IP per request via x-forwarded-for so the per-IP cap
+    // never fires; this isolates the per-principal cap.
+    const fromIp = (n: number) => new NextRequest(`http://localhost/api/feed/rss?principal=${PRINCIPAL}`, {
+      method: "GET",
+      headers: { "x-forwarded-for": `10.0.0.${n}` },
+    });
+    for (let i = 1; i <= 60; i++) {
+      const r = await RSS_GET(fromIp(i));
+      expect(r.status).toBe(200);
+    }
+    const over = await RSS_GET(fromIp(61));
+    expect(over.status).toBe(429);
+    const body = await over.json();
+    expect(body.error).toMatch(/principal/i);
+  });
 });
 
 describe("Atom-format-specific contracts", () => {
@@ -191,7 +209,7 @@ describe("provider failure modes", () => {
   it("returns 502 when buildFeed throws on a malformed item shape", async () => {
     // briefingProvider only validates briefing-level shape; per-item missing
     // scores.composite crashes item.scores.composite.toFixed() in summarize().
-    const malformedItem = { ...item(), scores: undefined as unknown as { composite: number } };
+    const malformedItem = { ...item(), scores: undefined } as unknown as ReturnType<typeof item>;
     (getLatestBriefing as jest.Mock).mockResolvedValue(briefing([malformedItem]));
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const r = await RSS_GET(makeReq(`/api/feed/rss?principal=${PRINCIPAL}`));

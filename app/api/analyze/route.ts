@@ -6,6 +6,8 @@ import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
 import { buildScoringPrompt } from "@/lib/scoring/prompt";
 import { parseScoreResponse } from "@/lib/scoring/parseResponse";
+import { callAnthropic } from "@/lib/api/anthropic";
+import { resolveAnthropicKey } from "@/lib/api/byok";
 
 export const maxDuration = 30;
 
@@ -34,28 +36,19 @@ async function scoreOneText(
     : [];
   const prompt = buildScoringPrompt(text, allTopics.length > 0 ? allTopics : undefined, 5000);
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role: "user", content: prompt }],
-    }),
-    signal: AbortSignal.timeout(15_000),
+  const res = await callAnthropic({
+    apiKey,
+    model: "claude-sonnet-4-20250514",
+    maxTokens: 1000,
+    messages: [{ role: "user", content: prompt }],
+    timeoutMs: 15_000,
   });
 
   if (!res.ok) {
     throw new Error(`Anthropic API returned ${res.status}`);
   }
 
-  const data = await res.json();
-  const rawText = data.content?.[0]?.text || "";
-  const parsed = parseScoreResponse(rawText);
+  const parsed = parseScoreResponse(res.text);
 
   if (!parsed) {
     throw new Error("Failed to parse AI response");
@@ -82,9 +75,7 @@ export async function POST(request: NextRequest) {
   };
 
   const userContext = sanitizeUserContext(rawCtx);
-  const userKey = request.headers.get("x-user-api-key");
-  const isUserKey = !!(userKey && userKey.startsWith("sk-ant-"));
-  const apiKey = isUserKey ? userKey : process.env.ANTHROPIC_API_KEY?.trim();
+  const { key: apiKey, isUser: isUserKey } = resolveAnthropicKey(request);
 
   // --- Batch mode ---
   if (texts && Array.isArray(texts)) {

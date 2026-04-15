@@ -9,6 +9,7 @@
 
 import type { AudioPrefs } from "./types";
 import { DEFAULT_AUDIO_PREFS } from "./types";
+import { getValidated, setValidated } from "@/lib/utils/validatedLocalStorage";
 
 const STORAGE_KEY = "aegis-audio-prefs";
 
@@ -25,22 +26,13 @@ function isValidPrefs(value: unknown): value is AudioPrefs {
 }
 
 export function getAudioPrefs(): AudioPrefs {
-  if (typeof globalThis.localStorage === "undefined") return { ...DEFAULT_AUDIO_PREFS };
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { ...DEFAULT_AUDIO_PREFS };
-  try {
-    const parsed = JSON.parse(raw);
-    if (!isValidPrefs(parsed)) return { ...DEFAULT_AUDIO_PREFS };
-    return parsed;
-  } catch {
-    return { ...DEFAULT_AUDIO_PREFS };
-  }
+  const stored = getValidated(STORAGE_KEY, isValidPrefs, DEFAULT_AUDIO_PREFS);
+  // Always return an independent object so callers can safely mutate.
+  return stored === DEFAULT_AUDIO_PREFS ? { ...DEFAULT_AUDIO_PREFS } : stored;
 }
 
 export function updateAudioPrefs(patch: Partial<AudioPrefs>): AudioPrefs {
   const next = { ...getAudioPrefs(), ...patch };
-  if (typeof globalThis.localStorage !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }
+  setValidated(STORAGE_KEY, next);
   return next;
 }

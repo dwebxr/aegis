@@ -1,6 +1,7 @@
 import { briefingToD2AResponse, syncBriefingToCanister } from "@/lib/briefing/sync";
 import type { BriefingState } from "@/lib/briefing/types";
 import type { ContentItem } from "@/lib/types/content";
+import { mockBackendActor } from "@/__tests__/__helpers__/mocks";
 
 function makeContentItem(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
@@ -269,7 +270,7 @@ describe("syncBriefingToCanister", () => {
   it("calls actor.saveLatestBriefing with JSON string", async () => {
     const mockActor = { saveLatestBriefing: jest.fn().mockResolvedValue(true) };
     const state = makeBriefingState();
-    const result = await syncBriefingToCanister(mockActor as any, state);
+    const result = await syncBriefingToCanister(mockBackendActor(mockActor), state);
     expect(result).toBe(true);
     expect(mockActor.saveLatestBriefing).toHaveBeenCalledTimes(1);
     const jsonArg = mockActor.saveLatestBriefing.mock.calls[0][0];
@@ -282,7 +283,7 @@ describe("syncBriefingToCanister", () => {
   it("returns false when actor throws", async () => {
     const mockActor = { saveLatestBriefing: jest.fn().mockRejectedValue(new Error("Network error")) };
     const consoleSpy = jest.spyOn(console, "error").mockImplementation();
-    const result = await syncBriefingToCanister(mockActor as any, makeBriefingState());
+    const result = await syncBriefingToCanister(mockBackendActor(mockActor), makeBriefingState());
     expect(result).toBe(false);
     expect(consoleSpy).toHaveBeenCalledWith(
       "[briefing/sync] Failed to sync:",
@@ -293,20 +294,20 @@ describe("syncBriefingToCanister", () => {
 
   it("returns false when saveLatestBriefing returns false", async () => {
     const mockActor = { saveLatestBriefing: jest.fn().mockResolvedValue(false) };
-    const result = await syncBriefingToCanister(mockActor as any, makeBriefingState());
+    const result = await syncBriefingToCanister(mockBackendActor(mockActor), makeBriefingState());
     expect(result).toBe(false);
   });
 
   it("passes nostrPubkey through to the briefing response", async () => {
     const mockActor = { saveLatestBriefing: jest.fn().mockResolvedValue(true) };
-    await syncBriefingToCanister(mockActor as any, makeBriefingState(), "npub1xyz");
+    await syncBriefingToCanister(mockBackendActor(mockActor), makeBriefingState(), "npub1xyz");
     const parsed = JSON.parse(mockActor.saveLatestBriefing.mock.calls[0][0]);
     expect(parsed.meta.nostrPubkey).toBe("npub1xyz");
   });
 
   it("defaults nostrPubkey to null", async () => {
     const mockActor = { saveLatestBriefing: jest.fn().mockResolvedValue(true) };
-    await syncBriefingToCanister(mockActor as any, makeBriefingState());
+    await syncBriefingToCanister(mockBackendActor(mockActor), makeBriefingState());
     const parsed = JSON.parse(mockActor.saveLatestBriefing.mock.calls[0][0]);
     expect(parsed.meta.nostrPubkey).toBeNull();
   });
@@ -314,7 +315,7 @@ describe("syncBriefingToCanister", () => {
   it("handles empty state gracefully", async () => {
     const mockActor = { saveLatestBriefing: jest.fn().mockResolvedValue(true) };
     const emptyState = makeBriefingState({ priority: [], filteredOut: [], totalItems: 0 });
-    const result = await syncBriefingToCanister(mockActor as any, emptyState);
+    const result = await syncBriefingToCanister(mockBackendActor(mockActor), emptyState);
     expect(result).toBe(true);
     const parsed = JSON.parse(mockActor.saveLatestBriefing.mock.calls[0][0]);
     expect(parsed.items).toEqual([]);

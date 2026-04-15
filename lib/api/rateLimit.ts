@@ -52,6 +52,36 @@ export async function distributedRateLimit(
   return null;
 }
 
+/**
+ * Per-key distributed rate limiter. The caller supplies the bucket key
+ * (e.g. an IC principal) so independent traffic axes can be capped
+ * separately from per-IP limits. KV-backed; falls back to per-key in-memory
+ * window when KV is unavailable.
+ */
+export async function distributedRateLimitByKey(
+  key: string,
+  limit: number,
+  windowSec: number,
+  errorMessage = "Rate limit exceeded for this resource. Try again later.",
+): Promise<NextResponse | null> {
+  const store = await getKV();
+  if (!store) return inMemoryRateLimitByKey(key, limit, windowSec * 1000, errorMessage);
+
+  const windowKey = `aegis:rl:key:${key}:${Math.floor(Date.now() / (windowSec * 1000))}`;
+  const count = await store.incr(windowKey);
+  if (count === 1) await store.expire(windowKey, windowSec);
+
+  if (count > limit) {
+    const ttl = await store.ttl(windowKey);
+    const retryAfter = ttl > 0 ? ttl : windowSec;
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } },
+    );
+  }
+  return null;
+}
+
 export function _resetKVCache(): void {
   _kv = undefined;
 }
@@ -87,6 +117,37 @@ export function _resetRateLimits(): void {
     clearInterval(cleanupTimer);
     cleanupTimer = null;
   }
+}
+
+function inMemoryRateLimitByKey(
+  key: string,
+  limit: number,
+  windowMs: number,
+  errorMessage: string,
+): NextResponse | null {
+  const bucketKey = `key:${key}`;
+  const now = Date.now();
+  const entry = windows.get(bucketKey);
+
+  if (!entry || now >= entry.resetAt) {
+    if (windows.size >= MAX_WINDOW_ENTRIES) {
+      const oldest = windows.keys().next().value;
+      if (oldest !== undefined) windows.delete(oldest);
+    }
+    windows.set(bucketKey, { count: 1, resetAt: now + windowMs });
+    return null;
+  }
+
+  if (entry.count >= limit) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } },
+    );
+  }
+
+  entry.count++;
+  return null;
 }
 
 /**

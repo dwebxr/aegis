@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
+import { callAnthropic } from "@/lib/api/anthropic";
+import { resolveAnthropicKey } from "@/lib/api/byok";
 
 export const maxDuration = 30;
 
@@ -31,9 +33,7 @@ export async function POST(request: NextRequest) {
 
   const articles = body.articles.slice(0, 5);
 
-  const userKey = request.headers.get("x-user-api-key");
-  const isUserKey = !!(userKey && userKey.startsWith("sk-ant-"));
-  const apiKey = isUserKey ? userKey : process.env.ANTHROPIC_API_KEY?.trim();
+  const { key: apiKey, isUser: isUserKey } = resolveAnthropicKey(request);
 
   if (!apiKey) {
     return NextResponse.json({ error: "No API key available" }, { status: 503 });
@@ -58,19 +58,12 @@ ${articleSummaries}
 Respond with ONLY the digest paragraph, no labels or formatting.`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 300,
-        messages: [{ role: "user", content: prompt }],
-      }),
-      signal: AbortSignal.timeout(15_000),
+    const res = await callAnthropic({
+      apiKey,
+      model: "claude-sonnet-4-20250514",
+      maxTokens: 300,
+      messages: [{ role: "user", content: prompt }],
+      timeoutMs: 15_000,
     });
 
     if (!res.ok) {
@@ -78,10 +71,7 @@ Respond with ONLY the digest paragraph, no labels or formatting.`;
       return NextResponse.json({ error: "Request failed" }, { status: 502 });
     }
 
-    const data = await res.json();
-    const digest = data.content?.[0]?.text?.trim() || "";
-
-    return NextResponse.json({ digest });
+    return NextResponse.json({ digest: res.text.trim() });
   } catch (err) {
     console.error("[briefing/digest] Anthropic request failed:", errMsg(err));
     return NextResponse.json(

@@ -51,6 +51,9 @@ const nextConfig = {
 };
 
 const withPWA = withSerwist({
+  // Service-worker source resolved by Serwist at build time. Static-analysis
+  // tools (knip) cannot follow this string reference and may flag app/sw.ts
+  // as unused — keep this comment as a deletion guard.
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
   maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
