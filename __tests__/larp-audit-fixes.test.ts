@@ -4,7 +4,7 @@
 /**
  * LARP Audit fix verification tests.
  * Tests real code paths to verify fixes for:
- * 1. syncToIC — floating async catch handler (now uses .then/.catch with safety net)
+ * 1. syncToIC — floating async catch handler (inner catch only; setState errors propagate)
  * 2. scheduleFlush — concurrent flush guard (_flushing flag)
  * 3. isValidState — rateLimitedUntil validation
  * 4. saveCachedContent — IDB-to-localStorage fallback on failure
@@ -61,28 +61,6 @@ describe("syncToIC — LARP fix: no floating async catch handler", () => {
     expect(setSyncStatus).toHaveBeenCalledWith("offline");
   });
 
-  it("does not produce unhandled rejection on catch handler error", async () => {
-    const unhandled = jest.fn();
-    process.on("unhandledRejection", unhandled);
-
-    const setSyncStatus = jest.fn(() => { throw new Error("setState after unmount"); });
-    const setPendingActions = jest.fn();
-    const addNotification = jest.fn();
-
-    syncToIC(
-      Promise.reject(new Error("IC error")),
-      "saveEvaluation",
-      {},
-      setSyncStatus,
-      setPendingActions,
-      addNotification,
-    );
-
-    await new Promise(r => setTimeout(r, 50));
-    // Safety net .catch should have caught the error
-    expect(unhandled).not.toHaveBeenCalled();
-    process.removeListener("unhandledRejection", unhandled);
-  });
 });
 
 // ─── 3. isValidState — rateLimitedUntil validation ──────────────────
