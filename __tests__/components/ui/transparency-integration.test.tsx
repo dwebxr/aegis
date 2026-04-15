@@ -1,13 +1,8 @@
 /**
  * @jest-environment jsdom
  *
- * Integration: feeds REAL runFilterPipeline output into BurnedItemsDrawer,
- * opens the modal via user interaction, and verifies the displayed text
- * matches what the pipeline actually decided.
- *
- * Touches: lib/filtering/pipeline.ts (real), lib/filtering/customRules.ts
- * (real), components/ui/BurnedItemsDrawer.tsx (real), components/ui/
- * WhyFilteredModal.tsx (real). No mocks of code under test.
+ * Integration: runFilterPipeline output → BurnedItemsDrawer → WhyFilteredModal.
+ * No mocks of the code under test.
  */
 
 import "@testing-library/jest-dom";

@@ -71,7 +71,7 @@ A complete runnable example lives at [`examples/node-offer.ts`](./examples/node-
 | --- | --- |
 | Constants | `KIND_AGENT_PROFILE`, `KIND_EPHEMERAL`, `TAG_D2A_*`, `MAX_*`, `MIN_OFFER_SCORE`, `RESONANCE_THRESHOLD`, `INTEREST_BROADCAST_THRESHOLD`, `HANDSHAKE_TIMEOUT_MS`, `PRESENCE_BROADCAST_INTERVAL_MS`, `PEER_EXPIRY_MS`, `DISCOVERY_POLL_INTERVAL_MS`, `D2A_FEE_*`, `D2A_APPROVE_AMOUNT`, `DEFAULT_RELAYS`, `mergeRelays()` |
 | Encryption | `encryptMessage()`, `decryptMessage()` |
-| Manifest | `buildManifestWith()`, `buildManifestAsync()`, `decodeManifest()`, `diffManifestWith()`, `MANIFEST_MAX_ENTRIES` |
+| Manifest | `buildManifest()`, `decodeManifest()`, `diffManifest()`, `MANIFEST_MAX_ENTRIES` |
 | Handshake | `sendOffer()`, `sendAccept()`, `sendReject()`, `deliverContent()`, `sendComment()`, `parseD2AMessage()`, `isHandshakeExpired()` |
 | Discovery | `broadcastPresence()`, `discoverPeers()`, `calculateResonance()` |
 | Types | `D2AMessage`, `D2AOfferPayload`, `D2ADeliverPayload`, `D2ACommentPayload`, `AgentProfile`, `HandshakeState`, `HandshakePhase`, `ContentManifest`, `ManifestableItem`, `ResonancePrefs`, `ScoreBreakdown`, `Verdict` |

@@ -5,7 +5,7 @@
  *  - Constants: every wire-format constant from the spec (Section 8 of
  *    docs/D2A_PROTOCOL.md).
  *  - Encryption: NIP-44 v2 wrappers.
- *  - Manifest: build / decode / diff content manifests (sync + async).
+ *  - Manifest: build / decode / diff content manifests.
  *  - Handshake: sendOffer / sendAccept / sendReject / deliverContent /
  *    sendComment + parseD2AMessage validator.
  *  - Discovery: broadcastPresence / discoverPeers / calculateResonance.
@@ -19,13 +19,11 @@ export * from "./protocol";
 export * from "./types";
 export { encryptMessage, decryptMessage } from "./encrypt";
 export {
-  buildManifestWith,
-  buildManifestAsync,
+  buildManifest,
   decodeManifest,
-  diffManifestWith,
+  diffManifest,
   MANIFEST_MAX_ENTRIES,
   type ManifestableItem,
-  type HashFunction,
 } from "./manifest";
 export {
   sendOffer,

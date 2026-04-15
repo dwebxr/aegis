@@ -1,8 +1,6 @@
 /**
- * Tests for sendOffer / sendAccept / sendReject / deliverContent / sendComment
- * exercise the real encryption + event-construction code paths. The Nostr
- * relay layer (SimplePool) is mocked to avoid hitting wss:// in CI, but the
- * payloads it receives are inspected to verify the SDK builds correct events.
+ * Tests for the five send* handshake helpers. SimplePool is mocked at the
+ * relay boundary; encryption, signing, and tag construction run unmocked.
  */
 
 const mockPublish = jest.fn<unknown[], unknown[]>();

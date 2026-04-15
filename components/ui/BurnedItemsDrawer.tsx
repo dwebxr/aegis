@@ -87,7 +87,6 @@ export const BurnedItemsDrawer: React.FC<BurnedItemsDrawerProps> = ({
             <DialogTitle>Filtered out — {totalBurned} item{totalBurned === 1 ? "" : "s"}</DialogTitle>
           </DialogHeader>
 
-          {/* Summary */}
           <div className="flex flex-wrap gap-2 text-caption">
             <span className="rounded-md bg-orange-500/[0.08] border border-orange-500/20 px-2 py-1 text-orange-300">
               Slop: <span className="font-mono font-bold">{totals.slop}</span>
@@ -100,14 +99,12 @@ export const BurnedItemsDrawer: React.FC<BurnedItemsDrawerProps> = ({
             </span>
           </div>
 
-          {/* Empty state */}
           {rows.length === 0 && (
             <p className="text-body-sm text-muted-foreground py-6 text-center">
               Nothing has been filtered out yet. Burned items will appear here when the scoring engine drops them.
             </p>
           )}
 
-          {/* List */}
           {rows.length > 0 && (
             <ul className="flex flex-col gap-2">
               {rows.map(({ item, reason }) => (

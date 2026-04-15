@@ -1,9 +1,7 @@
 /**
- * Tests for broadcastPresence + discoverPeers exercise the SDK's event
- * construction and parsing logic against a mocked SimplePool. The mock
- * returns synthetic Nostr events shaped like what real relays would emit,
- * so the SDK's tag walking, capacity clamping, manifest decoding, and
- * resonance filtering are all exercised end-to-end.
+ * Tests for broadcastPresence + discoverPeers. SimplePool is mocked;
+ * synthetic Nostr events drive the SDK's tag walking, capacity clamping,
+ * manifest decoding, and resonance filtering.
  */
 
 const mockPublish = jest.fn();

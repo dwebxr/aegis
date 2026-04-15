@@ -3,11 +3,11 @@ import type { D2ABriefingResponse, D2ABriefingItem } from "@/lib/d2a/types";
 import { APP_URL } from "@/lib/config";
 
 const SUMMARY_MAX_CHARS = 600;
+const MAX_CATEGORIES = 20;
 
-/** Code-point-safe truncation: never splits a surrogate pair (e.g. emoji). */
+/** Code-point-safe truncation: never splits a UTF-16 surrogate pair (e.g. emoji). */
 function truncateByCodePoint(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
-  const codePoints = Array.from(text); // iterates by Unicode code point
+  const codePoints = Array.from(text);
   if (codePoints.length <= maxChars) return text;
   return codePoints.slice(0, maxChars).join("").trimEnd() + "…";
 }
@@ -45,8 +45,7 @@ export function buildFeed({ briefing, principal, rssSelfUrl, atomSelfUrl }: Buil
     copyright: `Curated by Aegis user ${principal}.`,
   });
 
-  // Add primary topics as feed-level categories.
-  for (const topic of briefing.meta.topics.slice(0, 20)) {
+  for (const topic of briefing.meta.topics.slice(0, MAX_CATEGORIES)) {
     feed.addCategory(topic);
   }
 
@@ -59,7 +58,7 @@ export function buildFeed({ briefing, principal, rssSelfUrl, atomSelfUrl }: Buil
       content: item.content,
       date: updated,
       author: item.source ? [{ name: item.source }] : [],
-      category: (item.topics ?? []).slice(0, 20).map(name => ({ name })),
+      category: (item.topics ?? []).slice(0, MAX_CATEGORIES).map(name => ({ name })),
     });
   });
 

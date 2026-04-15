@@ -15,7 +15,7 @@ export interface ManifestableItem {
   topics?: readonly string[];
 }
 
-/** SHA-256 of the canonicalized item text. Pure JS — no Node Buffer. */
+/** SHA-256 of the canonicalized item text. The D2A spec mandates SHA-256. */
 async function sha256Hex(text: string): Promise<string> {
   const data = new TextEncoder().encode(text);
   const buf = await crypto.subtle.digest("SHA-256", data);
@@ -24,14 +24,7 @@ async function sha256Hex(text: string): Promise<string> {
     .join("");
 }
 
-/**
- * Synchronous content hash (used internally when callers can pre-compute).
- * Async variant `sha256Hex` is the recommended path for browsers; consumers
- * may supply their own hash function via `buildManifestWith`.
- */
-export type HashFunction = (text: string) => string;
-
-function defaultQualifier(
+function isQualified(
   c: ManifestableItem,
 ): c is ManifestableItem & { topics: readonly [string, ...string[]] } {
   return (
@@ -42,34 +35,12 @@ function defaultQualifier(
   );
 }
 
-/**
- * Build a manifest from a set of scored items using a synchronous hash.
- * For browsers preferring SubtleCrypto, use `buildManifestAsync`.
- */
-export function buildManifestWith(
-  items: readonly ManifestableItem[],
-  hash: HashFunction,
-): ContentManifest {
-  const qualified = items
-    .filter(defaultQualifier)
-    .sort((a, b) => b.scores.composite - a.scores.composite)
-    .slice(0, MAX_MANIFEST_ENTRIES);
-
-  const entries: ManifestEntry[] = qualified.map(c => ({
-    hash: hash(c.text),
-    topic: c.topics[0],
-    score: Math.round(c.scores.composite * 10) / 10,
-  }));
-
-  return { entries, generatedAt: Date.now() };
-}
-
-/** SubtleCrypto-backed manifest builder. Browsers + Node 20+ support this natively. */
-export async function buildManifestAsync(
+/** Build a manifest from a set of scored items. SubtleCrypto-backed (Node 20+ / browsers). */
+export async function buildManifest(
   items: readonly ManifestableItem[],
 ): Promise<ContentManifest> {
   const qualified = items
-    .filter(defaultQualifier)
+    .filter(isQualified)
     .sort((a, b) => b.scores.composite - a.scores.composite)
     .slice(0, MAX_MANIFEST_ENTRIES);
 
@@ -113,24 +84,21 @@ export function decodeManifest(raw: string): ContentManifest | null {
 }
 
 /**
- * Diff: returns items the peer hasn't seen AND that share at least one topic
- * with the peer's manifest. Sorted by composite descending — first item is
- * the natural offer candidate.
+ * Returns items the peer hasn't seen AND that share at least one topic with
+ * the peer's manifest. Sorted by composite descending — first item is the
+ * natural offer candidate.
  */
-export function diffManifestWith(
+export async function diffManifest(
   myContent: readonly ManifestableItem[],
   peerManifest: ContentManifest,
-  hash: HashFunction,
-): ManifestableItem[] {
+): Promise<ManifestableItem[]> {
   const peerHashes = new Set(peerManifest.entries.map(e => e.hash));
   const peerTopics = new Set(peerManifest.entries.map(e => e.topic));
 
-  return myContent
-    .filter(c =>
-      defaultQualifier(c) &&
-      !peerHashes.has(hash(c.text)) &&
-      c.topics.some(t => peerTopics.has(t)),
-    )
+  const candidates = myContent.filter(isQualified);
+  const hashes = await Promise.all(candidates.map(c => sha256Hex(c.text)));
+  return candidates
+    .filter((c, i) => !peerHashes.has(hashes[i]) && c.topics.some(t => peerTopics.has(t)))
     .sort((a, b) => b.scores.composite - a.scores.composite);
 }
 

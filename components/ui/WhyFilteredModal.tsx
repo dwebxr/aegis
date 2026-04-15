@@ -62,10 +62,7 @@ export const WhyFilteredModal: React.FC<WhyFilteredModalProps> = ({
   const engine = item.scoringEngine ?? decoded.engine;
   const engineLabel = engine ? ENGINE_LABELS[engine] : "Unknown engine";
   const cleanReason = decoded.cleanReason || "(no reason recorded)";
-  const hasVCL =
-    typeof item.vSignal === "number" &&
-    typeof item.cContext === "number" &&
-    typeof item.lSlop === "number";
+  const { vSignal, cContext, lSlop } = item;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -80,7 +77,6 @@ export const WhyFilteredModal: React.FC<WhyFilteredModalProps> = ({
         <div className="flex flex-col gap-4">
           <VerdictBanner reason={reason} />
 
-          {/* Item snippet */}
           <div className="rounded-md border border-border bg-card px-3 py-2">
             <div className="text-caption text-muted-foreground mb-1">
               <span className="font-semibold text-tertiary">{item.author}</span>
@@ -89,13 +85,11 @@ export const WhyFilteredModal: React.FC<WhyFilteredModalProps> = ({
             <div className="text-body-sm line-clamp-3">{item.text}</div>
           </div>
 
-          {/* Scoring tier */}
           <div className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 text-body-sm">
             <span className="text-muted-foreground">Scoring engine</span>
             <span className="font-mono font-bold text-tertiary">{engineLabel}</span>
           </div>
 
-          {/* Threshold comparison */}
           <div className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 text-body-sm">
             <span className="text-muted-foreground">Composite vs threshold</span>
             <span className="font-mono">
@@ -107,17 +101,15 @@ export const WhyFilteredModal: React.FC<WhyFilteredModalProps> = ({
             </span>
           </div>
 
-          {/* V/C/L breakdown */}
-          {hasVCL && (
+          {vSignal !== undefined && cContext !== undefined && lSlop !== undefined && (
             <div>
               <div className="text-caption text-muted-foreground mb-1.5">V/C/L breakdown</div>
-              <ScoreBar label="V — Signal" score={item.vSignal!} color={colors.purple[400]} />
-              <ScoreBar label="C — Context" score={item.cContext!} color={colors.sky[400]} />
-              <ScoreBar label="L — Slop" score={item.lSlop!} color={colors.red[400]} />
+              <ScoreBar label="V — Signal" score={vSignal} color={colors.purple[400]} />
+              <ScoreBar label="C — Context" score={cContext} color={colors.sky[400]} />
+              <ScoreBar label="L — Slop" score={lSlop} color={colors.red[400]} />
             </div>
           )}
 
-          {/* O/I/C breakdown */}
           <div>
             <div className="text-caption text-muted-foreground mb-1.5">O/I/C breakdown (legacy)</div>
             <ScoreBar label="Originality" score={item.scores.originality} color={colors.purple[500]} />
@@ -125,7 +117,6 @@ export const WhyFilteredModal: React.FC<WhyFilteredModalProps> = ({
             <ScoreBar label="Credibility" score={item.scores.credibility} color={colors.green[500]} />
           </div>
 
-          {/* Reason text */}
           <div>
             <div className="text-caption text-muted-foreground mb-1">AI explanation</div>
             <div className="rounded-md border border-border bg-card px-3 py-2 text-body-sm text-tertiary">
@@ -133,7 +124,7 @@ export const WhyFilteredModal: React.FC<WhyFilteredModalProps> = ({
             </div>
           </div>
 
-          {/* Privacy note */}
+          {/* Reasons stay local — never published to peers (security guarantee). */}
           <p className="text-caption text-disabled">
             This explanation was produced by {engineLabel}. Reasons are stored locally in your browser and never sent to other Aegis users.
           </p>

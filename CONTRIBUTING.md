@@ -1,6 +1,6 @@
 # Contributing to Aegis
 
-Aegis is a content-quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted [D2A protocol](docs/D2A_PROTOCOL.md). This document is for developers — both first-time contributors fixing a small issue and people who want to ship a new tab.
+Aegis is a content-quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted [D2A protocol](docs/D2A_PROTOCOL.md). This guide is for both first-time contributors and feature-shippers.
 
 ## Quick start
 
