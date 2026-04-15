@@ -25,6 +25,13 @@ export interface FilterPipelineResult {
   stats: FilterPipelineStats;
 }
 
+export interface BurnedByRule {
+  itemId: string;
+  ruleId: string;
+  field: "author" | "title";
+  pattern: string;
+}
+
 export interface FilterPipelineStats {
   totalInput: number;
   wotScoredCount: number;
@@ -33,4 +40,8 @@ export interface FilterPipelineStats {
   estimatedAPICost: number;
   mode: FilterMode;
   customRulesBurned: number;
+  /** Item IDs filtered out by a custom burn rule, with which rule matched. */
+  burnedByRule: BurnedByRule[];
+  /** Item IDs filtered out because composite < qualityThreshold. */
+  burnedByThreshold: string[];
 }

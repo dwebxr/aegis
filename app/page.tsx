@@ -237,6 +237,7 @@ function AegisAppInner() {
       wotEnabled: !!wotGraph,
       qualityThreshold: profile.calibration.qualityThreshold,
       profile,
+      customRules: profile.customFilterRules,
     });
   }, [content, wotGraph, filterMode, profile]);
 
@@ -631,7 +632,7 @@ function AegisAppInner() {
       )}
       {tab === "dashboard" && (
         <TabErrorBoundary tabName="Home">
-          <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} onTranslate={translateItem} isItemTranslating={isItemTranslating} />
+          <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} onTranslate={translateItem} isItemTranslating={isItemTranslating} pipelineStats={pipelineResult?.stats ?? null} />
         </TabErrorBoundary>
       )}
       {tab === "briefing" && (

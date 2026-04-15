@@ -4,7 +4,7 @@ import type { WoTGraph } from "@/lib/wot/types";
 import type { FilterConfig, FilteredItem, FilterPipelineResult, FilterPipelineStats } from "./types";
 import { calculateWoTScore, calculateWeightedScore, isWoTSerendipity } from "@/lib/wot/scorer";
 import { isContentSerendipity } from "./serendipity";
-import { matchesCustomBurnRule } from "./customRules";
+import { findMatchingBurnRule } from "./customRules";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
 
 // Anthropic Claude Sonnet via /api/analyze — ~400 input tokens + ~100 output
@@ -25,6 +25,8 @@ export function runFilterPipeline(
     estimatedAPICost: 0,
     mode: config.mode,
     customRulesBurned: 0,
+    burnedByRule: [],
+    burnedByThreshold: [],
   };
 
   const items: FilteredItem[] = [];
@@ -36,11 +38,23 @@ export function runFilterPipeline(
     if (isAI) stats.aiScoredCount++;
     if (item.scoringEngine ? PAID_ENGINES.has(item.scoringEngine) : isAI) paidCount++;
 
-    if (customRules.length > 0 && matchesCustomBurnRule(item, customRules)) {
-      stats.customRulesBurned++;
+    if (customRules.length > 0) {
+      const matched = findMatchingBurnRule(item, customRules);
+      if (matched) {
+        stats.customRulesBurned++;
+        stats.burnedByRule.push({
+          itemId: item.id,
+          ruleId: matched.id,
+          field: matched.field,
+          pattern: matched.pattern,
+        });
+        continue;
+      }
+    }
+    if (item.scores.composite < config.qualityThreshold) {
+      stats.burnedByThreshold.push(item.id);
       continue;
     }
-    if (item.scores.composite < config.qualityThreshold) continue;
 
     let wotScore = null;
     if (config.wotEnabled && wotGraph && item.nostrPubkey) {

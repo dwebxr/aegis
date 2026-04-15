@@ -40,6 +40,7 @@ import { NewItemsBar } from "@/components/ui/NewItemsBar";
 import { useSources } from "@/contexts/SourceContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { BurnedItemsDrawer } from "@/components/ui/BurnedItemsDrawer";
 import { useAutoReveal } from "@/hooks/useAutoReveal";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { deduplicateItems } from "@/contexts/content/dedup";
@@ -282,9 +283,10 @@ interface DashboardTabProps {
   onFlushPending?: () => void;
   onTranslate?: (id: string) => void;
   isItemTranslating?: (id: string) => boolean;
+  pipelineStats?: import("@/lib/filtering/types").FilterPipelineStats | null;
 }
 
-export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [], pendingCount = 0, onFlushPending, onTranslate, isItemTranslating }) => {
+export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [], pendingCount = 0, onFlushPending, onTranslate, isItemTranslating, pipelineStats }) => {
   const { filterMode } = useFilterMode();
   const { sources } = useSources();
   const { isDemoMode } = useDemo();
@@ -313,6 +315,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   });
   const { profile, addFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [burnedDrawerOpen, setBurnedDrawerOpen] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem("aegis-home-mode", homeMode); } catch (e) { console.debug("[dashboard] localStorage write failed:", e); }
@@ -469,10 +472,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   }, [profile.topicAffinities]);
 
   const metricsItems = [
-    { icon: "\u{1F6E1}", value: todayQual.length, delta: todayQual.length - yesterdayQual, label: "quality", colorClass: "text-cyan-400" },
-    { icon: "\u{1F525}", value: todaySlop.length, delta: todaySlop.length - yesterdaySlop, label: "burned", colorClass: "text-orange-400" },
-    { icon: "\u26A1", value: todayContent.length, delta: todayContent.length - yesterdayEval, label: "eval", colorClass: "text-purple-400" },
-    { icon: "\u{1F4E1}", value: uniqueSources.size, delta: todaySources - yesterdaySources, label: "sources", colorClass: "text-sky-400" },
+    { icon: "\u{1F6E1}", value: todayQual.length, delta: todayQual.length - yesterdayQual, label: "quality", colorClass: "text-cyan-400", onClick: undefined as undefined | (() => void) },
+    { icon: "\u{1F525}", value: todaySlop.length, delta: todaySlop.length - yesterdaySlop, label: "burned", colorClass: "text-orange-400", onClick: () => setBurnedDrawerOpen(true) },
+    { icon: "\u26A1", value: todayContent.length, delta: todayContent.length - yesterdayEval, label: "eval", colorClass: "text-purple-400", onClick: undefined as undefined | (() => void) },
+    { icon: "\u{1F4E1}", value: uniqueSources.size, delta: todaySources - yesterdaySources, label: "sources", colorClass: "text-sky-400", onClick: undefined as undefined | (() => void) },
   ];
 
   const sidebarUnreviewed = useMemo(() => {
@@ -763,13 +766,30 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
             {mobile && (
               <div data-testid="aegis-metrics-bar" className="flex flex-wrap items-center mb-3 px-4 py-2 bg-card border border-border rounded-md gap-3">
                 <div className="flex flex-wrap gap-3 flex-1">
-                  {metricsItems.map(m => (
-                    <span key={m.label} className="flex items-center gap-1 text-body-sm text-muted-foreground">
-                      <span>{m.icon}</span>
-                      <span className={cn("font-bold font-mono", m.colorClass)}>{m.value}</span>
-                      <span>{m.label}</span>
-                    </span>
-                  ))}
+                  {metricsItems.map(m => {
+                    const inner = (
+                      <>
+                        <span>{m.icon}</span>
+                        <span className={cn("font-bold font-mono", m.colorClass)}>{m.value}</span>
+                        <span>{m.label}</span>
+                      </>
+                    );
+                    return m.onClick ? (
+                      <button
+                        type="button"
+                        key={m.label}
+                        onClick={m.onClick}
+                        data-testid={`aegis-metric-${m.label}`}
+                        className="flex items-center gap-1 text-body-sm text-muted-foreground rounded-sm hover:bg-muted/30 px-1 -mx-1 focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        {inner}
+                      </button>
+                    ) : (
+                      <span key={m.label} className="flex items-center gap-1 text-body-sm text-muted-foreground">
+                        {inner}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -992,18 +1012,35 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
               {/* ── Metrics bar ── */}
               <div data-testid="aegis-metrics-bar" className="px-4 py-3 bg-card border border-border rounded-md">
                 <div className="flex flex-col gap-2">
-                  {metricsItems.map(m => (
-                    <span key={m.label} className="flex items-center gap-1.5 text-body-sm text-muted-foreground">
-                      <span>{m.icon}</span>
-                      <span className={cn("font-bold font-mono", m.colorClass)}>{m.value}</span>
-                      <span>{m.label}</span>
-                      {m.delta !== 0 && (
-                        <span className={cn("text-tiny font-mono", m.delta > 0 ? "text-emerald-400" : "text-red-400")}>
-                          {m.delta > 0 ? "+" : ""}{m.delta}
-                        </span>
-                      )}
-                    </span>
-                  ))}
+                  {metricsItems.map(m => {
+                    const inner = (
+                      <>
+                        <span>{m.icon}</span>
+                        <span className={cn("font-bold font-mono", m.colorClass)}>{m.value}</span>
+                        <span>{m.label}</span>
+                        {m.delta !== 0 && (
+                          <span className={cn("text-tiny font-mono", m.delta > 0 ? "text-emerald-400" : "text-red-400")}>
+                            {m.delta > 0 ? "+" : ""}{m.delta}
+                          </span>
+                        )}
+                      </>
+                    );
+                    return m.onClick ? (
+                      <button
+                        type="button"
+                        key={m.label}
+                        onClick={m.onClick}
+                        data-testid={`aegis-metric-${m.label}`}
+                        className="flex items-center gap-1.5 text-body-sm text-muted-foreground rounded-sm hover:bg-muted/30 px-1 -mx-1 text-left focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        {inner}
+                      </button>
+                    ) : (
+                      <span key={m.label} className="flex items-center gap-1.5 text-body-sm text-muted-foreground">
+                        {inner}
+                      </span>
+                    );
+                  })}
                 </div>
                 <div className="flex gap-3 items-center mt-3 pt-3 border-t border-border">
                   <div className="flex items-center gap-1 flex-1">
@@ -1464,6 +1501,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
       )}
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={paletteCommands} mobile={mobile} />
+
+      <BurnedItemsDrawer
+        open={burnedDrawerOpen}
+        onClose={() => setBurnedDrawerOpen(false)}
+        items={todayContent}
+        burnedByRule={pipelineStats?.burnedByRule ?? []}
+        burnedByThreshold={pipelineStats?.burnedByThreshold ?? []}
+        qualityThreshold={profile.calibration.qualityThreshold}
+      />
     </div>
   );
 };

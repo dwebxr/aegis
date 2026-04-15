@@ -64,6 +64,8 @@ function makeResult(items: FilteredItem[]): FilterPipelineResult {
       estimatedAPICost: 0,
       mode: "pro",
       customRulesBurned: 0,
+      burnedByRule: [],
+      burnedByThreshold: [],
     },
   };
 }

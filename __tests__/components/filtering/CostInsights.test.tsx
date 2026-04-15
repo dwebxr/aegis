@@ -12,6 +12,8 @@ function makeStats(overrides: Partial<FilterPipelineStats> = {}): FilterPipeline
     estimatedAPICost: 0.09,
     mode: "pro",
     customRulesBurned: 0,
+    burnedByRule: [],
+    burnedByThreshold: [],
     ...overrides,
   };
 }
