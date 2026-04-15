@@ -3,3 +3,4 @@ canisters/
 Makefile
 dfx.json
 canister_ids.json
+packages/
