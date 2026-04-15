@@ -7,6 +7,14 @@
   </p>
 </div>
 
+<p align="left">
+  <a href="https://nostr.com"><img src="https://img.shields.io/badge/Nostr-8E44AD?logo=nostr&logoColor=white" alt="Nostr" /></a>
+  <a href="https://internetcomputer.org"><img src="https://img.shields.io/badge/Internet%20Computer-29ABE2?logo=internetcomputer&logoColor=white" alt="Internet Computer" /></a>
+  <a href="https://ai.google.dev/edge/mediapipe"><img src="https://img.shields.io/badge/MediaPipe-4285F4?logo=google&logoColor=white" alt="MediaPipe" /></a>
+  <a href="https://claude.com"><img src="https://img.shields.io/badge/Claude-D97757?logo=anthropic&logoColor=white" alt="Claude" /></a>
+  <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js%2015-000000?logo=nextdotjs&logoColor=white" alt="Next.js 15" /></a>
+</p>
+
 ## Latest Updates (April 2026)
 
 ### 8-Agent Parallel Cleanup Sweep
