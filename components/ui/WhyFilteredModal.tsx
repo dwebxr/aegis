@@ -71,10 +71,10 @@ export const WhyFilteredModal: React.FC<WhyFilteredModalProps> = ({
     );
   }
 
-  const decoded = decodeEngineFromReason(item.reason || "");
+  const decoded = decodeEngineFromReason(item.reason);
   const engine = item.scoringEngine ?? decoded.engine;
   const engineLabel = engine ? ENGINE_LABELS[engine] : "Unknown engine";
-  const cleanReason = decoded.cleanReason || item.reason || "(no reason recorded)";
+  const cleanReason = decoded.cleanReason || "(no reason recorded)";
   const hasVCL =
     typeof item.vSignal === "number" &&
     typeof item.cContext === "number" &&
@@ -97,7 +97,7 @@ export const WhyFilteredModal: React.FC<WhyFilteredModalProps> = ({
           <div className="rounded-md border border-border bg-card px-3 py-2">
             <div className="text-caption text-muted-foreground mb-1">
               <span className="font-semibold text-tertiary">{item.author}</span>
-              {item.source && <span> · {item.source}</span>}
+              <span> · {item.source}</span>
             </div>
             <div className="text-body-sm line-clamp-3">{item.text}</div>
           </div>

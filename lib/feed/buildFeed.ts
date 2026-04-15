@@ -2,7 +2,6 @@ import { Feed } from "feed";
 import type { D2ABriefingResponse, D2ABriefingItem } from "@/lib/d2a/types";
 import { APP_URL } from "@/lib/config";
 
-const AEGIS_NS = "https://aegis-ai.xyz/ns/feed";
 const SUMMARY_MAX_CHARS = 600;
 
 function summarize(item: D2ABriefingItem): string {
@@ -16,6 +15,17 @@ function feedItemId(item: D2ABriefingItem, fallbackIndex: number, principal: str
   if (item.sourceUrl) return item.sourceUrl;
   // Stable URN for items lacking a sourceUrl (e.g. raw nostr events without external link).
   return `urn:aegis:item:${principal}:${fallbackIndex}:${encodeURIComponent(item.title.slice(0, 80))}`;
+}
+
+function aegisExtensions(item: D2ABriefingItem): Array<{ name: string; objects: { _: string } }> {
+  const ext: Array<{ name: string; objects: { _: string } }> = [
+    { name: "aegis:composite", objects: { _: item.scores.composite.toFixed(2) } },
+    { name: "aegis:verdict", objects: { _: item.verdict } },
+  ];
+  for (const [key, value] of [["aegis:vSignal", item.scores.vSignal], ["aegis:cContext", item.scores.cContext], ["aegis:lSlop", item.scores.lSlop]] as const) {
+    if (value !== undefined) ext.push({ name: key, objects: { _: value.toFixed(2) } });
+  }
+  return ext;
 }
 
 export interface BuildFeedOptions {
@@ -56,19 +66,12 @@ export function buildFeed({ briefing, principal, rssSelfUrl, atomSelfUrl }: Buil
       date: updated,
       author: item.source ? [{ name: item.source }] : [],
       category: (item.topics ?? []).slice(0, 20).map(name => ({ name })),
-      // Custom Aegis namespace fields. The `feed` package serialises arbitrary
-      // extension keys when present on the addItem options.
-      extensions: [
-        { name: "aegis:composite", objects: { _: item.scores.composite.toFixed(2) } },
-        { name: "aegis:verdict", objects: { _: item.verdict } },
-        ...(item.scores.vSignal !== undefined ? [{ name: "aegis:vSignal", objects: { _: item.scores.vSignal.toFixed(2) } }] : []),
-        ...(item.scores.cContext !== undefined ? [{ name: "aegis:cContext", objects: { _: item.scores.cContext.toFixed(2) } }] : []),
-        ...(item.scores.lSlop !== undefined ? [{ name: "aegis:lSlop", objects: { _: item.scores.lSlop.toFixed(2) } }] : []),
-      ],
+      // Custom Aegis namespace exposes per-item scores. Most readers ignore
+      // unknown namespaces; power-user readers (e.g. NetNewsWire) surface them.
+      extensions: aegisExtensions(item),
     });
   });
 
   return feed;
 }
 
-export const AEGIS_FEED_NAMESPACE = AEGIS_NS;

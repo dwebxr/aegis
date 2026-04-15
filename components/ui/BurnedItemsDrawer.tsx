@@ -51,22 +51,30 @@ export const BurnedItemsDrawer: React.FC<BurnedItemsDrawerProps> = ({
 }) => {
   const [selected, setSelected] = useState<RowEntry | null>(null);
 
-  const rows = useMemo<RowEntry[]>(() => {
+  const { rows, totals } = useMemo(() => {
     const byRule = new Map<string, BurnedByRule>(burnedByRule.map(b => [b.itemId, b]));
     const byThreshold = new Set<string>(burnedByThreshold);
+
+    let totalSlop = 0;
+    let totalRule = 0;
+    let totalThreshold = 0;
     const out: RowEntry[] = [];
+
     for (const item of items) {
       const reason = classify(item, byRule, byThreshold, qualityThreshold);
       if (!reason) continue;
-      out.push({ item, reason });
-      if (out.length >= maxItems) break;
+
+      if (reason.kind === "verdict-slop") totalSlop++;
+      else if (reason.kind === "custom-rule") totalRule++;
+      else totalThreshold++;
+
+      if (out.length < maxItems) out.push({ item, reason });
     }
-    return out;
+
+    return { rows: out, totals: { slop: totalSlop, rule: totalRule, threshold: totalThreshold } };
   }, [items, burnedByRule, burnedByThreshold, qualityThreshold, maxItems]);
 
-  const ruleCount = burnedByRule.length;
-  const thresholdCount = burnedByThreshold.length;
-  const slopCount = rows.filter(r => r.reason.kind === "verdict-slop").length;
+  const totalBurned = totals.slop + totals.rule + totals.threshold;
 
   return (
     <>
@@ -76,19 +84,19 @@ export const BurnedItemsDrawer: React.FC<BurnedItemsDrawerProps> = ({
           className="max-w-2xl max-h-[80vh] overflow-y-auto"
         >
           <DialogHeader>
-            <DialogTitle>Filtered out — {rows.length} item{rows.length === 1 ? "" : "s"}</DialogTitle>
+            <DialogTitle>Filtered out — {totalBurned} item{totalBurned === 1 ? "" : "s"}</DialogTitle>
           </DialogHeader>
 
           {/* Summary */}
           <div className="flex flex-wrap gap-2 text-caption">
             <span className="rounded-md bg-orange-500/[0.08] border border-orange-500/20 px-2 py-1 text-orange-300">
-              Slop: <span className="font-mono font-bold">{slopCount}</span>
+              Slop: <span className="font-mono font-bold">{totals.slop}</span>
             </span>
             <span className="rounded-md bg-red-500/[0.08] border border-red-500/20 px-2 py-1 text-red-300">
-              Below threshold: <span className="font-mono font-bold">{thresholdCount}</span>
+              Below threshold: <span className="font-mono font-bold">{totals.threshold}</span>
             </span>
             <span className="rounded-md bg-amber-500/[0.08] border border-amber-500/20 px-2 py-1 text-amber-300">
-              Custom rule: <span className="font-mono font-bold">{ruleCount}</span>
+              Custom rule: <span className="font-mono font-bold">{totals.rule}</span>
             </span>
           </div>
 
@@ -110,7 +118,7 @@ export const BurnedItemsDrawer: React.FC<BurnedItemsDrawerProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="text-caption text-muted-foreground">
                       <span className="font-semibold text-tertiary">{item.author}</span>
-                      {item.source && <span> · {item.source}</span>}
+                      <span> · {item.source}</span>
                     </div>
                     <div className="text-body-sm truncate">{item.text}</div>
                     <div className="text-caption text-disabled mt-0.5">
@@ -135,9 +143,9 @@ export const BurnedItemsDrawer: React.FC<BurnedItemsDrawerProps> = ({
             </ul>
           )}
 
-          {items.length > rows.length && rows.length === maxItems && (
+          {totalBurned > rows.length && (
             <p className="text-caption text-disabled mt-2 text-center">
-              Showing the first {maxItems}. Older filtered items are available via your local cache.
+              Showing the first {maxItems} of {totalBurned}. Older filtered items are available via your local cache.
             </p>
           )}
         </DialogContent>
