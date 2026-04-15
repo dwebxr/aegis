@@ -2,6 +2,7 @@
   "name": "aegis",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "engines": {
     "node": ">=20"
   },
@@ -14,7 +15,10 @@
     "test:watch": "jest --watch",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "sdk:install": "npm install --prefix packages/d2a-client",
+    "sdk:build": "npm run build --prefix packages/d2a-client",
+    "sdk:test": "npm test --prefix packages/d2a-client"
   },
   "dependencies": {
     "@dfinity/agent": "2.4.1",

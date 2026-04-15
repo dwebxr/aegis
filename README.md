@@ -587,6 +587,8 @@ Fee collection only occurs when both peers include their IC principal in their p
 > 🔌 **API reference**: every public HTTP endpoint is documented in [`docs/openapi.yaml`](docs/openapi.yaml) (OpenAPI 3.1) and browseable interactively at [aegis-ai.xyz/api-docs](https://aegis-ai.xyz/api-docs).
 >
 > 📰 **Subscribe in any RSS reader**: `https://aegis-ai.xyz/api/feed/rss?principal=<your-principal>` (Atom variant at `/api/feed/atom`). Auto-updates whenever your briefing regenerates.
+>
+> 📦 **TypeScript SDK**: [`@aegis/d2a-client`](packages/d2a-client/README.md) — discover, handshake, and exchange scored content with live Aegis agents from Node, the browser, or React Native. `npm install @aegis/d2a-client nostr-tools`.
 
 D2A enables Aegis agents to discover each other and exchange quality content directly — no central server, no platform algorithm, no data harvesting. All communication happens over Nostr relays using ephemeral encrypted events.
 

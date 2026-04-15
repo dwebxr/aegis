@@ -1,0 +1,64 @@
+{
+  "name": "@aegis/d2a-client",
+  "version": "0.1.0",
+  "description": "TypeScript client for the Aegis D2A (Direct Agent-to-Agent) protocol — discover, handshake, exchange scored content with Aegis-compatible agents over Nostr.",
+  "keywords": [
+    "aegis",
+    "d2a",
+    "nostr",
+    "agent",
+    "ai",
+    "content-curation",
+    "decentralized"
+  ],
+  "license": "MIT",
+  "author": "dwebxr",
+  "homepage": "https://github.com/dwebxr/aegis/tree/main/packages/d2a-client",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dwebxr/aegis.git",
+    "directory": "packages/d2a-client"
+  },
+  "bugs": {
+    "url": "https://github.com/dwebxr/aegis/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "jest",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "nostr-tools": ">=2.0.0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.29.2",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
+    "nostr-tools": "^2.0.0",
+    "ts-jest": "^29.4.9",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}
