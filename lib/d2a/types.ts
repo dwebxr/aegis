@@ -53,4 +53,3 @@ export interface ChangesResponse {
   changes: BriefingChange[];
 }
 
-export type { GlobalBriefingResponse, GlobalBriefingContributor } from "./briefingProvider";

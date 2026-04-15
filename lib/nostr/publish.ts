@@ -6,7 +6,7 @@ import { KIND_TEXT_NOTE, KIND_LONG_FORM, DEFAULT_RELAYS } from "./types";
 import type { SerializedBriefing } from "@/lib/briefing/serialize";
 
 /** Delay before pool.destroy() to let relay connections flush. Shortened in tests. */
-export let RELAY_FLUSH_MS = 1500;
+let RELAY_FLUSH_MS = 1500;
 export function _setRelayFlushMs(ms: number) { RELAY_FLUSH_MS = ms; }
 
 export interface PublishResult {

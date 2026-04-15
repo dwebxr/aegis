@@ -101,12 +101,6 @@ export const D2AIcon: React.FC<IconProps> = ({ s = 20 }) => (
   </svg>
 );
 
-export const ChevronDownIcon: React.FC<IconProps> = ({ s = 16 }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="6 9 12 15 18 9" />
-  </svg>
-);
-
 export const PencilIcon: React.FC<IconProps> = ({ s = 16 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
