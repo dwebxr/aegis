@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   }
 
   const WebSocket = (await import("ws")).default;
-  setWsImpl(WebSocket as unknown as typeof globalThis.WebSocket);
+  setWsImpl(WebSocket);
 
   const pool = new SimplePool();
 

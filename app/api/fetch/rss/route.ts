@@ -125,10 +125,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- rss-parser Output type uses `any` for media extensions
-function buildItems(feed: Parser.Output<any>, limit: number) {
+// buildItems only needs .items; each item is narrowed to Record<string, unknown>
+// at runtime before any untrusted field is read. Declaring a local shape avoids
+// pulling in rss-parser's `any`-typed custom-field generic while keeping the
+// base Item keys strongly typed.
+function buildItems(feed: { items?: Parser.Item[] }, limit: number) {
   return (feed.items || []).slice(0, Math.min(limit, 50)).map(item => {
-    const raw = item as Record<string, unknown>;
+    const raw = item as unknown as Record<string, unknown>;
     const contentEncoded = typeof raw["content:encoded"] === "string" ? raw["content:encoded"] : "";
     const rawContent: string = contentEncoded || item.content || item.contentSnippet || item.summary || "";
     const textContent = rawContent.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();

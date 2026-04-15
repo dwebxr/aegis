@@ -37,7 +37,7 @@ async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
   const { SimplePool, useWebSocketImplementation: setWsImpl } =
     await import("nostr-tools/pool");
   const WebSocket = (await import("ws")).default;
-  setWsImpl(WebSocket as unknown as typeof globalThis.WebSocket);
+  setWsImpl(WebSocket);
 
   const pool = new SimplePool();
   const filter = {

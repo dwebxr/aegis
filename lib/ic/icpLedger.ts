@@ -1,12 +1,12 @@
 import { Actor, Identity } from "@dfinity/agent";
+import type { IDL } from "@dfinity/candid";
 import { createAgent, ensureRootKey } from "./agent";
 import { errMsg } from "@/lib/utils/errors";
 
 const ICP_LEDGER_CANISTER_ID = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 
 // Minimal ICRC-1/2 IDL for balance, fee, approve, and allowance
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const icpLedgerIdlFactory = ({ IDL }: { IDL: any }) => {
+const icpLedgerIdlFactory: IDL.InterfaceFactory = ({ IDL }) => {
   const Account = IDL.Record({
     owner: IDL.Principal,
     subaccount: IDL.Opt(IDL.Vec(IDL.Nat8)),
@@ -73,7 +73,6 @@ const icpLedgerIdlFactory = ({ IDL }: { IDL: any }) => {
     icrc2_allowance: IDL.Func([AllowanceArgs], [Allowance], ["query"]),
   });
 };
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export interface ICPLedgerActor {
   icrc1_balance_of: (account: { owner: import("@dfinity/principal").Principal; subaccount: [] }) => Promise<bigint>;
