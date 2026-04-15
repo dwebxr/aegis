@@ -53,3 +53,29 @@ export interface ChangesResponse {
   changes: BriefingChange[];
 }
 
+export interface GlobalBriefingContributor {
+  principal: string;
+  generatedAt: string;
+  summary: {
+    totalEvaluated: number;
+    totalBurned: number;
+    qualityRate: number;
+  };
+  topItems: Array<{
+    title: string;
+    topics: string[];
+    briefingScore: number;
+    verdict: "quality" | "slop";
+  }>;
+}
+
+export interface GlobalBriefingResponse {
+  version: "1.0";
+  type: "global";
+  generatedAt: string;
+  pagination: { offset: number; limit: number; total: number; hasMore: boolean };
+  contributors: GlobalBriefingContributor[];
+  aggregatedTopics: string[];
+  totalEvaluated: number;
+  totalQualityRate: number;
+}

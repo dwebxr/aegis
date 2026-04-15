@@ -34,4 +34,3 @@ export interface FilterPipelineStats {
   mode: FilterMode;
   customRulesBurned: number;
 }
-
