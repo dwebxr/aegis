@@ -819,6 +819,88 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/feed/rss:
+    get:
+      tags: [Fetching]
+      summary: User briefing as RSS 2.0
+      description: |
+        Returns the latest briefing for `principal` rendered as RSS 2.0 XML so
+        any RSS reader can subscribe. Items inherit `<category>` per topic and
+        a custom `xmlns:aegis` namespace exposes V/C/L per-item scores. No
+        authentication: anyone with the principal can subscribe (matches the
+        existing `/api/d2a/briefing` semantics — see Decision 1 in the project
+        plan). Edge-cached with `s-maxage=300, stale-while-revalidate=600`.
+      parameters:
+        - name: principal
+          in: query
+          required: true
+          schema: { type: string }
+          description: IC principal text to feed.
+      responses:
+        '200':
+          description: RSS 2.0 XML
+          headers:
+            X-Aegis-Briefing-Items:
+              schema: { type: integer }
+              description: Number of items in the rendered feed.
+            X-Aegis-Generated-At:
+              schema: { type: string, format: date-time }
+              description: Briefing generation timestamp (ISO 8601).
+          content:
+            application/rss+xml:
+              schema: { type: string }
+        '400':
+          description: Missing or invalid principal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: No briefing exists for this principal yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/feed/atom:
+    get:
+      tags: [Fetching]
+      summary: User briefing as Atom 1.0
+      description: |
+        Same content surface as `/api/feed/rss` but rendered as Atom 1.0.
+        Same auth model (public per-principal), same edge cache, same
+        observability headers. Choose Atom for readers that prefer it
+        (NetNewsWire, Reeder, Feedly all accept either).
+      parameters:
+        - name: principal
+          in: query
+          required: true
+          schema: { type: string }
+          description: IC principal text to feed.
+      responses:
+        '200':
+          description: Atom 1.0 XML
+          headers:
+            X-Aegis-Briefing-Items:
+              schema: { type: integer }
+            X-Aegis-Generated-At:
+              schema: { type: string, format: date-time }
+          content:
+            application/atom+xml:
+              schema: { type: string }
+        '400':
+          description: Missing or invalid principal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: No briefing exists for this principal yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
   /api/health:
     get:
       tags: [Operational]

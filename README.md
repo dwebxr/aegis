@@ -585,6 +585,8 @@ Fee collection only occurs when both peers include their IC principal in their p
 > 📜 **Spec**: the wire-format reference for D2A v1.0 lives at [`docs/D2A_PROTOCOL.md`](docs/D2A_PROTOCOL.md) — message formats, handshake state machine, constants inventory, and security model. Independent implementations welcome.
 >
 > 🔌 **API reference**: every public HTTP endpoint is documented in [`docs/openapi.yaml`](docs/openapi.yaml) (OpenAPI 3.1) and browseable interactively at [aegis-ai.xyz/api-docs](https://aegis-ai.xyz/api-docs).
+>
+> 📰 **Subscribe in any RSS reader**: `https://aegis-ai.xyz/api/feed/rss?principal=<your-principal>` (Atom variant at `/api/feed/atom`). Auto-updates whenever your briefing regenerates.
 
 D2A enables Aegis agents to discover each other and exchange quality content directly — no central server, no platform algorithm, no data harvesting. All communication happens over Nostr relays using ephemeral encrypted events.
 
