@@ -9,6 +9,20 @@
 
 ## Latest Updates (April 2026)
 
+### 8-Agent Parallel Cleanup Sweep
+- **405 suites / 7,132 tests** — zero failures, zero TypeScript errors, zero circular dependencies
+- Eight specialized subagents worked in isolated git worktrees in parallel, each producing a critical evaluation document (`.claude/evaluations/0N-*.md`) and applying HIGH-confidence recommendations only
+- **Dead code removal**: deleted 16 unused shadcn UI component files (`avatar, badge, card, command, dropdown-menu, input, label, popover, scroll-area, select, separator, sheet, skeleton, switch, tabs, textarea` — 1,400 LOC), 11 unused exports, `cmdk` dependency, the 546-line orphan `aegis_app.jsx` prototype, and a stale `.vercelignore` entry pointing at non-existent files
+- **Casing fix**: `components/ui/Tooltip.tsx` → `tooltip.tsx` — matches existing import sites, prevents case-sensitive filesystem breakage in CI/Linux environments
+- **Circular dependencies eliminated**: 3 type-only cycles broken via inlined literals and type relocation (`lib/scoring/types.ts` ↔ `lib/types/content.ts`, `lib/d2a/briefingProvider.ts` ↔ `lib/d2a/types.ts`, `lib/filtering/types.ts` ↔ `lib/filtering/serendipity.ts`) — `madge --circular` now reports zero cycles
+- **Type consolidation**: `SchedulerSource` deduplicated across `contexts/SourceContext.tsx` and `lib/ingestion/scheduler.ts`; 7 inline `"quality" | "slop"` unions replaced with the shared `Verdict` alias; inline `syncStatus` unions consolidated to `ContentSyncStatus`
+- **DRY refactor**: extracted `postToApi<T>()` file-local helper in `lib/ingestion/fetchers.ts` consolidating the POST/JSON/error-callback/map scaffold shared by `fetchRSS`, `fetchNostr`, `fetchURL`, `fetchFarcaster` — net -105/+134 lines with clearer per-source intent, ETag/304 handling preserved via optional `onData` hook
+- **Weak type elimination**: 2 `any` removed (`lib/ic/icpLedger.ts` IDL factory → `IDL.InterfaceFactory`, `app/api/fetch/rss/route.ts` → precise `Parser.Output` narrowing), 3 redundant `as unknown as` WebSocket double-casts removed. ~85 `unknown` boundary occurrences audited and confirmed legitimate (JSON.parse narrowing, `catch (err: unknown)`, IDB/localStorage validation predicates)
+- **Defensive programming removed**: speculative outer `.catch` safety net in `contexts/content/icSync.ts:139-142` removed — the inner handler already wraps the only throwing call; remaining state-setter errors now surface as unhandled rejections so Sentry sees them instead of quiet `console.error` swallowing. Test `larp-audit-fixes.test.ts` updated to match the new contract
+- **AI-slop comment pass**: first-person "paste it back to me" debug-paste comment in `TranslationSettings.tsx` rewritten to user-neutral language. Broader search confirmed the codebase was already clean (prior LARP audits covered most of it)
+- **Legacy code scrub**: scoring cascade multi-backend fallback (Ollama→WebLLM→BYOK→IC→Server→Heuristic), Motoko persistent actor stable vars (M0169 rule), `storage/migrate.ts` IDB migration, and `__AEGIS_MOCK_AUTH` e2e fixture all correctly preserved as legitimate current-architecture paths
+- **MEDIUM/LOW items deferred**: ~40 candidates documented in `.claude/evaluations/` for future reference — Anthropic `POST /v1/messages` consolidation (3 sites with divergent error contracts), BYOK `x-user-api-key` header parsing (3 sites), localStorage config stores (8+ modules with per-domain validation). Deferred because consolidation would couple unrelated concerns or merge divergent contracts
+
 ### Code Quality, Test Coverage & Production Readiness Sweep
 - **405 suites / 7,133 tests** — zero failures, zero skipped, **zero TypeScript errors**
 - **Refactoring**: extracted `scoredItemFields()` shared builder eliminating 3-site ContentItem construction duplication (ContentContext, scheduler, pipeline), `buildSourceConfig()` helper in SourceContext, `loadFromLocalStorage()` in scoring cache, cached `fetchCallbacks` in scheduler constructor
