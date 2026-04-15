@@ -1,8 +1,28 @@
 # Growth Suite Implementation Plan
 
-> **Status**: draft for review — do not begin implementation until decision points are resolved.
+> **Status**: decisions recorded (2026-04-15) — cleared for phased implementation in recommended sequence.
 > **Scope**: 7 features (#3 badges, #4 D2A spec, #6 SDK, #7 OpenAPI, #8 CONTRIBUTING, #9 RSS, #10 transparency UI)
 > **Critical finding**: investigation surfaced that `lib/agent` and `lib/d2a` are entangled via `discovery.ts → d2a/manifest → agent/protocol → nostr/types` — this affects Feature 6 SDK extraction boundaries.
+
+## Decisions recorded (2026-04-15)
+
+| # | Topic | Decision |
+|---|---|---|
+| 1 | RSS auth (#9) | **Option B — principal-in-URL public** ship first; migrate to C (canister-stored opaque feed secret) only if abuse observed |
+| 2 | npm org (#6) | `@aegis` — **verified available** at registry.npmjs.org (both `@aegis` and `@aegis-ai` return ResourceNotFound, so either is claimable; proceeding with `@aegis`) |
+| 3 | LICENSE (#6) | **MIT** — add to repo root (currently absent) and to every published package |
+| 4 | Transparency UI default (#10) | **OFF** — modal opened from existing Dashboard burned-count badge, not surfaced proactively |
+| 5 | LLM raw response (#10) | **Summary-only** — keep existing 500-char `reason` field; no schema change |
+| 6 | D2A spec (#4) | **Independent spec first**; NIP draft only after external implementers appear |
+| 7 | principal↔pubkey binding (#4) | **Self-asserted**; document as "advisory, verifiable via IC canister query" |
+| 8 | SDK semver start (#6) | **v0.1.0** — SDK and protocol versions independent |
+
+## Resolved unknowns (investigated)
+
+- **LICENSE file**: NOT present in repo. Phase 0 of Feature 6 must add `LICENSE` (MIT) at root.
+- **npm org availability**: `@aegis` and `@aegis-ai` both unclaimed (confirmed via `registry.npmjs.org/-/org/{name}` → `ResourceNotFound`).
+- **Discord community**: Live — `https://discord.gg/85JVzJaatT` (from `lib/config.ts:4`). Linkable from CONTRIBUTING.md.
+- **Security email / vulnerability reporting**: No `security@` email exists. Use GitHub's private vulnerability reporting (enable via repo settings) and reference it in CONTRIBUTING.md.
 
 ## Cross-feature considerations
 
