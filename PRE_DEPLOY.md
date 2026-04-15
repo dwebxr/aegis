@@ -117,11 +117,16 @@ npm audit --production    # must report "found 0 vulnerabilities"
 
 Verification + monitoring:
 ```sh
-npm view @scalar/api-reference-react version    # check for upstream bump past 0.9.22
-npm audit --json | jq '.vulnerabilities.dompurify.severity'  # should stay <=moderate
+npm run audit:guard                              # automated — fails build on any high/critical
+npm view @scalar/api-reference-react version    # manual — check for upstream bump past 0.9.22
 ```
 
-Trigger to re-evaluate: a `high` or `critical` severity entry appears for dompurify, OR Scalar ships a version pinning a patched dompurify.
+`npm run audit:guard` (`scripts/audit-guard.sh`) is the automated guardrail: it
+fails non-zero on any `high` or `critical` severity, so a moderate→high
+escalation cannot ship silently.
+
+Trigger to re-evaluate: `audit:guard` fails OR Scalar ships a version pinning
+a patched dompurify.
 
 ### Task #32 — Qwen3 / Llama4Scout cycle-cost verification
 

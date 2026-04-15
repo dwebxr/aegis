@@ -38,12 +38,6 @@ export async function GET(request: NextRequest) {
     console.warn("[health] IC canister check failed:", errMsg(err));
   }
 
-  // Surface advertised public endpoints. They are routed via Next.js
-  // file-based routing — presence is build-time guaranteed; this entry
-  // confirms the surface for ops/uptime probes that reflect on /api/health.
-  checks.feedRoutes = "/api/feed/rss, /api/feed/atom";
-  checks.apiDocs = "/api-docs";
-
   // "ok" requires only services that make the app non-functional when absent.
   // Sentry and KV are advisory: the app works without them.
   const allOk = checks.anthropicKey === "configured" && checks.icCanister === "reachable";
@@ -60,6 +54,14 @@ export async function GET(request: NextRequest) {
     node: process.version,
     region: (process.env.VERCEL_REGION || "local").trim(),
     checks,
+    // Documentation only — these are static routes whose presence is
+    // build-time guaranteed by Next.js file-based routing. NOT probed.
+    publicRoutes: [
+      "/api/feed/rss",
+      "/api/feed/atom",
+      "/api-docs",
+      "/openapi.yaml",
+    ],
   });
   response.headers.set("Cache-Control", "no-store");
   return response;

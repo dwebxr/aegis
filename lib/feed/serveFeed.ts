@@ -62,14 +62,26 @@ export async function serveFeed(request: NextRequest, format: FeedFormat): Promi
     );
   }
 
+  // Per-item shape is not validated by briefingProvider — defend against a
+  // malformed item (missing scores.composite, title, content) crashing the
+  // serializer with no Sentry context.
   const links = selfLinks(principal);
-  const feed = buildFeed({ briefing, principal, rssSelfUrl: links.rss, atomSelfUrl: links.atom });
-  const { contentType, serialize } = SERIALIZERS[format];
+  let xml: string;
+  try {
+    const feed = buildFeed({ briefing, principal, rssSelfUrl: links.rss, atomSelfUrl: links.atom });
+    xml = SERIALIZERS[format].serialize(feed);
+  } catch (err) {
+    console.error(`[feed/${format}] feed serialization failed for ${principal}:`, errMsg(err));
+    return NextResponse.json(
+      { error: "Briefing data is malformed and cannot be rendered" },
+      { status: 502 },
+    );
+  }
 
-  return new NextResponse(serialize(feed), {
+  return new NextResponse(xml, {
     status: 200,
     headers: {
-      "Content-Type": contentType,
+      "Content-Type": SERIALIZERS[format].contentType,
       "Cache-Control": CACHE_HEADER,
       "X-Aegis-Briefing-Items": String(briefing.items.length),
       "X-Aegis-Generated-At": briefing.generatedAt,

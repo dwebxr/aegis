@@ -188,6 +188,23 @@ describe("briefing-shape edge cases", () => {
 });
 
 describe("provider failure modes", () => {
+  it("returns 502 when buildFeed throws on a malformed item shape", async () => {
+    // briefingProvider only validates briefing-level shape; per-item missing
+    // scores.composite crashes item.scores.composite.toFixed() in summarize().
+    const malformedItem = { ...item(), scores: undefined as unknown as { composite: number } };
+    (getLatestBriefing as jest.Mock).mockResolvedValue(briefing([malformedItem]));
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const r = await RSS_GET(makeReq(`/api/feed/rss?principal=${PRINCIPAL}`));
+    expect(r.status).toBe(502);
+    const body = await r.json();
+    expect(body.error).toMatch(/malformed/i);
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining("[feed/rss] feed serialization failed"),
+      expect.any(String),
+    );
+    spy.mockRestore();
+  });
+
   it("returns 502 + structured error when getLatestBriefing throws", async () => {
     (getLatestBriefing as jest.Mock).mockRejectedValue(new Error("IC down"));
     const r = await RSS_GET(makeReq(`/api/feed/rss?principal=${PRINCIPAL}`));

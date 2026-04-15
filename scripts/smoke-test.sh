@@ -180,6 +180,60 @@ else
 fi
 echo
 
+# ----- 5. /api-docs + /openapi.yaml -----
+echo "[5] /api-docs + /openapi.yaml"
+status=$(http_get "$BASE_URL/api-docs")
+if [ "$status" = "200" ]; then
+  if grep -q "scalar" /tmp/smoke-body 2>/dev/null; then
+    pass "/api-docs renders Scalar viewer"
+  else
+    fail "/api-docs returned 200 but Scalar marker not in body"
+  fi
+else
+  fail "/api-docs not served" "status=$status"
+fi
+status=$(http_get "$BASE_URL/openapi.yaml")
+if [ "$status" = "200" ]; then
+  if head -1 /tmp/smoke-body | grep -q "openapi:"; then
+    pass "/openapi.yaml served as YAML"
+  else
+    fail "/openapi.yaml first line not OpenAPI"
+  fi
+else
+  fail "/openapi.yaml not served" "status=$status"
+fi
+echo
+
+# ----- 6. /api/feed/{rss,atom} contract -----
+# Without AEGIS_FEED_PRINCIPAL set, only the validation contract is exercised
+# (400 / 404 paths). With AEGIS_FEED_PRINCIPAL=<known-principal>, also probes
+# end-to-end IC briefing → RSS render.
+echo "[6] /api/feed contract"
+status=$(http_get "$BASE_URL/api/feed/rss")
+if [ "$status" = "400" ]; then pass "rss missing-principal → 400"; else fail "rss missing-principal expected 400" "got $status"; fi
+status=$(http_get "$BASE_URL/api/feed/rss?principal=!!!invalid!!!")
+if [ "$status" = "400" ]; then pass "rss bad-principal → 400"; else fail "rss bad-principal expected 400" "got $status"; fi
+status=$(http_get "$BASE_URL/api/feed/atom")
+if [ "$status" = "400" ]; then pass "atom missing-principal → 400"; else fail "atom missing-principal expected 400" "got $status"; fi
+
+if [ -n "${AEGIS_FEED_PRINCIPAL:-}" ]; then
+  status=$(http_get "$BASE_URL/api/feed/rss?principal=$AEGIS_FEED_PRINCIPAL")
+  if [ "$status" = "200" ]; then
+    if head -1 /tmp/smoke-body | grep -q '<?xml'; then
+      pass "rss real-IC e2e: principal $AEGIS_FEED_PRINCIPAL → valid XML"
+    else
+      fail "rss real-IC: 200 but body is not XML" "first line: $(head -1 /tmp/smoke-body)"
+    fi
+  elif [ "$status" = "404" ]; then
+    pass "rss real-IC e2e: principal $AEGIS_FEED_PRINCIPAL → 404 (no briefing yet, contract OK)"
+  else
+    fail "rss real-IC: principal $AEGIS_FEED_PRINCIPAL unexpected" "status=$status"
+  fi
+else
+  echo "  skip: real-IC e2e (set AEGIS_FEED_PRINCIPAL to enable)"
+fi
+echo
+
 # ----- summary -----
 echo "—"
 echo "passed: $PASS"
