@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     description: "D2A Social Agent Platform — AI-curated content briefings with V/C/L scoring",
     version: "1.0",
     sourceUrl: APP_URL,
+    specUrl: "https://github.com/dwebxr/aegis/blob/main/docs/D2A_PROTOCOL.md",
     endpoints: {
       briefing: {
         url: "/api/d2a/briefing",
