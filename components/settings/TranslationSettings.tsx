@@ -146,9 +146,9 @@ const APP_VERSION =
  * Diagnostic panel showing the last N translation attempts (per-item
  * per-backend with timing + outcome). Mobile users — especially in
  * standalone PWA mode — cannot easily open the browser console, so the
- * cascade now writes its per-attempt diagnostics to localStorage and
- * this panel surfaces them. The "Copy" button puts the formatted log on
- * the clipboard so the user can paste it back to me for debugging.
+ * cascade writes its per-attempt diagnostics to localStorage and this
+ * panel surfaces them. The "Copy" button puts the formatted log on the
+ * clipboard so the user can share it when reporting translation issues.
  */
 const TranslationDebugPanel: React.FC<{ mobile?: boolean }> = ({ mobile }) => {
   const [entries, setEntries] = useState<TranslationDebugEntry[]>([]);
