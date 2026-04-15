@@ -13,6 +13,9 @@ import { SOURCE_PLATFORMS } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
 import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
 import { getSourceKey, resetSourceErrors } from "@/lib/ingestion/sourceState";
+import type { SchedulerSource } from "@/lib/ingestion/scheduler";
+
+export type { SchedulerSource };
 
 /** Content identity key: rss:{feedUrl}, nostr:{sorted relays}, fc:{fid}. */
 function contentKey(s: SavedSource): string {
@@ -40,8 +43,6 @@ function dedup(sources: SavedSource[]): SavedSource[] {
 function isDeletePending(s: SavedSource, pending: Set<string>): boolean {
   return pending.has(s.id) || pending.has(contentKey(s));
 }
-
-export type SchedulerSource = { type: "rss" | "url" | "nostr" | "farcaster"; config: Record<string, string>; enabled: boolean; platform?: import("@/lib/types/sources").SourcePlatform };
 
 interface SourceState {
   sources: SavedSource[];
