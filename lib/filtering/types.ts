@@ -35,4 +35,3 @@ export interface FilterPipelineStats {
   customRulesBurned: number;
 }
 
-export type { SerendipityItem, DiscoveryType } from "./serendipity";

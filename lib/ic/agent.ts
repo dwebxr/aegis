@@ -1,5 +1,5 @@
 import { HttpAgent, Identity } from "@dfinity/agent";
-export { getHost, getInternetIdentityUrl, getCanisterId, getDerivationOrigin, isLocal } from "./config";
+export { getHost, getInternetIdentityUrl, getCanisterId, getDerivationOrigin } from "./config";
 import { getHost, isLocal } from "./config";
 
 export function createAgent(identity?: Identity): HttpAgent {

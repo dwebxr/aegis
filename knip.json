@@ -1,0 +1,49 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "app/**/{page,layout,loading,error,not-found,global-error,template,default,route,sitemap,robots,manifest,icon,apple-icon,opengraph-image,twitter-image}.{ts,tsx}",
+    "app/**/route.ts",
+    "middleware.ts",
+    "instrumentation.ts",
+    "instrumentation-client.ts",
+    "sentry.client.config.ts",
+    "sentry.server.config.ts",
+    "sentry.edge.config.ts",
+    "next.config.mjs",
+    "postcss.config.mjs",
+    "jest.config.js",
+    "jest.setup.ts",
+    "playwright.config.ts",
+    "scripts/**/*.{ts,js,mjs}",
+    "e2e/**/*.{ts,tsx}",
+    "__tests__/**/*.{ts,tsx}",
+    "public/sw*.js"
+  ],
+  "project": [
+    "app/**/*.{ts,tsx}",
+    "components/**/*.{ts,tsx}",
+    "contexts/**/*.{ts,tsx}",
+    "hooks/**/*.{ts,tsx}",
+    "lib/**/*.{ts,tsx}",
+    "styles/**/*.{ts,tsx}"
+  ],
+  "ignore": [
+    "lib/ic/declarations/**",
+    "canisters/**",
+    "aegis_app.jsx",
+    "public/**"
+  ],
+  "ignoreDependencies": [
+    "tailwindcss",
+    "@tailwindcss/postcss",
+    "tw-animate-css",
+    "postcss",
+    "shadcn",
+    "sharp",
+    "eslint-config-next",
+    "@types/.*",
+    "fake-indexeddb",
+    "ts-jest"
+  ],
+  "ignoreBinaries": ["dfx"]
+}
