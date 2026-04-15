@@ -17,17 +17,6 @@ function feedItemId(item: D2ABriefingItem, fallbackIndex: number, principal: str
   return `urn:aegis:item:${principal}:${fallbackIndex}:${encodeURIComponent(item.title.slice(0, 80))}`;
 }
 
-function aegisExtensions(item: D2ABriefingItem): Array<{ name: string; objects: { _: string } }> {
-  const ext: Array<{ name: string; objects: { _: string } }> = [
-    { name: "aegis:composite", objects: { _: item.scores.composite.toFixed(2) } },
-    { name: "aegis:verdict", objects: { _: item.verdict } },
-  ];
-  for (const [key, value] of [["aegis:vSignal", item.scores.vSignal], ["aegis:cContext", item.scores.cContext], ["aegis:lSlop", item.scores.lSlop]] as const) {
-    if (value !== undefined) ext.push({ name: key, objects: { _: value.toFixed(2) } });
-  }
-  return ext;
-}
-
 export interface BuildFeedOptions {
   briefing: D2ABriefingResponse;
   principal: string;
@@ -66,9 +55,6 @@ export function buildFeed({ briefing, principal, rssSelfUrl, atomSelfUrl }: Buil
       date: updated,
       author: item.source ? [{ name: item.source }] : [],
       category: (item.topics ?? []).slice(0, 20).map(name => ({ name })),
-      // Custom Aegis namespace exposes per-item scores. Most readers ignore
-      // unknown namespaces; power-user readers (e.g. NetNewsWire) surface them.
-      extensions: aegisExtensions(item),
     });
   });
 

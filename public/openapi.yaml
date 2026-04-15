@@ -826,10 +826,11 @@ paths:
       description: |
         Returns the latest briefing for `principal` rendered as RSS 2.0 XML so
         any RSS reader can subscribe. Items inherit `<category>` per topic and
-        a custom `xmlns:aegis` namespace exposes V/C/L per-item scores. No
-        authentication: anyone with the principal can subscribe (matches the
-        existing `/api/d2a/briefing` semantics — see Decision 1 in the project
-        plan). Edge-cached with `s-maxage=300, stale-while-revalidate=600`.
+        the composite score is prefixed into each `<description>` as
+        `[score X.X]`. No authentication: anyone with the principal can
+        subscribe (matches the existing `/api/d2a/briefing` semantics —
+        see Decision 1 in the project plan). Edge-cached with
+        `s-maxage=300, stale-while-revalidate=600`.
       parameters:
         - name: principal
           in: query
