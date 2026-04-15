@@ -151,13 +151,15 @@ export const BurnedItemsDrawer: React.FC<BurnedItemsDrawerProps> = ({
         </DialogContent>
       </Dialog>
 
-      <WhyFilteredModal
-        open={selected !== null}
-        onClose={() => setSelected(null)}
-        item={selected?.item ?? null}
-        reason={selected?.reason ?? null}
-        qualityThreshold={qualityThreshold}
-      />
+      {selected && (
+        <WhyFilteredModal
+          open
+          onClose={() => setSelected(null)}
+          item={selected.item}
+          reason={selected.reason}
+          qualityThreshold={qualityThreshold}
+        />
+      )}
     </>
   );
 };

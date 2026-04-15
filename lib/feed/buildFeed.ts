@@ -4,11 +4,16 @@ import { APP_URL } from "@/lib/config";
 
 const SUMMARY_MAX_CHARS = 600;
 
+/** Code-point-safe truncation: never splits a surrogate pair (e.g. emoji). */
+function truncateByCodePoint(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  const codePoints = Array.from(text); // iterates by Unicode code point
+  if (codePoints.length <= maxChars) return text;
+  return codePoints.slice(0, maxChars).join("").trimEnd() + "…";
+}
+
 function summarize(item: D2ABriefingItem): string {
-  const text = item.content.length > SUMMARY_MAX_CHARS
-    ? item.content.slice(0, SUMMARY_MAX_CHARS).trimEnd() + "…"
-    : item.content;
-  return `[score ${item.scores.composite.toFixed(1)}] ${text}`;
+  return `[score ${item.scores.composite.toFixed(1)}] ${truncateByCodePoint(item.content, SUMMARY_MAX_CHARS)}`;
 }
 
 function feedItemId(item: D2ABriefingItem, fallbackIndex: number, principal: string): string {

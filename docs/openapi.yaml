@@ -66,9 +66,6 @@ paths:
       responses:
         '200':
           description: Scoring result (single) or batched results.
-          headers:
-            X-Aegis-Tier:
-              $ref: '#/components/headers/XAegisTier'
           content:
             application/json:
               schema:
@@ -127,9 +124,6 @@ paths:
       responses:
         '200':
           description: Digest paragraph.
-          headers:
-            X-Aegis-Tier:
-              $ref: '#/components/headers/XAegisTier'
           content:
             application/json:
               schema:
@@ -1073,9 +1067,6 @@ paths:
       responses:
         '200':
           description: Translation string.
-          headers:
-            X-Aegis-Tier:
-              $ref: '#/components/headers/XAegisTier'
           content:
             application/json:
               schema:
@@ -1147,16 +1138,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
 components:
-  headers:
-    XAegisTier:
-      description: |
-        Scoring tier that produced the response. Implementations may emit
-        this header on AI-backed routes; callers MUST treat it as optional
-        and informational.
-      schema:
-        type: string
-        enum: [heuristic, claude, ic, ollama, webllm, mediapipe]
-
   securitySchemes:
     byokApiKey:
       type: apiKey

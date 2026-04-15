@@ -1,9 +1,12 @@
 /**
  * @aegis/d2a-client — Node example.
  *
- * Run from the package directory:
- *   npm install --include=dev
- *   npm install nostr-tools tsx
+ * Consumer install:
+ *   npm install @aegis/d2a-client nostr-tools tsx
+ *   npx tsx node_modules/@aegis/d2a-client/examples/node-offer.ts
+ *
+ * Repo-internal run (dev):
+ *   cd packages/d2a-client && npm install
  *   npx tsx examples/node-offer.ts
  *
  * This script:
@@ -24,7 +27,7 @@ import {
   DEFAULT_RELAYS,
   DISCOVERY_POLL_INTERVAL_MS,
   type ResonancePrefs,
-} from "../src";
+} from "@aegis/d2a-client";
 
 async function main(): Promise<void> {
   const sk = generateSecretKey();

@@ -89,6 +89,19 @@ describe("buildFeed — RSS 2.0 output", () => {
     // Description (truncated) and content (full) both present.
     expect(xml).toContain("…");
   });
+
+  it("truncation does not split a UTF-16 surrogate pair (emoji safety)", () => {
+    // 600 'x' chars then a single 4-byte emoji at exactly position 600. A
+    // naive .slice(0, 600) would land mid-content; .slice(0, 601) would split
+    // the emoji's surrogate pair and produce an invalid Unicode string.
+    // We verify the output description never contains a lone surrogate.
+    const text = "x".repeat(599) + "🚀" + "tail";
+    const feed = buildFeed({ briefing: makeBriefing([makeItem({ content: text })]), principal: PRINCIPAL, rssSelfUrl: RSS_URL, atomSelfUrl: ATOM_URL });
+    const xml = feed.rss2();
+    // Lone high-surrogate (0xD800-0xDBFF) without a paired low-surrogate.
+    const loneSurrogate = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    expect(xml).not.toMatch(loneSurrogate);
+  });
 });
 
 describe("buildFeed — Atom 1.0 output", () => {

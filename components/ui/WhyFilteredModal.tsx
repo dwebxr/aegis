@@ -16,8 +16,8 @@ export type BurnReasonKind =
 interface WhyFilteredModalProps {
   open: boolean;
   onClose: () => void;
-  item: ContentItem | null;
-  reason: BurnReasonKind | null;
+  item: ContentItem;
+  reason: BurnReasonKind;
   qualityThreshold: number;
 }
 
@@ -58,19 +58,6 @@ export const WhyFilteredModal: React.FC<WhyFilteredModalProps> = ({
   reason,
   qualityThreshold,
 }) => {
-  if (!item || !reason) {
-    return (
-      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Why was this filtered?</DialogTitle>
-          </DialogHeader>
-          <p className="text-body-sm text-muted-foreground">No item selected.</p>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   const decoded = decodeEngineFromReason(item.reason);
   const engine = item.scoringEngine ?? decoded.engine;
   const engineLabel = engine ? ENGINE_LABELS[engine] : "Unknown engine";

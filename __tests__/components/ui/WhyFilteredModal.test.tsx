@@ -31,19 +31,6 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 }
 
 describe("WhyFilteredModal", () => {
-  it("renders 'No item selected' when item is null", () => {
-    render(
-      <WhyFilteredModal
-        open
-        onClose={() => {}}
-        item={null}
-        reason={null}
-        qualityThreshold={4}
-      />,
-    );
-    expect(screen.getByText(/No item selected/i)).toBeInTheDocument();
-  });
-
   it("renders verdict-slop banner with item text and engine label", () => {
     const item = makeItem();
     const reason: BurnReasonKind = { kind: "verdict-slop" };
