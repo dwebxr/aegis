@@ -1,0 +1,1831 @@
+openapi: 3.1.0
+info:
+  title: Aegis API
+  version: 1.0.0
+  summary: HTTP surface for the Aegis D2A social agent platform.
+  description: |
+    Aegis is a decentralized social agent platform that scores and curates
+    content across Nostr, Farcaster, RSS, X, and arbitrary URLs using the
+    V/C/L rubric (V=signal, C=context, L=slop) with a multi-tier scoring
+    cascade (local LLMs -> BYOK Claude -> IC LLM -> server Claude ->
+    heuristic fallback). This document describes the 19 public HTTP
+    endpoints exposed by the Next.js app at https://aegis-ai.xyz/api.
+    D2A endpoints additionally implement the x402 payment protocol and
+    CORS for cross-origin agent-to-agent consumption.
+  license:
+    name: MIT
+    url: https://github.com/dwebxr/aegis/blob/main/LICENSE
+  contact:
+    name: Aegis on GitHub
+    url: https://github.com/dwebxr/aegis
+
+servers:
+  - url: https://aegis-ai.xyz
+    description: Production
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: Scoring
+    description: AI-backed scoring and digest generation (V/C/L cascade, BYOK-aware).
+  - name: Fetching
+    description: Content source ingestion from Nostr, Farcaster, RSS, X, URLs, and feed discovery.
+  - name: D2A
+    description: Decentralized-to-Agent briefing surface (x402-paid, CORS-enabled).
+  - name: Push notifications
+    description: Web Push subscription fan-out (HMAC token authorized).
+  - name: Operational
+    description: Health checks, image upload, translation.
+
+paths:
+  /api/analyze:
+    post:
+      tags: [Scoring]
+      summary: Score one or more texts via the Claude scoring cascade
+      description: |
+        Scores a single `text` or a batch of `texts` (max 10, each truncated
+        to 10,000 chars). When a BYOK header `x-user-api-key` starting with
+        `sk-ant-` is present, the user's key is used and no server budget is
+        consumed. Otherwise the operator's `ANTHROPIC_API_KEY` is used, gated
+        by a daily budget. If the key is absent or the budget is exhausted,
+        the endpoint transparently returns heuristic-tier scores with a 200
+        status (never a 503). On Claude parse/response failure in single
+        mode, the endpoint returns 502 with a `fallback` heuristic payload.
+      operationId: analyzeText
+      security:
+        - {}
+        - byokApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/AnalyzeSingleRequest'
+                - $ref: '#/components/schemas/AnalyzeBatchRequest'
+      responses:
+        '200':
+          description: Scoring result (single) or batched results.
+          headers:
+            X-Aegis-Tier:
+              $ref: '#/components/headers/XAegisTier'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AnalyzeResponse'
+                  - $ref: '#/components/schemas/AnalyzeBatchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          description: Upstream scoring failed; heuristic fallback is included.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, fallback]
+                properties:
+                  error:
+                    type: string
+                    enum:
+                      - Failed to parse AI response
+                      - Failed to parse Anthropic response
+                      - Request failed
+                  fallback:
+                    $ref: '#/components/schemas/AnalyzeResponse'
+
+  /api/briefing/digest:
+    post:
+      tags: [Scoring]
+      summary: Generate a 200-300 char digest paragraph for top articles
+      description: |
+        Produces a single paragraph digest of up to 5 pre-scored articles.
+        Claude-only: if no API key is available returns 503; if the
+        operator's daily budget is exhausted returns 429. Language is
+        auto-selected (Japanese if input is Japanese, otherwise English).
+      operationId: generateDigest
+      security:
+        - {}
+        - byokApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [articles]
+              properties:
+                articles:
+                  type: array
+                  minItems: 1
+                  maxItems: 5
+                  description: Only the first 5 items are used; extras ignored.
+                  items:
+                    $ref: '#/components/schemas/DigestArticle'
+      responses:
+        '200':
+          description: Digest paragraph.
+          headers:
+            X-Aegis-Tier:
+              $ref: '#/components/headers/XAegisTier'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [digest]
+                properties:
+                  digest:
+                    type: string
+                    description: 200-300 char paragraph; empty string on upstream content miss.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          description: Rate limited OR daily budget exhausted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Anthropic request failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: No API key available.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/d2a/briefing:
+    get:
+      tags: [D2A]
+      summary: Get curated briefing (x402-paid)
+      description: |
+        Returns either a principal-specific briefing (`?principal=`) or a
+        paginated global summary. When `X402_RECEIVER` is configured, the
+        endpoint is wrapped in x402 payment middleware and callers must
+        include `Authorization: Bearer <x402-token>` (see https://x402.org).
+        If `X402_FREE_TIER_ENABLED` is `true`, `?preview=true` returns a
+        truncated payload without payment. Supports CORS for allowlisted
+        origins.
+      operationId: getD2ABriefing
+      security:
+        - {}
+        - x402: []
+      parameters:
+        - name: principal
+          in: query
+          required: false
+          description: IC principal (text form) for a user-specific briefing.
+          schema:
+            type: string
+        - name: preview
+          in: query
+          required: false
+          description: When `X402_FREE_TIER_ENABLED`, set `true` to bypass payment.
+          schema:
+            type: string
+            enum: [true]
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          description: Per-user path default 50 / max 100; global path default 5 / max 10.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: since
+          in: query
+          required: false
+          description: ISO 8601 timestamp; excludes briefings generated before it.
+          schema:
+            type: string
+            format: date-time
+        - name: topics
+          in: query
+          required: false
+          description: Comma-separated topic filter (case-insensitive, OR logic).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Per-user or global briefing.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/D2ABriefingResponse'
+                  - $ref: '#/components/schemas/GlobalBriefingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '402':
+          description: x402 payment required (when receiver configured and preview disabled).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No briefing available for principal, or no global briefings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    options:
+      tags: [D2A]
+      summary: CORS preflight
+      operationId: d2aBriefingOptions
+      responses:
+        '204':
+          description: Preflight response with CORS headers.
+
+  /api/d2a/briefing/changes:
+    get:
+      tags: [D2A]
+      summary: Diff endpoint — item hashes since a timestamp
+      description: |
+        Lightweight diff returning `added` item hashes from briefings
+        generated after `since`. Useful for agents polling for new content
+        without fetching full payloads. Only returns `"action": "added"`
+        (true diff with updated/removed requires server-side snapshot
+        storage which is not implemented).
+      operationId: getD2ABriefingChanges
+      parameters:
+        - name: since
+          in: query
+          required: true
+          description: ISO 8601 timestamp.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: List of new items since `since`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    options:
+      tags: [D2A]
+      summary: CORS preflight
+      operationId: d2aBriefingChangesOptions
+      responses:
+        '204':
+          description: Preflight response with CORS headers.
+
+  /api/d2a/health:
+    get:
+      tags: [D2A]
+      summary: D2A subsystem health check
+      operationId: getD2AHealth
+      responses:
+        '200':
+          description: Health status (ok or degraded).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/D2AHealthResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    options:
+      tags: [D2A]
+      summary: CORS preflight
+      operationId: d2aHealthOptions
+      responses:
+        '204':
+          description: Preflight response with CORS headers.
+
+  /api/d2a/info:
+    get:
+      tags: [D2A]
+      summary: D2A service descriptor (well-known manifest)
+      description: |
+        Machine-readable manifest describing D2A endpoints, pricing,
+        payment protocol, and the V/C/L scoring schema. Cached for 5
+        minutes at the edge.
+      operationId: getD2AInfo
+      responses:
+        '200':
+          description: Service descriptor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/D2AInfoResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    options:
+      tags: [D2A]
+      summary: CORS preflight
+      operationId: d2aInfoOptions
+      responses:
+        '204':
+          description: Preflight response with CORS headers.
+
+  /api/fetch/briefing:
+    get:
+      tags: [Fetching]
+      summary: Fetch a single Nostr long-form (NIP-23) briefing by naddr
+      operationId: fetchBriefingByNaddr
+      parameters:
+        - name: naddr
+          in: query
+          required: true
+          description: NIP-19 naddr pointing to a long-form event (kind 30023). Max 1000 chars.
+          schema:
+            type: string
+            maxLength: 1000
+      responses:
+        '200':
+          description: Decoded long-form event.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [content, tags, pubkey, created_at]
+                properties:
+                  content:
+                    type: string
+                  tags:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: string
+                  pubkey:
+                    type: string
+                  created_at:
+                    type: integer
+                    description: Unix seconds.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Event not found on relays.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          description: Relay query failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Relay query timed out.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/fetch/discover-feed:
+    post:
+      tags: [Fetching]
+      summary: Discover RSS/Atom feeds for a URL
+      description: |
+        Given a site URL, discovers feed URLs by (1) checking known platforms
+        (YouTube, etc.) via `detectPlatformFeed`, (2) parsing `<link
+        rel="alternate">` tags from fetched HTML, and (3) probing common
+        paths (`/feed`, `/rss`, `/feed.xml`, `/atom.xml`, `/rss.xml`,
+        `/index.xml`) via HEAD. Blocks private/internal URLs via SSRF guard.
+      operationId: discoverFeed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+      responses:
+        '200':
+          description: Feed list (may be empty).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [feeds]
+                properties:
+                  feeds:
+                    type: array
+                    items:
+                      type: object
+                      required: [url]
+                      properties:
+                        url:
+                          type: string
+                          format: uri
+                        title:
+                          type: string
+                        type:
+                          type: string
+                          enum: [rss, atom]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/fetch/farcaster:
+    post:
+      tags: [Fetching]
+      summary: Resolve a Farcaster username or fetch a user's cast feed
+      description: |
+        Two actions selected by `action` field. `resolve` turns a username
+        into an FID plus profile metadata. `feed` returns up to 50 casts
+        for the given FID (filtered to cast-add messages) with best-effort
+        profile enrichment from Farcaster Hub (Pinata).
+      operationId: fetchFarcaster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/FarcasterResolveRequest'
+                - $ref: '#/components/schemas/FarcasterFeedRequest'
+      responses:
+        '200':
+          description: Resolve result, feed, or partial feed with warning.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/FarcasterResolveResponse'
+                  - $ref: '#/components/schemas/FarcasterFeedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Farcaster user not found (resolve action only).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          description: Farcaster Hub unavailable or upstream error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/fetch/nostr:
+    post:
+      tags: [Fetching]
+      summary: Query Nostr relays for kind-1 notes
+      description: |
+        Queries up to 20 relays (with SSRF guard via `blockPrivateRelay`)
+        for short-text notes. Optionally filters by pubkeys, hashtags, and
+        `since` timestamp. Returns events with best-effort kind-0 profile
+        enrichment. Timeouts return an empty events array with `warning`
+        (HTTP 200) rather than erroring.
+      operationId: fetchNostr
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [relays]
+              properties:
+                relays:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: string
+                    maxLength: 2000
+                pubkeys:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: string
+                    maxLength: 128
+                hashtags:
+                  type: array
+                  maxItems: 30
+                  items:
+                    type: string
+                    maxLength: 100
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 20
+                since:
+                  type: integer
+                  description: Unix seconds lower bound.
+      responses:
+        '200':
+          description: Events plus profile map. Warning present on soft timeouts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NostrFetchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          description: Internal module load error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Relay query failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/fetch/ogimage:
+    post:
+      tags: [Fetching]
+      summary: Extract OpenGraph image URL from a page (single or batch)
+      description: |
+        Single mode (`url`) returns `{ imageUrl: string | null }`. Batch
+        mode (`urls`, max 30) returns `{ results: [...] }`. Responses are
+        cached in-process via the og-image cache. SSRF-guarded and capped
+        at 50 KB of downloaded HTML.
+      operationId: fetchOgImage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [url]
+                  properties:
+                    url:
+                      type: string
+                      format: uri
+                - type: object
+                  required: [urls]
+                  properties:
+                    urls:
+                      type: array
+                      minItems: 1
+                      maxItems: 30
+                      items:
+                        type: string
+                        format: uri
+      responses:
+        '200':
+          description: Image URL or batch of results.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [imageUrl]
+                    properties:
+                      imageUrl:
+                        type: string
+                        format: uri
+                        nullable: true
+                  - type: object
+                    required: [results]
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          type: object
+                          required: [url, imageUrl]
+                          properties:
+                            url:
+                              type: string
+                            imageUrl:
+                              type: string
+                              format: uri
+                              nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/fetch/rss:
+    post:
+      tags: [Fetching]
+      summary: Fetch and parse an RSS/Atom feed
+      description: |
+        Parses a feed URL with conditional fetch support (pass `etag` and
+        `lastModified` from a prior response; returns `notModified: true`
+        on 304). SSRF-guarded. Content is stripped of HTML and truncated
+        to 5000 chars per item; limit is bounded to 50. Response is edge-
+        cached for 5 minutes with SWR.
+      operationId: fetchRSS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feedUrl]
+              properties:
+                feedUrl:
+                  type: string
+                  format: uri
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  default: 20
+                etag:
+                  type: string
+                lastModified:
+                  type: string
+      responses:
+        '200':
+          description: Feed items or notModified sentinel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FetchRSSResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          description: Feed could not be parsed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          description: Network error or non-2xx upstream.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/fetch/twitter:
+    post:
+      tags: [Fetching]
+      summary: Search X (Twitter) recent tweets
+      description: |
+        Requires a user-supplied X API v2 bearer token in the request body
+        (not an operator secret). Uses `v2.search` with author expansion.
+        X "Basic" tier ($200/mo) or higher is required for search.
+      operationId: fetchTwitter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bearerToken, query]
+              properties:
+                bearerToken:
+                  type: string
+                  description: X API v2 bearer token.
+                query:
+                  type: string
+                maxResults:
+                  type: integer
+                  minimum: 10
+                  maximum: 100
+                  default: 10
+      responses:
+        '200':
+          description: Matching tweets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FetchTwitterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid or expired bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: API access tier does not include search.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Aegis or X API rate limit hit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/fetch/url:
+    post:
+      tags: [Fetching]
+      summary: Extract article content from a URL (single or batch)
+      description: |
+        Uses `@extractus/article-extractor`. SSRF-guarded. Cached. Single
+        mode preserves exact status codes for backward compat; batch mode
+        (max 10) returns a uniform 200 with per-item results or error
+        strings. Minimum extracted length is 50 characters.
+      operationId: fetchURL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [url]
+                  properties:
+                    url:
+                      type: string
+                      format: uri
+                - type: object
+                  required: [urls]
+                  properties:
+                    urls:
+                      type: array
+                      minItems: 1
+                      maxItems: 10
+                      items:
+                        type: string
+                        format: uri
+      responses:
+        '200':
+          description: Single extraction result OR batch of results.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/FetchURLResponse'
+                  - type: object
+                    required: [results]
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          oneOf:
+                            - allOf:
+                                - $ref: '#/components/schemas/FetchURLResponse'
+                                - type: object
+                                  required: [url]
+                                  properties:
+                                    url:
+                                      type: string
+                            - type: object
+                              required: [url, error]
+                              properties:
+                                url:
+                                  type: string
+                                error:
+                                  type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          description: Page had no parseable content or text was too short.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          description: Could not reach the URL.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/health:
+    get:
+      tags: [Operational]
+      summary: App health check
+      description: |
+        Reports status of Anthropic key, Sentry DSN, Vercel KV, and IC
+        canister reachability. `ok` requires Anthropic key AND IC canister;
+        Sentry and KV are advisory.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Health status (ok or degraded).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/push/send:
+    post:
+      tags: [Push notifications]
+      summary: Send a Web Push notification to a principal's subscriptions
+      description: |
+        Caller must include an HMAC-SHA256 `token` (obtained via
+        `/api/push/token`) that matches the `principal`. The server fans
+        out to all of the principal's Web Push subscriptions stored in the
+        IC canister and cleans up expired endpoints (HTTP 410/404).
+      operationId: sendPushNotification
+      security:
+        - pushToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [principal, token]
+              properties:
+                principal:
+                  type: string
+                  description: IC principal in text form.
+                token:
+                  type: string
+                  description: HMAC-SHA256 token from /api/push/token.
+                title:
+                  type: string
+                  default: Aegis Briefing
+                body:
+                  type: string
+                  default: Your new briefing is ready.
+                url:
+                  type: string
+                  default: /
+                tag:
+                  type: string
+                  default: aegis-briefing
+      responses:
+        '200':
+          description: Fan-out result.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [sent, message]
+                    properties:
+                      sent:
+                        type: integer
+                        enum: [0]
+                      message:
+                        type: string
+                        enum: [No subscriptions]
+                  - type: object
+                    required: [sent, failed, expired, cleanupFailed]
+                    properties:
+                      sent:
+                        type: integer
+                      failed:
+                        type: integer
+                      expired:
+                        type: integer
+                      cleanupFailed:
+                        type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Invalid or missing push token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: Push not configured (missing VAPID keys).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/push/token:
+    post:
+      tags: [Push notifications]
+      summary: Mint a push token for a principal
+      description: |
+        Returns an HMAC-SHA256 token to authorize subsequent calls to
+        `/api/push/send` for that principal. The token must then be passed
+        in the `token` request body field on send.
+      operationId: mintPushToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [principal]
+              properties:
+                principal:
+                  type: string
+      responses:
+        '200':
+          description: Token for the given principal.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token]
+                properties:
+                  token:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: Push not configured.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/translate:
+    post:
+      tags: [Operational]
+      summary: Translate via Claude (BYOK-ONLY)
+      description: |
+        Translation is strict BYOK: the operator's Anthropic key is NEVER
+        used here (intentional policy, see README "Translation Subsystem
+        Rebuild"). An anonymous request returns 401. The client sends a
+        fully-prepared prompt (max 10,000 chars); the endpoint forwards to
+        Claude and returns the raw translation string.
+      operationId: translate
+      security:
+        - byokApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                  maxLength: 10000
+      responses:
+        '200':
+          description: Translation string.
+          headers:
+            X-Aegis-Tier:
+              $ref: '#/components/headers/XAegisTier'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [translation]
+                properties:
+                  translation:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: BYOK key missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          description: Claude API error or empty response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/upload/image:
+    post:
+      tags: [Operational]
+      summary: Upload an image to nostr.build
+      description: |
+        Accepts multipart/form-data with `file` field. Validates type by
+        magic bytes (JPEG/PNG/GIF/WebP) — client-provided MIME is not
+        trusted. Max 5 MB. Forwards to nostr.build with an optional pass-
+        through `Authorization` header (NIP-98) and returns the uploaded
+        URL.
+      operationId: uploadImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Uploaded image URL.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          description: Image host unreachable, error, or malformed response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  headers:
+    XAegisTier:
+      description: |
+        Scoring tier that produced the response. Implementations may emit
+        this header on AI-backed routes; callers MUST treat it as optional
+        and informational.
+      schema:
+        type: string
+        enum: [heuristic, claude, ic, ollama, webllm, mediapipe]
+
+  securitySchemes:
+    byokApiKey:
+      type: apiKey
+      in: header
+      name: x-user-api-key
+      description: |
+        User's Anthropic API key ("Bring Your Own Key"). Must start with
+        `sk-ant-`. When present, server budget and operator key are
+        bypassed.
+    pushToken:
+      type: apiKey
+      in: header
+      name: token
+      description: |
+        HMAC-SHA256 push token obtained from `/api/push/token`. (Note: the
+        token is passed in the JSON body, not a header, on /api/push/send;
+        this security scheme documents the credential semantically.)
+    x402:
+      type: http
+      scheme: bearer
+      bearerFormat: x402
+      description: |
+        x402 payment protocol authorization (see https://x402.org). Applies
+        to `/api/d2a/briefing` when `X402_RECEIVER` is configured and
+        `preview=true` is not set.
+
+  responses:
+    BadRequest:
+      description: Invalid request (missing/malformed input).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    RateLimited:
+      description: Too many requests — see `Retry-After` header.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            description: Seconds until the rate-limit window resets.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    Verdict:
+      type: string
+      enum: [quality, slop]
+
+    ScoringEngine:
+      type: string
+      enum:
+        - ollama
+        - webllm
+        - mediapipe
+        - claude-byok
+        - claude-ic
+        - claude-server
+        - heuristic
+
+    ScoreBreakdown:
+      type: object
+      required: [originality, insight, credibility, composite]
+      properties:
+        originality:
+          type: number
+          minimum: 0
+          maximum: 10
+        insight:
+          type: number
+          minimum: 0
+          maximum: 10
+        credibility:
+          type: number
+          minimum: 0
+          maximum: 10
+        composite:
+          type: number
+          minimum: 0
+          maximum: 10
+
+    UserContext:
+      type: object
+      description: Optional personalization context for V/C/L scoring.
+      properties:
+        recentTopics:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 80
+        highAffinityTopics:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 80
+        lowAffinityTopics:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 80
+        trustedAuthors:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 80
+
+    AnalyzeSingleRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          maxLength: 10000
+        userContext:
+          $ref: '#/components/schemas/UserContext'
+
+    AnalyzeBatchRequest:
+      type: object
+      required: [texts]
+      properties:
+        texts:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 10000
+        userContext:
+          $ref: '#/components/schemas/UserContext'
+
+    AnalyzeResponse:
+      type: object
+      description: |
+        Single scoring result. Tier is conveyed inline via the `tier`
+        field (set to `heuristic` when falling back, `claude` when scored
+        by Claude). V/C/L and topics are present when personalized.
+      required: [originality, insight, credibility, composite, verdict, reason]
+      properties:
+        originality:
+          type: number
+          minimum: 0
+          maximum: 10
+        insight:
+          type: number
+          minimum: 0
+          maximum: 10
+        credibility:
+          type: number
+          minimum: 0
+          maximum: 10
+        composite:
+          type: number
+          minimum: 0
+          maximum: 10
+        verdict:
+          $ref: '#/components/schemas/Verdict'
+        reason:
+          type: string
+        vSignal:
+          type: number
+          minimum: 0
+          maximum: 10
+        cContext:
+          type: number
+          minimum: 0
+          maximum: 10
+        lSlop:
+          type: number
+          minimum: 0
+          maximum: 10
+        topics:
+          type: array
+          items:
+            type: string
+        scoredByAI:
+          type: boolean
+        scoringEngine:
+          $ref: '#/components/schemas/ScoringEngine'
+        tier:
+          type: string
+          enum: [heuristic, claude]
+          description: Emitted inline by /api/analyze to mark fallback vs AI scoring.
+
+    AnalyzeBatchResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyzeResponse'
+
+    DigestArticle:
+      type: object
+      required: [title, text, score, topics]
+      properties:
+        title:
+          type: string
+        text:
+          type: string
+        score:
+          type: number
+        topics:
+          type: array
+          items:
+            type: string
+
+    D2ABriefingItem:
+      type: object
+      required: [title, content, source, sourceUrl, scores, verdict, reason, topics, briefingScore]
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        source:
+          type: string
+        sourceUrl:
+          type: string
+          format: uri
+        scores:
+          allOf:
+            - $ref: '#/components/schemas/ScoreBreakdown'
+            - type: object
+              properties:
+                vSignal:
+                  type: number
+                cContext:
+                  type: number
+                lSlop:
+                  type: number
+        verdict:
+          $ref: '#/components/schemas/Verdict'
+        reason:
+          type: string
+        topics:
+          type: array
+          items:
+            type: string
+        briefingScore:
+          type: number
+
+    D2ABriefingResponse:
+      type: object
+      required: [version, generatedAt, source, sourceUrl, summary, items, serendipityPick, meta]
+      properties:
+        version:
+          type: string
+          enum: ["1.0"]
+        generatedAt:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum: [aegis]
+        sourceUrl:
+          type: string
+          format: uri
+        summary:
+          type: object
+          required: [totalEvaluated, totalBurned, qualityRate]
+          properties:
+            totalEvaluated:
+              type: integer
+            totalBurned:
+              type: integer
+            qualityRate:
+              type: number
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/D2ABriefingItem'
+        serendipityPick:
+          oneOf:
+            - $ref: '#/components/schemas/D2ABriefingItem'
+            - type: 'null'
+        meta:
+          type: object
+          required: [scoringModel, nostrPubkey, topics]
+          properties:
+            scoringModel:
+              type: string
+            nostrPubkey:
+              type: string
+              nullable: true
+            topics:
+              type: array
+              items:
+                type: string
+
+    BriefingChange:
+      type: object
+      required: [action, itemHash, title, sourceUrl, composite, generatedAt]
+      properties:
+        action:
+          type: string
+          enum: [added]
+        itemHash:
+          type: string
+        title:
+          type: string
+        sourceUrl:
+          type: string
+          format: uri
+        composite:
+          type: number
+        generatedAt:
+          type: string
+          format: date-time
+
+    ChangesResponse:
+      type: object
+      required: [since, checkedAt, changes]
+      properties:
+        since:
+          type: string
+          format: date-time
+        checkedAt:
+          type: string
+          format: date-time
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BriefingChange'
+
+    GlobalBriefingContributor:
+      type: object
+      required: [principal, generatedAt, summary, topItems]
+      properties:
+        principal:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        summary:
+          type: object
+          required: [totalEvaluated, totalBurned, qualityRate]
+          properties:
+            totalEvaluated:
+              type: integer
+            totalBurned:
+              type: integer
+            qualityRate:
+              type: number
+        topItems:
+          type: array
+          items:
+            type: object
+            required: [title, topics, briefingScore, verdict]
+            properties:
+              title:
+                type: string
+              topics:
+                type: array
+                items:
+                  type: string
+              briefingScore:
+                type: number
+              verdict:
+                $ref: '#/components/schemas/Verdict'
+
+    GlobalBriefingResponse:
+      type: object
+      required: [version, type, generatedAt, pagination, contributors, aggregatedTopics, totalEvaluated, totalQualityRate]
+      properties:
+        version:
+          type: string
+          enum: ["1.0"]
+        type:
+          type: string
+          enum: [global]
+        generatedAt:
+          type: string
+          format: date-time
+        pagination:
+          type: object
+          required: [offset, limit, total, hasMore]
+          properties:
+            offset:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            hasMore:
+              type: boolean
+        contributors:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlobalBriefingContributor'
+        aggregatedTopics:
+          type: array
+          items:
+            type: string
+        totalEvaluated:
+          type: integer
+        totalQualityRate:
+          type: number
+
+    D2AHealthResponse:
+      type: object
+      required: [status, timestamp, version, region, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          description: Git SHA (7 chars) or "local".
+        region:
+          type: string
+        checks:
+          type: object
+          required: [x402Receiver, x402Network, icCanister]
+          properties:
+            x402Receiver:
+              type: string
+              description: '"configured" or "not configured"'
+            x402Network:
+              type: string
+            icCanister:
+              type: string
+              description: One of "reachable", "unreachable", or "error (<status>)"
+
+    D2AInfoResponse:
+      type: object
+      required: [name, description, version, sourceUrl, specUrl, endpoints, payment, scoring, compatibility]
+      properties:
+        name:
+          type: string
+          enum: [Aegis]
+        description:
+          type: string
+        version:
+          type: string
+          enum: ["1.0"]
+        sourceUrl:
+          type: string
+          format: uri
+        specUrl:
+          type: string
+          format: uri
+        endpoints:
+          type: object
+          description: Human-readable endpoint descriptors for briefing/changes/info/health.
+          additionalProperties: true
+        payment:
+          type: object
+          required: [protocol, receiver, network, price, currency, usdcContract]
+          properties:
+            protocol:
+              type: string
+              enum: [x402]
+            receiver:
+              type: string
+            network:
+              type: string
+            price:
+              type: string
+            currency:
+              type: string
+              enum: [USDC]
+            usdcContract:
+              type: string
+        scoring:
+          type: object
+          required: [model, axes, legacy]
+          properties:
+            model:
+              type: string
+              enum: [aegis-vcl-v1]
+            axes:
+              type: object
+              required: [V_signal, C_context, L_slop]
+              properties:
+                V_signal:
+                  type: string
+                C_context:
+                  type: string
+                L_slop:
+                  type: string
+            legacy:
+              type: object
+              required: [originality, insight, credibility, composite]
+              properties:
+                originality:
+                  type: string
+                insight:
+                  type: string
+                credibility:
+                  type: string
+                composite:
+                  type: string
+        compatibility:
+          type: object
+          required: [x402Version]
+          properties:
+            x402Version:
+              type: integer
+              enum: [2]
+
+    HealthResponse:
+      type: object
+      required: [status, timestamp, version, node, region, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        warnings:
+          type: array
+          items:
+            type: string
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        node:
+          type: string
+        region:
+          type: string
+        checks:
+          type: object
+          required: [anthropicKey, sentryDsn, kvStore, canisterId, icCanister]
+          properties:
+            anthropicKey:
+              type: string
+              enum: [configured, missing]
+            sentryDsn:
+              type: string
+              enum: [configured, missing]
+            kvStore:
+              type: string
+            canisterId:
+              type: string
+            icCanister:
+              type: string
+
+    FetchURLResponse:
+      type: object
+      required: [title, author, content, source]
+      properties:
+        title:
+          type: string
+        author:
+          type: string
+        content:
+          type: string
+        description:
+          type: string
+        publishedDate:
+          type: string
+        source:
+          type: string
+          description: URL hostname.
+        imageUrl:
+          type: string
+          format: uri
+
+    FetchRSSItem:
+      type: object
+      required: [title, content, link]
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+          description: Plain text, stripped of HTML, max 5000 chars.
+        link:
+          type: string
+          format: uri
+        author:
+          type: string
+        publishedDate:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+
+    FetchRSSResponse:
+      type: object
+      required: [feedTitle, items]
+      properties:
+        feedTitle:
+          type: string
+        notModified:
+          type: boolean
+          description: True when upstream returned 304.
+        etag:
+          type: string
+        lastModified:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/FetchRSSItem'
+
+    FetchTwitterResponse:
+      type: object
+      required: [tweets]
+      properties:
+        tweets:
+          type: array
+          items:
+            type: object
+            required: [id, text, author, authorHandle, createdAt]
+            properties:
+              id:
+                type: string
+              text:
+                type: string
+              author:
+                type: string
+              authorHandle:
+                type: string
+              createdAt:
+                type: string
+
+    NostrEvent:
+      type: object
+      required: [id, pubkey, content, createdAt, tags]
+      properties:
+        id:
+          type: string
+        pubkey:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: integer
+          description: Unix seconds.
+        tags:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+
+    NostrFetchResponse:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/NostrEvent'
+        profiles:
+          type: object
+          description: Pubkey -> profile metadata (best-effort).
+          additionalProperties:
+            type: object
+            properties:
+              name:
+                type: string
+              picture:
+                type: string
+        warning:
+          type: string
+          description: Present on soft timeout (empty events).
+
+    FarcasterResolveRequest:
+      type: object
+      required: [action, username]
+      properties:
+        action:
+          type: string
+          enum: [resolve]
+        username:
+          type: string
+          maxLength: 30
+
+    FarcasterFeedRequest:
+      type: object
+      required: [action, fid]
+      properties:
+        action:
+          type: string
+          enum: [feed]
+        fid:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+
+    FarcasterResolveResponse:
+      type: object
+      required: [fid, username]
+      properties:
+        fid:
+          type: integer
+        displayName:
+          type: string
+        pfpUrl:
+          type: string
+          format: uri
+        username:
+          type: string
+
+    FarcasterFeedItem:
+      type: object
+      required: [text, author, sourceUrl, timestamp]
+      properties:
+        text:
+          type: string
+        author:
+          type: string
+        avatar:
+          type: string
+          format: uri
+        sourceUrl:
+          type: string
+          format: uri
+        imageUrl:
+          type: string
+          format: uri
+        timestamp:
+          type: integer
+
+    FarcasterFeedResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/FarcasterFeedItem'
+        feedTitle:
+          type: string
+        warning:
+          type: string
+          description: Present on upstream timeout with empty items.
