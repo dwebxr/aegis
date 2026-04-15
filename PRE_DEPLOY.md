@@ -111,6 +111,18 @@ The suggested `npm audit fix` downgrades `jest-environment-jsdom` to `27.0.0`, w
 npm audit --production    # must report "found 0 vulnerabilities"
 ```
 
+### dompurify CVEs in /api-docs (7 MODERATE, transitive)
+
+`npm audit` reports 7 moderate-severity XSS-class CVEs in `dompurify@<=3.3.1`, transitive through `@scalar/api-reference-react@0.9.22` (already on latest available version — upstream patch pending). dompurify only loads on `/api-docs`, which renders the **repo-controlled** `docs/openapi.yaml`. There is no user-supplied HTML on this page; the XSS vectors require attacker-controlled input that this page does not accept. Risk: bounded.
+
+Verification + monitoring:
+```sh
+npm view @scalar/api-reference-react version    # check for upstream bump past 0.9.22
+npm audit --json | jq '.vulnerabilities.dompurify.severity'  # should stay <=moderate
+```
+
+Trigger to re-evaluate: a `high` or `critical` severity entry appears for dompurify, OR Scalar ships a version pinning a patched dompurify.
+
 ### Task #32 — Qwen3 / Llama4Scout cycle-cost verification
 
 Deferred. The canister-side upgrade from Llama 3.1 8B to Qwen3 or Llama4Scout requires a running local `dfx` replica to measure cycle costs before committing the upgrade to mainnet. The task is tracked for future operators with local dfx access; it does not block the current production build because the translation cascade no longer depends on IC LLM for smart-model translation (Claude BYOK is the authoritative path, IC LLM is the free-but-flaky fallback).

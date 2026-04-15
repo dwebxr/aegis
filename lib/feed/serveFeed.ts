@@ -4,6 +4,7 @@ import { distributedRateLimit } from "@/lib/api/rateLimit";
 import { getLatestBriefing } from "@/lib/d2a/briefingProvider";
 import { buildFeed } from "./buildFeed";
 import { APP_URL } from "@/lib/config";
+import { errMsg } from "@/lib/utils/errors";
 
 const CACHE_HEADER = "public, max-age=300, s-maxage=300, stale-while-revalidate=600";
 
@@ -44,7 +45,16 @@ export async function serveFeed(request: NextRequest, format: FeedFormat): Promi
     return NextResponse.json({ error: "Invalid principal format" }, { status: 400 });
   }
 
-  const briefing = await getLatestBriefing(principal);
+  let briefing;
+  try {
+    briefing = await getLatestBriefing(principal);
+  } catch (err) {
+    console.error(`[feed/${format}] IC briefing fetch failed for ${principal}:`, errMsg(err));
+    return NextResponse.json(
+      { error: "Briefing source temporarily unavailable" },
+      { status: 502 },
+    );
+  }
   if (!briefing) {
     return NextResponse.json(
       { error: "No briefing available for this principal" },

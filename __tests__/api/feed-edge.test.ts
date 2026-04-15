@@ -188,14 +188,28 @@ describe("briefing-shape edge cases", () => {
 });
 
 describe("provider failure modes", () => {
-  it("propagates upstream getLatestBriefing rejection (no swallow)", async () => {
+  it("returns 502 + structured error when getLatestBriefing throws", async () => {
     (getLatestBriefing as jest.Mock).mockRejectedValue(new Error("IC down"));
-    await expect(RSS_GET(makeReq(`/api/feed/rss?principal=${PRINCIPAL}`))).rejects.toThrow(/IC down/);
+    const r = await RSS_GET(makeReq(`/api/feed/rss?principal=${PRINCIPAL}`));
+    expect(r.status).toBe(502);
+    const body = await r.json();
+    expect(body.error).toMatch(/temporarily unavailable/i);
   });
 
   it("treats null briefing as 404 (not as a 500)", async () => {
     (getLatestBriefing as jest.Mock).mockResolvedValue(null);
     const r = await RSS_GET(makeReq(`/api/feed/rss?principal=${PRINCIPAL}`));
     expect(r.status).toBe(404);
+  });
+
+  it("logs IC failures via console.error so Vercel/Sentry sees them", async () => {
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    (getLatestBriefing as jest.Mock).mockRejectedValue(new Error("relay timeout"));
+    await RSS_GET(makeReq(`/api/feed/rss?principal=${PRINCIPAL}`));
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining("[feed/rss] IC briefing fetch failed"),
+      expect.stringContaining("relay timeout"),
+    );
+    spy.mockRestore();
   });
 });

@@ -66,6 +66,20 @@ There is no separate database — content state lives in:
 - The IC canister (covered above)
 - Vercel KV (rate limit + daily budget counters; ephemeral, no rollback needed)
 
+## Stateless server-only additions
+
+The following routes are pure read-paths over the IC canister briefing data
+— no DB writes, no canister writes, no published artifacts. `vercel rollback`
+reverts them cleanly with no side-effects to clean up:
+
+- `/api/feed/rss`, `/api/feed/atom` — public per-principal RSS/Atom view
+- `/api-docs` — Scalar-rendered OpenAPI viewer over `/openapi.yaml`
+- `/api/d2a/info` `specUrl` field — additive JSON response field
+
+The `@aegis/d2a-client` SDK in `packages/d2a-client/` is a publishable
+artifact but is not yet on npm. Until `npm publish` is run there is
+nothing external to roll back.
+
 ## Incident response order
 
 1. **Frontend regression** → `vercel rollback` (≤30s).
