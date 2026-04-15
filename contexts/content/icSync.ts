@@ -136,9 +136,6 @@ export function syncToIC(
       console.error("[content] Failed to enqueue offline action:", errMsg(qErr));
       addNotification("Failed to save \u2014 changes will be lost", "error");
     }
-  }).catch((unexpectedErr: unknown) => {
-    // Safety net: catch any unexpected error in the rejection handler itself
-    console.error("[content] Unexpected error in syncToIC handler:", errMsg(unexpectedErr));
   });
 }
 
