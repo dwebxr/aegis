@@ -1,3 +1,5 @@
+import type { Verdict } from "@/lib/types/content";
+
 export interface WebLLMStatus {
   available: boolean;
   loaded: boolean;
@@ -11,7 +13,7 @@ export interface WebLLMScoreResult {
   insight: number;
   credibility: number;
   composite: number;
-  verdict: "quality" | "slop";
+  verdict: Verdict;
   reason: string;
   topics: string[];
   vSignal: number;

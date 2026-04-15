@@ -1,12 +1,16 @@
-import type { ContentItem } from "@/lib/types/content";
+import type { ContentItem, Verdict } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import type { BriefingState } from "@/lib/briefing/types";
 
+/** Sync status for content-tier state (IDB/IC). SourceContext uses a
+ *  different variant that includes "error" — keep those separate. */
+export type ContentSyncStatus = "idle" | "syncing" | "synced" | "offline";
+
 export interface ContentState {
   content: ContentItem[];
   isAnalyzing: boolean;
-  syncStatus: "idle" | "syncing" | "synced" | "offline";
+  syncStatus: ContentSyncStatus;
   /** True once the local cache has been checked (IDB/localStorage). */
   cacheChecked: boolean;
   analyze: (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
@@ -30,6 +34,6 @@ export interface ContentState {
 }
 
 export type PreferenceCallbacks = {
-  onValidate?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => void;
-  onFlag?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", itemId?: string) => void;
+  onValidate?: (topics: string[], author: string, composite: number, verdict: Verdict, sourceUrl?: string, itemId?: string) => void;
+  onFlag?: (topics: string[], author: string, composite: number, verdict: Verdict, itemId?: string) => void;
 };

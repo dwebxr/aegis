@@ -1,3 +1,5 @@
+import type { Verdict } from "@/lib/types/content";
+
 export interface D2ABriefingItem {
   title: string;
   content: string;
@@ -12,7 +14,7 @@ export interface D2ABriefingItem {
     cContext?: number;
     lSlop?: number;
   };
-  verdict: "quality" | "slop";
+  verdict: Verdict;
   reason: string;
   topics: string[];
   briefingScore: number;
@@ -65,7 +67,7 @@ export interface GlobalBriefingContributor {
     title: string;
     topics: string[];
     briefingScore: number;
-    verdict: "quality" | "slop";
+    verdict: Verdict;
   }>;
 }
 

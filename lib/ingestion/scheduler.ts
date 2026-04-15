@@ -28,7 +28,7 @@ const ENRICH_MIN_WORDS = 100;
 const MAX_TEXT_LENGTH = 2000;
 const MAX_DISPLAY_TEXT = 300;
 
-interface SchedulerSource {
+export interface SchedulerSource {
   type: "rss" | "url" | "nostr" | "farcaster";
   config: Record<string, string>;
   enabled: boolean;

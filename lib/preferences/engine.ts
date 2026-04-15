@@ -10,6 +10,7 @@ import {
   AUTHOR_TRUST_CAP,
   AUTHOR_TRUST_FLOOR,
 } from "./types";
+import type { Verdict } from "@/lib/types/content";
 import { clamp } from "@/lib/utils/math";
 
 interface LearnEvent {
@@ -17,7 +18,7 @@ interface LearnEvent {
   topics: string[];
   author: string;
   composite: number;
-  verdict: "quality" | "slop";
+  verdict: Verdict;
 }
 
 const VALIDATE_TOPIC_DELTA = 0.1;

@@ -5,6 +5,7 @@ import { useNotify } from "@/contexts/NotificationContext";
 import { translateContent, type TranslateOptions } from "@/lib/translation/engine";
 import { DEFAULT_TRANSLATION_PREFS } from "@/lib/translation/types";
 import type { ContentItem } from "@/lib/types/content";
+import type { ContentSyncStatus } from "@/contexts/content/types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 
@@ -29,7 +30,7 @@ export function useTranslation(
   items: ContentItem[],
   patchItem: (id: string, patch: Partial<ContentItem>) => void,
   actorRef: React.MutableRefObject<_SERVICE | null>,
-  syncStatus: "idle" | "syncing" | "synced" | "offline" = "offline",
+  syncStatus: ContentSyncStatus = "offline",
 ): UseTranslationReturn {
   const { profile } = usePreferences();
   const { isAuthenticated } = useAuth();

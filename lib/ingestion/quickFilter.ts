@@ -16,13 +16,14 @@ import { clamp } from "@/lib/utils/math";
 import { detectLanguage, type SupportedLang } from "./langDetect";
 import { scoreEnglish } from "./heuristics/en";
 import { scoreJapanese } from "./heuristics/ja";
+import type { Verdict } from "@/lib/types/content";
 
 export interface HeuristicScores {
   originality: number;
   insight: number;
   credibility: number;
   composite: number;
-  verdict: "quality" | "slop";
+  verdict: Verdict;
   reason: string;
   /** Language used to compute the signals (added in the multi-lang refactor). */
   detectedLang?: SupportedLang;
