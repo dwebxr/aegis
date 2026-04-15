@@ -3,10 +3,14 @@ import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import type { BriefingState } from "@/lib/briefing/types";
 
+/** Sync status for content-tier state (IDB/IC). SourceContext uses a
+ *  different variant that includes "error" — keep those separate. */
+export type ContentSyncStatus = "idle" | "syncing" | "synced" | "offline";
+
 export interface ContentState {
   content: ContentItem[];
   isAnalyzing: boolean;
-  syncStatus: "idle" | "syncing" | "synced" | "offline";
+  syncStatus: ContentSyncStatus;
   /** True once the local cache has been checked (IDB/localStorage). */
   cacheChecked: boolean;
   analyze: (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
