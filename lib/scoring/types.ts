@@ -1,5 +1,3 @@
-import type { Verdict } from "@/lib/types/content";
-
 export type ScoringEngine = "ollama" | "webllm" | "mediapipe" | "claude-byok" | "claude-ic" | "claude-server" | "heuristic";
 
 export const ENGINE_LABELS: Record<ScoringEngine, string> = {
@@ -42,7 +40,7 @@ export interface ScoreParseResult {
   insight: number;
   credibility: number;
   composite: number;
-  verdict: Verdict;
+  verdict: "quality" | "slop";
   reason: string;
   topics: string[];
   vSignal: number;
