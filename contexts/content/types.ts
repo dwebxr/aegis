@@ -1,4 +1,4 @@
-import type { ContentItem } from "@/lib/types/content";
+import type { ContentItem, Verdict } from "@/lib/types/content";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import type { BriefingState } from "@/lib/briefing/types";
@@ -30,6 +30,6 @@ export interface ContentState {
 }
 
 export type PreferenceCallbacks = {
-  onValidate?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => void;
-  onFlag?: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", itemId?: string) => void;
+  onValidate?: (topics: string[], author: string, composite: number, verdict: Verdict, sourceUrl?: string, itemId?: string) => void;
+  onFlag?: (topics: string[], author: string, composite: number, verdict: Verdict, itemId?: string) => void;
 };

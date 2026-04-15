@@ -4,6 +4,7 @@ import { idlFactory } from "@/lib/ic/declarations/idlFactory";
 import { getCanisterId, getHost } from "@/lib/ic/agent";
 import type { _SERVICE } from "@/lib/ic/declarations/aegis_backend.did";
 import type { D2ABriefingResponse } from "./types";
+import type { Verdict } from "@/lib/types/content";
 import { withTimeout } from "@/lib/utils/timeout";
 
 async function createActor(): Promise<_SERVICE> {
@@ -50,7 +51,7 @@ export interface GlobalBriefingContributor {
     title: string;
     topics: string[];
     briefingScore: number;
-    verdict: "quality" | "slop";
+    verdict: Verdict;
   }>;
 }
 

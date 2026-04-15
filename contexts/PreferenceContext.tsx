@@ -4,6 +4,7 @@ import { useCurrentRef } from "@/hooks/useCurrentRef";
 import { useAuth } from "./AuthContext";
 import type { UserPreferenceProfile, UserContext, CustomFilterRule, NotificationPrefs } from "@/lib/preferences/types";
 import type { TranslationPrefs } from "@/lib/translation/types";
+import type { Verdict } from "@/lib/types/content";
 import { createEmptyProfile, TOPIC_AFFINITY_CAP, TOPIC_AFFINITY_FLOOR } from "@/lib/preferences/types";
 import { learn, getContext, hasEnoughData } from "@/lib/preferences/engine";
 import { loadProfile, saveProfile, syncPreferencesToIC, loadPreferencesFromIC, mergeProfiles } from "@/lib/preferences/storage";
@@ -15,8 +16,8 @@ interface PreferenceState {
   profile: UserPreferenceProfile;
   userContext: UserContext | null;
   isPersonalized: boolean;
-  onValidate: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => void;
-  onFlag: (topics: string[], author: string, composite: number, verdict: "quality" | "slop", itemId?: string) => void;
+  onValidate: (topics: string[], author: string, composite: number, verdict: Verdict, sourceUrl?: string, itemId?: string) => void;
+  onFlag: (topics: string[], author: string, composite: number, verdict: Verdict, itemId?: string) => void;
   setTopicAffinity: (topic: string, value: number) => void;
   removeTopicAffinity: (topic: string) => void;
   setQualityThreshold: (value: number) => void;
@@ -181,12 +182,12 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     return next;
   }, [debouncedSave, debouncedICSync]);
 
-  const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", sourceUrl?: string, itemId?: string) => {
+  const onValidate = useCallback((topics: string[], author: string, composite: number, verdict: Verdict, sourceUrl?: string, itemId?: string) => {
     applyLearnEvent({ action: "validate", topics, author, composite, verdict }, itemId);
     trackDomainValidation(sourceUrl);
   }, [applyLearnEvent]);
 
-  const onFlag = useCallback((topics: string[], author: string, composite: number, verdict: "quality" | "slop", itemId?: string) => {
+  const onFlag = useCallback((topics: string[], author: string, composite: number, verdict: Verdict, itemId?: string) => {
     applyLearnEvent({ action: "flag", topics, author, composite, verdict }, itemId);
   }, [applyLearnEvent]);
 
