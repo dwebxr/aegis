@@ -3,7 +3,7 @@ import { Principal } from "@dfinity/principal";
 import { idlFactory } from "@/lib/ic/declarations/idlFactory";
 import { getCanisterId, getHost } from "@/lib/ic/agent";
 import type { _SERVICE } from "@/lib/ic/declarations/aegis_backend.did";
-import type { D2ABriefingResponse } from "./types";
+import type { D2ABriefingResponse, GlobalBriefingContributor, GlobalBriefingResponse } from "./types";
 import { withTimeout } from "@/lib/utils/timeout";
 
 async function createActor(): Promise<_SERVICE> {
@@ -36,33 +36,6 @@ export async function getLatestBriefing(principalText?: string): Promise<D2ABrie
     console.warn("[briefingProvider] Failed to parse briefing JSON:", err);
     return null;
   }
-}
-
-export interface GlobalBriefingContributor {
-  principal: string;
-  generatedAt: string;
-  summary: {
-    totalEvaluated: number;
-    totalBurned: number;
-    qualityRate: number;
-  };
-  topItems: Array<{
-    title: string;
-    topics: string[];
-    briefingScore: number;
-    verdict: "quality" | "slop";
-  }>;
-}
-
-export interface GlobalBriefingResponse {
-  version: "1.0";
-  type: "global";
-  generatedAt: string;
-  pagination: { offset: number; limit: number; total: number; hasMore: boolean };
-  contributors: GlobalBriefingContributor[];
-  aggregatedTopics: string[];
-  totalEvaluated: number;
-  totalQualityRate: number;
 }
 
 const MAX_TOP_ITEMS = 3;
