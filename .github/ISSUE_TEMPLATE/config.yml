@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discussion / Question
+    url: https://github.com/dwebxr/aegis/discussions
+    about: For open-ended questions and design proposals, prefer Discussions over Issues.
+  - name: Security vulnerability
+    url: https://github.com/dwebxr/aegis/security/advisories/new
+    about: Please use private vulnerability reporting; do not open public issues for security.
+  - name: Discord
+    url: https://discord.gg/85JVzJaatT
+    about: Casual real-time chat with maintainers and other contributors.
