@@ -18,7 +18,7 @@ import { syncBriefingToCanister } from "@/lib/briefing/sync";
 import type { BriefingState } from "@/lib/briefing/types";
 import { dequeueAll } from "@/lib/offline/actionQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import type { ContentState, PreferenceCallbacks } from "./content/types";
+import type { ContentState, ContentSyncStatus, PreferenceCallbacks } from "./content/types";
 import { loadCachedContent, saveCachedContent, truncatePreservingActioned } from "./content/cache";
 import { runScoringCascade } from "./content/scoring";
 import { toICEvaluation, syncToIC, drainOfflineQueue, loadFromICCanister } from "./content/icSync";
@@ -55,7 +55,7 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const { isAuthenticated, identity, principal } = useAuth();
   const [content, setContent] = useState<ContentItem[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "offline">("idle");
+  const [syncStatus, setSyncStatus] = useState<ContentSyncStatus>("idle");
   const [cacheChecked, setCacheChecked] = useState(false);
   const [pendingActions, setPendingActions] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);

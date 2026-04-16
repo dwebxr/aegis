@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import type { AnalyzeResponse } from "@/lib/types/api";
+import type { Verdict } from "@/lib/types/content";
 import type { UserContext } from "@/lib/preferences/types";
 import type { _SERVICE, OnChainAnalysis, Result } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
@@ -154,7 +155,7 @@ export async function runScoringCascade(
               insight: a.insight,
               credibility: a.credibility,
               composite: a.compositeScore,
-              verdict: ("quality" in a.verdict ? "quality" : "slop") as "quality" | "slop",
+              verdict: ("quality" in a.verdict ? "quality" : "slop") as Verdict,
               reason: a.reason,
               topics: a.topics,
               vSignal: a.vSignal.length > 0 ? a.vSignal[0] : undefined,

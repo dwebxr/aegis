@@ -37,6 +37,7 @@ import React, { useRef } from "react";
 import { renderHook, act, cleanup, waitFor } from "@testing-library/react";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { ContentItem } from "@/lib/types/content";
+import type { ContentSyncStatus } from "@/contexts/content/types";
 import type { TranslationResult, TranslationPolicy } from "@/lib/translation/types";
 
 function makeItem(id: string, composite = 7): ContentItem {
@@ -79,7 +80,7 @@ function setPolicy(policy: TranslationPolicy, opts: Partial<{ minScore: number; 
   };
 }
 
-function harness(initialItems: ContentItem[], syncStatus: "idle" | "syncing" | "synced" | "offline" = "idle") {
+function harness(initialItems: ContentItem[], syncStatus: ContentSyncStatus = "idle") {
   // Default syncStatus is "idle" so existing tests behave as if the IC
   // actor is ready and the cold-start gate doesn't suppress translation.
   // Cold-start race tests pass an explicit "offline" override.
@@ -360,7 +361,7 @@ describe("useTranslation — isReady gate (cold-start race protection)", () => {
     const patchItem = jest.fn();
     const items = [makeItem("a")];
     const actorRef = { current: null } as React.MutableRefObject<unknown>;
-    let currentSyncStatus: "idle" | "syncing" | "synced" | "offline" = "offline";
+    let currentSyncStatus: ContentSyncStatus = "offline";
     const wrapperFn = () =>
       useTranslation(
         items,
@@ -437,7 +438,7 @@ describe("useTranslation — isReady gate (cold-start race protection)", () => {
     const patchItem = jest.fn();
     const items = [makeItem("a")];
     const actorRef = { current: null } as React.MutableRefObject<unknown>;
-    let currentSyncStatus: "idle" | "syncing" | "synced" | "offline" = "offline";
+    let currentSyncStatus: ContentSyncStatus = "offline";
     const wrapperFn = () =>
       useTranslation(
         items,

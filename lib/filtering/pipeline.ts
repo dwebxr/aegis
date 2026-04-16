@@ -6,6 +6,7 @@ import { calculateWoTScore, calculateWeightedScore, isWoTSerendipity } from "@/l
 import { isContentSerendipity } from "./serendipity";
 import { findMatchingBurnRule } from "./customRules";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
+import type { RawItem } from "@/lib/ingestion/fetchers";
 
 // Anthropic Claude Sonnet via /api/analyze — ~400 input tokens + ~100 output
 // Based on Sonnet 4 pricing: $3/MTok input + $15/MTok output
@@ -84,7 +85,7 @@ export function runFilterPipeline(
 }
 
 export function scoreItemWithHeuristics(
-  raw: { text: string; author: string; avatar?: string; sourceUrl?: string; imageUrl?: string; nostrPubkey?: string },
+  raw: RawItem,
   sourceType: "rss" | "url" | "nostr" | "farcaster",
   platform?: import("@/lib/types/sources").SourcePlatform,
 ): ContentItem {
