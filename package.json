@@ -19,7 +19,8 @@
     "sdk:install": "npm install --prefix packages/d2a-client",
     "sdk:build": "npm run build --prefix packages/d2a-client",
     "sdk:test": "npm test --prefix packages/d2a-client",
-    "audit:guard": "scripts/audit-guard.sh"
+    "audit:guard": "scripts/audit-guard.sh",
+    "release:tag": "scripts/release-tag.sh"
   },
   "dependencies": {
     "@dfinity/agent": "2.4.1",

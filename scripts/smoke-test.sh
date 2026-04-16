@@ -74,10 +74,15 @@ echo "target: $BASE_URL"
 echo
 
 # ----- 1. health endpoint -----
+# /api/health returns 200 when all dependencies are ok, 503 when degraded
+# (missing Anthropic key, IC unreachable, or canister cycles below 2T).
+# Smoke should pass on 200 and fail on 503 so external monitors alert.
 echo "[1] /api/health"
 status=$(http_get "$BASE_URL/api/health" -H "Accept: application/json")
 if [ "$status" = "200" ]; then
-  pass "returns 200"
+  pass "returns 200 (ok)"
+elif [ "$status" = "503" ]; then
+  fail "returns 503 (degraded) — check body for which dependency failed" "$(cat /tmp/smoke-body 2>/dev/null | head -c 400)"
 else
   fail "expected 200, got $status" "$(cat /tmp/smoke-body 2>/dev/null | head -c 200)"
 fi
@@ -103,6 +108,14 @@ if command -v jq >/dev/null 2>&1; then
   else
     fail "IC canister not reachable" "checks.icCanister=$ic_status"
   fi
+
+  cycles_status=$(jq -r '.checks.canisterCycles // empty' /tmp/smoke-body 2>/dev/null)
+  case "$cycles_status" in
+    ok) pass "canister cycles above 2T threshold" ;;
+    low) fail "canister cycles below 2T — top up before freeze" "checks.canisterCycles=low" ;;
+    error) fail "cycles probe failed" "checks.canisterCycles=error" ;;
+    *) fail "cycles field missing or invalid" "got: $cycles_status" ;;
+  esac
 
   version=$(jq -r '.version // empty' /tmp/smoke-body 2>/dev/null)
   if [ -n "$version" ] && [ "$version" != "null" ]; then

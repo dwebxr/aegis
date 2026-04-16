@@ -2,6 +2,29 @@
 
 Aegis runs in two places: a Vercel-hosted Next.js frontend and an Internet Computer canister. Each has its own rollback path.
 
+## Release tagging
+
+Every production deploy should be tagged on main so operators have a
+stable reference to point `vercel rollback` at without hunting through
+deployment IDs.
+
+```sh
+# Bump package.json version first (patch for fixes, minor for features,
+# major for breaking changes), then:
+npm run release:tag
+git push origin "v$(node -p "require('./package.json').version")"
+```
+
+The script (`scripts/release-tag.sh`) refuses to tag a dirty tree, a
+non-main branch, a diverged local main, or an already-used version.
+Tags take the form `vMAJOR.MINOR.PATCH` and match the `version` field
+in `package.json`. Roll back to a tag with:
+
+```sh
+git checkout v0.2.1            # inspect the tagged state
+vercel rollback <deployment>   # Vercel still lists the deploy; tag tells you which one
+```
+
 ## Vercel (frontend + API routes)
 
 Vercel keeps every prior production deployment. To revert:
@@ -94,4 +117,79 @@ curl -s https://aegis-ai.xyz/api/health
 curl -s https://aegis-ai.xyz/api/d2a/health
 ```
 
-Both should return `status: "ok"` with `icCanister: "reachable"`.
+Both should return HTTP 200 with `status: "ok"` and `icCanister: "reachable"`.
+A 503 response means degraded — check the body's `checks` and `warnings`
+to identify the failing dependency. Uptime monitors can alert on HTTP
+status code alone.
+
+## Canister cycles runbook
+
+The canister needs cycles to execute queries and updates. `/api/health`
+surfaces the balance as `checks.canisterCycles` (`ok` | `low` | `error`).
+Low cycles → canister eventually freezes and all updates/queries fail.
+
+### Thresholds
+
+| State | Balance | Action |
+| --- | --- | --- |
+| `ok` | ≥ 2T cycles | no action |
+| `low` | < 2T cycles | top up within days — see below |
+| `error` | probe failed | investigate (canister may be unreachable, not necessarily low) |
+
+The 2T threshold mirrors `CYCLES_THRESHOLD` in
+`canisters/aegis_backend/main.mo`. Below this, the canister attempts
+self-top-up from on-chain revenue (see `topUpFromRevenue`), but if revenue
+is zero or the CMC path fails, manual top-up is required.
+
+### Manual top-up (dfx)
+
+```sh
+# From the controller identity. Amount in cycles — 1T cycles ≈ $1.30 at
+# current rates; top up in 1T–5T increments depending on runway.
+dfx wallet --network ic send <amount_cycles> <canister_id>
+
+# Or top up directly from ICP via the cycles minting canister:
+dfx ledger --network ic top-up rluf3-eiaaa-aaaam-qgjuq-cai --amount 1.0
+```
+
+Verify:
+
+```sh
+curl -s https://aegis-ai.xyz/api/health | jq '.checks.canisterCycles'
+# Expect "ok" within a minute (the probe is cached 60s).
+```
+
+### Freeze recovery
+
+If the canister has frozen (all calls fail with "canister frozen"),
+top up using `dfx ledger top-up` (that path works even when the target
+canister is frozen, since the CMC does the work). After top-up, issue a
+query to confirm the canister responds again.
+
+### Why the probe is cached
+
+`/api/health` caches the cycles probe in-process for 60 seconds
+(`CYCLES_CACHE_TTL_MS` in `lib/ic/health.ts`). This keeps the cost of
+frequent uptime polling bounded: one IC query per minute per serverless
+instance instead of one per request.
+
+## Feature-flag kill switches
+
+In addition to rollback, the app exposes env-driven kill switches for
+expensive code paths. Set and redeploy (Vercel env change triggers a
+rebuild). No code change required.
+
+| Flag env var | Default | Effect when `false` |
+| --- | --- | --- |
+| `FEATURE_SCORING_CASCADE` | `true` | `/api/analyze` returns heuristic only; client cascade still tries local tiers but server is short-circuited |
+| `FEATURE_TRANSLATION_CASCADE` | `true` | `/api/translate` returns 503 |
+| `FEATURE_BRIEFING_AGGREGATION` | `true` | `/api/d2a/briefing` (no principal) returns 503; per-principal unaffected |
+| `FEATURE_PUSH_SEND` | `true` | `/api/push/send` returns 503 |
+| `X402_FREE_TIER_ENABLED` | `false` | `?preview=true` bypasses x402 payment |
+
+Kill switches are faster than a rollback for cost-spike incidents
+(Anthropic budget blown, push campaign gone wrong) and do not
+invalidate the Vercel cache.
+
+See `lib/featureFlags.ts` for the flag registry and
+`/api/health` response's `flags` field for the current state.
