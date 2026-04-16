@@ -10,7 +10,9 @@ import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { AgentManager } from "@/lib/agent/manager";
 import { D2A_APPROVE_AMOUNT } from "@/lib/agent/protocol";
 import { createBackendActorAsync } from "@/lib/ic/actor";
-import { createICPLedgerActorAsync, ICP_FEE } from "@/lib/ic/icpLedger";
+// createICPLedgerActorAsync / ICP_FEE are only needed on agent start (a
+// post-auth user action). Imported dynamically below to keep landing-page
+// bundle lean.
 import { getCanisterId } from "@/lib/ic/agent";
 import { Principal } from "@dfinity/principal";
 import type { AgentState, D2ACommentPayload } from "@/lib/agent/types";
@@ -173,6 +175,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     const startAgent = async () => {
       const canisterId = getCanisterId();
       try {
+        const { createICPLedgerActorAsync, ICP_FEE } = await import("@/lib/ic/icpLedger");
         const ledger = await createICPLedgerActorAsync(capturedIdentity);
         if (cancelled) return;
         const spender = Principal.fromText(canisterId);

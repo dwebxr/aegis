@@ -1,7 +1,6 @@
 "use client";
 import React, { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { v4 as uuidv4 } from "uuid";
 import dynamic from "next/dynamic";
 import { AppShell } from "@/components/layout/AppShell";
 
@@ -24,8 +23,9 @@ import { useDemo } from "@/contexts/DemoContext";
 import { useFilterMode } from "@/contexts/FilterModeContext";
 import { useTranslation } from "@/hooks/useTranslation";
 import { DEMO_SOURCES } from "@/lib/demo/sources";
-import { buildFollowGraph } from "@/lib/wot/graph";
-import { loadWoTCache, saveWoTCache, clearWoTCache } from "@/lib/wot/cache";
+// buildFollowGraph pulls in nostr-tools + @noble crypto to traverse the
+// follow graph — ~60 kB of minified code. Imported lazily inside the WoT
+// effect to keep the landing-page bundle smaller.
 import { DEFAULT_WOT_CONFIG } from "@/lib/wot/types";
 import type { WoTGraph } from "@/lib/wot/types";
 import { runFilterPipeline } from "@/lib/filtering/pipeline";
@@ -39,9 +39,10 @@ import { getLinkedAccount, saveLinkedAccount, syncLinkedAccountToIC, fetchNostrP
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
-import { publishSignalToNostr, buildAegisTags } from "@/lib/nostr/publish";
-import { createNIP98AuthHeader } from "@/lib/nostr/nip98";
-import { createICPLedgerActorAsync, ICP_FEE, type ICPLedgerActor } from "@/lib/ic/icpLedger";
+// Nostr publishing + NIP-98 auth + ICP ledger only execute on user actions
+// (signal publish, stake, image upload). Import them lazily to keep the
+// landing-page bundle light for unauthenticated visitors.
+import type { ICPLedgerActor } from "@/lib/ic/icpLedger";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { Principal } from "@dfinity/principal";
 import { getCanisterId } from "@/lib/ic/agent";
@@ -178,6 +179,7 @@ function AegisAppInner() {
     let cancelled = false;
 
     (async () => {
+      const { loadWoTCache, saveWoTCache } = await import("@/lib/wot/cache");
       const cached = await loadWoTCache();
       if (cancelled) return;
       if (cached && cached.userPubkey === wotRootPubkey) {
@@ -194,6 +196,7 @@ function AegisAppInner() {
         : DEFAULT_WOT_CONFIG;
 
       try {
+        const { buildFollowGraph } = await import("@/lib/wot/graph");
         const graph = await buildFollowGraph(wotRootPubkey, config);
         if (cancelled) return;
         setWotGraph(graph);
@@ -215,7 +218,9 @@ function AegisAppInner() {
   const handleLinkAccount = useCallback((account: LinkedNostrAccount | null) => {
     setLinkedAccount(account);
     if (!account) {
-      void clearWoTCache().catch(err => console.warn("[page] clearWoTCache failed:", errMsg(err)));
+      void import("@/lib/wot/cache")
+        .then(m => m.clearWoTCache())
+        .catch(err => console.warn("[page] clearWoTCache failed:", errMsg(err)));
       setWotPromptDismissed(false);
       try { sessionStorage.removeItem("aegis-wot-prompt-dismissed"); } catch { console.debug("[page] sessionStorage unavailable"); }
     }
@@ -279,6 +284,7 @@ function AegisAppInner() {
     let cancelled = false;
     (async () => {
       try {
+        const { createICPLedgerActorAsync } = await import("@/lib/ic/icpLedger");
         const [ledger, backend] = await Promise.all([
           createICPLedgerActorAsync(identity),
           createBackendActorAsync(identity),
@@ -472,6 +478,7 @@ function AegisAppInner() {
       return { eventId: null, relaysPublished: [] };
     }
 
+    const { publishSignalToNostr, buildAegisTags } = await import("@/lib/nostr/publish");
     const tags = buildAegisTags(scores.composite, scores.vSignal, scores.topics || [], imageUrl);
 
     if (publishGate && !publishGate.canPublish) {
@@ -486,7 +493,7 @@ function AegisAppInner() {
     const publishText = imageUrl ? `${text}\n\n${imageUrl}` : text;
     const result = await publishSignalToNostr(publishText, nostrKeys.sk, tags);
 
-    const signalId = uuidv4();
+    const signalId = crypto.randomUUID();
 
     if (stakeAmount && identity && principalText) {
       try {
@@ -494,6 +501,7 @@ function AegisAppInner() {
         const spender = Principal.fromText(canisterId);
 
         // ICRC-2 approve: let canister transfer our ICP
+        const { createICPLedgerActorAsync, ICP_FEE } = await import("@/lib/ic/icpLedger");
         if (!ledgerRef.current) {
           ledgerRef.current = await createICPLedgerActorAsync(identity);
         }
@@ -598,6 +606,7 @@ function AegisAppInner() {
       form.append("file", file);
       const headers: Record<string, string> = {};
       if (nostrKeys) {
+        const { createNIP98AuthHeader } = await import("@/lib/nostr/nip98");
         headers["Authorization"] = createNIP98AuthHeader(
           nostrKeys.sk,
           "https://nostr.build/api/v2/upload/files",
