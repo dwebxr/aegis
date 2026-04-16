@@ -18,7 +18,7 @@ import { scoreEnglish } from "./heuristics/en";
 import { scoreJapanese } from "./heuristics/ja";
 import type { Verdict } from "@/lib/types/content";
 
-export interface HeuristicScores {
+interface HeuristicScores {
   originality: number;
   insight: number;
   credibility: number;
@@ -29,7 +29,7 @@ export interface HeuristicScores {
   detectedLang?: SupportedLang;
 }
 
-export interface HeuristicOptions {
+interface HeuristicOptions {
   /** Override automatic language detection. */
   lang?: SupportedLang;
 }

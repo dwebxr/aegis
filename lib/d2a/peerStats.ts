@@ -6,7 +6,7 @@ import { isD2AContent } from "./activity";
 import { calculateWoTScore } from "@/lib/wot/scorer";
 import { npubEncode } from "nostr-tools/nip19";
 
-export interface PeerStat {
+interface PeerStat {
   pubkey: string;
   displayName: string;
   itemsReceived: number;

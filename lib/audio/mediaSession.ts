@@ -13,7 +13,7 @@
 
 import type { AudioTrack, PlayerStatus } from "./types";
 
-export interface MediaSessionHandlers {
+interface MediaSessionHandlers {
   onPlay: () => void;
   onPause: () => void;
   onNext: () => void;

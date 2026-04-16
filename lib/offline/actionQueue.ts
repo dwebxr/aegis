@@ -2,9 +2,9 @@ const DB_NAME = "aegis-offline-queue";
 const DB_VERSION = 1;
 const STORE_NAME = "pending-actions";
 
-export type QueuedActionType = "saveEvaluation" | "updateEvaluation";
+type QueuedActionType = "saveEvaluation" | "updateEvaluation";
 
-export interface QueuedAction {
+interface QueuedAction {
   id?: number; // auto-incremented by IndexedDB
   type: QueuedActionType;
   payload: unknown;

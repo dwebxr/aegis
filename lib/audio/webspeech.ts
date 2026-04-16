@@ -129,7 +129,7 @@ function mapToBcp47(langCode: string): string {
   }
 }
 
-export interface SpeakChunkOptions {
+interface SpeakChunkOptions {
   text: string;
   lang: string;
   rate: number;

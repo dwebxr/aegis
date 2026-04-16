@@ -15,7 +15,7 @@ export interface SourceRuntimeState {
   rateLimitedUntil: number;
 }
 
-export type SourceHealth = "healthy" | "degraded" | "error" | "disabled" | "rate_limited";
+type SourceHealth = "healthy" | "degraded" | "error" | "disabled" | "rate_limited";
 
 export const BACKOFF_MS = [60_000, 300_000, 1_200_000, 3_600_000] as const;
 export const MAX_CONSECUTIVE_FAILURES = 5;

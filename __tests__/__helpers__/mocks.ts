@@ -7,42 +7,8 @@
  * across test files.
  */
 
-import type { ContentItem } from "@/lib/types/content";
-import type { UserPreferenceProfile, AuthorTrust } from "@/lib/preferences/types";
-import type { AgentState, ActivityLogEntry } from "@/lib/agent/types";
 import type { _SERVICE } from "@/lib/ic/declarations/aegis_backend.did";
 import type { WoTGraph } from "@/lib/wot/types";
-
-interface AgentManagerCallbacksLike {
-  onNewContent: (item: ContentItem) => void;
-  getContent: () => ContentItem[];
-  getPrefs: () => UserPreferenceProfile;
-  onStateChange: (state: AgentState) => void;
-  onD2AMatchComplete?: (senderPk: string, senderPrincipalId: string | undefined, contentHash: string, fee: number) => void | Promise<void>;
-  onComment?: (msg: unknown, senderPk: string) => void;
-}
-
-export function mockAgentCallbacks(
-  overrides: Partial<AgentManagerCallbacksLike> = {},
-): AgentManagerCallbacksLike {
-  return {
-    onNewContent: jest.fn(),
-    getContent: jest.fn(() => []),
-    getPrefs: jest.fn(() => ({
-      version: 1,
-      principalId: "test",
-      topicAffinities: {},
-      authorTrust: {} as Record<string, AuthorTrust>,
-      calibration: { qualityThreshold: 4 },
-      recentTopics: [],
-      totalValidated: 0,
-      totalFlagged: 0,
-      lastUpdated: Date.now(),
-    })),
-    onStateChange: jest.fn(),
-    ...overrides,
-  };
-}
 
 /** Minimal valid WoTGraph for tests that only check graph presence. */
 export function mockWoTGraph(overrides: Partial<WoTGraph> = {}): WoTGraph {
@@ -51,21 +17,6 @@ export function mockWoTGraph(overrides: Partial<WoTGraph> = {}): WoTGraph {
     nodes: new Map(),
     maxHops: 2,
     builtAt: Date.now(),
-    ...overrides,
-  };
-}
-
-export function mockAgentState(overrides: Partial<AgentState> = {}): AgentState {
-  return {
-    isActive: false,
-    myPubkey: null,
-    peers: [],
-    activeHandshakes: [],
-    receivedItems: 0,
-    sentItems: 0,
-    d2aMatchCount: 0,
-    consecutiveErrors: 0,
-    activityLog: [] as ActivityLogEntry[],
     ...overrides,
   };
 }

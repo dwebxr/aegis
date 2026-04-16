@@ -15,8 +15,6 @@ import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
 import { getSourceKey, resetSourceErrors } from "@/lib/ingestion/sourceState";
 import type { SchedulerSource } from "@/lib/ingestion/scheduler";
 
-export type { SchedulerSource };
-
 /** Content identity key: rss:{feedUrl}, nostr:{sorted relays}, fc:{fid}. */
 function contentKey(s: SavedSource): string {
   if (s.type === "rss") return `rss:${s.feedUrl || s.id}`;

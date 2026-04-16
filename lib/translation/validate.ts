@@ -41,7 +41,7 @@ function containsKana(text: string): boolean {
   return false;
 }
 
-export interface ValidationResult {
+interface ValidationResult {
   valid: boolean;
   reason?: string;
 }

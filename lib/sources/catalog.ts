@@ -2,7 +2,7 @@ import { colors } from "@/styles/theme";
 
 export type CatalogCategory = "news" | "tech" | "finance" | "science";
 
-export interface CatalogSource {
+interface CatalogSource {
   id: string;
   label: string;
   feedUrl: string;

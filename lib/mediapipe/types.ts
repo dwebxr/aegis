@@ -1,6 +1,6 @@
 export type MediaPipeModelId = "gemma-3-1b" | "gemma-4-e2b";
 
-export interface MediaPipeModelDef {
+interface MediaPipeModelDef {
   label: string;
   description: string;
   sizeEstimateMB: number;

@@ -10,7 +10,7 @@
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
-export interface CallAnthropicOptions {
+interface CallAnthropicOptions {
   apiKey: string;
   model: string;
   maxTokens: number;
@@ -19,7 +19,7 @@ export interface CallAnthropicOptions {
   timeoutMs: number;
 }
 
-export interface AnthropicResponse {
+interface AnthropicResponse {
   ok: boolean;
   status: number;
   /** First text block of the assistant response, or "" when missing. */
