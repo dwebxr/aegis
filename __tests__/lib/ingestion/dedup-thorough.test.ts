@@ -123,8 +123,7 @@ describe("ArticleDeduplicator — persistence", () => {
 
   it("flush is no-op when nothing changed", async () => {
     const d = new ArticleDeduplicator();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const setSpy = jest.spyOn(globalThis.localStorage as any, "setItem");
+    const setSpy = jest.spyOn(globalThis.localStorage, "setItem");
     await d.flush();
     // Should not call setItem because dirty flag is false
     expect(setSpy).not.toHaveBeenCalled();

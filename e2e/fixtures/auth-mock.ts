@@ -6,8 +6,7 @@ import type { Page } from "@playwright/test";
  */
 export async function setupAuthMock(page: Page, authenticated: boolean = true) {
   await page.addInitScript((isAuth: boolean) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
+    const w = window as Window & { __AEGIS_MOCK_AUTH?: boolean; __AEGIS_MOCK_PRINCIPAL?: string };
     w.__AEGIS_MOCK_AUTH = isAuth;
     w.__AEGIS_MOCK_PRINCIPAL = "2vxsx-fae"; // anonymous principal
   }, authenticated);

@@ -82,10 +82,11 @@ describe("isValidState — LARP fix: validates rateLimitedUntil", () => {
   });
 
   it("accepts state without rateLimitedUntil (backfills to 0)", () => {
-    const state = defaultState();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (state as any).rateLimitedUntil;
-    localStorage.setItem("aegis_source_states", JSON.stringify({ "rss:test": state }));
+    // Intentionally construct a state shape missing the rateLimitedUntil field
+    // to verify the loader back-fills it to 0 on legacy persisted data.
+    const { rateLimitedUntil: _omit, ...stateWithoutField } = defaultState();
+    void _omit;
+    localStorage.setItem("aegis_source_states", JSON.stringify({ "rss:test": stateWithoutField }));
     const loaded = loadSourceStates();
     expect(loaded["rss:test"].rateLimitedUntil).toBe(0);
   });
