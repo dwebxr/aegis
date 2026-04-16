@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { callAnthropic } from "@/lib/api/anthropic";
 import { requireUserByokKey } from "@/lib/api/byok";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
+  if (!isFeatureEnabled("translationCascade")) {
+    return NextResponse.json({ error: "Translation disabled" }, { status: 503 });
+  }
+
   // 60 req/60s per IP. Translation is per-item and a power user with a
   // briefing of 50+ articles can easily exceed 10/60s during a single
   // page load.
