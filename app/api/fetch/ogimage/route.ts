@@ -65,7 +65,6 @@ export async function POST(request: NextRequest) {
 
   const { url, urls } = body;
 
-  // Batch mode: accept array of URLs, return results for all
   if (urls && Array.isArray(urls)) {
     const validUrls = urls.filter(u => typeof u === "string" && u.length > 0).slice(0, 30);
     if (validUrls.length === 0) {
@@ -80,7 +79,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ results });
   }
 
-  // Single mode (backward compatible)
   if (!url || typeof url !== "string") {
     return NextResponse.json({ error: "URL is required" }, { status: 400 });
   }

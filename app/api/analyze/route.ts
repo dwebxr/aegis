@@ -77,7 +77,6 @@ export async function POST(request: NextRequest) {
   const userContext = sanitizeUserContext(rawCtx);
   const { key: apiKey, isUser: isUserKey } = resolveAnthropicKey(request);
 
-  // --- Batch mode ---
   if (texts && Array.isArray(texts)) {
     const validTexts = texts
       .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
@@ -115,7 +114,6 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // --- Single mode (backward compatible) ---
   if (typeof text !== "string" || !text.trim()) {
     return NextResponse.json({ error: "Text is required" }, { status: 400 });
   }

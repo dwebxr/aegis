@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
 
   const { url, urls } = body;
 
-  // Batch mode: accept array of URLs
   if (urls && Array.isArray(urls)) {
     const validUrls = urls
       .filter((u): u is string => typeof u === "string" && u.length > 0)

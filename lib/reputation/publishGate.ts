@@ -64,8 +64,6 @@ export function getPublishReputation(pubkey: string): PublishReputation | undefi
   return loadPublishReputations().get(pubkey);
 }
 
-// Recovery
-
 /**
  * Compute recovery-adjusted score without persisting.
  * +1 per 7-day period since lastActionAt, capped at MAX_RECOVERY_SCORE (0).
@@ -78,8 +76,6 @@ export function applyReputationRecovery(rep: PublishReputation): PublishReputati
   const recovered = Math.min(rep.score + periods, MAX_RECOVERY_SCORE);
   return { ...rep, score: recovered };
 }
-
-// Gate check
 
 export function checkPublishGate(pubkey: string): PublishGateDecision {
   const rep = getPublishReputation(pubkey);
