@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { decode } from "nostr-tools/nip19";
 import type { AddressPointer } from "nostr-tools/nip19";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Relay query timed out" }, { status: 504 });
     }
     console.error("[fetch/briefing] Relay query failed:", errMsg(err));
+    Sentry.captureException(err, { tags: { route: "fetch-briefing", failure: "relay-query" } });
     return NextResponse.json({ error: "Relay query failed" }, { status: 502 });
   } finally {
     pool.close(relays);

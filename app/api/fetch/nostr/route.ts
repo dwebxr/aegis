@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateRelay } from "@/lib/utils/url";
@@ -121,6 +122,10 @@ export async function POST(request: NextRequest) {
         warning: "Request timed out. Try fewer relays or a more specific filter.",
       });
     }
+    Sentry.captureException(err, {
+      tags: { route: "fetch-nostr", failure: "relay-query" },
+      extra: { relayCount: relays.length, msgPreview: msg.slice(0, 200) },
+    });
     return NextResponse.json({ error: "Relay query failed" }, { status: 502 });
   } finally {
     pool.close(relays);

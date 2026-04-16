@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { TwitterApi } from "twitter-api-v2";
 import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
     if (msg.includes("403") || msg.includes("Forbidden")) {
       return NextResponse.json({ error: "Your X API access level doesn't include search. You need Basic tier ($200/mo) or higher." }, { status: 403 });
     }
+    Sentry.captureException(err, { tags: { route: "fetch-twitter", failure: "x-api" } });
     return NextResponse.json({ error: "X API request failed. Please try again later." }, { status: 500 });
   }
 

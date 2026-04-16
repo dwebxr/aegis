@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import webpush from "web-push";
 import { HttpAgent, Actor } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
@@ -6,6 +7,7 @@ import { idlFactory } from "@/lib/ic/declarations/idlFactory";
 import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { generatePushToken } from "@/lib/api/pushToken";
 import { errMsg } from "@/lib/utils/errors";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 import { getCanisterId, getHost } from "@/lib/ic/config";
 import type { _SERVICE, PushSubscription } from "@/lib/ic/declarations/aegis_backend.did";
 
@@ -20,6 +22,10 @@ if (process.env.VAPID_PRIVATE_KEY && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isFeatureEnabled("pushSend")) {
+    return NextResponse.json({ error: "Push delivery disabled" }, { status: 503 });
+  }
+
   const limited = rateLimit(request, 5, 60_000);
   if (limited) return limited;
   const tooLarge = checkBodySize(request);
@@ -108,6 +114,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ sent, failed, expired: expiredEndpoints.length, cleanupFailed });
   } catch (error) {
     console.error("[push] Send error:", errMsg(error));
+    Sentry.captureException(error, {
+      tags: { route: "push-send", failure: "send" },
+    });
     return NextResponse.json({ error: "Failed to send" }, { status: 500 });
   }
 }

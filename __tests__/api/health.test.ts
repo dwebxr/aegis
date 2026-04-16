@@ -1,6 +1,12 @@
 import { GET } from "@/app/api/health/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";
+import { checkCanisterCycles, _resetCyclesCache } from "@/lib/ic/health";
+
+jest.mock("@/lib/ic/health", () => {
+  const actual = jest.requireActual("@/lib/ic/health");
+  return { ...actual, checkCanisterCycles: jest.fn() };
+});
 
 function makeRequest(): NextRequest {
   return new NextRequest("http://localhost/api/health", { method: "GET" });
@@ -8,14 +14,18 @@ function makeRequest(): NextRequest {
 
 const fetchMock = jest.fn();
 global.fetch = fetchMock;
+const cyclesMock = checkCanisterCycles as jest.MockedFunction<typeof checkCanisterCycles>;
 
 describe("GET /api/health", () => {
   const origEnv = process.env;
 
   beforeEach(() => {
     _resetRateLimits();
+    _resetCyclesCache();
     // Default: IC canister reachable (400 = expected with empty CBOR body)
     fetchMock.mockResolvedValue({ status: 400, ok: false });
+    // Default: cycles well above threshold
+    cyclesMock.mockResolvedValue({ status: "ok", balance: "5000000000000" });
   });
 
   afterEach(() => {
@@ -23,9 +33,9 @@ describe("GET /api/health", () => {
     fetchMock.mockReset();
   });
 
-  it("returns 200 with status and checks", async () => {
+  it("returns 200 or 503 with status and checks", async () => {
     const res = await GET(makeRequest());
-    expect(res.status).toBe(200);
+    expect([200, 503]).toContain(res.status);
     const data = await res.json();
     expect(["ok", "degraded"]).toContain(data.status);
     expect(typeof data.checks).toBe("object");
@@ -53,18 +63,20 @@ describe("GET /api/health", () => {
     expect(data.version).toBe("local");
   });
 
-  it("reports 'degraded' when ANTHROPIC_API_KEY is missing", async () => {
+  it("reports 'degraded' with HTTP 503 when ANTHROPIC_API_KEY is missing", async () => {
     process.env = { ...origEnv };
     delete process.env.ANTHROPIC_API_KEY;
     const res = await GET(makeRequest());
+    expect(res.status).toBe(503);
     const data = await res.json();
     expect(data.status).toBe("degraded");
     expect(data.checks.anthropicKey).toBe("missing");
   });
 
-  it("reports 'ok' when all checks pass", async () => {
+  it("reports 'ok' with HTTP 200 when all checks pass", async () => {
     process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key", NEXT_PUBLIC_SENTRY_DSN: "https://test@sentry.io/1", KV_REST_API_URL: "https://kv.vercel.com" };
     const res = await GET(makeRequest());
+    expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.status).toBe("ok");
     expect(data.checks.anthropicKey).toBe("configured");
@@ -117,6 +129,17 @@ describe("GET /api/health", () => {
     const data = await res.json();
     expect(data.checks.icCanister).toBe("error (500)");
     expect(data.status).toBe("degraded");
+  });
+
+  it("reports 'degraded' with HTTP 503 when canister cycles are low", async () => {
+    process.env = { ...origEnv, ANTHROPIC_API_KEY: "sk-test-key", NEXT_PUBLIC_SENTRY_DSN: "https://test@sentry.io/1" };
+    cyclesMock.mockResolvedValue({ status: "low", balance: "1000000000000" });
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(503);
+    const data = await res.json();
+    expect(data.status).toBe("degraded");
+    expect(data.checks.canisterCycles).toBe("low");
+    expect(data.warnings?.some((w: string) => w.includes("cycles below 2T"))).toBe(true);
   });
 
   it("includes node version and region", async () => {

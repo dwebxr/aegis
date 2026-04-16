@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { extract } from "@extractus/article-extractor";
 import { guardAndParse } from "@/lib/api/rateLimit";
 import { blockPrivateUrl } from "@/lib/utils/url";
@@ -30,6 +31,7 @@ async function extractOne(url: string): Promise<ExtractionResult> {
     article = await withTimeout(extract(url), 15_000, "Article extraction timed out");
   } catch (err) {
     console.error("[fetch/url] Extract failed:", url, errMsg(err));
+    Sentry.captureException(err, { tags: { route: "fetch-url", failure: "extract" }, extra: { url } });
     return { error: "Could not reach this URL. Please verify it is accessible.", status: 502 };
   }
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import Parser from "rss-parser";
 import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
@@ -9,6 +10,7 @@ export const maxDuration = 30;
 
 function feedErrorResponse(err: unknown, feedUrl: string, context: string): NextResponse {
   console.error(`[fetch/rss] ${context}:`, feedUrl, errMsg(err));
+  Sentry.captureException(err, { tags: { route: "fetch-rss", failure: context }, extra: { feedUrl } });
   const msg = errMsg(err);
   if (msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
     return NextResponse.json({ error: "Could not reach this feed. Check the URL and try again." }, { status: 502 });

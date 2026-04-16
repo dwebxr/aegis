@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import type { UserContext } from "@/lib/preferences/types";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
 import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
@@ -8,6 +9,7 @@ import { buildScoringPrompt } from "@/lib/scoring/prompt";
 import { parseScoreResponse } from "@/lib/scoring/parseResponse";
 import { callAnthropic } from "@/lib/api/anthropic";
 import { resolveAnthropicKey } from "@/lib/api/byok";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 
 export const maxDuration = 30;
 
@@ -77,6 +79,12 @@ export async function POST(request: NextRequest) {
   const userContext = sanitizeUserContext(rawCtx);
   const { key: apiKey, isUser: isUserKey } = resolveAnthropicKey(request);
 
+  // Scoring-cascade kill switch: when OFF, short-circuit to heuristic
+  // regardless of keys or budget. Client cascade treats this tier's
+  // response as authoritative for "claude-server" — heuristic result
+  // is a valid AnalyzeResponse so client fallback logic is unchanged.
+  const cascadeEnabled = isFeatureEnabled("scoringCascade");
+
   if (texts && Array.isArray(texts)) {
     const validTexts = texts
       .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
@@ -87,7 +95,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "At least one text is required" }, { status: 400 });
     }
 
-    if (!apiKey) {
+    if (!cascadeEnabled || !apiKey) {
       return NextResponse.json({
         results: validTexts.map(t => ({ ...heuristicScores(t), tier: "heuristic" })),
       });
@@ -123,6 +131,9 @@ export async function POST(request: NextRequest) {
 
   const heuristic = { ...heuristicScores(text), tier: "heuristic" as const };
 
+  if (!cascadeEnabled) {
+    return NextResponse.json(heuristic);
+  }
   if (!apiKey) {
     console.warn("[analyze] No API key available, using heuristic fallback");
     return NextResponse.json(heuristic);
@@ -139,6 +150,10 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const msg = errMsg(err);
     console.error("[analyze] Scoring failed:", msg);
+    Sentry.captureException(err, {
+      tags: { route: "analyze", failure: "anthropic-scoring" },
+      extra: { isUserKey, msgPreview: msg.slice(0, 200) },
+    });
     let errorMsg: string;
     if (msg.includes("Failed to parse AI response")) {
       errorMsg = "Failed to parse AI response";

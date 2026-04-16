@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("[upload/image] nostr.build fetch failed:", errMsg(err));
+    Sentry.captureException(err, { tags: { route: "upload-image", failure: "host-fetch" } });
     return NextResponse.json({ error: "Image host unreachable" }, { status: 502 });
   }
 

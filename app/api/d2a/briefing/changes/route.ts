@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { getRawGlobalBriefings } from "@/lib/d2a/briefingProvider";
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return withCors(NextResponse.json(response), origin);
   } catch (error) {
     console.error("[d2a/briefing/changes] Error:", errMsg(error));
+    Sentry.captureException(error, { tags: { route: "d2a-briefing-changes", failure: "fetch" } });
     return withCors(
       NextResponse.json({ error: "Failed to fetch changes" }, { status: 500 }),
       origin,

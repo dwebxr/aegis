@@ -25,9 +25,9 @@ describe("GET /api/d2a/health", () => {
     process.env = origEnv;
   });
 
-  it("returns 200 with JSON body", async () => {
+  it("returns 200 or 503 with JSON body", async () => {
     const res = await GET(makeRequest());
-    expect(res.status).toBe(200);
+    expect([200, 503]).toContain(res.status);
     const data = await res.json();
     expect(["ok", "degraded"]).toContain(data.status);
   });

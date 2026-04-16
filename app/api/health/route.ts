@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { getCanisterId } from "@/lib/ic/config";
-import { checkIcCanisterReachable, getDeployMeta } from "@/lib/ic/health";
+import { checkCanisterCycles, checkIcCanisterReachable, getDeployMeta } from "@/lib/ic/health";
+import { getFlagSnapshot } from "@/lib/featureFlags";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -23,32 +24,44 @@ export async function GET(request: NextRequest) {
   // Verify IC canister is reachable (lightweight status query)
   checks.icCanister = await checkIcCanisterReachable("[health]");
 
-  // "ok" requires only services that make the app non-functional when absent.
-  // Sentry and KV are advisory: the app works without them.
-  const allOk = checks.anthropicKey === "configured" && checks.icCanister === "reachable";
+  // Cycles balance probe (cached 60s in-process). "low" = below 2T threshold:
+  // the canister self-tops-up from revenue but if revenue is zero it will
+  // eventually freeze, so operators must be paged.
+  const cycles = checks.icCanister === "reachable"
+    ? await checkCanisterCycles("[health]")
+    : { status: "error" as const, error: "skipped (canister unreachable)" };
+  checks.canisterCycles = cycles.status;
+
+  const allOk = checks.anthropicKey === "configured"
+    && checks.icCanister === "reachable"
+    && cycles.status === "ok";
 
   const warnings: string[] = [];
   if (checks.sentryDsn === "missing") warnings.push("error tracking disabled — configure SENTRY_DSN");
   if (checks.kvStore.startsWith("missing")) warnings.push("rate limiting is per-instance only — configure KV_REST_API_URL");
+  if (cycles.status === "low") warnings.push(`canister cycles below 2T threshold (balance=${cycles.balance})`);
 
   const deploy = getDeployMeta();
-  const response = NextResponse.json({
-    status: allOk ? "ok" : "degraded",
-    ...(warnings.length > 0 && { warnings }),
-    timestamp: new Date().toISOString(),
-    version: deploy.version,
-    node: process.version,
-    region: deploy.region,
-    checks,
-    // Documentation only — these are static routes whose presence is
-    // build-time guaranteed by Next.js file-based routing. NOT probed.
-    publicRoutes: [
-      "/api/feed/rss",
-      "/api/feed/atom",
-      "/api-docs",
-      "/openapi.yaml",
-    ],
-  });
+  const response = NextResponse.json(
+    {
+      status: allOk ? "ok" : "degraded",
+      ...(warnings.length > 0 && { warnings }),
+      timestamp: new Date().toISOString(),
+      version: deploy.version,
+      node: process.version,
+      region: deploy.region,
+      checks,
+      publicRoutes: [
+        "/api/feed/rss",
+        "/api/feed/atom",
+        "/api-docs",
+        "/openapi.yaml",
+      ],
+      flags: getFlagSnapshot(),
+    },
+    // 503 on degraded so uptime monitors alert on HTTP status alone.
+    { status: allOk ? 200 : 503 },
+  );
   response.headers.set("Cache-Control", "no-store");
   return response;
 }

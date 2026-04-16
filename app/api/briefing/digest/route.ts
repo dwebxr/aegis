@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
@@ -74,6 +75,7 @@ Respond with ONLY the digest paragraph, no labels or formatting.`;
     return NextResponse.json({ digest: res.text.trim() });
   } catch (err) {
     console.error("[briefing/digest] Anthropic request failed:", errMsg(err));
+    Sentry.captureException(err, { tags: { route: "briefing-digest", failure: "anthropic" } });
     return NextResponse.json(
       { error: "Request failed" },
       { status: 502 },

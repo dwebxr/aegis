@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 
@@ -118,6 +119,7 @@ export async function POST(request: NextRequest) {
       if (msg.includes("404") || msg.includes("not found")) {
         return NextResponse.json({ error: `User "${username}" not found on Farcaster` }, { status: 404 });
       }
+      Sentry.captureException(err, { tags: { route: "fetch-farcaster", failure: "resolve-user" }, extra: { username } });
       return NextResponse.json({ error: "Failed to resolve user" }, { status: 502 });
     }
   }
@@ -163,6 +165,7 @@ export async function POST(request: NextRequest) {
       if (msg.includes("timeout")) {
         return NextResponse.json({ items: [], warning: "Request timed out" });
       }
+      Sentry.captureException(err, { tags: { route: "fetch-farcaster", failure: "feed-fetch" } });
       return NextResponse.json({ error: "Failed to fetch casts" }, { status: 502 });
     }
   }

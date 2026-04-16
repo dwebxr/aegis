@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { Principal } from "@dfinity/principal";
 import { withX402 } from "@x402/next";
 import { rateLimit } from "@/lib/api/rateLimit";
@@ -7,10 +8,11 @@ import { getLatestBriefing, getGlobalBriefingSummaries } from "@/lib/d2a/briefin
 import { resourceServer, X402_NETWORK, X402_PRICE, X402_RECEIVER } from "@/lib/d2a/x402Server";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
 import { parseFilterParams, filterAndPaginate, applyPreview } from "@/lib/d2a/filterItems";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 
 export const maxDuration = 30;
 
-const X402_FREE_TIER = process.env.X402_FREE_TIER_ENABLED === "true";
+const X402_FREE_TIER = isFeatureEnabled("x402FreeTier");
 
 const x402Config = {
   accepts: {
@@ -54,6 +56,15 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
       const result = preview ? applyPreview(filtered) : filtered;
 
       return withCors(NextResponse.json(result), origin);
+    }
+
+    // Global aggregation path — gated by the briefingAggregation kill switch.
+    // Per-principal briefings above remain available regardless.
+    if (!isFeatureEnabled("briefingAggregation")) {
+      return withCors(
+        NextResponse.json({ error: "Global briefing aggregation disabled" }, { status: 503 }),
+        origin,
+      );
     }
 
     const parsedOffset = searchParams.get("offset") !== null ? parseInt(searchParams.get("offset")!, 10) : NaN;
@@ -112,6 +123,7 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
     return withCors(NextResponse.json(global), origin);
   } catch (error) {
     console.error("[d2a/briefing] Error:", errMsg(error));
+    Sentry.captureException(error, { tags: { route: "d2a-briefing", failure: "fetch" } });
     return withCors(NextResponse.json({ error: "Failed to fetch briefing" }, { status: 500 }), origin);
   }
 }

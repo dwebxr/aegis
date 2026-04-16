@@ -21,13 +21,16 @@ export async function GET(request: NextRequest) {
   const allOk = checks.icCanister === "reachable" && checks.x402Receiver !== "not configured";
 
   const deploy = getDeployMeta();
-  const response = NextResponse.json({
-    status: allOk ? "ok" : "degraded",
-    timestamp: new Date().toISOString(),
-    version: deploy.version,
-    region: deploy.region,
-    checks,
-  });
+  const response = NextResponse.json(
+    {
+      status: allOk ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      version: deploy.version,
+      region: deploy.region,
+      checks,
+    },
+    { status: allOk ? 200 : 503 },
+  );
 
   response.headers.set("Cache-Control", "no-store");
   return withCors(response, request.headers.get("origin"));
