@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import type { ContentItem } from "@/lib/types/content";
+import type { ContentSyncStatus } from "./types";
 import type { _SERVICE, ContentSource } from "@/lib/ic/declarations";
 import { relativeTime } from "@/lib/utils/scores";
 import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
@@ -116,7 +117,7 @@ export function syncToIC(
   promise: Promise<unknown>,
   actionType: "saveEvaluation" | "updateEvaluation",
   payload: unknown,
-  setSyncStatus: (s: "idle" | "syncing" | "synced" | "offline") => void,
+  setSyncStatus: (s: ContentSyncStatus) => void,
   setPendingActions: React.Dispatch<React.SetStateAction<number>>,
   addNotification: (msg: string, type: "error" | "info" | "success") => void,
 ) {
@@ -139,7 +140,7 @@ export async function drainOfflineQueue(
   principal: import("@dfinity/principal").Principal,
   contentRef: React.MutableRefObject<ContentItem[]>,
   setPendingActions: React.Dispatch<React.SetStateAction<number>>,
-  setSyncStatus: (s: "idle" | "syncing" | "synced" | "offline") => void,
+  setSyncStatus: (s: ContentSyncStatus) => void,
   addNotification?: (msg: string, type: "error" | "info" | "success") => void,
 ) {
   const actions = await dequeueAll();
@@ -195,7 +196,7 @@ export async function loadFromICCanister(
   actor: _SERVICE,
   principal: import("@dfinity/principal").Principal,
   setContent: React.Dispatch<React.SetStateAction<ContentItem[]>>,
-  setSyncStatus: (s: "idle" | "syncing" | "synced" | "offline") => void,
+  setSyncStatus: (s: ContentSyncStatus) => void,
   syncRetryRef: React.MutableRefObject<number>,
   syncRetryTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | undefined>,
   loadFromICRef: React.MutableRefObject<() => Promise<void>>,

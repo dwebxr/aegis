@@ -1,5 +1,6 @@
 import type { MLCEngine } from "@mlc-ai/web-llm";
-import type { WebLLMScoreResult, WebLLMStatus } from "./types";
+import type { WebLLMStatus } from "./types";
+import type { ScoreParseResult } from "@/lib/scoring/types";
 import { buildScoringPrompt } from "@/lib/scoring/prompt";
 import { parseScoreResponse } from "@/lib/scoring/parseResponse";
 import { createStatusEmitter } from "@/lib/utils/statusEmitter";
@@ -70,7 +71,7 @@ export async function getOrCreateEngine(): Promise<MLCEngine> {
 export async function scoreWithWebLLM(
   text: string,
   userTopics: string[],
-): Promise<WebLLMScoreResult> {
+): Promise<ScoreParseResult> {
   const eng = await getOrCreateEngine();
   const prompt = buildScoringPrompt(text, userTopics);
 

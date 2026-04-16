@@ -1,4 +1,5 @@
 import type { ScoreParseResult } from "./types";
+import type { Verdict } from "@/lib/types/content";
 import { clamp } from "@/lib/utils/math";
 
 function toNum(value: unknown, fallback: number): number {
@@ -46,7 +47,7 @@ export function parseScoreResponse(raw: string): ScoreParseResult | null {
     if (rawVerdict !== "quality" && rawVerdict !== "slop") {
       console.warn("[parseResponse] Unexpected verdict from LLM:", JSON.stringify(rawVerdict), "— defaulting to slop");
     }
-    const verdict: "quality" | "slop" = rawVerdict === "quality" ? "quality" : "slop";
+    const verdict: Verdict = rawVerdict === "quality" ? "quality" : "slop";
     const reason = typeof parsed.reason === "string" ? parsed.reason.slice(0, 500) : "";
     const topics = Array.isArray(parsed.topics)
       ? parsed.topics.filter((t: unknown) => typeof t === "string").slice(0, 10)

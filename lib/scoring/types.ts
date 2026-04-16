@@ -40,7 +40,7 @@ export interface ScoreParseResult {
   insight: number;
   credibility: number;
   composite: number;
-  verdict: "quality" | "slop";
+  verdict: import("@/lib/types/content").Verdict;
   reason: string;
   topics: string[];
   vSignal: number;
