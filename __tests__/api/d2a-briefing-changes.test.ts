@@ -22,6 +22,7 @@ jest.mock("@/lib/d2a/x402Server", () => ({
 import { GET, OPTIONS } from "@/app/api/d2a/briefing/changes/route";
 import { getRawGlobalBriefings } from "@/lib/d2a/briefingProvider";
 import type { RawBriefingEntry } from "@/lib/d2a/briefingProvider";
+import type { ChangesResponse, D2ABriefingItem } from "@/lib/d2a/types";
 
 const mockGetRawGlobalBriefings = getRawGlobalBriefings as jest.MockedFunction<typeof getRawGlobalBriefings>;
 
@@ -53,7 +54,7 @@ function makeEntry(itemsOverride?: Array<Record<string, unknown>>, generatedAtMs
           topics: ["AI"],
           briefingScore: 85,
         },
-      ]) as any,
+      ]) as unknown as D2ABriefingItem[],
       serendipityPick: null,
       meta: { scoringModel: "vcl-v1", nostrPubkey: null, topics: ["AI"] },
     },
@@ -151,9 +152,9 @@ describe("GET /api/d2a/briefing/changes — multiple entries", () => {
     mockGetRawGlobalBriefings.mockResolvedValue([entry1, entry2]);
 
     const res = await GET(makeRequest({ since: "2026-03-20T00:00:00Z" }));
-    const data = await res.json();
+    const data = (await res.json()) as ChangesResponse;
     expect(data.changes).toHaveLength(3);
-    expect(data.changes.map((c: any) => c.title)).toEqual(["A1", "A2", "B1"]);
+    expect(data.changes.map((c) => c.title)).toEqual(["A1", "A2", "B1"]);
   });
 
   it("each change has unique itemHash for different items", async () => {

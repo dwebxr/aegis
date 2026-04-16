@@ -4,8 +4,7 @@
 
 // Polyfill structuredClone for jsdom
 if (typeof globalThis.structuredClone === "undefined") {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  globalThis.structuredClone = ((val: any) => JSON.parse(JSON.stringify(val))) as typeof structuredClone;
+  globalThis.structuredClone = ((val: unknown) => JSON.parse(JSON.stringify(val))) as typeof structuredClone;
 }
 
 import React from "react";

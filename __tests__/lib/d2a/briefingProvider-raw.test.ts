@@ -151,7 +151,7 @@ describe("getRawGlobalBriefings", () => {
       items: [[
         makePrincipal("u1"),
         makeValidJson({ generatedAt }),
-        "not-bigint" as any,
+        "not-bigint" as unknown as bigint,
       ]],
       total: BigInt(1),
     });

@@ -17,6 +17,7 @@ jest.mock("@/lib/d2a/x402Server", () => ({
 
 import { GET, OPTIONS } from "@/app/api/d2a/briefing/route";
 import { getLatestBriefing, getGlobalBriefingSummaries } from "@/lib/d2a/briefingProvider";
+import type { GlobalBriefingResponse } from "@/lib/d2a/types";
 
 const mockGetLatestBriefing = getLatestBriefing as jest.MockedFunction<typeof getLatestBriefing>;
 const mockGetGlobalBriefingSummaries = getGlobalBriefingSummaries as jest.MockedFunction<typeof getGlobalBriefingSummaries>;
@@ -286,9 +287,9 @@ describe("GET /api/d2a/briefing — global path filtering", () => {
   it("filters contributors by since timestamp", async () => {
     mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
     const res = await GET(makeRequest({ since: "2026-03-20T12:00:00Z" }));
-    const data = await res.json();
+    const data = (await res.json()) as GlobalBriefingResponse;
     expect(data.contributors).toHaveLength(2);
-    expect(data.contributors.map((c: any) => c.principal)).toEqual(["user-2", "user-4"]);
+    expect(data.contributors.map((c) => c.principal)).toEqual(["user-2", "user-4"]);
     expect(data.pagination.total).toBe(2);
     expect(data.pagination.hasMore).toBe(false);
   });
@@ -296,10 +297,10 @@ describe("GET /api/d2a/briefing — global path filtering", () => {
   it("filters contributors by topics", async () => {
     mockGetGlobalBriefingSummaries.mockResolvedValue(multiContributorBriefing);
     const res = await GET(makeRequest({ topics: "DeFi" }));
-    const data = await res.json();
+    const data = (await res.json()) as GlobalBriefingResponse;
     // user-2 (DeFi,Crypto), user-4 (AI,DeFi)
     expect(data.contributors).toHaveLength(2);
-    expect(data.contributors.map((c: any) => c.principal)).toEqual(["user-2", "user-4"]);
+    expect(data.contributors.map((c) => c.principal)).toEqual(["user-2", "user-4"]);
   });
 
   it("combines since and topics filters", async () => {

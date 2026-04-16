@@ -106,8 +106,9 @@ describe("handleICSessionError", () => {
 
   it("handles SSR environment (no window)", () => {
     const origWindow = globalThis.window;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (globalThis as any).window;
+    // `window` is non-optional on `globalThis`; cast to a shape where it's
+    // optional so the deletion is type-safe for this SSR simulation.
+    delete (globalThis as unknown as { window?: Window }).window;
     try {
       // Should return true (error matched) but not throw when dispatching
       const result = handleICSessionError(new Error("Invalid signature"));
