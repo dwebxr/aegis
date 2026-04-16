@@ -94,3 +94,36 @@ jobs:
           NEXT_PUBLIC_CANISTER_ID: rluf3-eiaaa-aaaam-qgjuq-cai
           NEXT_PUBLIC_IC_HOST: https://icp-api.io
           NEXT_PUBLIC_INTERNET_IDENTITY_URL: https://identity.ic0.app
+
+  canister-upgrade:
+    # Catches M0169 (stable field renamed/removed) at PR time. Spins up a
+    # local replica, deploys the PR-head canister as a baseline install, then
+    # deploys it again in --mode upgrade. If any persistent field was dropped
+    # or renamed, the upgrade step fails and the PR is blocked.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dfx
+        run: |
+          DFX_VERSION=0.30.2 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
+
+      - name: Install mops
+        run: npm install -g ic-mops
+
+      - name: Fetch mops sources
+        run: mops install
+
+      - name: Start local replica
+        run: dfx start --clean --background --host 127.0.0.1:4943
+
+      - name: Baseline install
+        run: dfx deploy aegis_backend --network local --no-wallet
+
+      - name: Upgrade (catches M0169 on stable field rename/remove)
+        run: dfx deploy aegis_backend --network local --mode upgrade --no-wallet
+
+      - name: Stop replica
+        if: ${{ !cancelled() }}
+        run: dfx stop
