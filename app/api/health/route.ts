@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
-import { getCanisterId, getHost } from "@/lib/ic/config";
-import { errMsg } from "@/lib/utils/errors";
+import { getCanisterId } from "@/lib/ic/config";
+import { checkIcCanisterReachable, getDeployMeta } from "@/lib/ic/health";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -18,25 +18,10 @@ export async function GET(request: NextRequest) {
   checks.sentryDsn = sentryDsn ? "configured" : "missing";
   checks.kvStore = process.env.KV_REST_API_URL?.trim() ? "configured" : "missing (budget per-instance)";
 
-  const canisterId = getCanisterId();
-  checks.canisterId = canisterId;
+  checks.canisterId = getCanisterId();
 
   // Verify IC canister is reachable (lightweight status query)
-  const icHost = getHost();
-  try {
-    const icRes = await fetch(`${icHost}/api/v2/canister/${canisterId}/query`, {
-      method: "POST",
-      headers: { "Content-Type": "application/cbor" },
-      body: new Uint8Array(0),
-      signal: AbortSignal.timeout(5000),
-    });
-    // 400 = canister reachable but bad request (expected with empty body)
-    // 200 = canister reachable
-    checks.icCanister = icRes.status === 400 || icRes.ok ? "reachable" : `error (${icRes.status})`;
-  } catch (err) {
-    checks.icCanister = "unreachable";
-    console.warn("[health] IC canister check failed:", errMsg(err));
-  }
+  checks.icCanister = await checkIcCanisterReachable("[health]");
 
   // "ok" requires only services that make the app non-functional when absent.
   // Sentry and KV are advisory: the app works without them.
@@ -46,13 +31,14 @@ export async function GET(request: NextRequest) {
   if (checks.sentryDsn === "missing") warnings.push("error tracking disabled — configure SENTRY_DSN");
   if (checks.kvStore.startsWith("missing")) warnings.push("rate limiting is per-instance only — configure KV_REST_API_URL");
 
+  const deploy = getDeployMeta();
   const response = NextResponse.json({
     status: allOk ? "ok" : "degraded",
     ...(warnings.length > 0 && { warnings }),
     timestamp: new Date().toISOString(),
-    version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "local",
+    version: deploy.version,
     node: process.version,
-    region: (process.env.VERCEL_REGION || "local").trim(),
+    region: deploy.region,
     checks,
     // Documentation only — these are static routes whose presence is
     // build-time guaranteed by Next.js file-based routing. NOT probed.

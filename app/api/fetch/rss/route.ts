@@ -3,6 +3,7 @@ import Parser from "rss-parser";
 import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
+import { stripHtmlToText } from "@/lib/utils/text";
 
 export const maxDuration = 30;
 
@@ -134,7 +135,7 @@ function buildItems(feed: { items?: Parser.Item[] }, limit: number) {
     const raw = item as unknown as Record<string, unknown>;
     const contentEncoded = typeof raw["content:encoded"] === "string" ? raw["content:encoded"] : "";
     const rawContent: string = contentEncoded || item.content || item.contentSnippet || item.summary || "";
-    const textContent = rawContent.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const textContent = stripHtmlToText(rawContent);
     const imageUrl = extractImage(raw, rawContent);
     const rawAuthor = typeof raw.author === "string" ? raw.author : "";
     return {

@@ -4,6 +4,7 @@ import { guardAndParse } from "@/lib/api/rateLimit";
 import { blockPrivateUrl } from "@/lib/utils/url";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
+import { stripHtmlToText } from "@/lib/utils/text";
 import { type ExtractionResult, getUrlCached, setUrlCache } from "@/lib/cache/urlExtract";
 
 export const maxDuration = 30;
@@ -40,7 +41,7 @@ async function extractOne(url: string): Promise<ExtractionResult> {
     return { error: "Page loaded but contained no article text", status: 422 };
   }
 
-  const textContent = article.content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const textContent = stripHtmlToText(article.content);
 
   if (textContent.length < 50) {
     return { error: "Extracted content is too short to evaluate meaningfully.", status: 422 };
