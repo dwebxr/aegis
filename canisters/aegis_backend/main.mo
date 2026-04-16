@@ -100,6 +100,9 @@ persistent actor AegisBackend {
   transient var evaluations = HashMap.HashMap<Text, Types.ContentEvaluation>(64, Text.equal, Text.hash);
   transient var profiles = HashMap.HashMap<Principal, Types.UserProfile>(16, Principal.equal, Principal.hash);
   transient var sourceConfigs = HashMap.HashMap<Text, Types.SourceConfigEntry>(16, Text.equal, Text.hash);
+  // Owner → [configId] index. Enables O(k) per-user list queries instead of
+  // the O(n) full-map scan in getSourceConfigStats / getUserSourceConfigs.
+  transient var sourceConfigOwnerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
 
   // Signal storage + owner index
   transient var signals = HashMap.HashMap<Text, Types.PublishedSignal>(16, Text.equal, Text.hash);
@@ -198,7 +201,10 @@ persistent actor AegisBackend {
     stableEvaluationsV2 := [];
     stableEvaluationsV3 := [];
     for ((p, profile) in stableProfiles.vals()) { profiles.put(p, profile) };
-    for ((id, config) in stableSourceConfigs.vals()) { sourceConfigs.put(id, config) };
+    for ((id, config) in stableSourceConfigs.vals()) {
+      sourceConfigs.put(id, config);
+      addToPrincipalIndex(sourceConfigOwnerIndex, config.owner, id);
+    };
     for ((id, signal) in stableSignals.vals()) {
       signals.put(id, signal);
       addToPrincipalIndex(signalOwnerIndex, signal.owner, id);
@@ -286,6 +292,27 @@ persistent actor AegisBackend {
         let buf = Buffer.Buffer<Text>(8);
         buf.add(id);
         index.put(owner, buf);
+      };
+    };
+  };
+
+  // Helper: drop an ID from a Principal-keyed Buffer index. Rebuilds the
+  // buffer without the target ID (Buffer has no remove-by-value in base).
+  // If the owner's list becomes empty, the entry is removed from the map
+  // so callers can distinguish "never had configs" from "deleted all".
+  func removeFromPrincipalIndex(index : HashMap.HashMap<Principal, Buffer.Buffer<Text>>, owner : Principal, id : Text) {
+    switch (index.get(owner)) {
+      case null { };
+      case (?buf) {
+        let filtered = Buffer.Buffer<Text>(buf.size());
+        for (entry in buf.vals()) {
+          if (entry != id) { filtered.add(entry) };
+        };
+        if (filtered.size() == 0) {
+          index.delete(owner);
+        } else {
+          index.put(owner, filtered);
+        };
       };
     };
   };
@@ -599,6 +626,19 @@ persistent actor AegisBackend {
       enabled = config.enabled;
       createdAt = if (config.createdAt == 0) { Time.now() } else { config.createdAt };
     };
+    // If this ID is being overwritten by a different owner the old index
+    // entry would leak. Update the owner index to reflect the new owner.
+    switch (sourceConfigs.get(tagged.id)) {
+      case (?existing) {
+        if (not Principal.equal(existing.owner, tagged.owner)) {
+          removeFromPrincipalIndex(sourceConfigOwnerIndex, existing.owner, tagged.id);
+          addToPrincipalIndex(sourceConfigOwnerIndex, tagged.owner, tagged.id);
+        };
+      };
+      case null {
+        addToPrincipalIndex(sourceConfigOwnerIndex, tagged.owner, tagged.id);
+      };
+    };
     sourceConfigs.put(tagged.id, tagged);
     tagged.id;
   };
@@ -614,15 +654,71 @@ persistent actor AegisBackend {
   };
 
   public query func getSourceConfigStats() : async { total: Nat; owners: [Principal] } {
-    let ownerSet = HashMap.HashMap<Principal, Bool>(4, Principal.equal, Principal.hash);
-    for ((_, config) in sourceConfigs.entries()) {
-      ownerSet.put(config.owner, true);
-    };
-    let ownerBuf = Buffer.Buffer<Principal>(ownerSet.size());
-    for ((p, _) in ownerSet.entries()) {
+    let ownerBuf = Buffer.Buffer<Principal>(sourceConfigOwnerIndex.size());
+    for ((p, _) in sourceConfigOwnerIndex.entries()) {
       ownerBuf.add(p);
     };
     { total = sourceConfigs.size(); owners = Buffer.toArray(ownerBuf) };
+  };
+
+  // Paginated variant of getSourceConfigStats — returns a slice of the
+  // owner list plus a `hasMore` flag so callers can iterate without
+  // transferring the full owner set in a single query. Uses the owner
+  // index for O(unique-owners) cost rather than the O(total-configs)
+  // full scan the legacy getSourceConfigStats used to perform.
+  public query func getSourceConfigStatsPaginated(offset : Nat, limit : Nat) : async {
+    total : Nat; owners : [Principal]; totalOwners : Nat; hasMore : Bool
+  } {
+    let allOwners = Buffer.Buffer<Principal>(sourceConfigOwnerIndex.size());
+    for ((p, _) in sourceConfigOwnerIndex.entries()) {
+      allOwners.add(p);
+    };
+    let totalOwners = allOwners.size();
+    let cappedLimit = if (limit > 500) { 500 } else { limit };
+    let end = Nat.min(offset + cappedLimit, totalOwners);
+    let sliced = Buffer.Buffer<Principal>(if (end > offset) { end - offset } else { 0 });
+    var i = offset;
+    while (i < end) {
+      sliced.add(allOwners.get(i));
+      i += 1;
+    };
+    {
+      total = sourceConfigs.size();
+      owners = Buffer.toArray(sliced);
+      totalOwners = totalOwners;
+      hasMore = end < totalOwners;
+    };
+  };
+
+  // Paginated variant of getUserSourceConfigs. The legacy method scans
+  // every source config in the canister (O(total)); this one looks up
+  // the user's entry in the owner index first (O(1) hash lookup) and
+  // then slices the index buffer (O(limit)).
+  public query func getUserSourceConfigsPaginated(
+    p : Principal, offset : Nat, limit : Nat
+  ) : async { items : [Types.SourceConfigEntry]; total : Nat; hasMore : Bool } {
+    switch (sourceConfigOwnerIndex.get(p)) {
+      case null { { items = []; total = 0; hasMore = false } };
+      case (?buf) {
+        let total = buf.size();
+        let cappedLimit = if (limit > 200) { 200 } else { limit };
+        let end = Nat.min(offset + cappedLimit, total);
+        let sliced = Buffer.Buffer<Types.SourceConfigEntry>(if (end > offset) { end - offset } else { 0 });
+        var i = offset;
+        while (i < end) {
+          switch (sourceConfigs.get(buf.get(i))) {
+            case (?config) { sliced.add(config) };
+            case null { };
+          };
+          i += 1;
+        };
+        {
+          items = Buffer.toArray(sliced);
+          total = total;
+          hasMore = end < total;
+        };
+      };
+    };
   };
 
   public shared(msg) func deleteSourceConfig(id : Text) : async Bool {
@@ -634,6 +730,7 @@ persistent actor AegisBackend {
       case (?config) {
         if (not Principal.equal(config.owner, caller)) { return false };
         sourceConfigs.delete(id);
+        removeFromPrincipalIndex(sourceConfigOwnerIndex, config.owner, id);
         true;
       };
     };
