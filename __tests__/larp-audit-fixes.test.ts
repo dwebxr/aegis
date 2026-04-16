@@ -40,14 +40,6 @@ describe("syncToIC — LARP fix: no floating async catch handler", () => {
     const setPendingActions = jest.fn();
     const addNotification = jest.fn();
 
-    // Mock enqueueAction to succeed
-    jest.mock("@/lib/offline/actionQueue", () => ({
-      enqueueAction: jest.fn().mockResolvedValue(undefined),
-      dequeueAll: jest.fn().mockResolvedValue([]),
-      removeAction: jest.fn(),
-      incrementRetries: jest.fn(),
-    }));
-
     syncToIC(
       Promise.reject(new Error("IC unavailable")),
       "saveEvaluation",
