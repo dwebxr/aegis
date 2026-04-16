@@ -1,6 +1,6 @@
 const STORAGE_KEY = "aegis-onboarding";
 
-export interface OnboardingState {
+interface OnboardingState {
   dismissed: boolean;
   firstSeenAt: number;
 }
@@ -12,7 +12,7 @@ export interface OnboardingContext {
   flaggedCount: number;
 }
 
-export interface OnboardingStep {
+interface OnboardingStep {
   id: "add-sources" | "wait-content" | "review-validate" | "personalized";
   label: string;
   description: string;

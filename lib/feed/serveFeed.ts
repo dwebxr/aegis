@@ -9,7 +9,7 @@ import { errMsg } from "@/lib/utils/errors";
 
 const CACHE_HEADER = "public, max-age=300, s-maxage=300, stale-while-revalidate=600";
 
-export type FeedFormat = "rss" | "atom";
+type FeedFormat = "rss" | "atom";
 
 const SERIALIZERS: Record<FeedFormat, { contentType: string; serialize: (f: ReturnType<typeof buildFeed>) => string }> = {
   rss: { contentType: "application/rss+xml; charset=utf-8", serialize: f => f.rss2() },

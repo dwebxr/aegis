@@ -146,7 +146,7 @@ export function computeTopicSpotlight(
   }).filter(Boolean) as Array<{ topic: string; items: ContentItem[] }>;
 }
 
-export interface DashboardActivityStats {
+interface DashboardActivityStats {
   qualityCount: number;
   slopCount: number;
   totalEvaluated: number;
@@ -240,7 +240,7 @@ export function computeUnreviewedQueue(
     .slice(0, 5);
 }
 
-export interface TopicDistEntry {
+interface TopicDistEntry {
   topic: string;
   count: number;
   qualityRate: number;

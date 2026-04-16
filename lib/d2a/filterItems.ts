@@ -1,14 +1,14 @@
 import { createHash } from "crypto";
 import type { D2ABriefingItem, D2ABriefingResponse } from "./types";
 
-export interface BriefingFilterParams {
+interface BriefingFilterParams {
   since?: string;
   limit: number;
   offset: number;
   topics?: string[];
 }
 
-export interface PaginatedBriefingResponse extends Omit<D2ABriefingResponse, "items"> {
+interface PaginatedBriefingResponse extends Omit<D2ABriefingResponse, "items"> {
   pagination: {
     offset: number;
     limit: number;

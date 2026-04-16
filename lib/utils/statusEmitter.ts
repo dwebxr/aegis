@@ -1,4 +1,4 @@
-export interface StatusEmitter<T> {
+interface StatusEmitter<T> {
   emit: (partial: Partial<T>) => void;
   onStatusChange: (listener: (status: T) => void) => () => void;
   getStatus: () => T;

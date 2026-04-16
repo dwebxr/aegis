@@ -31,7 +31,8 @@
     "lib/ic/declarations/**",
     "canisters/**",
     "aegis_app.jsx",
-    "public/**"
+    "public/**",
+    "app/sw.ts"
   ],
   "ignoreDependencies": [
     "tailwindcss",
@@ -43,7 +44,8 @@
     "eslint-config-next",
     "@types/.*",
     "fake-indexeddb",
-    "ts-jest"
+    "ts-jest",
+    "serwist"
   ],
   "ignoreBinaries": ["dfx"]
 }

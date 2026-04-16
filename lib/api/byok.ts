@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 const HEADER = "x-user-api-key";
 const PREFIX = "sk-ant-";
 
-export interface ByokResolution {
+interface ByokResolution {
   /** The key to send to Anthropic, or null if neither user nor server key is available. */
   key: string | null;
   /** True when the resolved key came from the request header (BYOK). */

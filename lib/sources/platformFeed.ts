@@ -1,4 +1,4 @@
-export interface PlatformFeedResult {
+interface PlatformFeedResult {
   feeds: Array<{ url: string; title: string; type: string }>;
 }
 

@@ -22,7 +22,7 @@ function feedItemId(item: D2ABriefingItem, fallbackIndex: number, principal: str
   return `urn:aegis:item:${principal}:${fallbackIndex}:${encodeURIComponent(item.title.slice(0, 80))}`;
 }
 
-export interface BuildFeedOptions {
+interface BuildFeedOptions {
   briefing: D2ABriefingResponse;
   principal: string;
   /** Absolute URL of the RSS endpoint (used for self-link metadata). */

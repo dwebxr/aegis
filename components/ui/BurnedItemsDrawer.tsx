@@ -6,7 +6,7 @@ import { WhyFilteredModal, type BurnReasonKind } from "./WhyFilteredModal";
 import type { ContentItem } from "@/lib/types/content";
 import type { BurnedByRule } from "@/lib/filtering/types";
 
-export interface BurnedItemsDrawerProps {
+interface BurnedItemsDrawerProps {
   open: boolean;
   onClose: () => void;
   /** All items including slop verdicts (today's window or full set). */
