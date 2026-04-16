@@ -85,14 +85,9 @@ export function mergePageIntoContent(
   const merged = pageItems.map(l => {
     const cached = cachedById.get(l.id);
     if (!cached) return l;
-    // Local-only fields that the IC canister does not store. Each ?? falls
-    // back to the cached value when the IC version lacks the field, which
-    // is the normal case (the canister has no schema for translation,
-    // nostrPubkey, vSignal/cContext/lSlop, platform). For scoringEngine
-    // we additionally treat "heuristic" as a downgrade and prefer the
-    // cached engine if it was a real AI tier — see the test
-    // "preserves cached scoredByAI / scoringEngine when IC reload
-    // classifies as heuristic".
+    // Canister has no schema for translation/nostrPubkey/vSignal/cContext/lSlop/platform,
+    // so fall back to cached values. For scoringEngine, a cached AI tier beats a reloaded
+    // "heuristic" (the canister only stores the engine name in reason-encoded form).
     const preferCachedEngine =
       l.scoringEngine === "heuristic" &&
       cached.scoringEngine !== undefined &&

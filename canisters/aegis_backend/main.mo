@@ -864,7 +864,6 @@ persistent actor AegisBackend {
             #err(errText);
           };
           case null {
-            // Save the signal
             let tagged : Types.PublishedSignal = {
               id = signal.id;
               owner = caller;
@@ -1210,7 +1209,7 @@ persistent actor AegisBackend {
               totalSignals += 1;
               compositeSum += signal.scores.compositeScore;
 
-              // Check if this signal's stake was returned (= validated)
+              // #returned status = stake was returned, treat as community-validated
               switch (signalStakeIndex.get(signalId)) {
                 case (?stakeId) {
                   switch (stakes.get(stakeId)) {

@@ -90,7 +90,6 @@ export function saveCachedContent(items: ContentItem[]): void {
     if (useIDB) {
       idbPut(STORE_CONTENT_CACHE, IDB_CONTENT_KEY, truncated).catch(err => {
         console.warn("[content] IDB save failed, falling back to localStorage:", errMsg(err));
-        // Fallback: attempt localStorage write when IDB fails
         if (typeof globalThis.localStorage !== "undefined") {
           try {
             localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncated));
