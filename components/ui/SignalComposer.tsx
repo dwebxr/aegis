@@ -29,7 +29,6 @@ export const SignalComposer: React.FC<SignalComposerProps> = ({ onPublish, onAna
   const [publishResult, setPublishResult] = useState<{ eventId: string | null; relaysPublished: string[] } | null>(null);
   const [stakeE8s, setStakeE8s] = useState(1_000_000);
 
-  // Image state
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);

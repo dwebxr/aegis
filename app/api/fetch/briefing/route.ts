@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { decode } from "nostr-tools/nip19";
 import type { AddressPointer } from "nostr-tools/nip19";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
+import { loadServerPool } from "@/lib/nostr/serverPool";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
@@ -37,12 +38,7 @@ export async function GET(request: NextRequest) {
 
   const relays = mergeRelays(addr.relays);
 
-  const { SimplePool, useWebSocketImplementation: setWsImpl } =
-    await import("nostr-tools/pool");
-  const WebSocket = (await import("ws")).default;
-  setWsImpl(WebSocket);
-
-  const pool = new SimplePool();
+  const pool = await loadServerPool();
   const filter = {
     kinds: [addr.kind],
     authors: [addr.pubkey],

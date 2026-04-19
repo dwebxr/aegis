@@ -40,7 +40,10 @@ export interface ScoreParseResult {
   insight: number;
   credibility: number;
   composite: number;
-  verdict: import("@/lib/types/content").Verdict;
+  // Structurally identical to `Verdict` in `@/lib/types/content`. Inlined
+  // here to break the type-only circular dependency between these two
+  // sibling type modules (madge cycle). Keep in sync with `Verdict`.
+  verdict: "quality" | "slop";
   reason: string;
   topics: string[];
   vSignal: number;

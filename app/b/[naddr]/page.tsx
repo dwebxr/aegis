@@ -6,6 +6,7 @@ import { parseBriefingMarkdown } from "@/lib/briefing/serialize";
 import type { ParsedBriefing } from "@/lib/briefing/serialize";
 import { SharedBriefingView } from "@/components/shared/SharedBriefingView";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
+import { loadServerPool } from "@/lib/nostr/serverPool";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
 
@@ -34,12 +35,7 @@ async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
 
   const relays = mergeRelays(addr.relays);
 
-  const { SimplePool, useWebSocketImplementation: setWsImpl } =
-    await import("nostr-tools/pool");
-  const WebSocket = (await import("ws")).default;
-  setWsImpl(WebSocket);
-
-  const pool = new SimplePool();
+  const pool = await loadServerPool();
   const filter = {
     kinds: [addr.kind],
     authors: [addr.pubkey],

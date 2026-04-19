@@ -43,7 +43,7 @@ export async function checkIcCanisterReachable(logPrefix: string): Promise<strin
  * and `/api/d2a/health` report the deploy's short-SHA and region; this
  * helper centralises the env-var access + default so they never drift.
  */
-export type CyclesCheck =
+type CyclesCheck =
   | { status: "ok"; balance: string }
   | { status: "low"; balance: string }
   | { status: "error"; error: string };

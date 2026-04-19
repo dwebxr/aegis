@@ -6,7 +6,12 @@ function loadCollapsed(): Set<string> {
   if (typeof globalThis.localStorage === "undefined") return new Set();
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return new Set();
-  try { return new Set(JSON.parse(raw)); } catch { return new Set(); }
+  try {
+    return new Set(JSON.parse(raw));
+  } catch (err) {
+    console.warn("[auto-reveal] Corrupted collapsed-sections state, resetting:", err);
+    return new Set();
+  }
 }
 
 function saveCollapsed(set: Set<string>): void {

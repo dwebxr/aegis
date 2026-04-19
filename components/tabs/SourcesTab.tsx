@@ -115,7 +115,6 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const [nostrError, setNostrError] = useState("");
   const [analyzedUrls, setAnalyzedUrls] = useState<Set<string>>(new Set());
 
-  // Quick Add presets
   const [quickAddMode, setQuickAddMode] = useState<"" | QuickAddId>("");
   const [quickAddInput, setQuickAddInput] = useState("");
   const [quickAddLoading, setQuickAddLoading] = useState(false);
@@ -123,7 +122,6 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const [resolvedFarcaster, setResolvedFarcaster] = useState<{ fid: number; username: string } | null>(null);
   const [resolvedPlatform, setResolvedPlatform] = useState<QuickAddId | null>(null);
 
-  // Popular Sources catalog
   const [catalogFilter, setCatalogFilter] = useState<CatalogCategory | "all">("all");
   const [justAddedIds, setJustAddedIds] = useState<Set<string>>(new Set());
   const addedFeedUrls = useMemo(

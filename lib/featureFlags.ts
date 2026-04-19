@@ -19,7 +19,7 @@
  * `.trim()`ed before comparison.
  */
 
-export type FlagScope = "server" | "public";
+type FlagScope = "server" | "public";
 
 interface FlagDef {
   envName: string;
@@ -65,7 +65,7 @@ export const FLAGS = {
   },
 } as const satisfies Record<string, FlagDef>;
 
-export type FlagName = keyof typeof FLAGS;
+type FlagName = keyof typeof FLAGS;
 
 function parseBooleanEnv(raw: string | undefined, defaultValue: boolean): boolean {
   if (raw === undefined) return defaultValue;

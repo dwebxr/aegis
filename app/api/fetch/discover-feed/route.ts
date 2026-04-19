@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   const feeds: Array<{ url: string; title?: string; type?: string }> = [];
 
-  // Step 1: Fetch HTML and look for <link rel="alternate"> tags
+  // Fetch HTML and look for <link rel="alternate"> tags.
   try {
     const res = await safeFetch(url, {
       headers: {
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     console.error("[discover-feed] HTML fetch failed:", errMsg(err));
   }
 
-  // Step 2: If no feeds found via <link> tags, probe common paths
+  // Fallback: probe common feed paths when no <link> tags were found.
   if (feeds.length === 0) {
     const origin = parsedUrl.origin;
     const probed = await Promise.all(

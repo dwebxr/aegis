@@ -4,6 +4,7 @@ import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateRelay } from "@/lib/utils/url";
 import { withTimeout } from "@/lib/utils/timeout";
+import { loadServerPool } from "@/lib/nostr/serverPool";
 
 export const maxDuration = 30;
 
@@ -33,21 +34,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  let SimplePool: typeof import("nostr-tools/pool").SimplePool;
-  let setWsImpl: typeof import("nostr-tools/pool").useWebSocketImplementation;
+  let pool: Awaited<ReturnType<typeof loadServerPool>>;
   try {
-    const poolModule = await import("nostr-tools/pool");
-    SimplePool = poolModule.SimplePool;
-    setWsImpl = poolModule.useWebSocketImplementation;
+    pool = await loadServerPool();
   } catch (err) {
     console.error("[fetch/nostr] Failed to load nostr-tools:", errMsg(err));
     return NextResponse.json({ error: "Failed to load Nostr tools" }, { status: 500 });
   }
-
-  const WebSocket = (await import("ws")).default;
-  setWsImpl(WebSocket);
-
-  const pool = new SimplePool();
 
   const filter: { kinds: number[]; limit: number; authors?: string[]; "#t"?: string[]; since?: number } = {
     kinds: [1],

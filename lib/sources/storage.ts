@@ -12,7 +12,8 @@ export function loadPendingDeletes(principalId: string): Set<string> {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
     return new Set(parsed.filter((id): id is string => typeof id === "string"));
-  } catch {
+  } catch (err) {
+    console.warn(`[sources] Failed to load pending deletes for ${principalId.slice(0, 8)}, resetting:`, errMsg(err));
     return new Set();
   }
 }
