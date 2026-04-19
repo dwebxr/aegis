@@ -17,6 +17,14 @@
 
 ## Latest Updates (April 2026)
 
+### Code Quality Cleanup Pass — DRY, Cycles, Defensive Logs, Comment Hygiene
+- **DRY consolidation**: new `lib/nostr/serverPool.ts::loadServerPool()` helper replaces duplicated pool-boot scaffolding across `app/api/fetch/nostr/route.ts`, `app/api/fetch/briefing/route.ts`, and `app/b/[naddr]/page.tsx` — net -24 lines, one import site to update when `nostr-tools/pool` or `useWebSocketImplementation` semantics change
+- **Cycle elimination**: `lib/types/content.ts` ↔ `lib/scoring/types.ts` back-edge broken by inlining the `"quality" | "slop"` literal on `ScoreParseResult` — `madge --circular` confirms 0 cycles with a newly checked-in `.madgerc` that teaches madge about the `@/*` path alias so CI runs produce the same result as local
+- **Type visibility tightening**: `FlagScope`, `FlagName`, `CyclesCheck` narrowed from exported to module-private (no external consumers) — smaller public surface, fewer stale re-imports to worry about on refactor
+- **Defensive logging**: two silent `catch {}` localStorage-corruption swallows in `hooks/useAutoReveal.ts` and `lib/sources/storage.ts` replaced with `console.warn` — corrupt blobs still fall back gracefully, but operators now see a signal instead of a completely silent data loss
+- **Comment hygiene**: AI-narration `// Step 1: …` / `// Step 2: …` labels and redundant "=== Section ===" banners removed across `app/api/fetch/discover-feed/route.ts`, `components/tabs/SourcesTab.tsx`, `components/ui/SignalComposer.tsx`, `lib/featureFlags.ts`, `lib/ic/health.ts` — code now explains itself via identifiers rather than running commentary
+- **Verification**: `tsc --noEmit` clean, `madge --circular` 0 cycles, `next lint` clean
+
 ### Production-Readiness Sweep — Health 503s, Cycles Monitoring, Feature Flags, Canister Pagination
 - **423 suites / 7,491 tests** — zero failures, zero TypeScript errors, zero ESLint warnings
 - **Health endpoints return HTTP 503 on degraded**: `/api/health` and `/api/d2a/health` previously returned 200 even when dependencies failed, meaning external uptime monitors couldn't alert on status alone. They now return 503 when any required dependency (Anthropic key, IC canister reachability, canister cycles) is unhealthy, with the existing JSON body surfaced in the error. `scripts/smoke-test.sh` updated to treat 503 as a reported-degraded failure with actionable context
