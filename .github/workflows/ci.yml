@@ -27,6 +27,16 @@ jobs:
 
       - run: npm test -- --ci --forceExit
 
+      - name: Coverage (enforces thresholds in jest.config.js)
+        run: npm run test:coverage -- --ci --forceExit
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: jest-coverage
+          path: coverage/
+          retention-days: 14
+
   security-audit:
     runs-on: ubuntu-latest
     steps:

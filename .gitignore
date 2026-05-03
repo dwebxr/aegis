@@ -36,6 +36,12 @@ yarn-error.log*
 # dfx local replica
 .dfx/
 
+# canister pre-upgrade snapshots (produced by scripts/canister-backup.sh)
+canister-backups/
+
+# k6 load test result snapshots
+loadtest/last-run.json
+
 # mops (Motoko package manager)
 .mops/
 

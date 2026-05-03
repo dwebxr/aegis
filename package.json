@@ -13,6 +13,7 @@
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
@@ -20,7 +21,10 @@
     "sdk:build": "npm run build --prefix packages/d2a-client",
     "sdk:test": "npm test --prefix packages/d2a-client",
     "audit:guard": "scripts/audit-guard.sh",
-    "release:tag": "scripts/release-tag.sh"
+    "release:tag": "scripts/release-tag.sh",
+    "loadtest": "loadtest/run.sh",
+    "canister:backup": "scripts/canister-backup.sh",
+    "canister:rollback": "scripts/canister-rollback.sh"
   },
   "dependencies": {
     "@dfinity/agent": "2.4.1",
