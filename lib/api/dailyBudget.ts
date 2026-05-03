@@ -9,33 +9,14 @@
  * before — resets on cold start, each instance gets its own budget).
  */
 
+import { getKV, _resetKVCache } from "./kvStore";
+
 const _parsed = parseInt((process.env.ANTHROPIC_DAILY_BUDGET || "500").trim(), 10);
 const DAILY_BUDGET = Number.isNaN(_parsed) ? 500 : _parsed;
 
 // In-memory fallback (per-instance)
 let memCalls = 0;
 let memResetAt = Date.now() + 86_400_000;
-
-// Lazy-loaded KV singleton: undefined = not checked, null = unavailable
-type KVStore = Awaited<typeof import("@vercel/kv")>["kv"];
-let _kv: KVStore | null | undefined;
-
-async function getKV(): Promise<KVStore | null> {
-  if (_kv !== undefined) return _kv;
-  if (!process.env.KV_REST_API_URL) {
-    _kv = null;
-    return null;
-  }
-  try {
-    const mod = await import("@vercel/kv");
-    _kv = mod.kv;
-    return _kv;
-  } catch (err) {
-    console.warn("[dailyBudget] KV import failed, using in-memory fallback:", err);
-    _kv = null;
-    return null;
-  }
-}
 
 function dailyKey(): string {
   return `aegis:api-calls:${new Date().toISOString().slice(0, 10)}`;
@@ -79,5 +60,5 @@ export async function _resetDailyBudget(): Promise<void> {
   if (store) await store.del(dailyKey());
   memCalls = 0;
   memResetAt = Date.now() + 86_400_000;
-  _kv = undefined; // Reset lazy cache for test isolation
+  _resetKVCache(); // Reset lazy cache for test isolation
 }

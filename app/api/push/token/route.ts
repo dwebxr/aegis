@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit } from "@/lib/api/rateLimit";
+import { rateLimit, parseJsonBody } from "@/lib/api/rateLimit";
 import { generatePushToken } from "@/lib/api/pushToken";
 
 export async function POST(request: NextRequest) {
@@ -10,12 +10,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Push not configured" }, { status: 503 });
   }
 
-  let body: { principal?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<{ principal?: string }>(request);
+  if (parsed.error) return parsed.error;
+  const body = parsed.body;
 
   if (!body.principal || typeof body.principal !== "string") {
     return NextResponse.json({ error: "principal required" }, { status: 400 });

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { distributedRateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
-import { callAnthropic } from "@/lib/api/anthropic";
+import { callAnthropic, ANTHROPIC_DEFAULT_MODEL } from "@/lib/api/anthropic";
 import { resolveAnthropicKey } from "@/lib/api/byok";
 
 export const maxDuration = 30;
@@ -21,12 +21,9 @@ export async function POST(request: NextRequest) {
   const tooLarge = checkBodySize(request, 32_000);
   if (tooLarge) return tooLarge;
 
-  let body: { articles?: DigestArticle[] };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<{ articles?: DigestArticle[] }>(request);
+  if (parsed.error) return parsed.error;
+  const body = parsed.body;
 
   if (!Array.isArray(body.articles) || body.articles.length === 0) {
     return NextResponse.json({ error: "articles array is required" }, { status: 400 });
@@ -61,7 +58,7 @@ Respond with ONLY the digest paragraph, no labels or formatting.`;
   try {
     const res = await callAnthropic({
       apiKey,
-      model: "claude-sonnet-4-20250514",
+      model: ANTHROPIC_DEFAULT_MODEL,
       maxTokens: 300,
       messages: [{ role: "user", content: prompt }],
       timeoutMs: 15_000,

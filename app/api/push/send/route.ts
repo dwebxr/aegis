@@ -4,7 +4,7 @@ import webpush from "web-push";
 import { HttpAgent, Actor } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { idlFactory } from "@/lib/ic/declarations/idlFactory";
-import { rateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { rateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
 import { generatePushToken } from "@/lib/api/pushToken";
 import { errMsg } from "@/lib/utils/errors";
 import { isFeatureEnabled } from "@/lib/featureFlags";
@@ -35,13 +35,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Push not configured" }, { status: 503 });
   }
 
-  let body: { principal?: string; token?: string; title?: string; body?: string; url?: string; tag?: string };
-  try {
-    body = await request.json();
-  } catch (err) {
-    console.warn("[push/send] JSON parse failed:", errMsg(err));
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<{ principal?: string; token?: string; title?: string; body?: string; url?: string; tag?: string }>(request);
+  if (parsed.error) return parsed.error;
+  const body = parsed.body;
 
   if (!body.principal) {
     return NextResponse.json({ error: "principal required" }, { status: 400 });

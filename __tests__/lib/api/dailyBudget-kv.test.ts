@@ -131,8 +131,11 @@ describe("dailyBudget — KV code path", () => {
       try {
         const mod = loadWithKVFailure();
         await mod.withinDailyBudget();
+        // Log prefix is now `[kvStore]` since the lazy-KV singleton moved to
+        // a shared module (lib/api/kvStore.ts). Both rateLimit and dailyBudget
+        // share the same import-failure log.
         expect(spy).toHaveBeenCalledWith(
-          expect.stringContaining("[dailyBudget] KV import failed"),
+          expect.stringContaining("KV import failed"),
           expect.any(Error),
         );
       } finally {

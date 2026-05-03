@@ -10,6 +10,13 @@
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
+/**
+ * Default Anthropic model used by all server-side scoring/translation/digest
+ * routes. Bumping the model is a single-line change here — search call sites
+ * before doing it to confirm none want to pin a specific version.
+ */
+export const ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-20250514";
+
 interface CallAnthropicOptions {
   apiKey: string;
   model: string;
