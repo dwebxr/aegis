@@ -9,6 +9,10 @@ if (dsn) {
     tracesSampleRate: 0.1,
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0.1,
+    // Forward console.warn/error so structured client logs (e.g. failed
+    // response.json() in tab components) reach prod observability instead
+    // of being visible only in DevTools.
+    integrations: [Sentry.captureConsoleIntegration({ levels: ["warn", "error"] })],
     beforeSend(event) {
       // Strip query strings from URLs to avoid leaking sensitive params
       if (event.request?.url) {

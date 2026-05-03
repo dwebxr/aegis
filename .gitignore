@@ -55,3 +55,7 @@ public/sw.js.map
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code harness ephemeral state
+.claude/worktrees/
+.claude/evaluations/
