@@ -1,23 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getKV, _resetKVCache } from "./kvStore";
 
-type KVStore = Awaited<typeof import("@vercel/kv")>["kv"];
-let _kv: KVStore | null | undefined;
-
-async function getKV(): Promise<KVStore | null> {
-  if (_kv !== undefined) return _kv;
-  if (!process.env.KV_REST_API_URL) {
-    _kv = null;
-    return null;
-  }
-  try {
-    const mod = await import("@vercel/kv");
-    _kv = mod.kv;
-    return _kv;
-  } catch {
-    _kv = null;
-    return null;
-  }
-}
+// Re-export _resetKVCache for tests that already import it from rateLimit.
+export { _resetKVCache };
 
 /**
  * Distributed rate limiter using Vercel KV (Upstash Redis).
@@ -80,10 +65,6 @@ export async function distributedRateLimitByKey(
     );
   }
   return null;
-}
-
-export function _resetKVCache(): void {
-  _kv = undefined;
 }
 
 interface WindowEntry {
@@ -169,6 +150,25 @@ export function checkBodySize(request: NextRequest, maxBytes = DEFAULT_MAX_BODY)
 }
 
 /**
+ * Parse JSON body with consistent 400 response on failure.
+ *
+ * Used by routes that compose their own rate-limit/body-size checks (e.g.
+ * `/api/analyze`, `/api/briefing/digest`, `/api/push/send`) and so cannot use
+ * `guardAndParse`. Returns `{ body }` on success or `{ error }` for the caller
+ * to short-circuit with.
+ */
+export async function parseJsonBody<T = Record<string, unknown>>(
+  request: NextRequest,
+): Promise<{ body: T; error?: undefined } | { body?: undefined; error: NextResponse }> {
+  try {
+    const body = await request.json() as T;
+    return { body };
+  } catch {
+    return { error: NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }) };
+  }
+}
+
+/**
  * Combined guard: rate limit + body size + JSON parse.
  * Returns { body } on success, or { error: NextResponse } on failure.
  */
@@ -180,12 +180,7 @@ export async function guardAndParse<T = Record<string, unknown>>(
   if (limited) return { error: limited };
   const tooLarge = checkBodySize(request, opts?.maxBytes);
   if (tooLarge) return { error: tooLarge };
-  try {
-    const body = await request.json() as T;
-    return { body };
-  } catch {
-    return { error: NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }) };
-  }
+  return parseJsonBody<T>(request);
 }
 
 export function rateLimit(request: NextRequest, limit = 30, windowMs = 60_000): NextResponse | null {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
-import { callAnthropic } from "@/lib/api/anthropic";
+import { callAnthropic, ANTHROPIC_DEFAULT_MODEL } from "@/lib/api/anthropic";
 import { requireUserByokKey } from "@/lib/api/byok";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   const res = await callAnthropic({
     apiKey,
-    model: "claude-sonnet-4-20250514",
+    model: ANTHROPIC_DEFAULT_MODEL,
     maxTokens: 4000,
     messages: [{ role: "user", content: prompt }],
     timeoutMs: 25_000,

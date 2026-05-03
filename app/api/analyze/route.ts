@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import type { UserContext } from "@/lib/preferences/types";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
-import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { distributedRateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
 import { buildScoringPrompt } from "@/lib/scoring/prompt";
 import { parseScoreResponse } from "@/lib/scoring/parseResponse";
-import { callAnthropic } from "@/lib/api/anthropic";
+import { callAnthropic, ANTHROPIC_DEFAULT_MODEL } from "@/lib/api/anthropic";
 import { resolveAnthropicKey } from "@/lib/api/byok";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 
@@ -40,7 +40,7 @@ async function scoreOneText(
 
   const res = await callAnthropic({
     apiKey,
-    model: "claude-sonnet-4-20250514",
+    model: ANTHROPIC_DEFAULT_MODEL,
     maxTokens: 1000,
     messages: [{ role: "user", content: prompt }],
     timeoutMs: 15_000,
@@ -65,16 +65,13 @@ export async function POST(request: NextRequest) {
   const tooLarge = checkBodySize(request, 64_000);
   if (tooLarge) return tooLarge;
 
-  let body;
-  try { body = await request.json(); } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const { text, texts, userContext: rawCtx } = body as {
+  const parsed = await parseJsonBody<{
     text?: string;
     texts?: string[];
     userContext?: UserContext;
-  };
+  }>(request);
+  if (parsed.error) return parsed.error;
+  const { text, texts, userContext: rawCtx } = parsed.body;
 
   const userContext = sanitizeUserContext(rawCtx);
   const { key: apiKey, isUser: isUserKey } = resolveAnthropicKey(request);

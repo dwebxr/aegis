@@ -4,6 +4,11 @@ import type { ScoreParseResult } from "@/lib/scoring/types";
 import { buildScoringPrompt } from "@/lib/scoring/prompt";
 import { parseScoreResponse } from "@/lib/scoring/parseResponse";
 import { createStatusEmitter } from "@/lib/utils/statusEmitter";
+import { isWebGPUAvailable } from "@/lib/utils/webgpu";
+
+// Re-exported so existing callers (and tests) can keep importing from
+// "@/lib/webllm/engine".
+export { isWebGPUAvailable };
 
 const MODEL_ID = "Llama-3.1-8B-Instruct-q4f16_1-MLC";
 
@@ -18,10 +23,6 @@ const { emit: emitStatus, onStatusChange } = createStatusEmitter<WebLLMStatus>({
 });
 
 export { onStatusChange };
-
-export function isWebGPUAvailable(): boolean {
-  return typeof navigator !== "undefined" && "gpu" in navigator;
-}
 
 export async function isWebGPUUsable(): Promise<boolean> {
   if (!isWebGPUAvailable()) return false;

@@ -45,22 +45,26 @@ async function fetchAnalyze(
   }
 }
 
-async function tryOllama(text: string, topics: string[]): Promise<AnalyzeResponse> {
-  const { scoreWithOllama } = await import("@/lib/ollama/engine");
-  const r = await scoreWithOllama(text, topics);
-  return { ...r, scoredByAI: true, scoringEngine: "ollama" as const };
-}
+/**
+ * Tag a raw scorer result with the AnalyzeResponse "engine identity" envelope.
+ * The local LLM tiers (ollama/webllm/mediapipe) all return the same shape and
+ * only differ in their `scoringEngine` label, so they share this helper.
+ */
+type LocalEngine = "ollama" | "webllm" | "mediapipe";
 
-async function tryWebLLM(text: string, topics: string[]): Promise<AnalyzeResponse> {
-  const { scoreWithWebLLM } = await import("@/lib/webllm/engine");
-  const r = await scoreWithWebLLM(text, topics);
-  return { ...r, scoredByAI: true, scoringEngine: "webllm" as const };
-}
-
-async function tryMediaPipe(text: string, topics: string[]): Promise<AnalyzeResponse> {
-  const { scoreWithMediaPipe } = await import("@/lib/mediapipe/engine");
-  const r = await scoreWithMediaPipe(text, topics);
-  return { ...r, scoredByAI: true, scoringEngine: "mediapipe" as const };
+async function runLocalTier(
+  engine: LocalEngine,
+  text: string,
+  topics: string[],
+): Promise<AnalyzeResponse> {
+  const r = await (async () => {
+    switch (engine) {
+      case "ollama":    return (await import("@/lib/ollama/engine")).scoreWithOllama(text, topics);
+      case "webllm":    return (await import("@/lib/webllm/engine")).scoreWithWebLLM(text, topics);
+      case "mediapipe": return (await import("@/lib/mediapipe/engine")).scoreWithMediaPipe(text, topics);
+    }
+  })();
+  return { ...r, scoredByAI: true, scoringEngine: engine };
 }
 
 async function tryBYOK(text: string, uc: UserContext | null | undefined, key: string): Promise<AnalyzeResponse> {
@@ -90,18 +94,14 @@ export async function runScoringCascade(
     // Tier 0-2: Run enabled local tiers in parallel (fastest wins)
     const localTiers: Promise<AnalyzeResponse>[] = [];
     const tierNames: string[] = [];
-    if (isOllamaEnabled()) {
-      localTiers.push(Sentry.startSpan({ name: "scoring.ollama", op: "scoring.tier" }, () => tryOllama(text, topics)));
-      tierNames.push("ollama");
-    }
+    const pushLocal = (engine: LocalEngine) => {
+      localTiers.push(Sentry.startSpan({ name: `scoring.${engine}`, op: "scoring.tier" }, () => runLocalTier(engine, text, topics)));
+      tierNames.push(engine);
+    };
+    if (isOllamaEnabled()) pushLocal("ollama");
     // WebLLM and MediaPipe share WebGPU — use one, not both
-    if (isMediaPipeEnabled()) {
-      localTiers.push(Sentry.startSpan({ name: "scoring.mediapipe", op: "scoring.tier" }, () => tryMediaPipe(text, topics)));
-      tierNames.push("mediapipe");
-    } else if (isWebLLMEnabled()) {
-      localTiers.push(Sentry.startSpan({ name: "scoring.webllm", op: "scoring.tier" }, () => tryWebLLM(text, topics)));
-      tierNames.push("webllm");
-    }
+    if (isMediaPipeEnabled()) pushLocal("mediapipe");
+    else if (isWebLLMEnabled()) pushLocal("webllm");
     if (userApiKey) {
       localTiers.push(Sentry.startSpan({ name: "scoring.byok", op: "scoring.tier" }, () => tryBYOK(text, userContext, userApiKey)));
       tierNames.push("byok");
