@@ -9,7 +9,7 @@ import { FeedSection } from "@/components/settings/FeedSection";
 import { DataSection } from "@/components/settings/DataSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 
-export type SettingsSubTab = "general" | "agent" | "feeds" | "data" | "account";
+type SettingsSubTab = "general" | "agent" | "feeds" | "data" | "account";
 
 const SUB_TABS: { id: SettingsSubTab; label: string }[] = [
   { id: "general", label: "General" },
