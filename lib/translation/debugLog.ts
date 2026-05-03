@@ -1,15 +1,5 @@
-/**
- * Persistent translation debug log.
- *
- * Captures the last N translation attempts (per-item per-backend) to
- * localStorage so the user can read them later from Settings →
- * Translation Engine without needing to open a browser console (which
- * is not feasible on a mobile PWA).
- *
- * Each log entry records: backend name, outcome (ok / skip / failed),
- * reason (if any), elapsed milliseconds, and timestamp. The log is
- * capped at 50 entries on a rolling basis.
- */
+// Last MAX_ENTRIES translation attempts persisted to localStorage so users can inspect them
+// from Settings without a console (PWA-friendly on mobile).
 
 const STORAGE_KEY = "aegis-translation-debug-log";
 const MAX_ENTRIES = 50;
@@ -93,11 +83,6 @@ export function clearTranslationDebugLog(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-/**
- * Format the debug log as a single human-readable string the user can
- * copy from the Settings UI and paste back. Includes a header line so
- * we know which build produced the log.
- */
 export function formatDebugLog(version?: string): string {
   const log = readLog();
   if (log.length === 0) {

@@ -8,19 +8,9 @@ import { withTimeout } from "@/lib/utils/timeout";
 // should still be paged so the canister doesn't freeze if revenue is zero.
 const CYCLES_THRESHOLD = 2_000_000_000_000n;
 
-/**
- * Probes the IC canister query endpoint to determine reachability.
- *
- * Returns one of:
- *  - `"reachable"` — HTTP 200 or 400 (400 is expected when POSTing an
- *    empty CBOR body — the replica answers but rejects the payload,
- *    which proves it is up and accepting requests).
- *  - `"unreachable"` — the fetch threw (DNS, timeout, connection
- *    refused, etc.). The helper logs under the supplied prefix so
- *    `/api/health` and `/api/d2a/health` stay distinguishable in logs.
- *  - `` `error (${status})` `` — any other status; preserves the
- *    legacy string format that operators and smoke tests rely on.
- */
+// Returns "reachable" | "unreachable" | `error (${status})`. HTTP 400 is reachable: the
+// replica is rejecting the empty CBOR body, which proves it's up. String format is load-bearing
+// for operator smoke tests.
 export async function checkIcCanisterReachable(logPrefix: string): Promise<string> {
   const icHost = getHost();
   const canisterId = getCanisterId();
@@ -38,19 +28,12 @@ export async function checkIcCanisterReachable(logPrefix: string): Promise<strin
   }
 }
 
-/**
- * Common envelope fields for health-style responses. Both `/api/health`
- * and `/api/d2a/health` report the deploy's short-SHA and region; this
- * helper centralises the env-var access + default so they never drift.
- */
 type CyclesCheck =
   | { status: "ok"; balance: string }
   | { status: "low"; balance: string }
   | { status: "error"; error: string };
 
-// Cache cycles probe result: /api/health can be hit by uptime monitors
-// every 30s, and each probe creates a full HttpAgent + syncTime +
-// getCyclesBalance query. Cache at 60s to keep load bounded.
+// Cache: each probe builds an HttpAgent + syncTime + query; uptime monitors hit /api/health every 30s.
 let cyclesCache: { at: number; value: CyclesCheck } | null = null;
 const CYCLES_CACHE_TTL_MS = 60_000;
 

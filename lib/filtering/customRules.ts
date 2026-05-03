@@ -12,11 +12,6 @@ function ruleMatches(item: ContentItem, rule: CustomFilterRule): boolean {
   }
 }
 
-/**
- * Returns the first rule that matches the item, or null.
- * Author rules: case-insensitive exact match.
- * Title rules: case-insensitive substring match against item.text.
- */
 export function findMatchingBurnRule(
   item: ContentItem,
   rules: CustomFilterRule[],
@@ -24,7 +19,6 @@ export function findMatchingBurnRule(
   return rules.find(rule => ruleMatches(item, rule)) ?? null;
 }
 
-/** Returns true if any custom burn rule matches the item. */
 export function matchesCustomBurnRule(
   item: ContentItem,
   rules: CustomFilterRule[],

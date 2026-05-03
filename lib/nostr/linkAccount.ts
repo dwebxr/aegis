@@ -154,11 +154,7 @@ export async function linkNostrAccount(
   return account;
 }
 
-/**
- * Sync the current linked Nostr account + D2A setting to the IC canister.
- * Fire-and-forget: errors are logged, not thrown.
- * Uses dynamic imports to avoid pulling @dfinity/agent into test bundles.
- */
+// Fire-and-forget. Dynamic imports keep @dfinity/agent out of test bundles.
 export async function syncLinkedAccountToIC(
   identity: import("@dfinity/agent").Identity,
   account: LinkedNostrAccount | null,
@@ -178,10 +174,6 @@ export async function syncLinkedAccountToIC(
   }
 }
 
-/**
- * Parse raw IC user settings into typed LinkedNostrAccount + d2aEnabled.
- * Pure function — no I/O. Used by both loadSettingsFromIC and page.tsx.
- */
 export function parseICSettings(
   settings: { linkedNostrNpub: string[]; linkedNostrPubkeyHex: string[]; d2aEnabled: boolean; updatedAt?: bigint },
 ): { account: LinkedNostrAccount | null; d2aEnabled: boolean } {
@@ -203,11 +195,6 @@ export function parseICSettings(
   return { account, d2aEnabled: settings.d2aEnabled };
 }
 
-/**
- * Load user settings (linked Nostr account + D2A) from the IC canister.
- * Returns null if no settings stored or on error.
- * Uses dynamic imports to avoid pulling @dfinity/agent into test bundles.
- */
 export async function loadSettingsFromIC(
   identity: import("@dfinity/agent").Identity,
   principalText: string,

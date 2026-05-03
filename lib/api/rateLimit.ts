@@ -4,11 +4,7 @@ import { getKV, _resetKVCache } from "./kvStore";
 // Re-export _resetKVCache for tests that already import it from rateLimit.
 export { _resetKVCache };
 
-/**
- * Distributed rate limiter using Vercel KV (Upstash Redis).
- * Uses sliding window via atomic INCR + EXPIRE.
- * Falls back to in-memory `rateLimit()` when KV is unavailable.
- */
+// Sliding window via Vercel KV INCR+EXPIRE; falls back to in-memory rateLimit() when KV is absent.
 export async function distributedRateLimit(
   request: NextRequest,
   limit = 20,
@@ -37,12 +33,7 @@ export async function distributedRateLimit(
   return null;
 }
 
-/**
- * Per-key distributed rate limiter. The caller supplies the bucket key
- * (e.g. an IC principal) so independent traffic axes can be capped
- * separately from per-IP limits. KV-backed; falls back to per-key in-memory
- * window when KV is unavailable.
- */
+// Caller-supplied bucket key (e.g. IC principal) caps independent traffic axes separately from per-IP.
 export async function distributedRateLimitByKey(
   key: string,
   limit: number,
@@ -131,14 +122,8 @@ function inMemoryRateLimitByKey(
   return null;
 }
 
-/**
- * Returns null if allowed, or 429 NextResponse if exceeded.
- *
- * LIMITATION: On Vercel serverless, state is per-instance (warm start).
- * Cold starts get a fresh Map. This provides burst protection within a
- * single instance but does not limit across distributed instances.
- * For stronger guarantees, migrate to Vercel KV or Redis.
- */
+// In-memory `rateLimit` is per-instance (Vercel warm-start state). Cold start = fresh Map.
+// Burst protection only — distributed limits require KV (see distributedRateLimit above).
 const DEFAULT_MAX_BODY = 512_000; // 512KB
 
 export function checkBodySize(request: NextRequest, maxBytes = DEFAULT_MAX_BODY): NextResponse | null {
@@ -149,14 +134,7 @@ export function checkBodySize(request: NextRequest, maxBytes = DEFAULT_MAX_BODY)
   return null;
 }
 
-/**
- * Parse JSON body with consistent 400 response on failure.
- *
- * Used by routes that compose their own rate-limit/body-size checks (e.g.
- * `/api/analyze`, `/api/briefing/digest`, `/api/push/send`) and so cannot use
- * `guardAndParse`. Returns `{ body }` on success or `{ error }` for the caller
- * to short-circuit with.
- */
+// Parses JSON body with a 400 response on failure. For routes that compose their own rate-limit/body-size checks.
 export async function parseJsonBody<T = Record<string, unknown>>(
   request: NextRequest,
 ): Promise<{ body: T; error?: undefined } | { body?: undefined; error: NextResponse }> {
@@ -168,10 +146,7 @@ export async function parseJsonBody<T = Record<string, unknown>>(
   }
 }
 
-/**
- * Combined guard: rate limit + body size + JSON parse.
- * Returns { body } on success, or { error: NextResponse } on failure.
- */
+// Combined: rate limit → body size → JSON parse. Returns { body } or { error: NextResponse }.
 export async function guardAndParse<T = Record<string, unknown>>(
   request: NextRequest,
   opts?: { limit?: number; windowMs?: number; maxBytes?: number },

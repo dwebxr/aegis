@@ -20,10 +20,7 @@ const CONTENT_SERENDIPITY_QUALITY_THRESHOLD = 7.0;
 const COLD_START_QUALITY_THRESHOLD = 8.0;
 const TOPIC_NOVELTY_THRESHOLD = 0.15;
 
-/**
- * Content-based serendipity for non-WoT items (RSS/URL).
- * Surfaces high-quality content from unfamiliar topics or unknown authors.
- */
+// Non-WoT serendipity (RSS/URL): high quality + unfamiliar topic OR unknown author.
 export function isContentSerendipity(
   item: ContentItem,
   profile: UserPreferenceProfile | undefined,

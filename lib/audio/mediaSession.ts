@@ -1,15 +1,4 @@
-/**
- * MediaSession integration for the audio briefing player.
- *
- * Hooks into `navigator.mediaSession` so that:
- *   - The OS lock screen / notification shade displays the current track
- *     title, author, and a "Aegis Briefing" album label.
- *   - Hardware media keys (Bluetooth headphones, car stereos, AirPods) can
- *     play / pause / skip without bringing the browser tab to the front.
- *
- * Falls back to no-ops when the API is unavailable (e.g. JSDOM, older
- * browsers, or non-secure origins). Never throws.
- */
+// No-ops when navigator.mediaSession is missing (JSDOM, old browsers, non-secure origins). Never throws.
 
 import type { AudioTrack, PlayerStatus } from "./types";
 
@@ -43,11 +32,6 @@ const ARTWORK: MediaImage[] = [
   { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
 ];
 
-/**
- * Update the metadata shown on the lock screen / notification shade. The
- * caller passes the current track and the total queue position so that
- * "now playing" includes the index (e.g. "Article 2 of 6").
- */
 export function setMediaSessionMetadata(
   track: AudioTrack | null,
   trackIndex: number,
@@ -70,10 +54,6 @@ export function setMediaSessionMetadata(
   });
 }
 
-/**
- * Mirror the player status to `mediaSession.playbackState` so the OS UI
- * shows the correct play/pause icon.
- */
 export function setMediaSessionPlaybackState(status: PlayerStatus): void {
   const ms = getMediaSession();
   if (!ms) return;
@@ -82,12 +62,7 @@ export function setMediaSessionPlaybackState(status: PlayerStatus): void {
   else ms.playbackState = "none";
 }
 
-/**
- * Wire the engine's playback handlers to the OS-level action callbacks.
- * Returns a cleanup function that detaches all handlers — call this when
- * the engine is torn down (or when "Listen" is closed) to avoid leaking
- * handlers across sessions.
- */
+// Returned cleanup detaches handlers; call on engine teardown to avoid leaking across sessions.
 export function attachMediaSessionHandlers(handlers: MediaSessionHandlers): () => void {
   const ms = getMediaSession();
   if (!ms) return () => {};

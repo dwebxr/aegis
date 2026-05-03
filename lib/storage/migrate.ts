@@ -1,8 +1,4 @@
-/**
- * One-time migration from localStorage to IndexedDB for large caches.
- * Migrates: score-cache, dedup, content-cache, wot-cache.
- * Safe to call multiple times — uses a migration flag to skip if already done.
- */
+// Idempotent localStorage→IDB migration; skipped after first run via MIGRATION_FLAG.
 
 import {
   isIDBAvailable,

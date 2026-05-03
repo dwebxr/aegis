@@ -1,15 +1,5 @@
-/**
- * English heuristic scoring.
- *
- * This is a verbatim port of the original `heuristicScores` body that lived
- * in `lib/ingestion/quickFilter.ts`. It must produce IDENTICAL signal
- * adjustments to the legacy implementation so that all existing
- * `__tests__/lib/ingestion/quickFilter*.test.ts` cases pass unchanged.
- *
- * Do not refactor this file's logic in isolation — any change here is a
- * regression risk for the entire scoring cascade Tier 4 fallback. Treat the
- * thresholds, regex patterns, and signal weights as fixed.
- */
+// IMPORTANT: thresholds/regex/weights here are load-bearing for the Tier 4 fallback and the
+// quickFilter test suite. Treat as frozen — refactor only with full test churn.
 
 import type { LanguageSignals } from "./types";
 import { emptySignals } from "./types";

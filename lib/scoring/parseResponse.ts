@@ -11,12 +11,7 @@ function scoreField(parsed: Record<string, unknown>, key: string): number {
   return clamp(toNum(parsed[key], 5), 0, 10);
 }
 
-/**
- * Parse a raw LLM response string into a ScoreParseResult.
- * Handles JSON fences (```json ... ```), extracts the first JSON object,
- * clamps values to 0-10, and derives composite/verdict.
- * Returns null if parsing fails entirely.
- */
+// Strips ```json fences, picks first {...}, clamps fields 0-10, derives composite if missing.
 export function parseScoreResponse(raw: string): ScoreParseResult | null {
   try {
     const cleaned = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();

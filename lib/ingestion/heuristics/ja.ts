@@ -1,35 +1,10 @@
-/**
- * Japanese heuristic scoring.
- *
- * Detects clickbait-style and high-quality writing patterns specific to
- * Japanese-language content. Designed to behave reasonably even on very
- * short headlines (a single phrase), since RSS titles are commonly the only
- * thing fed through Tier 4 fallback.
- *
- * Signals (relative to the 5/5/5 baseline):
- *
- *   negative
- *     - 2+ slop terms          → originality -2, credibility -2
- *     - "！？" / "！！" runs    → originality -2, credibility -2
- *     - >10% fullwidth alnum    → credibility -1
- *     - >5% decoration brackets → originality -1
- *
- *   positive
- *     - 2+ quality terms        → insight +1, credibility +1
- *     - 4+ quality terms        → insight +2, credibility +1 (subsumes above)
- *     - >120 chars              → insight +1
- *     - >300 chars              → insight +1, originality +1 (long-form)
- *     - >600 chars              → insight +1                  (detailed)
- *     - <20 chars               → insight -1, originality -1  (very short)
- *
- * Plus the language-independent common signals (links, numeric data,
- * structured paragraphs, emoji density).
- *
- * Character-count thresholds were chosen to be roughly equivalent to the
- * English word-count thresholds, using the rule of thumb that a typical
- * Japanese word averages ~2.5 characters: 50/100/200 English words ≈
- * 125/250/500 Japanese characters. Rounded to memorable values.
- */
+// Signals (relative to 5/5/5 baseline):
+//   negative: 2+ slop → orig -2/cred -2 | "！？"/"！！" runs → orig -2/cred -2
+//             | >10% fullwidth alnum → cred -1 | >5% decoration brackets → orig -1
+//   positive: 2+ quality → ins +1/cred +1 | 4+ quality → ins +2/cred +1 (subsumes)
+//             | >120 chars → ins +1 | >300 → ins +1/orig +1 | >600 → ins +1
+//             | <20 → ins -1/orig -1
+// Char thresholds ~= English word counts × 2.5 (typical ja word length).
 
 import type { LanguageSignals } from "./types";
 import { emptySignals } from "./types";

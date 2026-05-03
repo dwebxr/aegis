@@ -1,23 +1,6 @@
-/**
- * Typed feature-flag framework.
- *
- * Every flag is declared here with its env variable name, default, scope,
- * and description. Flags are evaluated ONCE at process start and cached
- * for the lifetime of the process. This matches Vercel's serverless
- * execution model (cold start reads env, warm starts reuse) and avoids
- * per-request env-var access overhead.
- *
- * Scopes:
- *  - `server`: backend only. Reads `process.env[envName]` at module load.
- *  - `public`: inlined into the client bundle. Must use `NEXT_PUBLIC_*`
- *    env names so Next.js/webpack DefinePlugin picks them up.
- *
- * Values: `"true"` / `"1"` / `"yes"` → enabled. Any other value → disabled.
- * Missing env var → the flag's `defaultValue` is used.
- *
- * Per user memory: Vercel env vars can carry trailing `\n`. All reads are
- * `.trim()`ed before comparison.
- */
+// Flags evaluated ONCE at module load (Vercel cold start reads env, warm reuses).
+// Truthy values: "true" | "1" | "yes" (.trim()ed; Vercel envs can carry trailing \n).
+// Scopes: "server" reads process.env at load; "public" must use NEXT_PUBLIC_* (DefinePlugin inlines).
 
 type FlagScope = "server" | "public";
 
@@ -28,10 +11,7 @@ interface FlagDef {
   scope: FlagScope;
 }
 
-/**
- * Central flag registry. All flags the app uses MUST be declared here.
- * Adding a flag? Document the kill-switch behaviour in `description`.
- */
+// Adding a flag? Document the kill-switch behaviour in `description`.
 export const FLAGS = {
   x402FreeTier: {
     envName: "X402_FREE_TIER_ENABLED",
@@ -74,10 +54,6 @@ function parseBooleanEnv(raw: string | undefined, defaultValue: boolean): boolea
   return normalized === "true" || normalized === "1" || normalized === "yes";
 }
 
-// Evaluate each flag once at module load. In Next.js server runtime this
-// runs on cold start; the cache is shared across requests on the same
-// instance. Public flags are inlined at build time via DefinePlugin, so
-// reading process.env for them is also a build-time constant substitution.
 const resolved: Record<FlagName, boolean> = Object.entries(FLAGS).reduce(
   (acc, [name, def]) => {
     acc[name as FlagName] = parseBooleanEnv(process.env[def.envName], def.defaultValue);
@@ -86,15 +62,10 @@ const resolved: Record<FlagName, boolean> = Object.entries(FLAGS).reduce(
   {} as Record<FlagName, boolean>,
 );
 
-/**
- * Returns the boolean value of a flag. Stable for the lifetime of the
- * process — cold-start re-reads env, warm requests hit the cache.
- */
 export function isFeatureEnabled(name: FlagName): boolean {
   return resolved[name];
 }
 
-/** Reverse of isFeatureEnabled. Reads nicer at call sites sometimes. */
 export function isFeatureDisabled(name: FlagName): boolean {
   return !resolved[name];
 }

@@ -1,13 +1,5 @@
-/**
- * Scoring result cache backed by IndexedDB (with localStorage fallback).
- * Avoids redundant AI API calls for identical content + profile combos.
- *
- * Key = SHA-256(normalized text first 500 chars) + profileHash
- * TTL = 24 hours, FIFO pruning at MAX_ENTRIES.
- *
- * Reads are synchronous (from in-memory cache).
- * Writes are debounced and flushed to IDB asynchronously.
- */
+// Key = SHA-256(normalized text[0..500]) + profileHash. TTL 24h, FIFO at MAX_ENTRIES.
+// Reads are sync (in-memory); writes are debounced and flushed to IDB async.
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import type { AnalyzeResponse } from "@/lib/types/api";
