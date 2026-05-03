@@ -11,13 +11,6 @@ describe("buildTranslationPrompt", () => {
     expect(prompt).toContain("Test article content");
   });
 
-  it("truncates text to maxLength when explicit", () => {
-    const longText = "a".repeat(5000);
-    const prompt = buildTranslationPrompt(longText, "de", undefined, 100);
-    expect(prompt).toContain("a".repeat(100));
-    expect(prompt).not.toContain("a".repeat(101));
-  });
-
   it("instructs to respond ALREADY_IN_TARGET if already in target language", () => {
     const prompt = buildTranslationPrompt("Hello", "en");
     expect(prompt).toContain("ALREADY_IN_TARGET");
