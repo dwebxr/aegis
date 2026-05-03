@@ -68,7 +68,7 @@ describe("POST /api/briefing/digest", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: "AI and climate developments highlight key trends." }],
+        content: [{ type: "text", text: "AI and climate developments highlight key trends." }],
       }),
     });
     const res = await POST(makeRequest({ articles: sampleArticles }));
@@ -100,7 +100,7 @@ describe("POST /api/briefing/digest", () => {
     }));
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ content: [{ text: "digest" }] }),
+      json: async () => ({ content: [{ type: "text", text: "digest" }] }),
     });
     await POST(makeRequest({ articles: manyArticles }));
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
@@ -112,7 +112,7 @@ describe("POST /api/briefing/digest", () => {
   it("uses user API key when provided via header", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ content: [{ text: "digest" }] }),
+      json: async () => ({ content: [{ type: "text", text: "digest" }] }),
     });
     await POST(makeRequest({ articles: sampleArticles }, { "x-user-api-key": "sk-ant-user-key" }));
     const headers = mockFetch.mock.calls[0][1].headers;

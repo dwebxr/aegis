@@ -26,14 +26,32 @@ interface CallAnthropicOptions {
   timeoutMs: number;
 }
 
-interface AnthropicResponse {
-  ok: boolean;
-  status: number;
-  /** First text block of the assistant response, or "" when missing. */
-  text: string;
-  /** Raw response body (already-parsed JSON when ok, raw string when not). Useful for caller-side logging. */
-  raw: unknown;
+/**
+ * Subset of the Anthropic Messages API success response we use.
+ * Per https://docs.anthropic.com/en/api/messages, content is an array of
+ * "content blocks". We only consume the leading text block here; other
+ * block types (tool_use, future kinds) are still accepted but treated as
+ * non-text by the discriminator below.
+ */
+export type AnthropicContentBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: unknown }
+  | { type: "thinking"; thinking: string };
+
+export interface AnthropicMessagesResponse {
+  id: string;
+  type: "message";
+  role: "assistant";
+  model: string;
+  content: AnthropicContentBlock[];
+  stop_reason: string | null;
+  stop_sequence: string | null;
+  usage?: { input_tokens: number; output_tokens: number };
 }
+
+export type AnthropicResponse =
+  | { ok: true; status: number; text: string; raw: AnthropicMessagesResponse }
+  | { ok: false; status: number; text: ""; raw: string };
 
 /**
  * Calls Anthropic with the configured payload and returns a normalized result.
@@ -61,7 +79,8 @@ export async function callAnthropic(opts: CallAnthropicOptions): Promise<Anthrop
     return { ok: false, status: res.status, text: "", raw: errText };
   }
 
-  const data = await res.json();
-  const text = data.content?.[0]?.text ?? "";
+  const data: AnthropicMessagesResponse = await res.json();
+  const first = data.content?.[0];
+  const text = first && first.type === "text" ? first.text : "";
   return { ok: true, status: res.status, text, raw: data };
 }

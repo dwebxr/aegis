@@ -237,7 +237,7 @@ describe("syncToIC — enqueue failure", () => {
     const setPendingActions = jest.fn();
     const addNotification = jest.fn();
 
-    syncToICFresh(Promise.reject(new Error("IC down")), "saveEvaluation", {}, setSyncStatus, setPendingActions, addNotification);
+    syncToICFresh(Promise.reject(new Error("IC down")), "saveEvaluation", { itemId: "down" }, setSyncStatus, setPendingActions, addNotification);
 
     await new Promise(r => setTimeout(r, 100));
 

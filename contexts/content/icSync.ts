@@ -7,6 +7,7 @@ import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
 import { withTimeout } from "@/lib/utils/timeout";
 import { encodeEngineInReason, decodeEngineFromReason, encodeTopicsInReason, decodeTopicsFromReason } from "@/lib/scoring/types";
 import { enqueueAction, dequeueAll, removeAction, incrementRetries } from "@/lib/offline/actionQueue";
+import type { SaveEvaluationPayload, UpdateEvaluationPayload } from "@/lib/offline/actionQueue";
 
 const SOURCE_KEYS = ["rss", "url", "twitter", "nostr", "manual"] as const;
 
@@ -113,10 +114,10 @@ export function mergePageIntoContent(
 }
 
 /** IC call with offline queue fallback on failure. */
-export function syncToIC(
+export function syncToIC<T extends "saveEvaluation" | "updateEvaluation">(
   promise: Promise<unknown>,
-  actionType: "saveEvaluation" | "updateEvaluation",
-  payload: unknown,
+  actionType: T,
+  payload: T extends "saveEvaluation" ? SaveEvaluationPayload : UpdateEvaluationPayload,
   setSyncStatus: (s: ContentSyncStatus) => void,
   setPendingActions: React.Dispatch<React.SetStateAction<number>>,
   addNotification: (msg: string, type: "error" | "info" | "success") => void,
@@ -125,7 +126,8 @@ export function syncToIC(
     console.warn("[content] IC sync failed:", errMsg(err));
     setSyncStatus("offline");
     try {
-      await enqueueAction(actionType, payload);
+      // The conditional type narrows for callers; the enqueue side is generic.
+      await enqueueAction(actionType, payload as never);
       setPendingActions(p => p + 1);
       addNotification("Saved locally \u2014 will sync when online", "info");
     } catch (qErr) {
@@ -163,10 +165,10 @@ export async function drainOfflineQueue(
     }
     try {
       if (action.type === "updateEvaluation") {
-        const { id, validated, flagged } = action.payload as { id: string; validated: boolean; flagged: boolean };
+        const { id, validated, flagged } = action.payload;
         await actor.updateEvaluation(id, validated, flagged);
       } else if (action.type === "saveEvaluation") {
-        const { itemId } = action.payload as { itemId: string };
+        const { itemId } = action.payload;
         const item = contentRef.current.find(c => c.id === itemId);
         if (!item) {
           console.warn(`[offline-queue] Referenced item ${itemId} no longer in local content, dropping action ${actionId}`);

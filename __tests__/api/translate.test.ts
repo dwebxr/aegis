@@ -96,7 +96,7 @@ describe("POST /api/translate — BYOK enforcement (server boundary)", () => {
     const userKey = "sk-ant-user-byok-abcdef";
     const fetchSpy = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ content: [{ text: "アップルが発表しました。" }] }),
+      json: async () => ({ content: [{ type: "text", text: "アップルが発表しました。" }] }),
       text: async () => "",
     });
     global.fetch = fetchSpy as jest.Mock;
@@ -172,7 +172,7 @@ describe("POST /api/translate — BYOK enforcement (server boundary)", () => {
   it("truncates very long prompts to 10_000 chars before forwarding", async () => {
     const fetchSpy = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ content: [{ text: "ok" }] }),
+      json: async () => ({ content: [{ type: "text", text: "ok" }] }),
       text: async () => "",
     });
     global.fetch = fetchSpy as jest.Mock;

@@ -17,6 +17,7 @@ import { recordPublishValidation, recordPublishFlag } from "@/lib/reputation/pub
 import { syncBriefingToCanister } from "@/lib/briefing/sync";
 import type { BriefingState } from "@/lib/briefing/types";
 import { dequeueAll } from "@/lib/offline/actionQueue";
+import type { SaveEvaluationPayload, UpdateEvaluationPayload } from "@/lib/offline/actionQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import type { ContentState, ContentSyncStatus, PreferenceCallbacks } from "./content/types";
 import { loadCachedContent, saveCachedContent, truncatePreservingActioned } from "./content/cache";
@@ -83,7 +84,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     return () => { cancelled = true; };
   }, []);
 
-  const doSyncToIC = useCallback((promise: Promise<unknown>, actionType: "saveEvaluation" | "updateEvaluation", payload: unknown) => {
+  const doSyncToIC = useCallback(<T extends "saveEvaluation" | "updateEvaluation">(
+    promise: Promise<unknown>,
+    actionType: T,
+    payload: T extends "saveEvaluation" ? SaveEvaluationPayload : UpdateEvaluationPayload,
+  ) => {
     syncToIC(promise, actionType, payload, setSyncStatus, setPendingActions, addNotification);
   }, [addNotification]);
 

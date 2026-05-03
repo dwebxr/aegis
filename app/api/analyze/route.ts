@@ -7,6 +7,7 @@ import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
 import { buildScoringPrompt } from "@/lib/scoring/prompt";
 import { parseScoreResponse } from "@/lib/scoring/parseResponse";
+import type { ScoreParseResult } from "@/lib/scoring/types";
 import { callAnthropic, ANTHROPIC_DEFAULT_MODEL } from "@/lib/api/anthropic";
 import { resolveAnthropicKey } from "@/lib/api/byok";
 import { isFeatureEnabled } from "@/lib/featureFlags";
@@ -32,7 +33,7 @@ async function scoreOneText(
   text: string,
   userContext: UserContext | undefined,
   apiKey: string,
-): Promise<Record<string, unknown>> {
+): Promise<ScoreParseResult & { tier: "claude" }> {
   const allTopics = userContext
     ? [...userContext.recentTopics, ...userContext.highAffinityTopics].filter(Boolean)
     : [];
@@ -56,7 +57,7 @@ async function scoreOneText(
     throw new Error("Failed to parse AI response");
   }
 
-  return { ...parsed, tier: "claude" };
+  return { ...parsed, tier: "claude" as const };
 }
 
 export async function POST(request: NextRequest) {

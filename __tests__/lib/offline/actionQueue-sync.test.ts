@@ -30,7 +30,7 @@ describe("incrementRetries", () => {
   });
 
   it("increments multiple times", async () => {
-    await enqueueAction("updateEvaluation", { id: "multi-retry" });
+    await enqueueAction("updateEvaluation", { id: "multi-retry", validated: true, flagged: false });
     const actions = await dequeueAll();
     const id = actions[0].id!;
 
@@ -114,13 +114,10 @@ describe("clearQueue", () => {
 });
 
 describe("action payload integrity", () => {
-  it("preserves complex payload through enqueue/dequeue", async () => {
-    const payload = {
-      itemId: "complex-test",
-      nested: { scores: { originality: 8, insight: 7 } },
-      tags: ["ai", "ml"],
-      timestamp: 1700000000000,
-    };
+  it("preserves itemId through enqueue/dequeue", async () => {
+    // saveEvaluation payload is now strictly typed to { itemId: string }.
+    // The IDB wrapper must not strip or reshape it.
+    const payload = { itemId: "complex-test" };
 
     await enqueueAction("saveEvaluation", payload);
 
@@ -129,11 +126,11 @@ describe("action payload integrity", () => {
   });
 
   it("preserves unicode in payload", async () => {
-    const payload = { itemId: "unicode", text: "日本語テスト 🎉 émojis" };
-    await enqueueAction("saveEvaluation", payload);
+    const itemId = "unicode-日本語テスト-🎉-émojis";
+    await enqueueAction("saveEvaluation", { itemId });
 
     const actions = await dequeueAll();
-    expect((actions[0].payload as { text: string }).text).toBe("日本語テスト 🎉 émojis");
+    expect(actions[0].type === "saveEvaluation" && actions[0].payload.itemId).toBe(itemId);
   });
 
   it("records createdAt timestamp on enqueue", async () => {

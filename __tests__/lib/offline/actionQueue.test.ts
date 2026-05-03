@@ -28,8 +28,8 @@ describe("actionQueue", () => {
   });
 
   it("removes individual actions by id", async () => {
-    await enqueueAction("updateEvaluation", { id: "a" });
-    await enqueueAction("updateEvaluation", { id: "b" });
+    await enqueueAction("updateEvaluation", { id: "a", validated: true, flagged: false });
+    await enqueueAction("updateEvaluation", { id: "b", validated: false, flagged: true });
 
     const before = await dequeueAll();
     expect(before).toHaveLength(2);
@@ -37,11 +37,11 @@ describe("actionQueue", () => {
     await removeAction(before[0].id!);
     const after = await dequeueAll();
     expect(after).toHaveLength(1);
-    expect((after[0].payload as { id: string }).id).toBe("b");
+    expect(after[0].type === "updateEvaluation" && after[0].payload.id).toBe("b");
   });
 
   it("increments retry count", async () => {
-    await enqueueAction("updateEvaluation", { id: "x" });
+    await enqueueAction("updateEvaluation", { id: "x", validated: true, flagged: false });
     const [action] = await dequeueAll();
     expect(action.retries).toBe(0);
 
@@ -55,9 +55,9 @@ describe("actionQueue", () => {
   });
 
   it("clears the entire queue", async () => {
-    await enqueueAction("updateEvaluation", { id: "1" });
+    await enqueueAction("updateEvaluation", { id: "1", validated: true, flagged: false });
     await enqueueAction("saveEvaluation", { itemId: "2" });
-    await enqueueAction("updateEvaluation", { id: "3" });
+    await enqueueAction("updateEvaluation", { id: "3", validated: false, flagged: true });
 
     expect(await queueSize()).toBe(3);
     await clearQueue();
@@ -70,7 +70,7 @@ describe("actionQueue", () => {
   it("returns correct queue size", async () => {
     expect(await queueSize()).toBe(0);
 
-    await enqueueAction("updateEvaluation", { id: "a" });
+    await enqueueAction("updateEvaluation", { id: "a", validated: true, flagged: false });
     expect(await queueSize()).toBe(1);
 
     await enqueueAction("saveEvaluation", { itemId: "b" });
@@ -78,14 +78,14 @@ describe("actionQueue", () => {
   });
 
   it("preserves action order (FIFO)", async () => {
-    await enqueueAction("updateEvaluation", { id: "first" });
-    await enqueueAction("updateEvaluation", { id: "second" });
-    await enqueueAction("updateEvaluation", { id: "third" });
+    await enqueueAction("updateEvaluation", { id: "first", validated: true, flagged: false });
+    await enqueueAction("updateEvaluation", { id: "second", validated: true, flagged: false });
+    await enqueueAction("updateEvaluation", { id: "third", validated: true, flagged: false });
 
     const actions = await dequeueAll();
-    expect((actions[0].payload as { id: string }).id).toBe("first");
-    expect((actions[1].payload as { id: string }).id).toBe("second");
-    expect((actions[2].payload as { id: string }).id).toBe("third");
+    expect(actions[0].type === "updateEvaluation" && actions[0].payload.id).toBe("first");
+    expect(actions[1].type === "updateEvaluation" && actions[1].payload.id).toBe("second");
+    expect(actions[2].type === "updateEvaluation" && actions[2].payload.id).toBe("third");
   });
 
   it("dequeueAll returns empty array when queue is empty", async () => {
