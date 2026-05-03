@@ -1,13 +1,9 @@
-// ── Breakpoints ─────────────────────────────────────────────
 export const breakpoints = {
   mobile: 680,
   tablet: 960,
 } as const;
 
-// ── Color palette ───────────────────────────────────────────
-// bg/text/border values are CSS custom properties defined in globals.css
-// and resolve to dark or light values based on [data-theme] attribute.
-// Accent colors remain as hex constants (identical in both themes).
+// bg/text/border resolve via CSS custom properties on [data-theme]; accents are hex (theme-invariant).
 export const colors = {
   bg: {
     root: "var(--color-bg-root)",
@@ -52,7 +48,6 @@ export const colors = {
   sky: { 400: "#38bdf8" },
 } as const;
 
-// ── Score grade helper ──────────────────────────────────────
 export function scoreGrade(composite: number): { grade: string; color: string; bg: string } {
   if (composite >= 8) return { grade: "A", color: colors.green[400], bg: colors.green.bg };
   if (composite >= 6) return { grade: "B", color: colors.cyan[400], bg: "rgba(6,182,212,0.08)" };

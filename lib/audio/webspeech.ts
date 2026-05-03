@@ -1,24 +1,8 @@
-/**
- * Web Speech API wrapper for the audio briefing player.
- *
- * Wraps `SpeechSynthesisUtterance` in a promise-based API so the engine can
- * `await speakChunk(...)` and chain utterances cleanly. Handles three quirks
- * the spec doesn't make obvious:
- *
- *   1. iOS Safari `onend` bug — utterances longer than ~150 chars never fire
- *      `onend`. The chunker keeps each utterance below that limit, but as a
- *      defence in depth this wrapper also installs a fallback timer derived
- *      from the chunk length so a missing `onend` does not stall the queue.
- *
- *   2. Voice list lazy loading — Chrome populates `getVoices()` asynchronously
- *      via `voiceschanged`. We expose `loadVoices()` which resolves once a
- *      non-empty voice list is available (or after a short timeout).
- *
- *   3. Cancellation — `speechSynthesis.cancel()` synchronously aborts the
- *      current utterance and rejects all pending `speakChunk` promises with
- *      a sentinel `CancelledError` so the engine can distinguish "user
- *      stopped playback" from "actual TTS failure".
- */
+// Promise-based wrapper around SpeechSynthesisUtterance. Handles three quirks:
+//   1. iOS Safari onend never fires for utterances >~150 chars (chunker bounds, this is defence in depth).
+//   2. Chrome populates getVoices() async via voiceschanged — loadVoices() awaits the list.
+//   3. cancel() rejects pending speakChunk promises with CancelledError so the engine can
+//      distinguish user-stop from TTS failure.
 
 export class CancelledError extends Error {
   constructor() {
@@ -35,11 +19,6 @@ export function isWebSpeechAvailable(): boolean {
 
 let cachedVoices: SpeechSynthesisVoice[] | null = null;
 
-/**
- * Resolve once `speechSynthesis.getVoices()` returns a non-empty list, or
- * after `timeoutMs` ms have elapsed (whichever happens first). Subsequent
- * calls return the cached list immediately.
- */
 export async function loadVoices(timeoutMs = 1500): Promise<SpeechSynthesisVoice[]> {
   if (!isWebSpeechAvailable()) return [];
   if (cachedVoices && cachedVoices.length > 0) return cachedVoices;
@@ -66,17 +45,7 @@ export async function loadVoices(timeoutMs = 1500): Promise<SpeechSynthesisVoice
   });
 }
 
-/**
- * Pick the best `SpeechSynthesisVoice` for `langCode` (BCP-47 prefix match).
- * Preference order:
- *   1. Voice explicitly identified by `voiceURI` (used for the user's
- *      Settings choice).
- *   2. A `localService` voice matching the language exactly.
- *   3. Any voice matching the language exactly.
- *   4. A voice whose `lang` starts with the requested prefix (e.g. "en"
- *      matching "en-US").
- *   5. The system default voice (or undefined if none exists).
- */
+// Preference: explicit voiceURI > local exact > any exact > local prefix > any prefix > default.
 export function pickVoice(
   voices: ReadonlyArray<SpeechSynthesisVoice>,
   langCode: string,
@@ -107,11 +76,7 @@ export function pickVoice(
   return voices.find(v => v.default) ?? voices[0];
 }
 
-/**
- * Map a TranslationLanguage code to a BCP-47 voice locale. The Web Speech
- * API uses locales like "en-US", "ja-JP" rather than bare ISO codes, so we
- * normalise here.
- */
+// Web Speech API expects "en-US" / "ja-JP", not bare ISO codes.
 function mapToBcp47(langCode: string): string {
   const lower = langCode.toLowerCase();
   switch (lower) {
@@ -142,15 +107,7 @@ interface SpeakChunkOptions {
   signal?: AbortSignal;
 }
 
-/**
- * Speak a single chunk and resolve when the utterance ends. Rejects with
- * `CancelledError` if the abort signal fires, or with a regular Error for
- * any other failure surfaced by the synth engine.
- *
- * The fallback timer is `(text.length / 8) seconds + 2 seconds`, which is
- * generous enough to cover the slowest realistic speech rates while still
- * unblocking the queue if `onend` never fires.
- */
+// Fallback timer (text.length/8 + 2s) unblocks the queue if onend never fires (iOS Safari bug).
 export function speakChunk(opts: SpeakChunkOptions): Promise<void> {
   if (!isWebSpeechAvailable()) {
     return Promise.reject(new Error("Web Speech API not available"));
@@ -192,8 +149,7 @@ export function speakChunk(opts: SpeakChunkOptions): Promise<void> {
       if (settled) return;
       settled = true;
       cleanup();
-      // "interrupted" / "canceled" mean cancel() was called externally —
-      // surface that as CancelledError so the engine can ignore it.
+      // External cancel() arrives here as "interrupted"/"canceled" — engine ignores CancelledError.
       if (event.error === "interrupted" || event.error === "canceled") {
         reject(new CancelledError());
       } else {
@@ -215,8 +171,7 @@ export function speakChunk(opts: SpeakChunkOptions): Promise<void> {
 
     fallbackTimer = setTimeout(() => {
       if (settled) return;
-      // The synth never fired onend — likely the iOS Safari bug. Cancel the
-      // utterance to free the queue and resolve so playback can continue.
+      // iOS Safari onend bug: cancel the silent utterance to free the queue and continue.
       settled = true;
       cleanup();
       synth.cancel();
@@ -227,30 +182,13 @@ export function speakChunk(opts: SpeakChunkOptions): Promise<void> {
   });
 }
 
-/**
- * Force-cancel any in-flight or queued utterances. Safe to call when no
- * speech is in progress (no-op).
- */
 export function cancelSpeech(): void {
   if (!isWebSpeechAvailable()) return;
   globalThis.speechSynthesis.cancel();
 }
 
-/**
- * iOS Safari requires the first `speechSynthesis.speak()` call to occur
- * synchronously within a user-gesture event handler. Calls from microtasks,
- * timeouts, or promise continuations are silently blocked.
- *
- * This function speaks a zero-volume empty utterance to "unlock" the engine.
- * After one successful speak in a gesture context, subsequent async speaks
- * are permitted for the lifetime of the page.
- *
- * Call this at the top of every click handler that will eventually trigger
- * `speakChunk` — before any awaits or state transitions.
- *
- * No-op when Web Speech API is unavailable. Harmless on non-Safari browsers
- * (the empty utterance completes instantly).
- */
+// iOS Safari blocks async speak() unless the first speak happens synchronously inside a gesture.
+// Call this at the top of every click handler that may trigger speakChunk, before any await.
 export function unlockSpeech(): void {
   if (!isWebSpeechAvailable()) return;
   const synth = globalThis.speechSynthesis;
@@ -260,11 +198,7 @@ export function unlockSpeech(): void {
   synth.speak(u);
 }
 
-/**
- * Test seam — clears the cached voice list. Tests that swap the
- * speechSynthesis mock between cases call this to force `loadVoices` to
- * re-read voices from the new mock.
- */
+// Test seam: clears voice cache so tests swapping the speechSynthesis mock get fresh reads.
 export function _resetVoiceCache(): void {
   cachedVoices = null;
 }

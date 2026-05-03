@@ -14,14 +14,12 @@ export interface ContentState {
   /** True once the local cache has been checked (IDB/localStorage). */
   cacheChecked: boolean;
   analyze: (text: string, userContext?: UserContext | null, meta?: { sourceUrl?: string; imageUrl?: string }) => Promise<AnalyzeResponse>;
-  /** Run the full scoring cascade without side effects (no state update, no IC save). Used by scheduler. */
+  // Side-effect-free cascade run; used by scheduler.
   scoreText: (text: string, userContext?: UserContext | null) => Promise<AnalyzeResponse>;
   validateItem: (id: string) => void;
   flagItem: (id: string) => void;
   addContent: (item: ContentItem) => void;
-  /** Buffer a new item for later display (used by scheduler). */
   addContentBuffered: (item: ContentItem) => void;
-  /** Move all buffered items into visible content. */
   flushPendingItems: () => void;
   pendingCount: number;
   clearDemoContent: () => void;

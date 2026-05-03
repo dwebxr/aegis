@@ -1,29 +1,15 @@
-/**
- * AudioBriefingPlayer — singleton playback engine.
- *
- * Owns the global state for the briefing audio player and exposes a
- * status-emitter so React components can subscribe without prop-drilling
- * through the BriefingTab tree. The singleton design is intentional: only
- * one TTS session can play at a time (the Web Speech API is itself a
- * global), and we want playback to survive tab navigation within the SPA.
- *
- * State machine:
- *
- *   ┌──────┐  start()   ┌──────────┐  pause() ┌────────┐
- *   │ idle │ ─────────► │ playing  │ ───────► │ paused │
- *   └──────┘ ◄───────── └─────┬────┘ ◄─────── └────────┘
- *      ▲       end / stop()   │      resume()
- *      │                       │ next() / prev()
- *      │                       ▼
- *      │                  (re-enters playing on a new track)
- *      └──── error ◄──── any speakChunk rejection that is not CancelledError
- *
- * Cancellation discipline:
- *   Each playback session has its own AbortController. `start()` aborts the
- *   previous session before constructing a new one, so any in-flight
- *   `speakChunk` resolves with CancelledError immediately and the old loop
- *   exits without touching the new session's state.
- */
+// Singleton: Web Speech API is global, only one TTS session can play.
+//
+// State machine:
+//   ┌──────┐  start()   ┌──────────┐  pause() ┌────────┐
+//   │ idle │ ─────────► │ playing  │ ───────► │ paused │
+//   └──────┘ ◄───────── └─────┬────┘ ◄─────── └────────┘
+//      ▲       end / stop()   │      resume()
+//      │                       │ next() / prev()
+//      └──── error ◄──── speakChunk rejection that is not CancelledError
+//
+// Each session has its own AbortController; start() aborts the previous so an in-flight
+// speakChunk resolves with CancelledError and the old loop exits without touching new state.
 
 import { createStatusEmitter } from "@/lib/utils/statusEmitter";
 import { errMsg } from "@/lib/utils/errors";
@@ -72,17 +58,12 @@ interface Session {
   voice: SpeechSynthesisVoice | undefined;
   trackIndex: number;
   chunkIndex: number;
-  /** Last index for which we pushed metadata to MediaSession; -1 = never. */
+  // -1 = MediaSession metadata never pushed.
   lastMetadataIndex: number;
-  /** Resolved when paused; recreated when resume() is called. */
+  // Resolved on pause; recreated on resume.
   pauseGate: { promise: Promise<void>; release: () => void } | null;
-  /** Cleanup function for MediaSession handlers. */
   detachMediaSession: () => void;
-  /**
-   * Monotonic counter incremented before every cancelSpeech() call.
-   * Lets runSession detect cancellation even when Safari fires onend
-   * instead of onerror (making speakChunk resolve instead of reject).
-   */
+  // Bumped before each cancelSpeech(); detects cancel when Safari fires onend (not onerror).
   cancelGeneration: number;
 }
 
@@ -109,8 +90,7 @@ function emitFromSession(s: Session, status: PlayerStatusSnapshot["status"], err
     error,
   });
   setMediaSessionPlaybackState(status);
-  // Only refresh OS-level metadata when the track actually changes; it does
-  // not need to fire on every chunk.
+  // OS metadata only on track change, not per chunk.
   if (s.lastMetadataIndex !== s.trackIndex) {
     s.lastMetadataIndex = s.trackIndex;
     setMediaSessionMetadata(currentTrack, s.trackIndex, s.tracks.length);
@@ -192,10 +172,7 @@ function teardown(reason: "stop" | "restart"): void {
     old.detachMediaSession();
     cancelSpeech();
   }
-  // stop() (and the test reset that calls it) always returns the emitter to
-  // its idle baseline, even if a previous failSession had already cleared
-  // the session field — otherwise lingering "error" status would leak
-  // across calls.
+  // Always reset emitter on stop so a stale "error" doesn't leak across calls.
   if (reason === "stop") {
     emitter.emit({ ...INITIAL_SNAPSHOT });
   }
@@ -206,12 +183,7 @@ async function ensureVoice(prefs: AudioPrefs, lang: string): Promise<SpeechSynth
   return pickVoice(voices, lang, prefs.voiceURI);
 }
 
-/**
- * Start a new audio session from a list of TrackSources. Cancels any
- * existing session first. Resolves immediately after the queue starts
- * playing — playback continues asynchronously in the background until the
- * queue is exhausted, an error occurs, or `stop()` is called.
- */
+// Cancels any existing session, then resolves once playback starts; the queue runs in the background.
 export async function startBriefingPlayback(
   sources: ReadonlyArray<TrackSource>,
   prefs: AudioPrefs,
@@ -239,9 +211,6 @@ export async function startBriefingPlayback(
     return;
   }
 
-  // Pre-resolve a voice for the first track's language; subsequent tracks
-  // will reuse the same voice if their language matches, otherwise the
-  // engine queries the voice list again (loadVoices() is cached).
   const voice = await ensureVoice(prefs, tracks[0].lang);
 
   const s: Session = {
@@ -269,8 +238,7 @@ export async function startBriefingPlayback(
   session = s;
   emitFromSession(s, "playing");
 
-  // Run the session in the background. Any rejection lands as an error
-  // emission inside `runSession` itself.
+  // Background loop. Errors emit inside runSession.
   void runSession(s);
 }
 
@@ -315,18 +283,14 @@ export function stopPlayback(): void {
   teardown("stop");
 }
 
-/**
- * Apply a new playback rate to the in-flight session. Takes effect on the
- * next chunk (the current chunk plays through at its existing rate, since
- * Web Speech does not support live rate changes on a queued utterance).
- */
+// Takes effect on the next chunk; Web Speech doesn't allow live rate changes mid-utterance.
 export function setPlaybackRate(rate: number): void {
   if (!session) return;
   session.prefs = { ...session.prefs, rate };
   emitFromSession(session, session.pauseGate ? "paused" : "playing");
 }
 
-/** Test seam — fully resets the engine to its initial state. */
+// Test seam.
 export function _resetEngine(): void {
   teardown("stop");
   sessionCounter = 0;

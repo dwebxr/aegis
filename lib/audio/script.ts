@@ -1,25 +1,6 @@
-/**
- * Script builder: turn BriefingItems + a translation cache into AudioTracks.
- *
- * Behaviour:
- *   - Each track speaks the article *title* (first line, ≤ 80 chars), then a
- *     short pause marker, then the article *body* truncated to a sensible
- *     listening length (Q3 in the Plan A document settled on 500 chars to
- *     keep a 5-track briefing under ~5 minutes at 1.0× rate).
- *   - When `preferTranslated` is set in AudioPrefs and the item has a
- *     pre-existing `translation` property, the translated text is used in
- *     place of the original. Translation IS NOT triggered here — we only
- *     consume cache that already exists. This keeps "Listen" cheap.
- *   - Tracks with no spoken content (empty title and empty body) are
- *     filtered out so the player never gets stuck on a silent track.
- *
- * Language selection per track:
- *   1. If a translation is being used, use the translation's targetLanguage.
- *   2. Otherwise inspect the original `text` and pick "ja" if it contains
- *      kana, else fall back to "en". This deliberately mirrors the
- *      coarse-grained heuristic in `lib/ingestion/langDetect.ts` so the
- *      audio module stays small without re-importing the full detector.
- */
+// Title (<=80) → pause → body (500-char cap keeps 5 tracks under ~5min at 1.0x).
+// Uses cached `item.translation` when preferTranslated; never triggers translation.
+// Empty tracks dropped so the player never stalls on silence.
 
 import type { ContentItem } from "@/lib/types/content";
 import type { TranslationLanguage } from "@/lib/translation/types";
@@ -102,10 +83,6 @@ function buildTrack(source: TrackSource, prefs: AudioPrefs): AudioTrack | null {
   };
 }
 
-/**
- * Convert a list of TrackSources into playable AudioTracks. Empty / silent
- * sources are filtered out.
- */
 export function buildTracks(
   sources: ReadonlyArray<TrackSource>,
   prefs: AudioPrefs,

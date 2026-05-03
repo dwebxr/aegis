@@ -79,10 +79,7 @@ export async function POST(request: NextRequest) {
   const userContext = sanitizeUserContext(rawCtx);
   const { key: apiKey, isUser: isUserKey } = resolveAnthropicKey(request);
 
-  // Scoring-cascade kill switch: when OFF, short-circuit to heuristic
-  // regardless of keys or budget. Client cascade treats this tier's
-  // response as authoritative for "claude-server" — heuristic result
-  // is a valid AnalyzeResponse so client fallback logic is unchanged.
+  // Kill switch short-circuits to heuristic; client treats it as authoritative for "claude-server".
   const cascadeEnabled = isFeatureEnabled("scoringCascade");
 
   if (texts && Array.isArray(texts)) {

@@ -19,14 +19,7 @@ function saveCollapsed(set: Set<string>): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
 }
 
-/**
- * Manages expand/collapse state with IntersectionObserver auto-reveal.
- *
- * - Sections auto-expand when they scroll into view (once).
- * - If user manually collapses a section, it stays collapsed and is
- *   persisted to localStorage across sessions.
- * - `observeRef` returns a callback ref to attach to each section's wrapper div.
- */
+// Auto-expands once on viewport entry; manual collapses persist in localStorage and suppress reveal.
 export function useAutoReveal() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const manuallyCollapsed = useRef<Set<string>>(loadCollapsed());

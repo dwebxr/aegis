@@ -1,8 +1,4 @@
-/**
- * Article-level deduplication using URL + content fingerprint (SHA-256).
- * Persisted to IndexedDB (with localStorage fallback).
- * Prevents re-scoring identical articles across cycles.
- */
+// URL + SHA-256 content fingerprint dedup. Persisted to IDB (localStorage fallback).
 
 import { computeContentFingerprint } from "@/lib/utils/hashing";
 import { isIDBAvailable, idbGet, idbPut, STORE_DEDUP } from "@/lib/storage/idb";
@@ -31,7 +27,7 @@ export class ArticleDeduplicator {
     this.insertionOrder = [];
   }
 
-  /** Async initialization from IDB (preferred) or localStorage (fallback). Must be called before first use. */
+  // Must be called before first use.
   async init(): Promise<void> {
     if (this.initialized) return;
 

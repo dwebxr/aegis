@@ -112,10 +112,7 @@ export function saveProfile(profile: UserPreferenceProfile): boolean {
   }
 }
 
-/**
- * Sync preference profile to IC canister (fire-and-forget).
- * Dynamic imports avoid pulling @dfinity/agent into test bundles.
- */
+// Dynamic imports keep @dfinity/agent out of test bundles.
 export async function syncPreferencesToIC(
   identity: import("@dfinity/agent").Identity,
   profile: UserPreferenceProfile,
@@ -133,10 +130,6 @@ export async function syncPreferencesToIC(
   }
 }
 
-/**
- * Load preference profile from IC canister.
- * Returns deserialized profile or null if none stored / on error.
- */
 export async function loadPreferencesFromIC(
   identity: import("@dfinity/agent").Identity,
   principalText: string,
@@ -163,10 +156,7 @@ export async function loadPreferencesFromIC(
   }
 }
 
-/**
- * Merge IC profile with local profile.
- * IC wins if newer or if local is empty (new device scenario).
- */
+// IC wins if newer or if local is empty (new-device scenario).
 export function mergeProfiles(
   local: UserPreferenceProfile,
   ic: UserPreferenceProfile,

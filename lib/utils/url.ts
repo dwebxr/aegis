@@ -52,10 +52,7 @@ export function blockPrivateUrl(urlString: string): string | null {
   return blockPrivateHostname(parsed.hostname);
 }
 
-/**
- * Fetch with SSRF-safe redirect handling.
- * Each redirect target is validated against blockPrivateUrl before following.
- */
+// SSRF-safe: every redirect target is re-validated via blockPrivateUrl before following.
 export async function safeFetch(
   url: string,
   init?: RequestInit,

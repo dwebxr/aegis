@@ -1,11 +1,4 @@
-/**
- * Shared Anthropic Claude API caller.
- *
- * The wire contract is identical across /api/analyze, /api/briefing/digest,
- * and /api/translate: same URL, same auth header, same anthropic-version.
- * Per-route differences (timeout, max_tokens, error mapping) are kept at
- * the call site so each route preserves its existing failure semantics.
- */
+// Per-route differences (timeout, max_tokens, error mapping) live at the call site.
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -15,24 +8,19 @@ interface CallAnthropicOptions {
   model: string;
   maxTokens: number;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
-  /** Per-route timeout in milliseconds (analyze 15s, digest 15s, translate 25s). */
   timeoutMs: number;
 }
 
 interface AnthropicResponse {
   ok: boolean;
   status: number;
-  /** First text block of the assistant response, or "" when missing. */
+  // First text block, or "" when missing.
   text: string;
-  /** Raw response body (already-parsed JSON when ok, raw string when not). Useful for caller-side logging. */
+  // Parsed JSON when ok, raw string when not.
   raw: unknown;
 }
 
-/**
- * Calls Anthropic with the configured payload and returns a normalized result.
- * Caller decides how to map non-ok responses (heuristic fallback / 502 passthrough / etc.).
- * Network-level failures (timeout, abort, connection refused) propagate as throws.
- */
+// Network failures (timeout/abort/refused) propagate as throws; non-2xx returns ok:false.
 export async function callAnthropic(opts: CallAnthropicOptions): Promise<AnthropicResponse> {
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",

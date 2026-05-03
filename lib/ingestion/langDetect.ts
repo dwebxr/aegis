@@ -1,21 +1,5 @@
-/**
- * Lightweight language detection for heuristic scoring.
- *
- * Phase 1 scope: distinguishes Japanese ("ja") and English ("en") with high
- * accuracy and falls through to "unknown" for everything else. Designed to be
- * fast, synchronous, zero-dependency, and safe in both Node and browser.
- *
- * Strategy:
- *   1. Walk the input once and tally Unicode block frequencies.
- *   2. Any kana character (hiragana or katakana) → Japanese. These blocks
- *      are unique to Japanese, so a single occurrence is decisive.
- *   3. Latin letters dominate (≥60% of non-whitespace) → English.
- *   4. Otherwise → "unknown" (caller defaults to common+English rules).
- *
- * Pure-kanji headlines are deliberately classified as "unknown" to avoid
- * Chinese false positives; that case is rare in RSS feeds and Phase 2 will
- * add Chinese with proper disambiguation.
- */
+// Single pass: any kana → ja (kana blocks are ja-unique). Latin >=60% non-ws → en. Else unknown.
+// Pure-kanji headlines classify as unknown to avoid Chinese false positives.
 
 export type SupportedLang = "en" | "ja" | "unknown";
 
@@ -57,10 +41,7 @@ function tallyBlocks(text: string): BlockTally {
   return tally;
 }
 
-/**
- * Detects the language of `text`. Inputs with fewer than 4 non-whitespace
- * characters always return "unknown" to avoid spurious classifications.
- */
+// Inputs with <4 non-whitespace chars return "unknown" to avoid spurious classifications.
 export function detectLanguage(text: string): SupportedLang {
   if (!text) return "unknown";
   const tally = tallyBlocks(text);

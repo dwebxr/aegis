@@ -26,13 +26,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });
   }
 
-  // BYOK-only: the operator's Anthropic key is NEVER used for
-  // translation. The client-side `translateContent` in
-  // `lib/translation/engine.ts` removed claude-server from the auto
-  // cascade in hotfix 17 and made `backend: "cloud"` require a user
-  // API key — this route enforces the same invariant at the boundary
-  // so a malicious or regressed client cannot burn the operator's
-  // budget by hitting the endpoint directly.
+  // BYOK-only: enforce at the boundary so a regressed/malicious client cannot
+  // bill translation to the operator's Anthropic key.
   const apiKey = requireUserByokKey(request);
   if (!apiKey) {
     return NextResponse.json(

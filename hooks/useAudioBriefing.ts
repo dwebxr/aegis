@@ -31,18 +31,7 @@ export interface UseAudioBriefingResult {
   setPrefs: (patch: Partial<AudioPrefs>) => void;
 }
 
-/**
- * React binding for the audio briefing engine.
- *
- * Subscribes to the engine's status emitter and re-renders the consumer
- * whenever the player state changes. The engine itself lives outside React
- * (singleton in `lib/audio/engine.ts`) so playback survives unmounts of the
- * BriefingTab — the hook is just a view into that state.
- *
- * The hook also reads / writes the persisted AudioPrefs (rate, voice,
- * preferTranslated, etc.) so settings UIs can use the same hook without
- * needing to import storage helpers directly.
- */
+// View into the singleton engine in lib/audio/engine.ts; playback survives BriefingTab unmounts.
 export function useAudioBriefing(): UseAudioBriefingResult {
   const [status, setStatus] = useState<PlayerStatusSnapshot>(() => getPlayerStatus());
   const [prefs, setLocalPrefs] = useState<AudioPrefs>(() => getAudioPrefs());

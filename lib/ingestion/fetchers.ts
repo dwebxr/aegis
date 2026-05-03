@@ -19,22 +19,8 @@ export type HttpCacheHeaders = Map<string, { etag?: string; lastModified?: strin
 const MAX_TEXT_LENGTH = 2000;
 const FETCH_TIMEOUT_MS = 30_000;
 
-/**
- * Shared POST-to-internal-API scaffold used by the per-source fetchers below.
- *
- * Each fetcher (`fetchRSS`, `fetchNostr`, `fetchURL`, `fetchFarcaster`)
- * was open-coding the same 8-line dance: POST with JSON body, short-circuit
- * on `!res.ok` via `cb.handleFetchError`, parse JSON, map into `RawItem[]`,
- * and on thrown errors log under `[scheduler]` and call
- * `cb.recordSourceError`. This helper captures that invariant so behaviour
- * stays uniform across sources — add a new source by writing a payload and
- * a mapper, nothing else.
- *
- * `onData` is invoked after a successful JSON parse and before `map`, so
- * callers (currently only `fetchRSS`) can peek at the response envelope
- * to update out-of-band state like ETag / Last-Modified caches and
- * short-circuit on 304-style `notModified` responses.
- */
+// `onData` runs after JSON parse, before `map` — callers (e.g. fetchRSS) use it to refresh
+// ETag/Last-Modified state and short-circuit on 304-style `notModified` envelopes.
 async function postToApi<T>(opts: {
   endpoint: string;
   body: unknown;

@@ -1,17 +1,5 @@
-/**
- * Heuristic text-quality scoring (no API call needed).
- * Used as fallback in /api/analyze and as pre-filter in ingestion.
- *
- * Multi-language dispatcher: detects the input language and applies the
- * appropriate per-language signal set. English is preserved byte-for-byte
- * with the legacy implementation; Japanese gets a dedicated rule set
- * tailored to clickbait/quality vocabulary and punctuation patterns common
- * in Japanese-language news and social posts.
- *
- * Adding a new language: create a `lib/ingestion/heuristics/<lang>.ts`
- * exporting `score<Lang>(text): LanguageSignals`, register it in the
- * dispatch below, and teach `langDetect.ts` to recognize it.
- */
+// Per-language dispatcher. To add a language: add lib/ingestion/heuristics/<lang>.ts exporting
+// score<Lang>(text): LanguageSignals, register in dispatch below, teach langDetect to detect it.
 import { clamp } from "@/lib/utils/math";
 import { detectLanguage, type SupportedLang } from "./langDetect";
 import { scoreEnglish } from "./heuristics/en";
@@ -25,20 +13,17 @@ interface HeuristicScores {
   composite: number;
   verdict: Verdict;
   reason: string;
-  /** Language used to compute the signals (added in the multi-lang refactor). */
   detectedLang?: SupportedLang;
 }
 
 interface HeuristicOptions {
-  /** Override automatic language detection. */
+  // Override automatic detection.
   lang?: SupportedLang;
 }
 
 export function heuristicScores(text: string, options?: HeuristicOptions): HeuristicScores {
   const lang = options?.lang ?? detectLanguage(text);
-  // "en" and "unknown" both fall back to the English module so pre-existing
-  // behaviour is preserved for ASCII-dominant inputs and any text where
-  // detection isn't confident.
+  // "en" and "unknown" both use the English module to preserve legacy ASCII behaviour.
   const signals = lang === "ja" ? scoreJapanese(text) : scoreEnglish(text);
 
   const originality = clamp(5 + signals.originality, 0, 10);
