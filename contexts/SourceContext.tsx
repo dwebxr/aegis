@@ -8,7 +8,7 @@ import { DEMO_SOURCES } from "@/lib/demo/sources";
 import { useNotify } from "./NotificationContext";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 import { loadSources, saveSources, inferPlatform, loadPendingDeletes, savePendingDeletes } from "@/lib/sources/storage";
-import type { SavedSource } from "@/lib/types/sources";
+import type { SavedSource, SourceSyncStatus } from "@/lib/types/sources";
 import { SOURCE_PLATFORMS } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
 import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
@@ -44,7 +44,7 @@ function isDeletePending(s: SavedSource, pending: Set<string>): boolean {
 
 interface SourceState {
   sources: SavedSource[];
-  syncStatus: "idle" | "syncing" | "synced" | "error";
+  syncStatus: SourceSyncStatus;
   syncError: string;
   addSource: (source: Omit<SavedSource, "id" | "createdAt">) => boolean;
   removeSource: (id: string) => void;
@@ -78,7 +78,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, identity, principalText } = useAuth();
   const { isDemoMode } = useDemo();
   const [sources, setSources] = useState<SavedSource[]>([]);
-  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "error">("idle");
+  const [syncStatus, setSyncStatus] = useState<SourceSyncStatus>("idle");
   const [syncError, setSyncError] = useState("");
   const actorRef = useRef<_SERVICE | null>(null);
   const pendingDeletesRef = useRef<Set<string>>(new Set());
