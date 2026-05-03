@@ -30,7 +30,7 @@ jobs:
       - name: Coverage (enforces thresholds in jest.config.js)
         run: npm run test:coverage -- --ci --forceExit
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: jest-coverage
@@ -79,7 +79,7 @@ jobs:
           NEXT_PUBLIC_IC_HOST: https://icp-api.io
           NEXT_PUBLIC_INTERNET_IDENTITY_URL: https://identity.ic0.app
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
