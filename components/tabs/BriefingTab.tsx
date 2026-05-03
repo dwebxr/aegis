@@ -140,7 +140,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
         body: JSON.stringify({ articles }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
+        const body = await res.json().catch((err) => { console.warn("[briefing/digest] error response not JSON:", err); return null; });
         throw new Error(body?.error || `API ${res.status}`);
       }
       const data = await res.json();

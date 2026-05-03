@@ -218,7 +218,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     setUrlLoading(true); setUrlError(""); setUrlResult(null);
     try {
       const res = await fetch("/api/fetch/url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: target }), signal: AbortSignal.timeout(20_000) });
-      if (!res.ok) { const e = await res.json().catch(() => null); setUrlError(e?.error || "Failed to extract"); return; }
+      if (!res.ok) { const e = await res.json().catch((err) => { console.warn("[fetch/url] error response not JSON:", err); return null; }); setUrlError(e?.error || "Failed to extract"); return; }
       const data = await res.json();
       setUrlResult(data);
     } catch (err) { setUrlError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setUrlLoading(false); }
@@ -229,7 +229,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     setRssLoading(true); setRssError(""); setRssResult(null);
     try {
       const res = await fetch("/api/fetch/rss", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ feedUrl: rssInput, limit: 10 }), signal: AbortSignal.timeout(15_000) });
-      if (!res.ok) { const e = await res.json().catch(() => null); setRssError(e?.error || "Failed to parse feed"); return; }
+      if (!res.ok) { const e = await res.json().catch((err) => { console.warn("[fetch/rss] error response not JSON:", err); return null; }); setRssError(e?.error || "Failed to parse feed"); return; }
       const data = await res.json();
       setRssResult(data);
     } catch (err) { setRssError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setRssLoading(false); }
@@ -240,7 +240,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     setTwitterLoading(true); setTwitterError(""); setTwitterResult(null);
     try {
       const res = await fetch("/api/fetch/twitter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bearerToken: twitterToken, query: twitterQuery, maxResults: 10 }), signal: AbortSignal.timeout(20_000) });
-      if (!res.ok) { const e = await res.json().catch(() => null); setTwitterError(e?.error || "Failed to fetch tweets"); return; }
+      if (!res.ok) { const e = await res.json().catch((err) => { console.warn("[fetch/twitter] error response not JSON:", err); return null; }); setTwitterError(e?.error || "Failed to fetch tweets"); return; }
       const data = await res.json();
       setTwitterResult(data);
     } catch (err) { setTwitterError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setTwitterLoading(false); }
@@ -252,7 +252,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
       const relays = nostrRelays.split("\n").map(r => r.trim()).filter(Boolean);
       const pubkeys = nostrPubkeys.split("\n").map(p => p.trim()).filter(Boolean);
       const res = await fetch("/api/fetch/nostr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ relays, pubkeys: pubkeys.length > 0 ? pubkeys : undefined, limit: 20 }), signal: AbortSignal.timeout(15_000) });
-      if (!res.ok) { const e = await res.json().catch(() => null); setNostrError(e?.error || "Failed to fetch events"); return; }
+      if (!res.ok) { const e = await res.json().catch((err) => { console.warn("[fetch/nostr] error response not JSON:", err); return null; }); setNostrError(e?.error || "Failed to fetch events"); return; }
       const data = await res.json();
       setNostrResult(data);
     } catch (err) { setNostrError(isTimeout(err) ? "Request timed out — try again" : "Network error — check connection"); } finally { setNostrLoading(false); }
@@ -388,7 +388,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
           signal: AbortSignal.timeout(15_000),
         });
         if (!res.ok) {
-          const e = await res.json().catch(() => null);
+          const e = await res.json().catch((err) => { console.warn("[fetch/rss/quickadd] error response not JSON:", err); return null; });
           setRssInput("");
           if (quickAddMode === "topic") {
             setRssError("Feed fetch failed — try different keywords or paste a direct RSS URL");
