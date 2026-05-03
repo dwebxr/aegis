@@ -242,26 +242,19 @@ ${body}`;
 /**
  * Build a translation prompt for any LLM backend. Routes to a Japanese
  * specialized template for ja targets and a generic template for everything
- * else. The output is byte-budget-bound (default 9000 bytes) so the prompt
- * fits inside the DFINITY LLM canister's 10 KiB request cap with margin
- * left for the chat envelope.
- *
- * The legacy `maxLength` parameter is honoured: when set, it caps the body
- * to that many characters BEFORE the byte budget is applied. Existing
- * callers and tests that pass an explicit char limit continue to work.
+ * else. The output is byte-budget-bound (9000 bytes) so the prompt fits
+ * inside the DFINITY LLM canister's 10 KiB request cap with margin left for
+ * the chat envelope.
  */
 export function buildTranslationPrompt(
   text: string,
   targetLanguage: TranslationLanguage,
   reason?: string,
-  maxLength?: number,
 ): string {
-  const charClipped = maxLength !== undefined ? text.slice(0, maxLength) : text;
-
   if (targetLanguage === "ja") {
-    return buildJapanesePrompt(charClipped, reason, PROMPT_BUDGET_BYTES);
+    return buildJapanesePrompt(text, reason, PROMPT_BUDGET_BYTES);
   }
-  return buildGenericPrompt(charClipped, targetLanguage, reason, PROMPT_BUDGET_BYTES);
+  return buildGenericPrompt(text, targetLanguage, reason, PROMPT_BUDGET_BYTES);
 }
 
 /**
