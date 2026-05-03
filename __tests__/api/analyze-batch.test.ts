@@ -35,7 +35,7 @@ function mockAnthropicSuccess(overrides: Record<string, unknown> = {}) {
     ok: true,
     status: 200,
     json: () => Promise.resolve({
-      content: [{ text: scoreJson }],
+      content: [{ type: "text", text: scoreJson }],
     }),
   });
 }

@@ -11,7 +11,14 @@ beforeEach(() => {
 
 describe("urlExtract cache", () => {
   const successResult: ExtractionResult = {
-    data: { title: "Test", content: "Hello world", source: "example.com" },
+    data: {
+      title: "Test",
+      content: "Hello world",
+      source: "example.com",
+      author: "",
+      description: "",
+      publishedDate: "",
+    },
     status: 200,
   };
 

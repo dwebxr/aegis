@@ -36,7 +36,7 @@ describe("POST /api/analyze — BYOK (user API key)", () => {
     global.fetch = jest.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: '{"originality":8,"insight":7,"credibility":9,"composite":8.1,"verdict":"quality","reason":"Good"}' }],
+        content: [{ type: "text", text: '{"originality":8,"insight":7,"credibility":9,"composite":8.1,"verdict":"quality","reason":"Good"}' }],
       }),
     }) as jest.Mock;
 
@@ -84,7 +84,7 @@ describe("POST /api/analyze — BYOK (user API key)", () => {
     global.fetch = jest.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: '{"originality":7,"insight":7,"credibility":7,"composite":7.0,"verdict":"quality","reason":"ok"}' }],
+        content: [{ type: "text", text: '{"originality":7,"insight":7,"credibility":7,"composite":7.0,"verdict":"quality","reason":"ok"}' }],
       }),
     }) as jest.Mock;
 
@@ -153,7 +153,7 @@ describe("POST /api/analyze — BYOK (user API key)", () => {
     global.fetch = jest.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: "This is not JSON at all, just a rambling response" }],
+        content: [{ type: "text", text: "This is not JSON at all, just a rambling response" }],
       }),
     }) as jest.Mock;
 
@@ -172,7 +172,7 @@ describe("POST /api/analyze — BYOK (user API key)", () => {
     global.fetch = jest.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: '```json\n{"originality":8,"insight":8,"credibility":8,"composite":8.0,"verdict":"quality","reason":"ok"}\n```' }],
+        content: [{ type: "text", text: '```json\n{"originality":8,"insight":8,"credibility":8,"composite":8.0,"verdict":"quality","reason":"ok"}\n```' }],
       }),
     }) as jest.Mock;
 
@@ -192,6 +192,7 @@ describe("POST /api/analyze — BYOK (user API key)", () => {
       ok: true,
       json: async () => ({
         content: [{
+          type: "text",
           text: '{"originality":8,"insight":7,"credibility":9,"composite":8.1,"verdict":"quality","reason":"Novel","vSignal":9,"cContext":7,"lSlop":2,"topics":["ai","ml"]}',
         }],
       }),
@@ -255,7 +256,7 @@ describe("POST /api/analyze — userContext sanitization", () => {
     global.fetch = jest.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: '{"originality":7,"insight":7,"credibility":7,"composite":7.0,"verdict":"quality","reason":"ok"}' }],
+        content: [{ type: "text", text: '{"originality":7,"insight":7,"credibility":7,"composite":7.0,"verdict":"quality","reason":"ok"}' }],
       }),
     }) as jest.Mock;
 

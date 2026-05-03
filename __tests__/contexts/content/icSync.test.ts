@@ -373,7 +373,7 @@ describe("syncToIC", () => {
     const setPendingActions = jest.fn();
     const addNotification = jest.fn();
 
-    syncToIC(Promise.resolve(), "saveEvaluation", {}, setSyncStatus, setPendingActions, addNotification);
+    syncToIC(Promise.resolve(), "saveEvaluation", { itemId: "noop" }, setSyncStatus, setPendingActions, addNotification);
 
     await new Promise(r => setTimeout(r, 50));
 
@@ -437,7 +437,7 @@ describe("drainOfflineQueue", () => {
   });
 
   it("drops actions after 5 retries", async () => {
-    await enqueueAction("updateEvaluation", { id: "retry-me" });
+    await enqueueAction("updateEvaluation", { id: "retry-me", validated: true, flagged: false });
 
     // Manually increment retries to 5
     const { incrementRetries } = await import("@/lib/offline/actionQueue");

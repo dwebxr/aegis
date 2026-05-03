@@ -2,12 +2,36 @@ const DB_NAME = "aegis-offline-queue";
 const DB_VERSION = 1;
 const STORE_NAME = "pending-actions";
 
-type QueuedActionType = "saveEvaluation" | "updateEvaluation";
+/** saveEvaluation re-runs `actor.saveEvaluation(toICEvaluation(item))` against the
+ *  caller's local content list. Only the item id is stored — the latest item state
+ *  is fetched from the in-memory cache at replay time so the user's most recent
+ *  validated/flagged toggles aren't overwritten by a stale snapshot. */
+export interface SaveEvaluationPayload {
+  itemId: string;
+}
 
-interface QueuedAction {
+/** updateEvaluation toggles validated/flagged flags on an existing IC evaluation.
+ *  Captured at enqueue time because the canonical state lives on IC, not in the
+ *  local cache. */
+export interface UpdateEvaluationPayload {
+  id: string;
+  validated: boolean;
+  flagged: boolean;
+}
+
+export type QueuedActionPayloadFor<T extends QueuedActionType> =
+  T extends "saveEvaluation" ? SaveEvaluationPayload :
+  T extends "updateEvaluation" ? UpdateEvaluationPayload :
+  never;
+
+export type QueuedActionType = "saveEvaluation" | "updateEvaluation";
+
+export type QueuedAction =
+  | (QueuedActionBase & { type: "saveEvaluation"; payload: SaveEvaluationPayload })
+  | (QueuedActionBase & { type: "updateEvaluation"; payload: UpdateEvaluationPayload });
+
+interface QueuedActionBase {
   id?: number; // auto-incremented by IndexedDB
-  type: QueuedActionType;
-  payload: unknown;
   createdAt: number;
   retries: number;
 }
@@ -37,9 +61,14 @@ function withDB<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBR
   }));
 }
 
-export async function enqueueAction(type: QueuedActionType, payload: unknown): Promise<void> {
+export async function enqueueAction<T extends QueuedActionType>(
+  type: T,
+  payload: QueuedActionPayloadFor<T>,
+): Promise<void> {
   await withDB("readwrite", store => {
-    store.add({ type, payload, createdAt: Date.now(), retries: 0 } satisfies Omit<QueuedAction, "id">);
+    // The discriminated union narrows fine for callers, but TS can't prove the
+    // generic here aligns with one branch — cast at the IDB boundary.
+    store.add({ type, payload, createdAt: Date.now(), retries: 0 } as Omit<QueuedAction, "id">);
   });
 }
 

@@ -1,7 +1,23 @@
 /** In-memory cache for extracted articles. TTL = 30 min. */
 
+/**
+ * Shape of `data` produced by /api/fetch/url after running
+ * `@extractus/article-extractor` and post-processing. Fields originate
+ * from the extractor (title, author, description, image, published) plus
+ * the post-processed text content and parsed hostname.
+ */
+export interface ExtractedArticle {
+  title: string;
+  author: string;
+  content: string;
+  description: string;
+  publishedDate: string;
+  source: string;
+  imageUrl?: string;
+}
+
 export interface ExtractionResult {
-  data?: Record<string, unknown>;
+  data?: ExtractedArticle;
   error?: string;
   status: number;
 }
