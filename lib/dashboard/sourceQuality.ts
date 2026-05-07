@@ -60,6 +60,13 @@ export interface UnattributedStats {
   d2a: { scored: number; quality: number; slop: number };
   manual: { scored: number; quality: number; slop: number };
   sharedUrl: { scored: number; quality: number; slop: number };
+  /**
+   * Items whose `savedSourceId` references a SavedSource the user has since
+   * deleted, with no live source matching by inference (pubkey / hostname /
+   * username). The orphan stamp is kept on the item so we can surface these
+   * in their own bucket rather than silently dropping them.
+   */
+  deletedSource: { scored: number; quality: number; slop: number };
 }
 
 export function recommend(s: {
@@ -92,24 +99,44 @@ export function classifyQualityHealth(s: {
 }
 
 /**
+ * True iff the item carries a `savedSourceId` that doesn't match any current
+ * SavedSource — i.e. the source it came from has been deleted. Used by both
+ * attributeItem (to fall through to re-inference) and computeUnattributedStats
+ * (to bucket survivors as "deletedSource").
+ */
+export function isOrphan(
+  item: ContentItem,
+  sources: ReadonlyArray<SavedSource>,
+): boolean {
+  if (!item.savedSourceId) return false;
+  for (const s of sources) {
+    if (s.id === item.savedSourceId) return false;
+  }
+  return true;
+}
+
+/**
  * Map a ContentItem back to its originating SavedSource id when possible.
- * Mutates `item.savedSourceId` on first inference so repeat lookups are O(1).
+ * Mutates `item.savedSourceId` on successful inference so repeat lookups are
+ * O(1). Cached stamps are validated against `sources[]` on every call: if the
+ * source has been deleted, the stamp is ignored (but kept on the item so the
+ * orphan can be detected by isOrphan / computeUnattributedStats).
  *
- * Match priority: explicit stamp > nostr pubkey membership > rss feed hostname
- * (with feedburner / google news intermediaries) > farcaster fid/username in URL.
- *
- * Known v1 limitation: an item whose `savedSourceId` references a source the
- * user has since deleted will return that orphan id here. The id won't match
- * any current `sources[]` entry, so it disappears from per-source tables and
- * is also excluded from the "unattributed" buckets (which key off undefined).
- * A future "deleted source archive" view would cover this; intentionally out
- * of scope for v1.
+ * Match priority: live cached stamp > nostr pubkey membership > rss feed
+ * hostname (with feedburner / google news intermediaries) > farcaster
+ * fid/username in URL.
  */
 export function attributeItem(
   item: ContentItem,
   sources: ReadonlyArray<SavedSource>,
 ): string | undefined {
-  if (item.savedSourceId) return item.savedSourceId;
+  if (item.savedSourceId) {
+    for (const s of sources) {
+      if (s.id === item.savedSourceId) return item.savedSourceId;
+    }
+    // Stamp points to a deleted source; fall through to re-inference. We do
+    // NOT clear item.savedSourceId so isOrphan() can still detect this.
+  }
 
   if (item.source === "nostr" && item.nostrPubkey) {
     for (const s of sources) {
@@ -282,19 +309,25 @@ export function computeUnattributedStats(
     d2a: { scored: 0, quality: 0, slop: 0 },
     manual: { scored: 0, quality: 0, slop: 0 },
     sharedUrl: { scored: 0, quality: 0, slop: 0 },
+    deletedSource: { scored: 0, quality: 0, slop: 0 },
   };
 
   for (const item of content) {
     if (item.createdAt < sinceMs) continue;
     if (attributeItem(item, sources) !== undefined) continue;
 
-    const bucket = isD2AContent(item)
-      ? buckets.d2a
-      : item.source === "manual"
-        ? buckets.manual
-        : item.source === "url"
-          ? buckets.sharedUrl
-          : null;
+    // attributeItem returned undefined. Either the item was stamped to a
+    // since-deleted source AND inference couldn't re-attribute it (orphan),
+    // or it was never stamped (genuine D2A / manual / shared URL).
+    const bucket = isOrphan(item, sources)
+      ? buckets.deletedSource
+      : isD2AContent(item)
+        ? buckets.d2a
+        : item.source === "manual"
+          ? buckets.manual
+          : item.source === "url"
+            ? buckets.sharedUrl
+            : null;
 
     if (!bucket) continue;
     bucket.scored++;

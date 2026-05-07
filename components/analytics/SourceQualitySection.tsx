@@ -86,7 +86,11 @@ export const SourceQualitySection: React.FC<SourceQualitySectionProps> = ({ cont
 
   if (sources.length === 0) return null;
 
-  const totalUnattributed = unattributed.d2a.scored + unattributed.manual.scored + unattributed.sharedUrl.scored;
+  const totalUnattributed =
+    unattributed.d2a.scored +
+    unattributed.manual.scored +
+    unattributed.sharedUrl.scored +
+    unattributed.deletedSource.scored;
 
   return (
     <div data-testid="aegis-source-quality" className={cn("bg-card border border-border rounded-lg mb-16", mobile ? "p-4 mb-12" : "p-5")}>
@@ -146,10 +150,15 @@ export const SourceQualitySection: React.FC<SourceQualitySectionProps> = ({ cont
       {totalUnattributed > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
           <div className="text-tiny font-bold uppercase tracking-[0.5px] text-disabled mb-2">Unattributed</div>
-          <div className={cn("grid gap-2", mobile ? "grid-cols-1" : "grid-cols-3")}>
+          <div className={cn("grid gap-2", mobile ? "grid-cols-1" : "grid-cols-4")}>
             <UnattributedCard label="D2A" stats={unattributed.d2a} />
             <UnattributedCard label="Manual" stats={unattributed.manual} />
             <UnattributedCard label="Shared URL" stats={unattributed.sharedUrl} />
+            <UnattributedCard
+              label="Deleted Source"
+              stats={unattributed.deletedSource}
+              hint="Items from sources you've removed"
+            />
           </div>
         </div>
       )}
@@ -259,12 +268,17 @@ const ActionChip: React.FC<ActionChipProps> = ({ kind, enabled, onMute, onRemove
 interface UnattributedCardProps {
   label: string;
   stats: { scored: number; quality: number; slop: number };
+  hint?: string;
 }
 
-const UnattributedCard: React.FC<UnattributedCardProps> = ({ label, stats }) => {
+const UnattributedCard: React.FC<UnattributedCardProps> = ({ label, stats, hint }) => {
   const yieldPct = stats.scored > 0 ? (stats.quality / stats.scored) * 100 : 0;
   return (
-    <div className="bg-navy-lighter rounded-sm px-3 py-2" data-testid={`aegis-source-quality-unattributed-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+    <div
+      className="bg-navy-lighter rounded-sm px-3 py-2"
+      data-testid={`aegis-source-quality-unattributed-${label.toLowerCase().replace(/\s+/g, "-")}`}
+      title={hint}
+    >
       <div className="text-tiny font-bold uppercase tracking-[0.5px] text-disabled">{label}</div>
       <div className="text-body-sm font-semibold text-secondary-foreground mt-0.5">
         {stats.scored} scored

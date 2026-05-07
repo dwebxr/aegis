@@ -3,6 +3,7 @@ import {
   classifyQualityHealth,
   computeSourceQualityStats,
   computeUnattributedStats,
+  isOrphan,
   KEEP_QUALITY_YIELD,
   MIN_SAMPLE_SIZE,
   recommend,
@@ -117,8 +118,8 @@ describe("classifyQualityHealth()", () => {
 });
 
 describe("attributeItem()", () => {
-  it("returns existing savedSourceId without re-inference", () => {
-    const sources: SavedSource[] = [];
+  it("returns existing savedSourceId fast-path when the source is still live", () => {
+    const sources = [makeSource({ id: "preset" })];
     expect(attributeItem(makeItem({ savedSourceId: "preset" }), sources)).toBe("preset");
   });
 
@@ -267,6 +268,41 @@ describe("computeSourceQualityStats()", () => {
   });
 });
 
+describe("isOrphan()", () => {
+  it("false when item has no savedSourceId", () => {
+    expect(isOrphan(makeItem(), [])).toBe(false);
+  });
+  it("false when stamp matches a current source", () => {
+    expect(isOrphan(makeItem({ savedSourceId: "live" }), [makeSource({ id: "live" })])).toBe(false);
+  });
+  it("true when stamp references a deleted source", () => {
+    expect(isOrphan(makeItem({ savedSourceId: "dead" }), [makeSource({ id: "live" })])).toBe(true);
+  });
+});
+
+describe("attributeItem() — orphan handling", () => {
+  it("ignores stamp pointing to a deleted source and falls through to inference", () => {
+    const sources = [makeSource({ id: "live", type: "nostr", pubkeys: ["abc"] })];
+    const item = makeItem({ savedSourceId: "deleted-id", source: "nostr", nostrPubkey: "abc" });
+    expect(attributeItem(item, sources)).toBe("live");
+    expect(item.savedSourceId).toBe("live");
+  });
+
+  it("returns undefined when stamp points to deleted source AND inference cannot re-attribute", () => {
+    const sources = [makeSource({ id: "live", type: "nostr", pubkeys: ["other"] })];
+    const item = makeItem({ savedSourceId: "deleted-id", source: "nostr", nostrPubkey: "abc" });
+    expect(attributeItem(item, sources)).toBeUndefined();
+    // Stamp is preserved so isOrphan() can detect this on the next call.
+    expect(item.savedSourceId).toBe("deleted-id");
+  });
+
+  it("returns undefined when sources is empty even if item carries a stamp", () => {
+    const item = makeItem({ savedSourceId: "anything" });
+    expect(attributeItem(item, [])).toBeUndefined();
+    expect(item.savedSourceId).toBe("anything");
+  });
+});
+
 describe("computeUnattributedStats()", () => {
   it("buckets manual / d2a / sharedUrl content separately", () => {
     const sources: SavedSource[] = [];
@@ -293,5 +329,33 @@ describe("computeUnattributedStats()", () => {
     expect(result.manual.scored).toBe(0);
     expect(result.sharedUrl.scored).toBe(0);
     expect(result.d2a.scored).toBe(0);
+    expect(result.deletedSource.scored).toBe(0);
+  });
+
+  it("orphan items (deleted-source stamp + no re-inference) bucket into deletedSource", () => {
+    const sources = [makeSource({ id: "live", type: "nostr", pubkeys: ["other"] })];
+    const content: ContentItem[] = [
+      makeItem({ id: "o1", savedSourceId: "deleted-1", source: "rss", sourceUrl: "https://orphan.example.com/x", verdict: "quality" }),
+      makeItem({ id: "o2", savedSourceId: "deleted-2", source: "rss", sourceUrl: "https://orphan.example.com/y", verdict: "slop" }),
+      // Re-attributable orphan: deleted stamp but live source matches by pubkey → goes to per-source, not deletedSource.
+      makeItem({ id: "r1", savedSourceId: "deleted-3", source: "nostr", nostrPubkey: "other", verdict: "quality" }),
+    ];
+    const result = computeUnattributedStats(content, sources, NOW - TIME_WINDOWS["30d"]);
+    expect(result.deletedSource.scored).toBe(2);
+    expect(result.deletedSource.quality).toBe(1);
+    expect(result.deletedSource.slop).toBe(1);
+    expect(result.manual.scored).toBe(0);
+  });
+
+  it("does NOT count orphans in the source-by-source view (computeSourceQualityStats)", () => {
+    const sources = [makeSource({ id: "live", type: "rss", feedUrl: "https://live.example.com/feed" })];
+    const content: ContentItem[] = [
+      makeItem({ id: "orphan", savedSourceId: "deleted", source: "rss", sourceUrl: "https://orphan.example.com/x", verdict: "quality" }),
+      makeItem({ id: "live1", source: "rss", sourceUrl: "https://live.example.com/x", savedSourceId: "live", verdict: "quality" }),
+    ];
+    const stats = computeSourceQualityStats(content, sources, new Map(), NOW - TIME_WINDOWS["30d"]);
+    expect(stats).toHaveLength(1);
+    expect(stats[0].id).toBe("live");
+    expect(stats[0].scored).toBe(1);
   });
 });

@@ -256,16 +256,18 @@ describe("SourceQualitySection — badge styling regression", () => {
 });
 
 describe("SourceQualitySection — unattributed", () => {
-  it("renders D2A / Manual / Shared URL cards when content has unattributed entries", () => {
+  it("renders D2A / Manual / Shared URL / Deleted Source cards when content has unattributed entries", () => {
     mockSources = [makeSource({ id: "s1" })];
     mockContent = [
       makeItem({ id: "m1", source: "manual", verdict: "quality" }),
       makeItem({ id: "u1", source: "url", verdict: "slop" }),
       makeItem({ id: "d1", source: "manual", reason: "Received via D2A from peer-abc", verdict: "quality" }),
+      makeItem({ id: "o1", savedSourceId: "deleted-id", source: "rss", sourceUrl: "https://orphan.com/x", verdict: "quality" }),
     ];
     render(<SourceQualitySection content={mockContent} />);
     expect(screen.getByTestId("aegis-source-quality-unattributed-d2a")).toBeInTheDocument();
     expect(screen.getByTestId("aegis-source-quality-unattributed-manual")).toBeInTheDocument();
     expect(screen.getByTestId("aegis-source-quality-unattributed-shared-url")).toBeInTheDocument();
+    expect(screen.getByTestId("aegis-source-quality-unattributed-deleted-source")).toBeInTheDocument();
   });
 });
