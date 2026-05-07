@@ -2,7 +2,7 @@ import type { ContentItem } from "@/lib/types/content";
 import { MIN_OFFER_SCORE } from "@/lib/agent/protocol";
 import { hashContent } from "@/lib/utils/hashing";
 
-export interface ManifestEntry {
+interface ManifestEntry {
   hash: string;
   topic: string;
   score: number;

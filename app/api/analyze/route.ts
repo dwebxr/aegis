@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import type { UserContext } from "@/lib/preferences/types";
 import { heuristicScores } from "@/lib/ingestion/quickFilter";
-import { distributedRateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
+import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
 import { buildScoringPrompt } from "@/lib/scoring/prompt";
@@ -61,16 +61,11 @@ async function scoreOneText(
 }
 
 export async function POST(request: NextRequest) {
-  const limited = await distributedRateLimit(request, 20, 60);
-  if (limited) return limited;
-  const tooLarge = checkBodySize(request, 64_000);
-  if (tooLarge) return tooLarge;
-
-  const parsed = await parseJsonBody<{
+  const parsed = await distributedGuardAndParse<{
     text?: string;
     texts?: string[];
     userContext?: UserContext;
-  }>(request);
+  }>(request, { limit: 20, windowSec: 60, maxBytes: 64_000 });
   if (parsed.error) return parsed.error;
   const { text, texts, userContext: rawCtx } = parsed.body;
 

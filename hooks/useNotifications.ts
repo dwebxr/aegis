@@ -1,10 +1,12 @@
 "use client";
 import { useState, useCallback, useRef, useEffect } from "react";
 
+export type NotificationType = "success" | "error" | "info";
+
 export interface Notification {
   id: number;
   text: string;
-  type: "success" | "error" | "info";
+  type: NotificationType;
 }
 
 export const DEDUPE_WINDOW_MS = 5_000;
@@ -24,10 +26,7 @@ export function shouldSuppressDuplicate(
 }
 
 export function computeDismissDuration(type: Notification["type"]): number {
-  // Errors stay on screen for 30 seconds so the user has time to read
-  // and copy them on mobile (where opening the browser console is not
-  // feasible). Info / success messages dismiss faster since they don't
-  // need to be acted on.
+  // Errors persist 30s so users can read/copy them on mobile (no console there).
   return type === "error" ? 30000 : 2500;
 }
 

@@ -19,12 +19,12 @@ interface CallAnthropicOptions {
 }
 
 // See https://docs.anthropic.com/en/api/messages — content is an array of blocks; we read the first text block only.
-export type AnthropicContentBlock =
+type AnthropicContentBlock =
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: unknown }
   | { type: "thinking"; thinking: string };
 
-export interface AnthropicMessagesResponse {
+interface AnthropicMessagesResponse {
   id: string;
   type: "message";
   role: "assistant";

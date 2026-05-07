@@ -11,7 +11,7 @@ export interface AgentProfile {
   manifest?: ContentManifest;
 }
 
-export type HandshakePhase = "offered" | "accepted" | "delivering" | "completed" | "rejected";
+type HandshakePhase = "offered" | "accepted" | "delivering" | "completed" | "rejected";
 
 export interface HandshakeState {
   peerId: string;
@@ -27,22 +27,22 @@ interface D2AMessageBase {
   toPubkey: string;
 }
 
-export interface D2AOfferMessage extends D2AMessageBase {
+interface D2AOfferMessage extends D2AMessageBase {
   type: "offer";
   payload: D2AOfferPayload;
 }
 
-export interface D2AAcceptMessage extends D2AMessageBase {
+interface D2AAcceptMessage extends D2AMessageBase {
   type: "accept";
   payload: Record<string, never>;
 }
 
-export interface D2ARejectMessage extends D2AMessageBase {
+interface D2ARejectMessage extends D2AMessageBase {
   type: "reject";
   payload: Record<string, never>;
 }
 
-export interface D2ADeliverMessage extends D2AMessageBase {
+interface D2ADeliverMessage extends D2AMessageBase {
   type: "deliver";
   payload: D2ADeliverPayload;
 }

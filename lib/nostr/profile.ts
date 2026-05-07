@@ -66,7 +66,6 @@ export async function fetchAgentProfile(
 
     if (events.length === 0) return null;
 
-    // Pick latest event (highest created_at)
     let best = events[0];
     for (let i = 1; i < events.length; i++) {
       if (events[i].created_at > best.created_at) best = events[i];

@@ -27,7 +27,6 @@ const ThemeContext = createContext<ThemeState>({
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeRaw] = useState<ThemeMode>(() => {
     const t = loadPersistedTheme();
-    // SSR-safe: document may not exist during server render
     if (typeof document !== "undefined") document.documentElement.setAttribute("data-theme", t);
     return t;
   });

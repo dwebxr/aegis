@@ -8,6 +8,8 @@ import { withTimeout } from "@/lib/utils/timeout";
 import { encodeEngineInReason, decodeEngineFromReason, encodeTopicsInReason, decodeTopicsFromReason } from "@/lib/scoring/types";
 import { enqueueAction, dequeueAll, removeAction, incrementRetries } from "@/lib/offline/actionQueue";
 import type { SaveEvaluationPayload, UpdateEvaluationPayload } from "@/lib/offline/actionQueue";
+import { msToNs, nsToMs } from "@/lib/utils/icTime";
+import type { NotificationType } from "@/hooks/useNotifications";
 
 const SOURCE_KEYS = ["rss", "url", "twitter", "nostr", "manual"] as const;
 
@@ -41,10 +43,10 @@ export function toICEvaluation(c: ContentItem, owner: import("@dfinity/principal
       c.scoringEngine ? encodeEngineInReason(c.scoringEngine, c.reason) : c.reason,
       c.topics,
     ),
-    createdAt: BigInt(Math.round(c.createdAt)) * BigInt(1_000_000),
+    createdAt: msToNs(c.createdAt),
     validated: c.validated,
     flagged: c.flagged,
-    validatedAt: c.validatedAt ? [BigInt(Math.round(c.validatedAt)) * BigInt(1_000_000)] as [bigint] : [] as [],
+    validatedAt: c.validatedAt ? [msToNs(c.validatedAt)] as [bigint] : [] as [],
   };
 }
 
@@ -69,11 +71,11 @@ export function evalToContentItem(e: Awaited<ReturnType<_SERVICE["getUserEvaluat
     verdict: ("quality" in e.verdict ? "quality" : "slop") as ContentItem["verdict"],
     reason: cleanReason,
     topics: topics.length > 0 ? topics : undefined,
-    createdAt: Number(e.createdAt) / 1_000_000,
+    createdAt: nsToMs(e.createdAt),
     validated: e.validated,
     flagged: e.flagged,
-    validatedAt: e.validatedAt.length > 0 ? Number(e.validatedAt[0]) / 1_000_000 : undefined,
-    timestamp: relativeTime(Number(e.createdAt) / 1_000_000),
+    validatedAt: e.validatedAt.length > 0 ? nsToMs(e.validatedAt[0] as bigint) : undefined,
+    timestamp: relativeTime(nsToMs(e.createdAt)),
     scoredByAI: engine ? engine !== "heuristic" : !e.reason.startsWith("Heuristic"),
     scoringEngine: engine,
   };
@@ -120,7 +122,7 @@ export function syncToIC<T extends "saveEvaluation" | "updateEvaluation">(
   payload: T extends "saveEvaluation" ? SaveEvaluationPayload : UpdateEvaluationPayload,
   setSyncStatus: (s: ContentSyncStatus) => void,
   setPendingActions: React.Dispatch<React.SetStateAction<number>>,
-  addNotification: (msg: string, type: "error" | "info" | "success") => void,
+  addNotification: (msg: string, type: NotificationType) => void,
 ) {
   promise.then(undefined, async (err: unknown) => {
     console.warn("[content] IC sync failed:", errMsg(err));
@@ -143,7 +145,7 @@ export async function drainOfflineQueue(
   contentRef: React.MutableRefObject<ContentItem[]>,
   setPendingActions: React.Dispatch<React.SetStateAction<number>>,
   setSyncStatus: (s: ContentSyncStatus) => void,
-  addNotification?: (msg: string, type: "error" | "info" | "success") => void,
+  addNotification?: (msg: string, type: NotificationType) => void,
 ) {
   const actions = await dequeueAll();
   if (actions.length === 0) return;
@@ -202,7 +204,7 @@ export async function loadFromICCanister(
   syncRetryRef: React.MutableRefObject<number>,
   syncRetryTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | undefined>,
   loadFromICRef: React.MutableRefObject<() => Promise<void>>,
-  addNotification: (msg: string, type: "error" | "info" | "success") => void,
+  addNotification: (msg: string, type: NotificationType) => void,
   backfillImageUrls: () => (() => void),
   backfillCleanupRef: React.MutableRefObject<(() => void) | null>,
 ) {

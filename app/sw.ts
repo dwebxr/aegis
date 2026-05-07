@@ -12,22 +12,18 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // IC canister communication
     {
       matcher: /^https:\/\/.*\.(icp0\.io|ic0\.app|icp-api\.io)(\/|$)/,
       handler: new NetworkOnly(),
     },
-    // Internet Identity
     {
       matcher: /^https:\/\/identity\.ic0\.app/,
       handler: new NetworkOnly(),
     },
-    // API routes
     {
       matcher: /\/api\//,
       handler: new NetworkOnly(),
     },
-    // Include serwist defaults for everything else
     ...defaultCache,
   ],
   fallbacks: {

@@ -80,7 +80,6 @@ export function usePushNotification() {
         throw new Error("Invalid subscription format");
       }
 
-      // Register on canister
       if (!actorRef.current) {
         actorRef.current = await createBackendActorAsync(identity);
       }

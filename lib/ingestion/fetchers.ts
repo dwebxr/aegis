@@ -59,7 +59,7 @@ export async function fetchRSS(
   httpCacheHeaders: HttpCacheHeaders,
   cb: FetcherCallbacks,
 ): Promise<RawItem[]> {
-  const body: Record<string, unknown> = { feedUrl, limit: 10 };
+  const body: { feedUrl: string; limit: number; etag?: string; lastModified?: string } = { feedUrl, limit: 10 };
   const cached = httpCacheHeaders.get(key);
   if (cached?.etag) body.etag = cached.etag;
   if (cached?.lastModified) body.lastModified = cached.lastModified;

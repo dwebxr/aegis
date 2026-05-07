@@ -12,6 +12,7 @@ import type { SavedSource, SourceSyncStatus } from "@/lib/types/sources";
 import { SOURCE_PLATFORMS } from "@/lib/types/sources";
 import type { _SERVICE, SourceConfigEntry } from "@/lib/ic/declarations";
 import { errMsg, errMsgShort, handleICSessionError } from "@/lib/utils/errors";
+import { msToNs, nsToMs } from "@/lib/utils/icTime";
 import { getSourceKey, resetSourceErrors } from "@/lib/ingestion/sourceState";
 import type { SchedulerSource } from "@/lib/ingestion/scheduler";
 
@@ -364,7 +365,7 @@ export function useSources() {
 }
 
 function savedToIC(s: SavedSource, owner: import("@dfinity/principal").Principal): SourceConfigEntry {
-  const config: Record<string, unknown> = {};
+  const config: Partial<Pick<SavedSource, "feedUrl" | "relays" | "pubkeys" | "fid" | "username" | "platform">> = {};
   if (s.feedUrl) config.feedUrl = s.feedUrl;
   if (s.relays) config.relays = s.relays;
   if (s.pubkeys) config.pubkeys = s.pubkeys;
@@ -377,7 +378,7 @@ function savedToIC(s: SavedSource, owner: import("@dfinity/principal").Principal
     sourceType: s.type,
     configJson: JSON.stringify({ label: s.label, ...config }),
     enabled: s.enabled,
-    createdAt: BigInt(Math.round(s.createdAt)) * BigInt(1_000_000),
+    createdAt: msToNs(s.createdAt),
   };
 }
 
@@ -401,7 +402,7 @@ function icToSaved(ic: SourceConfigEntry): SavedSource | null {
   const username = typeof parsed.username === "string" ? parsed.username : undefined;
   const platform = typeof parsed.platform === "string" && SOURCE_PLATFORMS.has(parsed.platform)
     ? parsed.platform as SavedSource["platform"] : undefined;
-  const createdAt = Number(ic.createdAt) / 1_000_000;
+  const createdAt = nsToMs(ic.createdAt);
 
   return {
     id: ic.id,

@@ -4,7 +4,7 @@
 const STORAGE_KEY = "aegis-translation-debug-log";
 const MAX_ENTRIES = 50;
 
-export type TranslationDebugOutcome = "ok" | "skip" | "failed" | "transport-error";
+type TranslationDebugOutcome = "ok" | "skip" | "failed" | "transport-error";
 
 export interface TranslationDebugEntry {
   /** ISO timestamp of when the attempt finished */

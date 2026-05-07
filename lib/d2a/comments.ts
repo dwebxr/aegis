@@ -40,7 +40,6 @@ export function loadComments(): StoredComment[] {
 export function saveComment(comment: StoredComment): void {
   const comments = readStore();
   comments.push(comment);
-  // Enforce max limit: drop oldest first
   if (comments.length > MAX_COMMENTS) {
     comments.sort((a, b) => a.timestamp - b.timestamp);
     comments.splice(0, comments.length - MAX_COMMENTS);

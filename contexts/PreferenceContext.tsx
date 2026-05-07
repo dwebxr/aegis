@@ -135,7 +135,7 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
           icSyncFailCountRef.current = 0; // reset to avoid spamming
         }
       });
-    }, 3_000); // IC sync debounce: 3 seconds
+    }, 3_000);
   }, []);
 
   useEffect(() => {
@@ -149,7 +149,7 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
   const lastSyncedAtRef = useRef(0);
   useEffect(() => {
     if (!isAuthenticated || !identity) return;
-    const HEARTBEAT_MS = 10 * 60 * 1000; // 10 minutes
+    const HEARTBEAT_MS = 10 * 60 * 1000;
     const interval = setInterval(() => {
       const p = profileRef.current;
       if (p.lastUpdated > lastSyncedAtRef.current) {
@@ -170,7 +170,6 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
     debouncedICSync(next);
   }, [debouncedSave, debouncedICSync]);
 
-  /** Apply a learn event, remove bookmark if present, persist & sync. */
   const applyLearnEvent = useCallback((event: Parameters<typeof learn>[1], itemId?: string) => {
     let next = learn(profileRef.current, event);
     if (itemId && next.bookmarkedIds?.includes(itemId)) {

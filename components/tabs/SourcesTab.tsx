@@ -6,6 +6,7 @@ import { RSSIcon, GlobeIcon, LinkIcon, GitHubIcon, CheckIcon } from "@/component
 import { POPULAR_SOURCES, CATALOG_CATEGORIES, type CatalogCategory } from "@/lib/sources/catalog";
 import type { AnalyzeResponse } from "@/lib/types/api";
 import type { FetchURLResponse, FetchRSSResponse, FetchTwitterResponse, FetchNostrResponse } from "@/lib/types/api";
+import type { SourcePlatform } from "@/lib/types/sources";
 
 import { useSources } from "@/contexts/SourceContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,10 +26,8 @@ interface SourcesTabProps {
   initialUrl?: string;
 }
 
-type QuickAddId = "youtube" | "topic" | "github" | "bluesky" | "reddit" | "mastodon" | "farcaster";
-
 const QUICK_ADD_PRESETS: ReadonlyArray<{
-  id: QuickAddId; icon: string; label: string;
+  id: SourcePlatform; icon: string; label: string;
   activeClass: string; badgeClass: string;
   formLabel: string; placeholder: string; hint: string;
 }> = [
@@ -115,12 +114,12 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   const [nostrError, setNostrError] = useState("");
   const [analyzedUrls, setAnalyzedUrls] = useState<Set<string>>(new Set());
 
-  const [quickAddMode, setQuickAddMode] = useState<"" | QuickAddId>("");
+  const [quickAddMode, setQuickAddMode] = useState<"" | SourcePlatform>("");
   const [quickAddInput, setQuickAddInput] = useState("");
   const [quickAddLoading, setQuickAddLoading] = useState(false);
   const [quickAddError, setQuickAddError] = useState("");
   const [resolvedFarcaster, setResolvedFarcaster] = useState<{ fid: number; username: string } | null>(null);
-  const [resolvedPlatform, setResolvedPlatform] = useState<QuickAddId | null>(null);
+  const [resolvedPlatform, setResolvedPlatform] = useState<SourcePlatform | null>(null);
 
   const [catalogFilter, setCatalogFilter] = useState<CatalogCategory | "all">("all");
   const [justAddedIds, setJustAddedIds] = useState<Set<string>>(new Set());
@@ -152,7 +151,6 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialUrl]);
 
-  // Source auto-suggestions from validated domains
   const [feedSuggestions, setFeedSuggestions] = useState<Array<DomainValidation & { discoveredFeedUrl?: string | null }>>([]);
   useEffect(() => {
     if (isDemoMode) return;
@@ -177,7 +175,6 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     return () => { cancelled = true; };
   }, [sources, isDemoMode]);
 
-  // Feed auto-discovery
   const [discoveredFeeds, setDiscoveredFeeds] = useState<Array<{ url: string; title?: string; type?: string }>>([]);
   const [discoverLoading, setDiscoverLoading] = useState(false);
 
@@ -399,7 +396,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
         }
         const data = await res.json();
         setRssResult({ ...data, feedTitle: data.feedTitle || label });
-        setResolvedPlatform(quickAddMode as QuickAddId);
+        setResolvedPlatform(quickAddMode as SourcePlatform);
         // Only clear quick add form after successful validation
         setQuickAddMode("");
         setQuickAddInput("");

@@ -7,6 +7,7 @@ import { getInternetIdentityUrl, getDerivationOrigin } from "@/lib/ic/agent";
 import * as Sentry from "@sentry/nextjs";
 import { useNotify } from "./NotificationContext";
 import { errMsg } from "@/lib/utils/errors";
+import { nowNs } from "@/lib/utils/icTime";
 
 interface DelegationChain {
   delegations: Array<{ delegation: { expiration: bigint } }>;
@@ -25,9 +26,9 @@ function isDelegationFresh(identity: Identity): boolean {
   if (!hasDelegation(identity)) return true;
   try {
     const chain = identity.getDelegation();
-    const nowNs = BigInt(Date.now()) * BigInt(1_000_000);
+    const now = nowNs();
     for (const { delegation } of chain.delegations) {
-      if (delegation.expiration < nowNs) return false;
+      if (delegation.expiration < now) return false;
     }
     return true;
   } catch (err) {

@@ -4,6 +4,7 @@ import { DEFAULT_RELAYS } from "./types";
 import { clearWoTCache } from "@/lib/wot/cache";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
+import { nsToMs } from "@/lib/utils/icTime";
 
 const STORAGE_KEY = "aegis-linked-nostr";
 
@@ -183,7 +184,7 @@ export function parseICSettings(
   let account: LinkedNostrAccount | null = null;
   if (npub && pubkeyHex) {
     // Use IC's updatedAt (nanoseconds → ms) as linkedAt; fall back to 0 if unavailable
-    const linkedAt = settings.updatedAt ? Number(settings.updatedAt / BigInt(1_000_000)) : 0;
+    const linkedAt = settings.updatedAt ? nsToMs(settings.updatedAt) : 0;
     account = {
       npub,
       pubkeyHex,

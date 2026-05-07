@@ -74,6 +74,17 @@ const icpLedgerIdlFactory: IDL.InterfaceFactory = ({ IDL }) => {
   });
 };
 
+export type ApproveError =
+  | { BadFee: { expected_fee: bigint } }
+  | { InsufficientFunds: { balance: bigint } }
+  | { AllowanceChanged: { current_allowance: bigint } }
+  | { Expired: { ledger_time: bigint } }
+  | { TooOld: null }
+  | { CreatedInFuture: { ledger_time: bigint } }
+  | { Duplicate: { duplicate_of: bigint } }
+  | { TemporarilyUnavailable: null }
+  | { GenericError: { error_code: bigint; message: string } };
+
 export interface ICPLedgerActor {
   icrc1_balance_of: (account: { owner: import("@dfinity/principal").Principal; subaccount: [] }) => Promise<bigint>;
   icrc1_fee: () => Promise<bigint>;
@@ -86,7 +97,7 @@ export interface ICPLedgerActor {
     fee: [];
     memo: [];
     created_at_time: [];
-  }) => Promise<{ Ok: bigint } | { Err: Record<string, unknown> }>;
+  }) => Promise<{ Ok: bigint } | { Err: ApproveError }>;
   icrc2_allowance: (args: {
     account: { owner: import("@dfinity/principal").Principal; subaccount: [] };
     spender: { owner: import("@dfinity/principal").Principal; subaccount: [] };

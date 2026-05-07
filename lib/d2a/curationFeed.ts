@@ -13,12 +13,9 @@ export function buildGroupFeed(
 
   return allContent
     .filter(item => {
-      // Must be D2A content from a group member
       if (!isD2AContent(item)) return false;
       if (!item.nostrPubkey || !memberSet.has(item.nostrPubkey)) return false;
-      // Must be validated quality
       if (item.verdict !== "quality") return false;
-      // Topic filter (if set)
       if (topicSet && (!item.topics || !item.topics.some(t => topicSet.has(t)))) return false;
       return true;
     })

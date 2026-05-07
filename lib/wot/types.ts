@@ -20,7 +20,7 @@ export interface WoTGraph {
   builtAt: number;
 }
 
-export interface SerializedWoTGraph {
+interface SerializedWoTGraph {
   userPubkey: string;
   nodes: Array<[string, WoTNode]>;
   maxHops: number;

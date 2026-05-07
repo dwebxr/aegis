@@ -123,7 +123,6 @@ export function useKeyboardNav({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [enabled, expandedId, onExpand, onValidate, onFlag, onOpenPalette, focusItem]);
 
-  // Reset focus when items change significantly
   useEffect(() => {
     if (indexRef.current >= items.length) {
       indexRef.current = -1;

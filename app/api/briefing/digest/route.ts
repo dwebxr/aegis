@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { distributedRateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
+import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
 import { callAnthropic, ANTHROPIC_DEFAULT_MODEL } from "@/lib/api/anthropic";
@@ -16,12 +16,11 @@ interface DigestArticle {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = await distributedRateLimit(request, 5, 60);
-  if (limited) return limited;
-  const tooLarge = checkBodySize(request, 32_000);
-  if (tooLarge) return tooLarge;
-
-  const parsed = await parseJsonBody<{ articles?: DigestArticle[] }>(request);
+  const parsed = await distributedGuardAndParse<{ articles?: DigestArticle[] }>(request, {
+    limit: 5,
+    windowSec: 60,
+    maxBytes: 32_000,
+  });
   if (parsed.error) return parsed.error;
   const body = parsed.body;
 

@@ -6,7 +6,7 @@
  * from the extractor (title, author, description, image, published) plus
  * the post-processed text content and parsed hostname.
  */
-export interface ExtractedArticle {
+interface ExtractedArticle {
   title: string;
   author: string;
   content: string;

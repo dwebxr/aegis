@@ -64,7 +64,6 @@ export async function POST(request: NextRequest) {
 
     rawEvents.sort((a, b) => b.created_at - a.created_at);
 
-    // Fetch Kind 0 profiles for authors
     const uniquePubkeys = Array.from(new Set(rawEvents.map(e => e.pubkey)));
     const profiles: Record<string, { name?: string; picture?: string }> = {};
     if (uniquePubkeys.length > 0) {

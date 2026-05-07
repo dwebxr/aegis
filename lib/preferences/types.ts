@@ -4,7 +4,7 @@ export interface AuthorTrust {
   trust: number; // [-1, 1]
 }
 
-export interface RecentTopic {
+interface RecentTopic {
   topic: string;
   timestamp: number;
 }
@@ -13,7 +13,7 @@ export interface ScoringCalibration {
   qualityThreshold: number;
 }
 
-export type FilterRuleField = "author" | "title";
+type FilterRuleField = "author" | "title";
 
 export interface CustomFilterRule {
   id: string;

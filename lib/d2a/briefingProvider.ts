@@ -5,6 +5,7 @@ import { getCanisterId, getHost } from "@/lib/ic/agent";
 import type { _SERVICE } from "@/lib/ic/declarations/aegis_backend.did";
 import type { D2ABriefingResponse, GlobalBriefingContributor, GlobalBriefingResponse } from "./types";
 import { withTimeout } from "@/lib/utils/timeout";
+import { nsToMs } from "@/lib/utils/icTime";
 
 async function createActor(): Promise<_SERVICE> {
   const agent = await HttpAgent.create({ host: getHost() });
@@ -92,7 +93,7 @@ export async function getGlobalBriefingSummaries(
       contributors.push({
         principal: principal.toText(),
         generatedAt: typeof generatedAt === "bigint"
-          ? new Date(Number(generatedAt / BigInt(1_000_000))).toISOString()
+          ? new Date(nsToMs(generatedAt)).toISOString()
           : parsed.generatedAt,
         summary: parsed.summary,
         topItems,
@@ -142,7 +143,7 @@ export async function getRawGlobalBriefings(sinceMs: number): Promise<RawBriefin
 
       // Compute timestamp: prefer bigint nanosecond IC timestamp, fall back to parsed generatedAt
       const fromBigint = typeof generatedAtNs === "bigint"
-        ? Number(generatedAtNs / BigInt(1_000_000))
+        ? nsToMs(generatedAtNs)
         : 0;
       const generatedAtMs = fromBigint > 0
         ? fromBigint

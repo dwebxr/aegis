@@ -158,6 +158,19 @@ export async function guardAndParse<T = Record<string, unknown>>(
   return parseJsonBody<T>(request);
 }
 
+// Same as guardAndParse but uses Vercel KV for distributed limits — windowSec
+// (seconds) instead of windowMs to match distributedRateLimit's contract.
+export async function distributedGuardAndParse<T = Record<string, unknown>>(
+  request: NextRequest,
+  opts?: { limit?: number; windowSec?: number; maxBytes?: number },
+): Promise<{ body: T; error?: undefined } | { body?: undefined; error: NextResponse }> {
+  const limited = await distributedRateLimit(request, opts?.limit, opts?.windowSec);
+  if (limited) return { error: limited };
+  const tooLarge = checkBodySize(request, opts?.maxBytes);
+  if (tooLarge) return { error: tooLarge };
+  return parseJsonBody<T>(request);
+}
+
 export function rateLimit(request: NextRequest, limit = 30, windowMs = 60_000): NextResponse | null {
   const ip = getClientIP(request);
   const now = Date.now();

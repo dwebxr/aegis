@@ -37,7 +37,6 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     } catch { console.debug("[demo] sessionStorage unavailable"); }
   }, []);
 
-  // Reset banner on login
   useEffect(() => {
     if (isAuthenticated) setBannerDismissed(false);
   }, [isAuthenticated]);

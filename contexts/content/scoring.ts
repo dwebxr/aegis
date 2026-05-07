@@ -23,7 +23,7 @@ async function fetchAnalyze(
   apiKey?: string,
 ): Promise<AnalyzeResponse | null> {
   try {
-    const body: Record<string, unknown> = { text };
+    const body: { text: string; userContext?: UserContext } = { text };
     if (userContext) body.userContext = userContext;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (apiKey) headers["X-User-API-Key"] = apiKey;
@@ -118,17 +118,9 @@ export async function runScoringCascade(
       }
     }
 
-    // Tier 3: IC LLM via canister (free, on-chain). The withIcLlmSlot
-    // wrapper enforces the 2-concurrent ceiling shared with translateOnChain
-    // — see lib/ic/icLlmConcurrency.ts. Without it, scoring + translation
-    // running in parallel would push the LLM canister past its per-caller
-    // limit and items would fail with "IC LLM translation failed".
-    //
-    // The circuit breaker (lib/ic/icLlmCircuitBreaker.ts) tracks
-    // consecutive transport-level failures across BOTH analyze and
-    // translate. When it is open we skip this tier entirely and fall
-    // through to the server Claude tier — no point burning 10s on a
-    // call we know will fail.
+    // Tier 3: IC LLM. withIcLlmSlot enforces a 2-concurrent ceiling shared with
+    // translateOnChain (lib/ic/icLlmConcurrency.ts). The circuit breaker covers
+    // both analyze and translate, so we skip this tier entirely when open.
     if (!result && actorRef.current && isAuthenticated && !isIcLlmCircuitOpen()) {
       try {
         result = await Sentry.startSpan({ name: "scoring.ic-llm", op: "scoring.tier" }, async () => {

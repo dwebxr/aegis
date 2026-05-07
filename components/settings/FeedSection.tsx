@@ -101,7 +101,6 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
     }
   }, [webllmOn, addNotification]);
 
-  // MediaPipe status subscription
   useEffect(() => {
     if (!mediapipeOn) return;
     let unsub: (() => void) | null = null;
@@ -205,20 +204,15 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
       addNotification("Invalid key format — must start with sk-ant-", "error");
       return;
     }
-    try {
-      const saved = setUserApiKey(apiKeyInput);
-      if (!saved) {
-        addNotification("Failed to save API key (storage full?)", "error");
-        return;
-      }
-      setHasApiKey(true);
-      setMaskedKey(maskApiKey(apiKeyInput));
-      setApiKeyInput("");
-      addNotification("API key saved — Pro mode ready", "success");
-    } catch (err) {
-      console.error("[settings] Failed to save API key:", err);
-      addNotification("Failed to save API key", "error");
+    const saved = setUserApiKey(apiKeyInput);
+    if (!saved) {
+      addNotification("Failed to save API key (storage full?)", "error");
+      return;
     }
+    setHasApiKey(true);
+    setMaskedKey(maskApiKey(apiKeyInput));
+    setApiKeyInput("");
+    addNotification("API key saved — Pro mode ready", "success");
   };
 
   const handleClearApiKey = () => {
