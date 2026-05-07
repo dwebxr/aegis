@@ -13,6 +13,8 @@ export interface SourceRuntimeState {
   totalItemsScored: number;
   /** Timestamp until which this source is rate-limited (0 = not limited) */
   rateLimitedUntil: number;
+  /** Items the in-cycle dedup discarded before scoring. Drives the duplicate-rate column in Source ROI. */
+  duplicatesSuppressed: number;
 }
 
 type SourceHealth = "healthy" | "degraded" | "error" | "disabled" | "rate_limited";
@@ -40,6 +42,7 @@ export function defaultState(): SourceRuntimeState {
     averageScore: 0,
     totalItemsScored: 0,
     rateLimitedUntil: 0,
+    duplicatesSuppressed: 0,
   };
 }
 
@@ -72,7 +75,8 @@ function isValidState(v: unknown): v is SourceRuntimeState {
     typeof s.nextFetchAt === "number" &&
     typeof s.averageScore === "number" &&
     typeof s.totalItemsScored === "number" &&
-    (s.rateLimitedUntil === undefined || typeof s.rateLimitedUntil === "number")
+    (s.rateLimitedUntil === undefined || typeof s.rateLimitedUntil === "number") &&
+    (s.duplicatesSuppressed === undefined || typeof s.duplicatesSuppressed === "number")
   );
 }
 
@@ -87,8 +91,8 @@ export function loadSourceStates(): Record<string, SourceRuntimeState> {
     const result: Record<string, SourceRuntimeState> = {};
     for (const [key, value] of Object.entries(parsed)) {
       if (isValidState(value)) {
-        // Backfill rateLimitedUntil for pre-existing data
         if (typeof value.rateLimitedUntil !== "number") value.rateLimitedUntil = 0;
+        if (typeof value.duplicatesSuppressed !== "number") value.duplicatesSuppressed = 0;
         result[key] = value;
       } else {
         result[key] = defaultState();

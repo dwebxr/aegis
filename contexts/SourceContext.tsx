@@ -327,7 +327,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
     for (const s of sources) {
       if (!s.enabled) continue;
       if (s.type === "rss" && s.feedUrl) {
-        result.push({ type: "rss", config: { feedUrl: s.feedUrl }, enabled: true, platform: s.platform });
+        result.push({ type: "rss", config: { feedUrl: s.feedUrl }, enabled: true, platform: s.platform, savedSourceId: s.id });
       } else if (s.type === "nostr") {
         result.push({
           type: "nostr",
@@ -336,6 +336,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
             pubkeys: (s.pubkeys || []).join(","),
           },
           enabled: true,
+          savedSourceId: s.id,
         });
       } else if (s.type === "farcaster" && s.fid) {
         result.push({
@@ -343,6 +344,7 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
           config: { fid: String(s.fid), username: s.username || "" },
           enabled: true,
           platform: "farcaster",
+          savedSourceId: s.id,
         });
       }
     }

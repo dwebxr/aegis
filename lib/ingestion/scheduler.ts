@@ -33,6 +33,8 @@ export interface SchedulerSource {
   config: Record<string, string>;
   enabled: boolean;
   platform?: import("@/lib/types/sources").SourcePlatform;
+  /** SavedSource.id — stamped onto each scored ContentItem for ROI attribution. Optional for demo/legacy callers. */
+  savedSourceId?: string;
 }
 
 interface SchedulerCallbacks {
@@ -241,6 +243,10 @@ export class IngestionScheduler {
         const passed = items.filter(raw => quickSlopFilter(raw.text));
 
         const unique = passed.filter(raw => !this.dedup.isDuplicate(raw.sourceUrl, raw.text));
+        const suppressedThisCycle = passed.length - unique.length;
+        if (suppressedThisCycle > 0) {
+          state.duplicatesSuppressed += suppressedThisCycle;
+        }
 
         const enriched = await this.enrichItems(unique, source.type);
         const toScore = enriched.slice(0, MAX_ITEMS_PER_SOURCE);
@@ -252,6 +258,7 @@ export class IngestionScheduler {
             : await this.scoreItem(raw, userContext, source.type, source.platform);
           this.dedup.markSeen(raw.sourceUrl, raw.text);
           if (scored) {
+            if (source.savedSourceId) scored.savedSourceId = source.savedSourceId;
             scores.push(scored.scores.composite);
             this.callbacks.onNewContent(scored);
             cycleItems.push(scored);

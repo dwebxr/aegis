@@ -65,10 +65,15 @@ export interface ContentItem extends ContentEvaluation {
   lSlop?: number;
   /** true = scored by AI (Claude API / IC LLM), false = heuristic. Omitted on legacy items. */
   scoredByAI?: boolean;
-  /** Which scoring engine produced the scores */
   scoringEngine?: import("@/lib/scoring/types").ScoringEngine;
   /** Original platform (e.g. "youtube", "bluesky") for RSS-type items. Omitted for direct nostr. */
   platform?: import("@/lib/types/sources").SourcePlatform;
-  /** Translation result, populated by translation engine */
   translation?: import("@/lib/translation/types").TranslationResult;
+  /**
+   * Originating SavedSource.id when known. Stamped at ingestion by the
+   * scheduler; populated lazily via attributeItem() for items predating
+   * the field or arriving via D2A/manual paths (in which case it stays
+   * undefined).
+   */
+  savedSourceId?: string;
 }
