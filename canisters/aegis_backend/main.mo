@@ -1394,18 +1394,28 @@ persistent actor AegisBackend {
     };
   };
 
-  public query func getPushSubscriptions(user : Principal) : async [Types.PushSubscription] {
+  // Returns subscriptions only to the owner (or a controller). Other callers
+  // get an empty list — endpoint+keys are functionally equivalent to a Web
+  // Push secret, so leaking them lets anyone bypass our /api/push/send and
+  // notify the user directly.
+  public shared query ({ caller }) func getPushSubscriptions(user : Principal) : async [Types.PushSubscription] {
+    if (not Principal.equal(caller, user) and not Principal.isController(caller)) {
+      return [];
+    };
     switch (pushSubscriptions.get(user)) {
       case (?subs) { subs };
       case null { [] };
     };
   };
 
-  // Called from Vercel API route to clean up expired subscriptions (410/404).
-  // No auth: server calls with anonymous identity. Risk: push DoS only (no data leak).
-  public shared func removePushSubscriptions(
+  // Caller-gated batch cleanup. Owners drain expired endpoints after a
+  // /api/push/send response; controllers may sweep on behalf of users.
+  public shared ({ caller }) func removePushSubscriptions(
     user : Principal, endpoints : [Text]
   ) : async Bool {
+    if (not Principal.equal(caller, user) and not Principal.isController(caller)) {
+      Debug.trap("not authorized to modify push subscriptions for this user");
+    };
     switch (pushSubscriptions.get(user)) {
       case (?existing) {
         let filtered = Array.filter<Types.PushSubscription>(

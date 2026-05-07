@@ -19,11 +19,16 @@ describe("generatePushToken", () => {
   it("matches the explicit HMAC-SHA256-truncated reference output", () => {
     process.env.VAPID_PRIVATE_KEY = "deterministic-secret";
     const principal = "principal-1";
+    const endpoints = ["https://push.example.com/a", "https://push.example.com/b"];
+    // Mirror lib/api/pushToken.ts: lowercase + sort endpoints, NUL-join, then
+    // HMAC over `${principal}\0${joined}`. NUL separator avoids field-boundary
+    // collisions in case an endpoint contains a literal space or similar.
+    const canonical = [...endpoints].map(e => e.toLowerCase()).sort().join("\0");
     const expected = createHmac("sha256", "deterministic-secret")
-      .update(principal)
+      .update(`${principal}\0${canonical}`)
       .digest("hex")
       .slice(0, 32);
-    expect(generatePushToken(principal)).toBe(expected);
+    expect(generatePushToken(principal, endpoints)).toBe(expected);
   });
 
   it("is deterministic for identical inputs", () => {
@@ -50,7 +55,7 @@ describe("generatePushToken", () => {
     delete process.env.VAPID_PRIVATE_KEY;
     const token = generatePushToken("any");
     const expected = createHmac("sha256", "")
-      .update("any")
+      .update("any\0")
       .digest("hex")
       .slice(0, 32);
     expect(token).toBe(expected);

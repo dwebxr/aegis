@@ -99,13 +99,11 @@ function AegisAppInner() {
     try { return sessionStorage.getItem("aegis-wot-prompt-dismissed") === "true"; } catch { return false; }
   });
 
-  // One-time migration from localStorage to IndexedDB + scoring cache init
   useEffect(() => {
     migrateToIDB().catch(err => console.warn("[page] IDB migration failed:", errMsg(err)));
     initScoringCache().catch(err => console.warn("[page] Scoring cache init failed:", errMsg(err)));
   }, []);
 
-  // Listen for cross-context notification events (e.g. preference corruption)
   useEffect(() => {
     const handler = (e: Event) => {
       const { message, type } = (e as CustomEvent).detail;
@@ -254,7 +252,6 @@ function AegisAppInner() {
     }));
   }, [pipelineResult, content]);
 
-  // WoT serendipity discoveries (Pro mode only)
   const discoveries = useMemo<SerendipityItem[]>(() => {
     if (!pipelineResult || filterMode !== "pro") return [];
     return detectSerendipity(pipelineResult);
@@ -304,7 +301,6 @@ function AegisAppInner() {
         setReputation(rep);
         setEngagementIndex(eIndex);
 
-        // Restore user settings from IC
         const rawSettings = icSettings[0];
         if (rawSettings) {
           const { account: icAccount, d2aEnabled: icD2A } = parseICSettings(rawSettings);
@@ -348,6 +344,8 @@ function AegisAppInner() {
   isDemoRef.current = isDemoMode;
   const principalTextRef = useRef(principalText);
   principalTextRef.current = principalText;
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
   const scoreTextRef = useRef(scoreText);
   scoreTextRef.current = scoreText;
 
@@ -388,12 +386,10 @@ function AegisAppInner() {
           }
         } catch (err) { console.warn("[push] localStorage unavailable, skipping push:", errMsg(err)); return; }
         const quality = items.filter(i => i.verdict === "quality");
-        // Apply notification rules if set
         const notifPrefs = profileRef.current.notificationPrefs;
         let filteredItems = quality.length > 0 ? quality : items;
         if (notifPrefs) {
           filteredItems = filteredItems.filter(item => {
-            // D2A content always passes if d2aAlerts enabled
             if (notifPrefs.d2aAlerts && (item.source as string) === "d2a") return true;
             if (notifPrefs.minScoreAlert && item.scores.composite < notifPrefs.minScoreAlert) return false;
             if (notifPrefs.topicAlerts && notifPrefs.topicAlerts.length > 0) {
@@ -411,18 +407,32 @@ function AegisAppInner() {
         const summary = `${filteredItems.length} item${filteredItems.length !== 1 ? "s" : ""} matched`;
         try { localStorage.setItem("aegis-push-last", String(Date.now())); } catch (err) { console.warn("[push] Failed to save push timestamp:", errMsg(err)); }
         void (async () => {
+          const id = identityRef.current;
+          if (!id) return;
+          // The canister gates getPushSubscriptions to caller==user, so we
+          // must enumerate via the auth'd actor rather than from the server.
+          const actor = await createBackendActorAsync(id);
+          const subs = await actor.getPushSubscriptions(Principal.fromText(pt));
+          if (subs.length === 0) return;
+          const subscriptions = subs.map(s => ({
+            endpoint: s.endpoint,
+            keys: { p256dh: s.keys.p256dh, auth: s.keys.auth },
+          }));
+          const endpoints = subscriptions.map(s => s.endpoint);
+
           const tokenRes = await fetch("/api/push/token", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ principal: pt }),
+            body: JSON.stringify({ principal: pt, endpoints }),
           });
           if (!tokenRes.ok) return;
           const { token } = await tokenRes.json();
-          await fetch("/api/push/send", {
+          const sendRes = await fetch("/api/push/send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               principal: pt,
+              subscriptions,
               token,
               title: `Aegis: ${summary}`,
               body: preview || summary,
@@ -430,6 +440,16 @@ function AegisAppInner() {
               tag: `briefing-${new Date().toISOString().slice(0, 10)}`,
             }),
           });
+          if (!sendRes.ok) return;
+          const sendData = await sendRes.json().catch(() => null) as
+            | { expiredEndpoints?: string[] }
+            | null;
+          const expired = sendData?.expiredEndpoints ?? [];
+          for (const endpoint of expired) {
+            await actor.unregisterPushSubscription(endpoint).catch((err: unknown) => {
+              console.warn("[push] Failed to unregister expired subscription:", errMsg(err));
+            });
+          }
         })().catch((err: unknown) => {
           console.warn("[push] Send notification failed:", errMsg(err));
         });

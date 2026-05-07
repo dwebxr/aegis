@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import webpush from "web-push";
-import { HttpAgent, Actor } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
-import { idlFactory } from "@/lib/ic/declarations/idlFactory";
 import { rateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
 import { generatePushToken } from "@/lib/api/pushToken";
 import { errMsg } from "@/lib/utils/errors";
 import { isFeatureEnabled } from "@/lib/featureFlags";
-import { getCanisterId, getHost } from "@/lib/ic/config";
-import type { _SERVICE, PushSubscription } from "@/lib/ic/declarations/aegis_backend.did";
 
 export const maxDuration = 30;
 
@@ -19,6 +15,22 @@ if (process.env.VAPID_PRIVATE_KEY && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY.trim(),
     process.env.VAPID_PRIVATE_KEY.trim(),
   );
+}
+
+interface InputSubscription {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+const MAX_SUBSCRIPTIONS = 5;
+
+function isValidSubscription(s: unknown): s is InputSubscription {
+  if (!s || typeof s !== "object") return false;
+  const sub = s as Record<string, unknown>;
+  if (typeof sub.endpoint !== "string" || !sub.endpoint.startsWith("https://")) return false;
+  const keys = sub.keys as Record<string, unknown> | undefined;
+  if (!keys || typeof keys !== "object") return false;
+  return typeof keys.p256dh === "string" && typeof keys.auth === "string";
 }
 
 export async function POST(request: NextRequest) {
@@ -35,7 +47,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Push not configured" }, { status: 503 });
   }
 
-  const parsed = await parseJsonBody<{ principal?: string; token?: string; title?: string; body?: string; url?: string; tag?: string }>(request);
+  const parsed = await parseJsonBody<{
+    principal?: string;
+    subscriptions?: unknown;
+    token?: string;
+    title?: string;
+    body?: string;
+    url?: string;
+    tag?: string;
+  }>(request);
   if (parsed.error) return parsed.error;
   const body = parsed.body;
 
@@ -43,31 +63,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "principal required" }, { status: 400 });
   }
 
-  // Verify caller authorization via HMAC token
-  const expected = generatePushToken(body.principal);
+  if (!Array.isArray(body.subscriptions) || body.subscriptions.length === 0) {
+    return NextResponse.json({ error: "subscriptions required (non-empty array)" }, { status: 400 });
+  }
+  if (body.subscriptions.length > MAX_SUBSCRIPTIONS) {
+    return NextResponse.json({ error: `subscriptions exceeds limit of ${MAX_SUBSCRIPTIONS}` }, { status: 400 });
+  }
+  for (const sub of body.subscriptions) {
+    if (!isValidSubscription(sub)) {
+      return NextResponse.json({ error: "invalid subscription shape" }, { status: 400 });
+    }
+  }
+  const subscriptions = body.subscriptions as InputSubscription[];
+
+  const expected = generatePushToken(body.principal, subscriptions.map(s => s.endpoint));
   if (!body.token || body.token !== expected) {
     return NextResponse.json({ error: "Invalid or missing push token" }, { status: 403 });
   }
 
-  let userPrincipal: Principal;
   try {
-    userPrincipal = Principal.fromText(body.principal);
+    Principal.fromText(body.principal);
   } catch {
     return NextResponse.json({ error: "Invalid principal" }, { status: 400 });
   }
 
   try {
-    const agent = await HttpAgent.create({ host: getHost() });
-    const actor = Actor.createActor<_SERVICE>(idlFactory, {
-      agent,
-      canisterId: getCanisterId(),
-    });
-
-    const subscriptions = await actor.getPushSubscriptions(userPrincipal);
-    if (!subscriptions || subscriptions.length === 0) {
-      return NextResponse.json({ sent: 0, message: "No subscriptions" });
-    }
-
     const payload = JSON.stringify({
       title: body.title || "Aegis Briefing",
       body: body.body || "Your new briefing is ready.",
@@ -76,7 +96,7 @@ export async function POST(request: NextRequest) {
     });
 
     const results = await Promise.allSettled(
-      subscriptions.map((sub: PushSubscription) =>
+      subscriptions.map(sub =>
         webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } },
           payload,
@@ -94,20 +114,15 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    let cleanupFailed = false;
-    if (expiredEndpoints.length > 0) {
-      try {
-        await actor.removePushSubscriptions(userPrincipal, expiredEndpoints);
-      } catch (e) {
-        cleanupFailed = true;
-        console.error("[push] Failed to remove expired subscriptions for %s (%d endpoints):", body.principal, expiredEndpoints.length, errMsg(e));
-      }
-    }
-
     const sent = results.filter(r => r.status === "fulfilled").length;
     const failed = results.filter(r => r.status === "rejected").length;
 
-    return NextResponse.json({ sent, failed, expired: expiredEndpoints.length, cleanupFailed });
+    // Cleanup of expired endpoints is the client's responsibility: the canister
+    // gates getPushSubscriptions/removePushSubscriptions to the caller, and
+    // this route runs anonymously. Clients should call
+    // unregisterPushSubscription(endpoint) on the auth'd actor for each entry
+    // in expiredEndpoints.
+    return NextResponse.json({ sent, failed, expiredEndpoints });
   } catch (error) {
     console.error("[push] Send error:", errMsg(error));
     Sentry.captureException(error, {

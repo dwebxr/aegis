@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { distributedRateLimit, checkBodySize } from "@/lib/api/rateLimit";
+import { distributedRateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
 import { callAnthropic, ANTHROPIC_DEFAULT_MODEL } from "@/lib/api/anthropic";
 import { requireUserByokKey } from "@/lib/api/byok";
 import { isFeatureEnabled } from "@/lib/featureFlags";
@@ -20,7 +20,9 @@ export async function POST(request: NextRequest) {
   const bodyErr = checkBodySize(request, 32_000);
   if (bodyErr) return bodyErr;
 
-  const body = await request.json();
+  const parsed = await parseJsonBody<{ prompt?: unknown }>(request);
+  if (parsed.error) return parsed.error;
+  const body = parsed.body;
   const prompt = typeof body.prompt === "string" ? body.prompt.slice(0, 10_000) : "";
   if (!prompt) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });
