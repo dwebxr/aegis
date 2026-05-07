@@ -358,6 +358,45 @@ describe("AgentProvider — setWoTGraph", () => {
   });
 });
 
+describe("AgentProvider — D2A fee pre-approve handling", () => {
+  it("notifies trusted-only mode when ledger returns Err", async () => {
+    mockAuthValue = { isAuthenticated: true, identity: { fake: true }, principalText: "principal-abc" };
+    const approveMock = jest.fn().mockResolvedValue({ Err: { InsufficientFunds: { balance: 0n } } });
+    mockCreateLedgerActor.mockResolvedValueOnce({ icrc2_approve: approveMock });
+
+    const { result } = renderHook(() => useAgent(), { wrapper });
+
+    await act(async () => {
+      result.current.toggleAgent();
+    });
+    await waitFor(() => expect(approveMock).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockNotifyValue.addNotification).toHaveBeenCalledWith(
+        "D2A started in trusted-only mode. Fund wallet to exchange with unknown peers.",
+        "info",
+      ),
+    );
+  });
+
+  it("does NOT notify trusted-only mode when ledger returns Ok", async () => {
+    mockAuthValue = { isAuthenticated: true, identity: { fake: true }, principalText: "principal-abc" };
+    const approveMock = jest.fn().mockResolvedValue({ Ok: 42n });
+    mockCreateLedgerActor.mockResolvedValueOnce({ icrc2_approve: approveMock });
+
+    const { result } = renderHook(() => useAgent(), { wrapper });
+
+    await act(async () => {
+      result.current.toggleAgent();
+    });
+    await waitFor(() => expect(approveMock).toHaveBeenCalled());
+    await waitFor(() => expect(managerInstances.length).toBe(1));
+    expect(mockNotifyValue.addNotification).not.toHaveBeenCalledWith(
+      expect.stringContaining("trusted-only mode"),
+      "info",
+    );
+  });
+});
+
 describe("AgentProvider — agent state notifications", () => {
   it("notifies on receivedItems delta", async () => {
     mockAuthValue = { isAuthenticated: true, identity: { fake: true }, principalText: "principal-abc" };

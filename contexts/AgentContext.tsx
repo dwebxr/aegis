@@ -179,7 +179,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         const ledger = await createICPLedgerActorAsync(capturedIdentity);
         if (cancelled) return;
         const spender = Principal.fromText(canisterId);
-        await ledger.icrc2_approve({
+        const approveResult = await ledger.icrc2_approve({
           from_subaccount: [],
           spender: { owner: spender, subaccount: [] },
           amount: BigInt(D2A_APPROVE_AMOUNT) + ICP_FEE,
@@ -189,6 +189,15 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
           memo: [],
           created_at_time: [],
         });
+        if ("Err" in approveResult) {
+          // The ledger accepted the call but rejected the approve (e.g.
+          // InsufficientFunds, AllowanceChanged). Treat the same as a caught
+          // exception: the D2A agent runs trusted-only until the user funds
+          // the wallet and re-enables D2A.
+          const errKey = Object.keys(approveResult.Err)[0] ?? "Unknown";
+          console.warn(`[agent] D2A fee pre-approve rejected by ledger (${errKey}); running trusted-only`);
+          addNotification("D2A started in trusted-only mode. Fund wallet to exchange with unknown peers.", "info");
+        }
       } catch (err) {
         console.warn("[agent] D2A fee pre-approve failed (trusted-only mode):", errMsg(err));
         addNotification("D2A started in trusted-only mode. Fund wallet to exchange with unknown peers.", "info");
@@ -268,7 +277,6 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated, principalText, identity, isEnabled, nostrKeys, addContent, addNotification]);
 
-  // D2A event notifications — fires toasts for significant agent state transitions
   const prevStateRef = useRef<AgentState>(defaultState);
   useEffect(() => {
     const prev = prevStateRef.current;
