@@ -46,15 +46,13 @@ export interface SourceQualityStats {
   duplicatesSuppressed: number;
   qualityYield: number;
   slopRate: number;
+  /** (validated + flagged) / scored — share of items the user touched. */
   reviewRate: number;
-  validateRatio: number;
-  sampleSize: number;
   lastFetchedAt: number;
   lastError: string;
   fetchHealth: ReturnType<typeof getSourceHealth>;
   qualityHealth: QualityHealth;
   recommendation: SourceRecommendation;
-  isLearning: boolean;
   isStale: boolean;
 }
 
@@ -99,6 +97,13 @@ export function classifyQualityHealth(s: {
  *
  * Match priority: explicit stamp > nostr pubkey membership > rss feed hostname
  * (with feedburner / google news intermediaries) > farcaster fid/username in URL.
+ *
+ * Known v1 limitation: an item whose `savedSourceId` references a source the
+ * user has since deleted will return that orphan id here. The id won't match
+ * any current `sources[]` entry, so it disappears from per-source tables and
+ * is also excluded from the "unattributed" buckets (which key off undefined).
+ * A future "deleted source archive" view would cover this; intentionally out
+ * of scope for v1.
  */
 export function attributeItem(
   item: ContentItem,
@@ -231,18 +236,14 @@ export function computeSourceQualityStats(
     const scored = items.length;
     const qualityYield = scored > 0 ? quality / scored : 0;
     const slopRate = scored > 0 ? slop / scored : 0;
-    const reviewed = validated + flagged;
-    const reviewRate = scored > 0 ? reviewed / scored : 0;
-    const validateRatio = reviewed > 0 ? validated / reviewed : 0;
+    const reviewRate = scored > 0 ? (validated + flagged) / scored : 0;
 
     const lastFetchedAt = runtime?.lastFetchedAt ?? 0;
     const lastError = runtime?.lastError ?? "";
     const fetchHealth = runtime ? getSourceHealth(runtime) : "healthy";
     const isStale = lastFetchedAt > 0 && (now - lastFetchedAt) > STALE_MS;
-    const sampleSize = scored;
-    const isLearning = sampleSize < MIN_SAMPLE_SIZE;
 
-    const recInputs = { sampleSize, qualityYield, slopRate, fetchHealth, isStale };
+    const recInputs = { sampleSize: scored, qualityYield, slopRate, fetchHealth, isStale };
     const qualityHealth = classifyQualityHealth(recInputs);
     const recommendation = recommend(recInputs);
 
@@ -260,14 +261,11 @@ export function computeSourceQualityStats(
       qualityYield,
       slopRate,
       reviewRate,
-      validateRatio,
-      sampleSize,
       lastFetchedAt,
       lastError,
       fetchHealth,
       qualityHealth,
       recommendation,
-      isLearning,
       isStale,
     });
   }

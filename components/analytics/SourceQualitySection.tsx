@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { colors } from "@/styles/theme";
 import { useSources } from "@/contexts/SourceContext";
 import {
   computeSourceQualityStats,
@@ -27,12 +26,14 @@ const RECOMMENDATION_LABEL: Record<SourceRecommendation, string> = {
   insufficient_data: "Learning",
 };
 
-const RECOMMENDATION_COLOR: Record<SourceRecommendation, string> = {
-  keep: colors.green[400],
-  watch: colors.amber[400],
-  mute: colors.orange[400],
-  remove: colors.red[400],
-  insufficient_data: colors.text.muted,
+// Class-based styling avoids the inline-style alpha-suffix bug that broke
+// the insufficient_data branch (var(--...)40 is invalid CSS; hex+40 is RGBA).
+const RECOMMENDATION_BADGE_CLASS: Record<SourceRecommendation, string> = {
+  keep: "text-green-400 border-green-400/30 bg-green-400/[0.08]",
+  watch: "text-amber-400 border-amber-400/30 bg-amber-400/[0.08]",
+  mute: "text-orange-400 border-orange-400/30 bg-orange-400/[0.08]",
+  remove: "text-red-400 border-red-400/30 bg-red-400/[0.08]",
+  insufficient_data: "text-disabled border-border bg-navy-lighter",
 };
 
 const WINDOWS: ReadonlyArray<TimeWindow> = ["7d", "30d", "all"] as const;
@@ -63,13 +64,12 @@ export const SourceQualitySection: React.FC<SourceQualitySectionProps> = ({ cont
     };
   }, []);
 
-  const { stats, unattributed, sinceMs } = useMemo(() => {
+  const { stats, unattributed } = useMemo(() => {
     const since = window === "all" ? 0 : Date.now() - TIME_WINDOWS[window];
     const stateMap = new Map(Object.entries(runtimeStates));
     return {
       stats: computeSourceQualityStats(content, sources, stateMap, since),
       unattributed: computeUnattributedStats(content, sources, since),
-      sinceMs: since,
     };
   }, [content, sources, runtimeStates, window]);
 
@@ -87,7 +87,6 @@ export const SourceQualitySection: React.FC<SourceQualitySectionProps> = ({ cont
   if (sources.length === 0) return null;
 
   const totalUnattributed = unattributed.d2a.scored + unattributed.manual.scored + unattributed.sharedUrl.scored;
-  void sinceMs;
 
   return (
     <div data-testid="aegis-source-quality" className={cn("bg-card border border-border rounded-lg mb-16", mobile ? "p-4 mb-12" : "p-5")}>
@@ -188,6 +187,7 @@ const SourceList: React.FC<SourceListProps> = ({ rows, mobile, onMute, onRemove,
           {!compact && (
             <div className="text-tiny text-muted-foreground mt-0.5">
               {s.scored} scored · quality {(s.qualityYield * 100).toFixed(0)}% · slop {(s.slopRate * 100).toFixed(0)}%
+              {s.reviewRate > 0 && <> · reviewed {(s.reviewRate * 100).toFixed(0)}%</>}
               {s.duplicatesSuppressed > 0 && <> · {s.duplicatesSuppressed} dup</>}
               {s.flagged > 0 && <> · {s.flagged} flagged</>}
               {s.validated > 0 && <> · {s.validated} validated</>}
@@ -215,12 +215,10 @@ const SourceList: React.FC<SourceListProps> = ({ rows, mobile, onMute, onRemove,
 const RecommendationBadge: React.FC<{ rec: SourceRecommendation }> = ({ rec }) => (
   <span
     data-testid={`aegis-source-quality-badge-${rec}`}
-    className="text-tiny font-bold uppercase tracking-[1px] px-1.5 py-px rounded-sm border"
-    style={{
-      color: RECOMMENDATION_COLOR[rec],
-      borderColor: `${RECOMMENDATION_COLOR[rec]}40`,
-      backgroundColor: `${RECOMMENDATION_COLOR[rec]}1a`,
-    }}
+    className={cn(
+      "text-tiny font-bold uppercase tracking-[1px] px-1.5 py-px rounded-sm border whitespace-nowrap",
+      RECOMMENDATION_BADGE_CLASS[rec],
+    )}
   >
     {RECOMMENDATION_LABEL[rec]}
   </span>

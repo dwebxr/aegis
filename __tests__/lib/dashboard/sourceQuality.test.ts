@@ -222,7 +222,6 @@ describe("computeSourceQualityStats()", () => {
     expect(s.qualityYield).toBeCloseTo(2 / 3, 5);
     expect(s.slopRate).toBeCloseTo(1 / 3, 5);
     expect(s.reviewRate).toBeCloseTo(2 / 3, 5);
-    expect(s.validateRatio).toBeCloseTo(0.5, 5);
     expect(s.duplicatesSuppressed).toBe(7);
     expect(s.recommendation).toBe("insufficient_data");
   });

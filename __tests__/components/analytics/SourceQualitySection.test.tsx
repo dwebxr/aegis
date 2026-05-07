@@ -225,6 +225,36 @@ describe("SourceQualitySection — time window toggle", () => {
   });
 });
 
+describe("SourceQualitySection — badge styling regression", () => {
+  it("Learning badge carries the class-based muted styling (no var(...)40 invalid CSS)", () => {
+    mockSources = [makeSource({ id: "s1" })];
+    mockContent = [makeItem({ source: "rss", sourceUrl: "https://example.com/a", savedSourceId: "s1" })];
+    render(<SourceQualitySection content={mockContent} />);
+
+    const badge = screen.getByTestId("aegis-source-quality-badge-insufficient_data");
+    expect(badge.className).toContain("text-disabled");
+    expect(badge.className).toContain("border-border");
+    expect(badge.className).toContain("bg-navy-lighter");
+    // Inline style must NOT contain the broken `var(...)<alpha>` pattern.
+    expect(badge.getAttribute("style") || "").not.toMatch(/var\([^)]+\)[0-9a-f]/i);
+  });
+
+  it("Keep badge carries the green class set", () => {
+    mockSources = [makeSource({ id: "good", feedUrl: "https://good.com/feed" })];
+    mockContent = Array.from({ length: MIN_SAMPLE_SIZE }, (_, i) => makeItem({
+      id: `q${i}`,
+      sourceUrl: `https://good.com/${i}`,
+      savedSourceId: "good",
+      verdict: "quality",
+      createdAt: NOW - 1000,
+    }));
+    render(<SourceQualitySection content={mockContent} />);
+    const badge = screen.getByTestId("aegis-source-quality-badge-keep");
+    expect(badge.className).toContain("text-green-400");
+    expect(badge.className).toContain("border-green-400/30");
+  });
+});
+
 describe("SourceQualitySection — unattributed", () => {
   it("renders D2A / Manual / Shared URL cards when content has unattributed entries", () => {
     mockSources = [makeSource({ id: "s1" })];
