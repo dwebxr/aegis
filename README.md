@@ -17,6 +17,24 @@
 
 ## Latest Updates (May 2026)
 
+### Source Quality / ROI — per-source noise vs. value visibility
+- **426 suites / 7,547 tests** — zero failures, zero TypeScript errors. Adds 53 new tests across pure aggregator + UI + attribution + orphan handling
+- **Why**: existing `Sources` panel surfaced fetch health (errors / rate limits) but not whether a source was actually paying off in the briefing. Users had no easy way to spot a feed that was 80% slop or a feed that had quietly stopped producing items 30 days ago. Closes that gap by computing per-source quality yield, slop rate, review signal, and duplicate-suppression count from the data already in `content[]` + the existing per-source runtime state — no canister change required
+- **New module `lib/dashboard/sourceQuality.ts`** (pure):
+  - `attributeItem(item, sources)` hybrid linker: explicit `savedSourceId` stamp (set by the scheduler at ingestion) > Nostr pubkey membership > RSS feed hostname (with feedburner / google-news `?url=` intermediate handling) > Farcaster username/fid path match. Mutates the item to cache the inferred id on hit. Validates the cached id against `sources[]` on every call so a stamp that's gone stale (deleted source) falls through to re-inference instead of silently sticking
+  - `computeSourceQualityStats(content, sources, runtimeStates, sinceMs)` returns `{ scored, quality, slop, validated, flagged, duplicatesSuppressed, qualityYield, slopRate, reviewRate, fetchHealth, qualityHealth, recommendation, lastFetchedAt, isStale }` per SavedSource
+  - `computeUnattributedStats(content, sources, sinceMs)` returns 4 buckets — D2A / Manual / Shared URL / **Deleted Source** (orphan items whose `savedSourceId` references a SavedSource the user has since removed and inference can't re-attribute). Closes the v1 gap where orphans previously vanished from both the per-source list and the unattributed view
+  - `recommend(stats)` decides Keep / Watch / Mute / Remove / Insufficient-Data with explicit thresholds: `MIN_SAMPLE_SIZE=10`, `KEEP_QUALITY_YIELD=0.6`, `WATCH_FLOOR=0.3`, `SLOP_REMOVE_THRESHOLD=0.5`, `STALE_DAYS=30`. Remove only fires when fetchHealth is `disabled` AND the source has been idle past STALE_DAYS — never auto-removes, only suggests
+  - `classifyQualityHealth(stats)` for the SourcesTab badge: Healthy / Noisy / Stale / Learning / Issue
+- **`ContentItem.savedSourceId?: string`** added — optional, stamped at ingestion in `Scheduler.scoreItem`, lazily filled by `attributeItem` for legacy items. IC schema unchanged — the field is client-side optional and not persisted to the canister's stable storage
+- **`SourceRuntimeState.duplicatesSuppressed: number`** added — incremented in the scheduler when in-cycle dedup discards a post-quickFilter item. Backfilled to 0 in `loadSourceStates` for existing localStorage data so v1 clients keep working
+- **AnalyticsTab — new `SourceQualitySection`**: 7d / 30d / all rolling-window toggle (default 30d), Top 5 / Bottom 5 split when ranked sources exceed TOP_N, Learning sub-list for sources still below `MIN_SAMPLE_SIZE`, Unattributed footer with the 4 buckets. Recommendation chip per row (Mute → `toggleSource(id)`, Remove → `removeSource(id)`) — suggestion-only, never auto
+- **SourcesTab — per-row `QualityBadge`** alongside the existing health-toggle dot (Healthy / Noisy / Stale / Learning / Issue with hex-Tailwind class map; the `RecommendationBadge` in AnalyticsTab uses the same class-map approach after a LARP audit caught an inline-style alpha-suffix bug — `var(--color-text-muted)40` is invalid CSS where `#34d39940` is valid 8-char RGBA, so the muted-color path silently rendered without border or background). Mute / Remove suggestion chips appear inline next to the platform badge for actionable recs
+- **LARP-audited twice** during the build:
+  - First pass caught the inline-style CSS bug (Learning badge rendered without styling), 4 dead-but-exposed fields (`sampleSize`/`isLearning` redundant with `scored`/recommendation; `validateRatio` computed but never displayed), and a `void sinceMs` lint-silencer left over from a useMemo refactor. All fixed; regression tests grep the live `style` attribute for the broken `var(...)<alpha>` pattern so this class of bug can't sneak back in
+  - Second pass closed the orphan-items limitation that was originally documented as deferred. Now part of the core path, with `isOrphan(item, sources)` exported as the single source of truth
+- **Verified**: `npx tsc --noEmit` clean, `npx jest --runInBand` 7547/7547 green, `npx madge --circular` 0 cycles, `dfx build aegis_backend --check` clean. No canister change in this update
+
 ### Security Hardening + Round-3 Cleanup + D2A Approve Err Fix
 - **423 suites / 7,494 tests** — zero failures, zero TypeScript errors, zero circular dependencies (`npx madge --circular` across 13,349 files)
 - **Push notification security (2 highs closed)**:
