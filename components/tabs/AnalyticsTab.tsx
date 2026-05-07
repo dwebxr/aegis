@@ -26,6 +26,7 @@ import {
   computeTopicDistribution,
   computeTopicTrends,
 } from "@/lib/dashboard/utils";
+import { SourceQualitySection } from "@/components/analytics/SourceQualitySection";
 
 interface AnalyticsTabProps {
   content: ContentItem[];
@@ -242,6 +243,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ content, reputation,
           <BarChart data={Object.values(sourceDistribution)} labels={Object.keys(sourceDistribution)} color={colors.purple[400]} />
         </div>
       </div>
+
+      <SourceQualitySection content={content} mobile={mobile} />
 
       {Object.keys(engineDistribution).length > 0 && (
         <div className={cn("grid grid-cols-1 gap-4 mb-16", mobile && "gap-3 mb-12")}>

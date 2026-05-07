@@ -13,6 +13,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { parseGitHubRepo, parseBlueskyHandle, parseRedditSubreddit, parseMastodonAccount, parseFarcasterUser, buildTopicFeedUrl } from "@/lib/sources/platformFeed";
 import { loadSourceStates, resetSourceErrors, type SourceRuntimeState, getSourceHealth, getSourceKey } from "@/lib/ingestion/sourceState";
+import { computeSourceQualityStats, type SourceQualityStats, type SourceRecommendation, TIME_WINDOWS } from "@/lib/dashboard/sourceQuality";
+import { useContent } from "@/contexts/ContentContext";
 import { relativeTime } from "@/lib/utils/scores";
 import { getSuggestions, dismissSuggestion, discoverFeed as discoverFeedForDomain, type DomainValidation } from "@/lib/sources/discovery";
 import { isTimeout } from "@/lib/utils/errors";
@@ -47,6 +49,42 @@ const HEALTH_BG: Record<string, string> = {
   disabled: "bg-disabled",
   rate_limited: "bg-sky-400",
 };
+
+const QUALITY_BADGE_CLASS: Record<SourceQualityStats["qualityHealth"], string> = {
+  healthy: "text-green-400 border-green-400/30 bg-green-400/[0.08]",
+  noisy: "text-orange-400 border-orange-400/30 bg-orange-400/[0.08]",
+  stale: "text-amber-400 border-amber-400/30 bg-amber-400/[0.08]",
+  learning: "text-disabled border-border bg-navy-lighter",
+  issue: "text-red-400 border-red-400/30 bg-red-400/[0.08]",
+};
+
+const QUALITY_BADGE_LABEL: Record<SourceQualityStats["qualityHealth"], string> = {
+  healthy: "Healthy",
+  noisy: "Noisy",
+  stale: "Stale",
+  learning: "Learning",
+  issue: "Issue",
+};
+
+function recommendationTitle(rec: SourceRecommendation, stats: SourceQualityStats): string {
+  if (rec === "insufficient_data") return `Learning — ${stats.scored}/10 items needed`;
+  const yieldStr = `${(stats.qualityYield * 100).toFixed(0)}%`;
+  const slopStr = `${(stats.slopRate * 100).toFixed(0)}%`;
+  return `${rec.toUpperCase()} — quality ${yieldStr}, slop ${slopStr} over ${stats.scored} items (30d)`;
+}
+
+const QualityBadge: React.FC<{ stats: SourceQualityStats }> = ({ stats }) => (
+  <span
+    data-testid={`aegis-sources-quality-badge-${stats.id}`}
+    className={cn(
+      "text-tiny font-bold uppercase tracking-[1px] px-1.5 py-px rounded-sm border whitespace-nowrap",
+      QUALITY_BADGE_CLASS[stats.qualityHealth],
+    )}
+    title={recommendationTitle(stats.recommendation, stats)}
+  >
+    {QUALITY_BADGE_LABEL[stats.qualityHealth]}
+  </span>
+);
 
 const inputClass = "w-full bg-card border border-border rounded-md px-4 py-3 text-foreground text-body-sm font-[inherit] outline-none box-border";
 
@@ -84,6 +122,7 @@ function formatRetryCountdown(until: number): string {
 
 export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, mobile, initialUrl }) => {
   const { sources, syncStatus, syncError, addSource, removeSource, toggleSource, updateSource } = useSources();
+  const { content } = useContent();
   const { isAuthenticated } = useAuth();
   const { isDemoMode } = useDemo();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -139,6 +178,14 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
     document.addEventListener("visibilitychange", onVisible);
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
+
+  // Per-source quality (rolling 30 days). Indexed by SavedSource.id for O(1) row lookup.
+  const qualityById = useMemo<Map<string, SourceQualityStats>>(() => {
+    const sinceMs = Date.now() - TIME_WINDOWS["30d"];
+    const stateMap = new Map(Object.entries(sourceStates));
+    const stats = computeSourceQualityStats(content, sources, stateMap, sinceMs);
+    return new Map(stats.map(s => [s.id, s]));
+  }, [content, sources, sourceStates]);
 
   // Deep link: auto-fill URL and trigger extraction
   const initialUrlConsumedRef = useRef(false);
@@ -884,6 +931,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
             const stateKey = getStateKey(s);
             const state = sourceStates[stateKey];
             const health = state ? getSourceHealth(state) : "healthy";
+            const quality = qualityById.get(s.id);
 
             return (
               <div key={s.id} className="mb-1">
@@ -904,11 +952,14 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                     title={s.enabled ? (health === "rate_limited" ? "Rate limited — retrying soon" : `${health} — click to disable`) : "Enable"}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className={cn(
-                      "text-body-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap",
-                      s.enabled ? "text-secondary-foreground" : "text-disabled"
-                    )}>
-                      {s.label}
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "text-body-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap",
+                        s.enabled ? "text-secondary-foreground" : "text-disabled"
+                      )}>
+                        {s.label}
+                      </div>
+                      {quality && <QualityBadge stats={quality} />}
                     </div>
                     <div className="text-tiny text-muted-foreground">
                       {s.type === "rss" ? s.feedUrl : `${(s.relays || []).length} relays · ${(s.pubkeys || []).length} keys`}
@@ -951,6 +1002,26 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                       </div>
                     )}
                   </div>
+                  {!isDemoMode && quality && quality.recommendation === "mute" && s.enabled && (
+                    <button
+                      onClick={() => toggleSource(s.id)}
+                      data-testid={`aegis-sources-mute-${s.id}`}
+                      className="bg-orange-500/[0.08] border border-orange-500/30 rounded-sm text-orange-400 text-tiny font-semibold px-2 py-0.5 cursor-pointer font-[inherit] whitespace-nowrap transition-fast"
+                      title={`Mute — quality ${(quality.qualityYield * 100).toFixed(0)}%, slop ${(quality.slopRate * 100).toFixed(0)}% over ${quality.scored} items`}
+                    >
+                      Mute
+                    </button>
+                  )}
+                  {!isDemoMode && quality && quality.recommendation === "remove" && (
+                    <button
+                      onClick={() => removeSource(s.id)}
+                      data-testid={`aegis-sources-remove-suggested-${s.id}`}
+                      className="bg-red-500/[0.08] border border-red-500/30 rounded-sm text-red-400 text-tiny font-semibold px-2 py-0.5 cursor-pointer font-[inherit] whitespace-nowrap transition-fast"
+                      title={`Remove — disabled and idle for ${Math.floor((Date.now() - quality.lastFetchedAt) / 86_400_000)} days`}
+                    >
+                      Remove
+                    </button>
+                  )}
                   <span className={cn(
                     "text-tiny font-bold uppercase tracking-[1px]",
                     platformBadgeClass(s.platform, s.type)
