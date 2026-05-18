@@ -1,1386 +1,244 @@
-# Aegis — D2A Social Agent Protocol
+# Aegis
 
-<div align="left">
-  <img src="overview.png" alt="Coo + Aegis" width="100%" />
-  <p>
-    <strong>Content quality filter that learns your taste, curates a zero-noise briefing, publishes signals to Nostr, and exchanges content with other agents over an encrypted D2A protocol — with on-chain quality assurance deposits and D2A content provision fees.</strong>
-  </p>
-</div>
+> AI content quality filter. Turn an infinite feed into a clean, ranked briefing.
 
-<p align="left">
-  <a href="https://nostr.com"><img src="https://img.shields.io/badge/Nostr-8E44AD?logo=nostr&logoColor=white" alt="Nostr" /></a>
-  <a href="https://internetcomputer.org"><img src="https://img.shields.io/badge/Internet%20Computer-29ABE2?logo=internetcomputer&logoColor=white" alt="Internet Computer" /></a>
-  <a href="https://ai.google.dev/edge/mediapipe"><img src="https://img.shields.io/badge/MediaPipe-4285F4?logo=google&logoColor=white" alt="MediaPipe" /></a>
-  <a href="https://claude.com"><img src="https://img.shields.io/badge/Claude-D97757?logo=anthropic&logoColor=white" alt="Claude" /></a>
-  <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js%2015-000000?logo=nextdotjs&logoColor=white" alt="Next.js 15" /></a>
-</p>
+Aegis ingests content from RSS, Nostr, and public web pages, scores each item with an AI quality model (Value / Context / Slop), and surfaces only the signal — not the noise. It runs as a Next.js app backed by an Internet Computer canister.
 
-## Latest Updates (May 2026)
+**Status:** experimental open-source project. Code is public and runs in production at the URL below, but APIs and on-chain schemas are still moving.
 
-### Multi-Layer Security Audit + Hardening
-- **437 suites / 7,714 tests** + **12 real-canister smoke tests** — zero failures, zero TypeScript errors, `next build` green, `npm audit --production`: **0 vulnerabilities**
-- **12 codex security findings closed** end-to-end (Motoko + TS + routes + UI):
-  - **Canister owner checks** — `saveEvaluation`, `batchSaveEvaluations`, `saveSignal`, A2A `put_offer`/`delete_offer` now `Principal.equal`-guard the existing record before overwrite. New `offerOwners: HashMap<Text, Principal>` index keeps `Types.Offer` upgrade-compatible (legacy offers without an entry become controller-only mutable). saveSignal stopped double-appending to `signalOwnerIndex` on overwrite
-  - **D2A briefing privacy gate (#3)** — `BriefingTab` short-circuits `syncBriefing` when `d2aEnabled` is false; canister `saveLatestBriefing` rejects without the flag and `saveUserSettings({d2aEnabled: false})` purges any previously-synced briefing
-  - **SSRF DNS rebinding mitigation (#6)** — `lib/utils/safeFetch.server.ts` resolves every URL (including post-redirect hops) via `node:dns/promises.lookup` with `verbatim: true`, rejects any A/AAAA in private/link-local/CGNAT/IPv4-mapped-IPv6 ranges. IPv6 bracket stripping (Node `URL.hostname` differs across versions). Net effect: `attacker.dev → A 169.254.169.254` no longer slips past the hostname filter
-  - **`/api/fetch/url` SSRF (#5)** — route now `safeFetch(url) → extractFromHtml(html, url)` instead of `extract(url)`; article-extractor previously followed redirects internally, bypassing `blockPrivateUrl` on hop 2. 5MB body cap + content-type allowlist before extraction
-  - **Principal-scoped content cache + offline queue (#4)** — IDB/localStorage keys suffixed with `principalText`; account-switch (`prevPrincipalRef !== current && both non-null`) clears in-memory content + purges the previous bucket. **Logout (alice→null) does NOT delete the IDB bucket** — the audit caught my first impl wiping it. `actionQueue.QueuedAction.principal` filters dequeue; `dequeueAll(null)` is a no-op (no spurious wipe during transient unauth states)
-  - **Push token authz, full fix (#11)** — `/api/push/token` no longer trusts caller-supplied `(principal, endpoints)`. Server uses an Ed25519 controller identity (`PUSH_SERVER_PRIVATE_KEY` env, base64 32/64 bytes) to call `getPushSubscriptions(principal)` on-canister (gated to `caller == user || controller`), then verifies every requested endpoint is actually registered to that principal before HMAC mint. Closes the codex-flagged relay attack where an attacker holding any allowlisted FCM endpoint could mint a token for any victim. New: `lib/ic/serverIdentity.ts` (loud-fail loader), `lib/ic/actor.server.ts` (`server-only` guarded cached actor), `scripts/add-push-server-controller.sh` (generate keypair + register as canister controller in one shot, **verified end-to-end against local replica**)
-  - **Push endpoint allowlist, defense in depth (#11)** — `isAllowedPushEndpoint`: exact host match for `fcm.googleapis.com` / `updates.push.services.mozilla.com` / `web.push.apple.com`, suffix match for `.notify.windows.com` / `.push.apple.com`. Applied at both mint and send sites. Subdomain spoofing (`fcm.googleapis.com.attacker.dev`), `http://` (TLS required), `javascript:`/`data:` all blocked
-  - **UTF-8 byte caps (#9)** — `textBytes(s) = Blob.toArray(Text.encodeUtf8(s)).size()` replaces `Text.size` (which counted code points — 200KB of CJK slipped under a 50KB cap). 6 fields capped: eval text 50KB / reason 10KB / sourceUrl 4KB / source configJson 20KB / push endpoint 2KB / push key 512B. `MAX_BATCH_EVALS=100`. Constant names retained because persistent-actor `let` fields trigger M0169 without an explicit migration
-  - **parseJsonBody post-read cap (#10)** — `lib/api/rateLimit.ts` reads body as `arrayBuffer()` and re-checks `byteLength > maxBytes` before parsing; `Content-Length` header trust dropped for the second-line check. Chunked / spoofed-length payloads can no longer reach `JSON.parse` unbounded
-  - **RSS link XSS (#12)** — `app/api/fetch/rss/safeRssLink.ts` strips non-http(s) URIs (`javascript:alert(1)`, `data:text/html,…`, `vbscript:`, `file://`, scheme-relative). Belt-and-braces `^https?://` regex in `SourcesTab` render path
-- **Production build leak fix** — `lib/utils/url.ts` originally imported `node:net` / `node:dns/promises` dynamically; webpack pulled them into the client bundle anyway via `extractUrl` in `app/page.tsx`, breaking `next build`. Split into client-safe `url.ts` + `safeFetch.server.ts` (with `import "server-only"`). `jest.setup.ts` mocks `server-only` so tests still run from the same code path. `next build` was caught by the production-readiness audit, not the `tsc --noEmit` check, which doesn't carry webpack's bundle resolution
-- **End-to-end verification** — `scripts/canister-smoke-test.sh` spins a local replica + deploys the live wasm + runs 12 real assertions through dfx: cross-owner saveEvaluation (60K ASCII byte cap + 60K CJK byte cap separately), briefing d2a gate (off→reject, on→accept, off-again→purge), A2A offer hijack/delete denial. Upgrade compat: `git stash → dfx deploy old wasm → write offer → git stash pop → dfx deploy new wasm → verify offer preserved`
-- **npm audit (production)**: critical 2 → 0, high 4 → 0, moderate 8 → 0. Direct upgrades: `@extractus/article-extractor` 8.0.20→8.1.0 (sanitize-html XSS), `next` 15.5.12→15.5.18 (DoS), `postcss` 8.5.8→8.5.14, `uuid` 13→14, `@scalar/api-reference-react` 0.9.22→0.9.38. Overrides: `axios` 1.16.1, `fast-uri` 3.1.2, `postcss: "$postcss"` (force transitive deps to the direct version, kills the deep 8.4.31 pin in `next` 15.5.18's own tree)
-- **Setup**: a new `PUSH_SERVER_PRIVATE_KEY` env var is required. Generate + register the controller principal via `scripts/add-push-server-controller.sh`, paste the printed key into Vercel as a sensitive env, redeploy. Without it, `/api/push/token` returns **503 fail-closed** (no silent downgrade to the old trust model). See `.env.example` for details
-
-### Source Quality / ROI — per-source noise vs. value visibility
-- **426 suites / 7,547 tests** — adds 53 new tests across pure aggregator + UI + attribution + orphan handling
-- **Per-source quality stats** in new pure module `lib/dashboard/sourceQuality.ts`: computes `qualityYield`, `slopRate`, `reviewRate`, `duplicatesSuppressed`, fetch health, and a Keep / Watch / Mute / Remove / Learning recommendation per SavedSource. Thresholds: `MIN_SAMPLE_SIZE=10`, `KEEP=0.6`, `WATCH=0.3`, `SLOP_REMOVE=0.5`, `STALE_DAYS=30`. Closes the gap where the prior `Sources` panel surfaced fetch health but not whether a feed was actually paying off
-- **Hybrid attribution** (`attributeItem`): explicit `savedSourceId` stamp set by the scheduler > Nostr pubkey > RSS hostname (with feedburner / google-news `?url=` redirect handling) > Farcaster fid/username. Stamps validated against current `sources[]` on every call, so deleted-source items fall through to a dedicated orphan bucket (`isOrphan`) instead of silently sticking
-- **AnalyticsTab → new `SourceQualitySection`**: 7d / 30d / all rolling-window toggle, Top 5 / Bottom 5 split, Learning sub-list, 4-bucket Unattributed footer (D2A / Manual / Shared URL / Deleted Source). Mute / Remove chips are suggestion-only, never auto
-- **SourcesTab → per-row `QualityBadge`** alongside the existing fetch-health dot. LARP audit caught a CSS bug where the prior inline-style approach silently rendered nothing for the muted-color path (`var(--color-text-muted)40` is invalid CSS where `#34d39940` is valid 8-char RGBA); switched to a Tailwind class map and added a regression test that greps the live `style` attribute for the broken `var(...)<alpha>` pattern
-- **No canister change** — `ContentItem.savedSourceId?` is client-side optional and never persisted to stable storage
-
-### Security Hardening + Round-3 Cleanup + D2A Approve Err Fix
-- **423 suites / 7,494 tests** — zero failures, zero TypeScript errors, zero circular dependencies
-- **Push notification security (2 highs closed)**: `getPushSubscriptions(user)` and `removePushSubscriptions(user, endpoints)` are now `caller`-gated on the canister (previously leaked Web Push secrets to anonymous queries — `endpoint + p256dh + auth` keys are functionally a sender capability). `/api/push/token` HMAC now binds to `(principal, endpoints)` tuple (NUL-separated, lowercase + sorted endpoints) — captured tokens cannot be expanded. `/api/push/send` rewritten to receive subs from the auth'd client
-- **x402 paywall closure**: `/api/d2a/briefing/changes` was bypassing the gate that protected `/api/d2a/briefing` — wrapped with the same `withX402` + free-tier preview that redacts title and sourceUrl
-- **`/api/translate` 500→400 on bad JSON** via the shared `parseJsonBody` helper
-- **8-agent Round-3 cleanup**: new `lib/utils/icTime.ts` with `msToNs`/`nsToMs`/`nowNs` (replaces 12+ inline ms↔ns conversions across 5 files), 4 `Record<string, unknown>` → concrete types (notably the ICRC-2 `ApproveError` variant union, previously opaque), 13 unused type exports demoted to module-private (knip-verified), ~30 paraphrase comments removed across 14 files
-- **D2A approve Err handling**: `AgentContext.startAgent` was awaiting `ledger.icrc2_approve` and discarding the result — silent half-broken D2A start when the ledger returned `{ Err: ApproveError }`. Now mirrors the `app/page.tsx` `if ("Err" in approveResult)` pattern with user notification + 2 regression tests in `__tests__/contexts/AgentContext.test.tsx`
-
-<details>
-<summary><strong>Previous Updates</strong></summary>
-
-#### Multi-Agent Round-2 Cleanup + Operational Tooling
-423 suites / 7,488 tests. 8-agent parallel sweep — DRY consolidation (`lib/api/kvStore.ts` + `lib/utils/webgpu.ts`; one parameterized `runLocalTier(engine, ...)` replaces 3 cascade wrappers; new `parseJsonBody<T>()` helper). Weak-type elimination across actionQueue / anthropic / urlExtract / analyze (4 sites, ~155 other `unknown` audited and confirmed legitimate). New `scripts/canister-backup.sh` + `scripts/canister-rollback.sh` (snapshot integrity + dry-run on local replica via `git worktree`, catches M0169 before mainnet) + `loadtest/read-paths.k6.js`. Sentry `captureConsoleIntegration` wired across all three configs (`warn` + `error` levels). `.github/dependabot.yml` weekly grouped patches. CI-enforced coverage thresholds: global 73/67/66/75, `./lib/` 90/80/88/92.
-
-#### Code Quality Cleanup Pass — DRY, Cycles, Defensive Logs
-New `lib/nostr/serverPool.ts::loadServerPool()` helper consolidates pool-boot scaffolding across 3 fetch routes. `lib/types/content.ts` ↔ `lib/scoring/types.ts` cycle broken by inlining the `"quality" | "slop"` literal — `madge --circular` 0 cycles with a checked-in `.madgerc` teaching madge about `@/*`. `FlagScope`, `FlagName`, `CyclesCheck` narrowed to module-private. Two silent `catch {}` localStorage swallows replaced with `console.warn`.
-
-#### Production-Readiness Sweep — Health 503s, Cycles, Feature Flags
-423 suites / 7,491 tests. `/api/health` and `/api/d2a/health` now return 503 on degraded dependencies (uptime monitors can finally alert). Canister cycles probe in `lib/ic/health.ts` flags `low` below the 2T threshold (60s in-process cache). Typed feature-flag kill switches: `FEATURE_SCORING_CASCADE`, `FEATURE_TRANSLATION_CASCADE`, `FEATURE_BRIEFING_AGGREGATION`, `FEATURE_PUSH_SEND`, `X402_FREE_TIER_ENABLED`. `Sentry.captureException` added to 12 server error paths. New owner-indexed `getSourceConfigStatsPaginated` / `getUserSourceConfigsPaginated` canister methods (avoids O(n) scan). CI canister-upgrade dry-run job catches M0169 at PR time. 14 scoring-cascade integration tests. Bundle: 415kB → 414kB First Load JS via dynamic imports for ICP ledger / Nostr publish / WoT graph builder.
-
-#### 8-Agent Parallel Cleanup Sweep
-405 suites / 7,132 tests. 8 subagents in isolated git worktrees, each producing `.claude/evaluations/0N-*.md`. Deleted 16 unused shadcn UI components (~1,400 LOC), 11 unused exports, `cmdk` dependency, the 546-line orphan `aegis_app.jsx` prototype. 3 type-only cycles broken (`madge --circular` 0). `SchedulerSource` deduplicated across context + scheduler. `postToApi<T>()` file-local helper extracted in `lib/ingestion/fetchers.ts` (-105/+134 lines, 4-source consolidation). 2 `any` removed (`icpLedger.ts` IDL factory → `IDL.InterfaceFactory`, RSS route → `Parser.Output`).
-
-#### Code Quality, Test Coverage & Production Readiness Sweep
-405 suites / 7,133 tests. Extracted `scoredItemFields()` shared builder (3-site ContentItem-construction dedup), `buildSourceConfig()` helper, `loadFromLocalStorage()` for scoring cache. 77 new tests across webspeech / scoring cache flush / scheduler error recovery / offline action queue / `scoredItemFields`. All 10 test-file type errors resolved. `cContext ?? 5` magic default in serendipity scoring replaced with explicit null check.
-
-#### Audio Briefing Player Fix (pause/resume + mobile layout)
-400 suites / 7,056 tests. `runSession` loop died on pause because `cancelSpeech()` triggered `CancelledError` which unconditionally returned — fixed with labeled `continue outer` re-entering the loop. Safari iOS fires `onend` (not `onerror`) on `speechSynthesis.cancel()` — `cancelGeneration` counter detects cancellation regardless of browser behavior. Player repositioned above MobileNav using shared `--mobile-nav-h` CSS variable.
-
-#### Translation Subsystem Rebuild
-399 suites / 7,029 tests. BYOK-only enforced at both client cascade and `/api/translate` server boundary (anonymous POSTs return 401). Cascade: Ollama → MediaPipe/WebLLM → Claude BYOK → IC LLM. New `lib/ic/icLlmConcurrency.ts` (FIFO semaphore caps DFINITY LLM in-flight at 2 per caller — empirically the canister rejects the 3rd) and `lib/ic/icLlmCircuitBreaker.ts` (3 transport failures → 60s open). Japanese-specific output validation (kana presence, meta-commentary stripping, `MIN_RATIO=0.02` / `MAX_RATIO=5.0` length bounds). Claude transient-fetch retry for iOS Safari `Load failed` / Chrome `Failed to fetch`. SHA-256 keyed translation cache with corrupt-blob recovery + Safari private-mode quota fallback. Sentry span annotations via `span.setAttribute` (race-free for concurrent translations).
-
-#### Production Hardening & Test Coverage Push
-6,809 tests / 393 suites. Coverage 92.11% lines / 82.94% functions / 82.20% branches. AudioBriefingPlayer engine 64% → 98% lines via defer-mode mock + MediaSession action handler tests. AudioSettings + AudioBriefingPlayer UI 53/15% → 100/100%. `npm audit fix` 13 vulns → 4 low (dev-only). **Bug fix**: `.env.example` documented `ANTHROPIC_DAILY_BUDGET` as USD ($5.00) but the code uses `parseInt()` as a call count — copying the example would have capped the app at 5 calls/day. `ROLLBACK.md` + `PRE_DEPLOY.md` added.
-
-#### Mobile AI Scoring (MediaPipe LLM Inference)
-6,435 tests / 365 suites. MediaPipe LLM Inference for mobile via WebGPU using `@mediapipe/tasks-genai` — Gemma 3 1B (700MB, default) or Gemma 4 E2B (2GB). OOM detection ("Array buffer allocation failed") with actionable downgrade prompt. iOS Safari throws Event objects (not Error) for WebGPU failures — `describeError()` extracts useful messages. Mobile/desktop split: mobile sees MediaPipe card, desktop sees WebLLM card (mutual exclusion in scoring + translation cascades). New "Translation Off" policy.
-
-#### Content Translation (Multi-Backend) — initial release
-4 backends (IC LLM / Ollama / WebLLM / Claude BYOK), 3 policies (Manual / High quality / All posts), 10 languages including Japanese, SHA-256 keyed localStorage cache (200 entries, 7-day TTL). Canister endpoint `translateOnChain` via `mo:llm` (8000 char cap, authenticated). *Cascade composition rebuilt later — see "Translation Subsystem Rebuild" above.*
-
-#### OPML Import / Export
-OPML 2.0 import (Feedly / Inoreader / any RSS reader, nested folders, http/https URL validation, 500 feed / 1MB file caps, dedup against existing sources) + export (grouped by platform folder, XML-escaped, one-click `.opml` download). Disabled in demo mode.
-
-### Source Deletion Persistence & Light Mode (March 2026)
-- **6,215 tests, 355 suites** — zero failures, zero skipped
-- **Content-key deletion**: `pendingDeletes` tracks both ID and content key (`rss:{feedUrl}`, `fc:{fid}`) — blocks IC sources with different IDs but same feed from reappearing
-- **React 18 batching fix**: `localOnly`, `toggled`, `updated` computed from `sourcesRef.current` instead of `setSources` updater closure
-- **Light mode theme persistence**: head script always sets `data-theme` attribute before hydration
-- **Light mode readability**: navy CSS variables overridden with slate equivalents in light theme
-
-### Domain Migration
-- **New primary domain**: `aegis-ai.xyz` — all traffic redirected from `www.aegis-ai.xyz`
-- **Internet Identity**: `alternativeOrigins` updated for `aegis-ai.xyz` + `www.aegis-ai.xyz`
-
-### Canister Security Hardening
-- **Anonymous principal rejection**: `requireAuthenticated()` guard on all 22 canister update endpoints
-- **Anonymous principal rejection**: `requireAuthenticated()` guard on all 22 canister update endpoints — replaces fragile `assert(requireAuth())` pattern with `Debug.trap`
-- **Controller authorization**: `sweepProtocolFees`, `topUpCycles` restricted to canister controllers via `Principal.isController()`
-- **CallerGuard reentrancy prevention**: `try/finally` pattern on 4 async functions (`publishWithStake`, `validateSignal`, `flagSignal`, `recordD2AMatch`) — guard release guaranteed even on callback trap
-- **Cycle monitoring**: `getCyclesBalance()` query endpoint for canister health checks
-- **AuthContext hardening**: Anonymous principal detection on login + init, error notifications on login failure, delegation freshness edge cases
-- **ICP Skills integration**: 7 skill files from [skills.internetcomputer.org](https://skills.internetcomputer.org/) in `.claude/skills/` for AI-assisted canister development
-
-#### Briefing Search & Scoring Transparency
-6,146 tests, 352 suites. Briefing content search (full-text across text/author/topics), scoring engine badge (AI/Heuristic indicator), Speed Insights throttled to 30% sample rate.
-
-#### Mark-First UI Refactor
-Icon-driven signal badges (9 types), GradeBadge (A/B/C/D/F) with verdict indicator, MetricPill compact metrics, 12 new SVG icons, `deriveSignalTypes()`.
-
-#### A2A Protocol & On-Chain Storage
-OfferStore + ReceiptStore (7 canister functions), diff sync API (`/api/d2a/briefing/changes`), x402 free-tier preview.
-
-#### Production Readiness Audit & Hardening
-Sentry 3-layer monitoring (client/server/edge), IC sync safety net, scoring cache concurrent flush guard, offline queue Sentry reporting, preference sync failure escalation, 132 new edge tests, 7-category LARP audit.
-
-#### Code Integrity Audit & Bug Fixes
-Scoring cache `flushCache()` properly awaited, scheduler Map iteration fix, stale closure fix in PreferenceContext, buffer flush race condition fix, `incrementRetries` rewritten with direct transaction management.
-
-#### Social Links & Logout UX
-Discord/Medium/X icons via `SOCIAL_LINKS` constant, `SocialIcon` component, logout moved to Settings > Account.
-
-#### Production Hardening & Test Quality
-HMAC-SHA256 push token authorization, `errMsg()` standardized logging, 188 `toBeTruthy()` replaced with specific assertions.
-
-#### Sidebar Enhancements & Topic Filtering
-Interactive source/topic filtering, metrics delta indicators, reading streak, unreviewed queue, topic trend arrows, section collapse persistence.
-
-#### Infinite Scroll & Timer Cleanup
-IntersectionObserver-based infinite scroll (batch 40), stagger animation capped to first batch, `useInfiniteScroll` hook.
-
-#### Home Feed Right Sidebar
-Desktop 2-column layout with sticky sidebar, Top Sources/Topics, Agent Knowledge card, Chrome CTA.
-
-#### YouTube Preview in Feed & Briefing
-Click-to-play `YouTubePreview` component, CSP `frame-src` fix, all URL patterns supported.
-
-#### Security Hardening & Production Cleanup
-D2A sender pubkey verification, payload score bounds validation, CORS HTTPS-only, cache score validation, Sentry observability spans.
-
-#### Latest Sort Mode
-Reverse-chronological default, Ranked mode toggle, shared `applyVerdictAndSource()` filter, unified rendering loop.
-
-#### D2A Discovery Hardening
-Pool resource leak fix (`try/finally`), discovery log capping, Jest `forceExit` for worker leaks.
-
-#### Content Deduplication Overhaul
-URL normalization (UTM stripping, www removal), multi-signal dedup (URL + text), O(n+m) batch dedup.
-
-#### Next.js 15 Migration
-Next.js 15.5.12 (CVE fixes), ContentContext split into 5 modules, E2E CI against production build, Sentry `onRequestError` hook.
-
-#### Production Readiness
-Distributed rate limiting (Vercel KV), fail-secure fee design, IC call timeouts, API error sanitization, CSP hardening, Tailwind v4 + shadcn/ui.
-
-#### Dashboard UX & Performance
-Action/observation separation (Dashboard vs Analytics), Activity Trends + Topic Breakdown moved to Analytics, 15x clustering speedup, single-pass algorithms.
-
-</details>
-
-## Live
-
-- **Frontend**: https://aegis-ai.xyz (alias: https://aegis.dwebxr.xyz)
-- **Backend Canister**: [`rluf3-eiaaa-aaaam-qgjuq-cai`](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=rluf3-eiaaa-aaaam-qgjuq-cai)
-- **Repository**: https://github.com/dwebxr/aegis
-
-## Quick Start — No Deposit Required
-
-Aegis is **free to use** for content filtering. No wallet, no deposit, no setup required.
-
-### Getting Started
-
-1. **Open** https://aegis-ai.xyz — Demo mode starts immediately with preset feeds
-2. **Browse** the Dashboard — 3 preset RSS feeds (Hacker News, CoinDesk, The Verge) are auto-fetched and scored
-3. **Login** with Internet Identity — unlocks custom sources, Pro mode, and publishing
-4. **Add Sources** in the Sources tab — use Quick Add presets (YouTube, Topic, GitHub, Bluesky, Reddit, Mastodon, Farcaster) or paste any RSS/Atom feed URL
-5. **(Optional)** Link your Nostr npub in Settings > Account — enables WoT trust graph and free D2A with trusted peers
-
-### Three Modes: Demo → Lite → Pro
-
-Aegis has two independent axes: **authentication state** (Demo vs Logged-in) and **filter mode** (Lite vs Pro).
-
-| Mode | Authentication | Sources | Scoring | WoT + Serendipity | Cost |
-|------|---------------|---------|---------|:--:|------|
-| **Demo** | Not logged in | 3 preset feeds (read-only) | Heuristic (Lite) | No | Free |
-| **Lite** | Logged in | Custom (add/edit/remove) | Heuristic only | No | Free |
-| **Pro** | Logged in + AI setup | Custom (add/edit/remove) | AI pipeline + heuristic fallback | Yes | Free during alpha |
-
-- **Demo**: Open the app without logging in. You get 3 preset RSS feeds scored with heuristic filters. Source management is disabled. Great for trying Aegis without commitment. Pro mode selector is locked.
-- **Lite**: Login and select "Lite" in Settings > Feeds. Full source management with heuristic-only scoring. No API calls, $0 cost. WoT and serendipity disabled.
-- **Pro**: Login and select "Pro" in Settings > Feeds. **Requires at least one AI scoring engine** (Ollama, Browser AI, or BYOK API key) to be configured in Settings > Feeds. Full AI scoring pipeline (Ollama → MediaPipe/WebLLM → BYOK Claude → IC LLM → Server Claude → heuristic fallback) + WoT social graph filtering + serendipity discovery. Free during alpha.
-
-Users switch between Lite and Pro in Settings > Feeds (with AI engine status indicators). The Dashboard displays the current mode as a read-only badge — clicking it navigates to Settings. Pro is gated behind AI scoring availability — if no AI engine is configured, the Pro button shows "AI setup required" and auto-falls back to Lite. Demo mode is automatic when not logged in — logging in clears demo content and enables full source management.
-
-### AI Scoring Engines
-
-| Engine | Tier | Where | Cost | When used |
-|--------|------|-------|------|-----------|
-| Ollama / OpenAI-compatible | 0th\* | Local server (user-hosted) | Free | **Opt-in** — enable in Settings > Feeds; tried first when active |
-| MediaPipe (Gemma 3 1B / Gemma 4 E2B) | 1st\* | Browser-local (WebGPU) | Free | **Opt-in** — mobile only; enable in Settings > Feeds |
-| WebLLM (Llama 3.1 8B q4f16) | 1st\* | Browser-local (WebGPU) | Free | **Opt-in** — desktop only; enable in Settings > Feeds |
-| Anthropic Claude (BYOK) | 2nd | Off-chain (Vercel) | User's API key | When user sets own API key in Settings > Feeds |
-| IC LLM (Llama 3.1 8B) | 3rd | On-chain (IC canister) | Free | Default for authenticated users |
-| Anthropic Claude (server key) | 3.5th | Off-chain (Vercel) | Free during alpha | Non-BYOK users when IC LLM fails (future Pro subscription) |
-| Heuristic filter | 4th | Client-side | Free | Fallback when all LLM tiers fail |
-
-\*Ollama, MediaPipe, and WebLLM are **off by default**. MediaPipe and WebLLM are mutually exclusive (shared WebGPU); mobile shows MediaPipe, desktop shows WebLLM.
-
-BYOK users: Ollama\* → MediaPipe\*/WebLLM\* → BYOK Claude → IC LLM → Heuristic. 
-Non-BYOK users: Ollama\* → MediaPipe\*/WebLLM\* → IC LLM → Server Claude → Heuristic.
-
-### Publishing & D2A
-
-| What you want to do | Cost | Prerequisites |
-|---------------------|------|---------------|
-| Publish quality signals to Nostr | Free while in good standing | Login (Internet Identity) |
-| D2A exchange (trusted peers) | Free | Link Nostr npub in Settings > Account |
-| D2A exchange (known peers) | 0.001 ICP / item | ICRC-2 pre-approval (0.1 ICP) |
-| D2A exchange (unknown peers) | 0.002 ICP / item | ICRC-2 pre-approval (0.1 ICP) |
-
-\*Deposit required only if your published signals are repeatedly flagged as low-quality (anti-spam measure). New users and users in good standing publish for free.
-
-**Trusted peers** are users in the follow graph of the Nostr account you link in Settings > Account. D2A exchanges between trusted peers are free — no ICP needed. The agent starts in **trusted-only mode** when the wallet has insufficient funds.
-
-**How does Publish Signal reputation work?** Every publisher starts with a neutral reputation. Signals validated by the community improve your standing; signals flagged as slop degrade it. If your reputation drops below the threshold, an ICP deposit (0.001–1.0 ICP) is required as a quality assurance bond. Reputation naturally recovers over time (+1 per week of inactivity).
-
-### Settings Persistence
-
-| Setting | Storage | Synced across devices? |
-|---------|---------|:---:|
-| Nostr Account (npub) | IC canister + localStorage cache | Yes |
-| D2A Agent toggle | IC canister + localStorage cache | Yes |
-| API Key (BYOK) | localStorage only | No (secret) |
-| Push Notifications | IC canister + browser | No (browser-specific) |
-| Local LLM (Ollama) | localStorage only | No (browser-specific) |
-| Browser AI (WebLLM) | localStorage only | No (browser-specific) |
-| Mobile AI (MediaPipe) | localStorage only | No (browser-specific) |
-| Interests & Preferences | IC canister + localStorage cache | Yes |
-| Agent Profile (Kind 0) | Nostr relays + localStorage cache | Yes (via relays) |
-
-## Architecture
-
-```
-Browser                                  Internet Computer (Mainnet)
-┌───────────────────────────────────┐    ┌──────────────────────────┐
-│  Next.js 15 (App Router)          │    │  aegis_backend canister  │
-│                                   │    │  (Motoko)                │
-│  Tabs:                            │    │                          │
-│    Dashboard / Briefing / Burn    │◄──►│  - Evaluation storage    │
-│    Sources / Analytics / D2A      │    │  - User profiles         │
-│                                   │    │  - Source configs        │
-│  API Routes:                      │    │  - Quality deposits/rep  │
-│    POST /api/analyze              │    │  - D2A match records     │
-│    POST /api/fetch/{url,rss,      │    │  - IC LLM scoring        │
-│      twitter,nostr,farcaster,    │    │  - Engagement index      │
-│      discover-feed}              │    │                          │
-│                                   │    │  Internet Identity auth  │
-│  Client-side:                     │    └─────────┬────────────────┘
-│    WoT filter pipeline            │              │
-│    Preference learning engine     │    ┌─────────▼────────────────┐
-│    Briefing ranker                │    │  ICP Ledger (ICRC-1/2)   │
-│    Nostr identity (IC-derived)    │    │  ryjl3-tyaaa-aaaaa-aaaba │
-│    D2A agent manager              │    │  Deposit hold / return / │
-│    ICP Ledger (deposit/approve)   │    │  forfeit / D2A fee split │
-│                                   │    └──────────────────────────┘
-│                                   │
-│                                   │    Nostr Relays
-│                                   │◄──►┌──────────────────────────┐
-│                                   │    │  Signal publishing       │
-│                                   │    │  D2A agent discovery     │
-│                                   │    │  Encrypted handshakes    │
-└───────────┬───────────────────────┘    └──────────────────────────┘
-            │
-            ▼
-   Scoring Pipeline (fallback chain):
-   0.  Ollama / OpenAI-compatible (local server, if enabled)
-   1.  MediaPipe (Gemma 3 1B/4 E2B, mobile) or WebLLM (Llama 3.1 8B, desktop)
-   1.5 IC LLM (Llama 3.1 8B, free, on-chain)
-   2.  Anthropic Claude (premium, V/C/L) or BYOK
-   3.  Heuristic fallback (client-side)
-   + Per-IP API rate limiting (5-60 req/min per route)
-   + Request body size limits (64KB–512KB per route)
-   + Daily API budget (500 calls/day, Vercel KV shared or per-instance fallback)
-
-   WoT Filter Pipeline (Pro mode):
-   Content → Quality threshold → WoT scoring (Nostr social graph)
-     → Weighted composite → Serendipity detection → Ranked output
-   Filter Modes: Lite (heuristic only) | Pro (WoT + AI scoring)
-```
+- **Demo:** <https://aegis-ai.xyz>
+- **Canister (IC mainnet):** `rluf3-eiaaa-aaaam-qgjuq-cai`
+- **License:** MIT
 
 ---
 
-## Slop Detection: How Aegis Judges Content Quality
+## Key features
 
-Aegis uses a multi-tier scoring pipeline with automatic fallback. The system tries each tier in order and uses the first successful result — no silent failures.
-
-### Tier 0: Ollama / OpenAI-Compatible Local LLM (Free, Zero-Latency)
-
-When enabled in Settings > Feeds, **Ollama** (or any OpenAI-compatible local LLM server) is tried **first** — before any other tier. It calls `POST /v1/chat/completions` on your local server (default `http://localhost:11434`). Zero cost, zero latency, fully private — no data leaves your machine. Configure the endpoint and model in Settings > Feeds.
-
-**Setup**: Install [Ollama](https://ollama.ai), pull a model (`ollama pull llama3.2`), and start the server. Set `OLLAMA_ORIGINS=*` (or `OLLAMA_ORIGINS=https://aegis-ai.xyz`) to allow cross-origin requests from the browser. Any OpenAI-compatible server (LM Studio, llama.cpp server, vLLM, etc.) works — just set the endpoint in Settings.
-
-If Ollama is not enabled or fails, the system falls through to Tier 1.
-
-### Tier 1: Browser-Local Scoring (Free, Privacy-First)
-
-**Desktop — WebLLM**: Llama 3.1 8B q4f16 via WebGPU. Model downloads once on first use (~4 GB).
-
-**Mobile — MediaPipe LLM Inference**: Gemma 3 1B (default, ~700MB) or Gemma 4 E2B (optional, ~2GB) via `@mediapipe/tasks-genai`. Model selectable in Settings > Feeds. Gemma 4 E2B may fail with "Array buffer allocation failed" on low-memory devices — the UI shows actionable guidance to switch to Gemma 3 1B.
-
-Both run entirely in the browser: no API calls, no data leaves the device. MediaPipe and WebLLM are mutually exclusive (they share WebGPU). Requires a WebGPU-capable browser.
-
-If neither is enabled or both fail, the system falls through to Tier 2.
-
-### Tier 2: Claude API BYOK (User's Own Key)
-
-When the user has set their own Anthropic API key in Settings > Feeds, Aegis calls the Claude API with the full V/C/L framework and the user's preference context. This provides the highest quality analysis. The key is sent via `X-User-API-Key` header to the `/api/analyze` endpoint.
-
-If the BYOK call fails or no user key is set, the system falls through to Tier 3.
-
-### Tier 3: IC LLM On-Chain Scoring (Free, Decentralized)
-
-When authenticated, Aegis calls `analyzeOnChain()` on the canister, which runs **Llama 3.1 8B** via the [IC LLM Canister](https://github.com/nickcen/ic_llm) (`w36hm-eqaaa-aaaal-qr76a-cai`). This provides free, fully on-chain scoring with no API key required. The prompt includes the user's topic affinities for personalized evaluation.
-
-If IC LLM is unavailable (e.g. local dev, not authenticated), the system falls through to Tier 3.5.
-
-### Tier 3.5: Claude API Server Key (Provisional — Future Pro Subscription)
-
-For non-BYOK users when IC LLM also fails, Aegis calls the Claude API using the server-side key. This is free during alpha. In the future, this tier will be gated behind a Pro subscription plan.
-
-If the server key is missing, budget exceeded, or the call fails, the system falls through to Tier 4.
-
-### Tier 4: Heuristic Fallback (Client-side, No API Call)
-
-When all LLM tiers are unavailable, a fast heuristic filter scores content locally using text signals. This provides instant scoring with no network calls.
-
-| Signal | Effect | Threshold |
-|--------|--------|-----------|
-| Exclamation density | originality −3, credibility −3 | > 0.1 per word |
-| Emoji density | originality −2 | > 0.05 per word |
-| CAPS ratio | credibility −3, originality −2 | > 30% of chars |
-| Long-form (50+ words) | insight +1 | > 50 words |
-| Long-form (100+ words) | insight +1, originality +1 | > 100 words |
-| Contains links | credibility +2 | `https://` present |
-| Contains data/numbers | insight +2, credibility +1 | `%`, `$`, decimals |
-
-Base scores start at 5. Composite = `0.4 × Originality + 0.35 × Insight + 0.25 × Credibility`.
-
-### V/C/L Scoring Axes (Used by Tier 0, 1, 2, 3, and 3.5)
-
-Ollama, WebLLM, Claude, and IC LLM all evaluate three orthogonal axes:
-
-- **V (Signal)**: Information density and novelty. Does this contain genuinely new information, data, or analysis? (0–10)
-- **C (Context)**: Relevance to *this specific user's* interests, calibrated from their learned topic affinities. (0–10)
-- **L (Slop)**: Clickbait, engagement farming, rehashed content, empty opinions. Higher = worse. (0–10)
-
-Composite score:
-
-```
-S = (V_signal × C_context) / (L_slop + 0.5)
-```
-
-Normalized to 0–10 scale. Verdict: **quality** if S ≥ 4, else **slop**.
-
-The `+ 0.5` floor prevents division by zero and ensures that even zero-slop content still needs real signal to score well.
-
-### Personalized Re-ranking (Briefing)
-
-Quality items are further ranked by a personalized briefing score that combines multiple signals:
-
-```
-briefingScore = (composite + topicRelevance × 2 + authorTrust) × recencyDecay
-```
-
-- **Topic relevance**: Sum of learned affinities for the item's topics (each ±1.0 range)
-- **Author trust**: Accumulated from validate/flag history (+0.2 per validate, −0.3 per flag)
-- **Recency decay**: Exponential with 7-hour half-life — `e^(−ln(2)/7 × ageHours)`
-
-The top 5 items become the **Priority Briefing**. One additional item is selected as the **Serendipity Pick** — scored by `V_signal × 0.5 + noveltyBonus × 0.3 + topicNovelty × 0.2`, deliberately surfacing high-signal content *outside* the user's usual topics to prevent filter bubbles.
-
-### Preference Learning
-
-Every Validate/Flag action updates the user's preference profile:
-
-| Action | Topic Affinity | Author Trust | Quality Threshold |
-|--------|---------------|--------------|-------------------|
-| Validate | +0.1 per topic | +0.2 | −0.05 (if borderline 3.5–4.5) |
-| Flag | −0.05 per topic | −0.3 | +0.1 (if AI said "quality") |
-
-Affinities are clamped to [−1.0, +1.0]. Author trust is clamped to [−1.0, +1.0]. After 3+ feedback events, the learned context is injected into Claude's prompt, making the AI scoring personalized.
+- **AI-scored briefing.** Each item gets three scores — Value (signal), Context (depth), Slop (low-quality marker) — plus a composite. Briefings show the top items by score, not by recency.
+- **Multi-source ingestion.** RSS / Atom, Nostr relays, single URLs (article extraction), OPML import.
+- **Multi-backend scoring.** Anthropic Claude (server, BYOK), Ollama (local), WebLLM / MediaPipe (in-browser via WebGPU), or a deterministic heuristic fallback.
+- **Cleaner briefing, not infinite scroll.** A small set of high-score items per cycle plus an optional serendipity pick.
+- **Translation (optional).** Per-item translation across 10 languages using the same cascade (Ollama → local LLM → Claude → IC LLM).
+- **Internet Identity auth.** Per-user evaluations, source configs, and reputation persisted on the IC canister.
+- **Nostr publishing.** Push your "this is quality" / "this is slop" signals to Nostr relays with NIP-44 encryption for private fields.
+- **D2A agent-to-agent exchange (experimental).** Encrypted agent-to-agent content swap with on-chain receipts. Protocol is in flux; expect breaking changes.
+- **x402 payment gateway (experimental).** Optional micropayment paywall for premium briefing endpoints.
 
 ---
 
-## WoT Filter Pipeline
-
-Aegis implements a Web of Trust (WoT) filter that uses the user's Nostr social graph to weight content quality scores. The pipeline runs client-side and supports two modes.
-
-### Filter Modes
-
-| Mode | Scoring Engine | WoT Filtering | Serendipity | Login Required |
-|------|---------------|:---:|:---:|:---:|
-| **Demo** | Heuristic only (Lite locked) | No | No | No |
-| **Lite** | Heuristic only (client-side) | No | No | Yes |
-| **Pro** | Ollama → WebLLM → BYOK → IC LLM → heuristic | Yes | Yes | Yes + AI setup |
-
-- **Demo**: Unauthenticated state. 3 preset RSS feeds, heuristic scoring, Pro selector locked. Source management disabled.
-- **Lite**: Authenticated, heuristic-only scoring. Full source management but no API calls, no WoT, no serendipity. $0 cost.
-- **Pro**: Authenticated + at least one AI engine configured (Ollama, WebLLM, or BYOK key). Full AI scoring pipeline + WoT social graph filtering + serendipity discovery (up to 5 per cycle). Free during alpha; alternatively bring your own Claude API key in Settings > Feeds.
-
-Users switch between Lite and Pro in Settings > Feeds (with AI engine status indicators). The Dashboard shows the current mode as a read-only badge. Pro is locked with "AI setup required" until an AI engine is configured. Demo mode is automatic when not logged in.
-
-### Nostr Account Linking
-
-By default, Aegis derives a Nostr keypair from the user's Internet Computer principal. Since this derived key has zero followers on the Nostr network, the WoT graph starts empty.
-
-Users can link an existing Nostr account (npub) in Settings > Account to use its follow graph as the WoT root:
-
-1. Enter an npub (bech32) or 64-char hex pubkey in **Settings > Account > Nostr Account**
-2. Aegis fetches the account's profile (Kind 0) and follow list (Kind 3) from relays
-3. The linked pubkey replaces the IC-derived key as the WoT graph root
-4. All WoT scores, D2A trust tiers, and content filtering automatically reflect the linked account's social graph
-
-The IC-derived keypair continues to be used for signing and publishing — only the graph root changes. Unlinking reverts to the IC-derived key and rebuilds the graph. The linked account and D2A agent toggle are synced to the IC canister, so they persist across browsers and devices.
-
-### WoT Graph Construction
-
-When the user authenticates via Internet Identity and has a Nostr identity (or linked account), Aegis builds a social graph from Nostr relay data:
-
-1. Fetch the root user's follow list (Kind 3 event)
-2. Fetch each followee's follow list (2-hop expansion; capped at 1 hop for >500 follows)
-3. Count mutual follows (bidirectional connections)
-4. Cache the graph in localStorage with configurable TTL
-
-### Trust Scoring
-
-Each content author is scored based on their position in the user's social graph:
+## How it works
 
 ```
-trustScore = (1/hopDistance) × 0.6 + (mutualFollows/maxMutual) × 0.3 + 0.1
+sources ──► ingestion ──► quick filter ──► AI scoring cascade ──► briefing ranker ──► UI
+ (RSS/Nostr/URL)            (dedup,         (Ollama → WebLLM →     (V/C/L composite,
+                             heuristics)    Claude → IC LLM)        serendipity)
+                                                                          │
+                                                                          ▼
+                                                                   Internet Computer
+                                                                   (per-user evals,
+                                                                    sources, reputation)
 ```
 
-- **Hop proximity (60%)**: Direct follows (hop 1) score highest. Inverse distance decay.
-- **Social proof (30%)**: Mutual (bidirectional) follows indicate network-verified trust.
-- **Base presence (10%)**: Being in the graph at all provides a minimum signal.
-
-Authors not in the graph receive `trustScore = 0, isInGraph = false`.
-
-### Weighted Composite
-
-The final content ranking combines AI quality score with WoT trust:
-
-```
-weightedComposite = composite × 0.7 + trustScore × composite × 0.3
-```
-
-This means WoT can boost high-quality content from trusted authors, but cannot elevate low-quality content regardless of trust.
-
-### Serendipity Detection
-
-Items with low trust but high quality are flagged as **WoT Serendipity** — valuable content from outside the user's social bubble:
-
-```
-isWoTSerendipity = trustScore < 0.3 AND composite > 7.0
-```
-
-In Pro mode, up to 5 serendipity items are surfaced in the Briefing tab with type-specific badges:
-
-| Type | Badge | Condition |
-|------|-------|-----------|
-| Out of Network | `OUT OF NETWORK` | Author not in graph or hop ≥ 3 |
-| Cross-Language | `CROSS-LANGUAGE` | Content has > 30% non-ASCII characters |
-| Emerging Topic | `EMERGING TOPIC` | Default (high quality, unknown author) |
-
-### Cost Tracking
-
-Daily cost records are stored in localStorage (90-day rolling window). The Analytics tab shows:
-
-- Monthly usage summary (articles evaluated, AI-scored, discoveries found)
-- Estimated API cost in USD
-- Time saved vs manual curation (3 min/article baseline)
-- Lite vs Pro feature comparison
-- Competitor cost comparison (Twitter Blue, news subscriptions, manual curation)
+1. Sources are pulled on a schedule (RSS feeds, Nostr filters, manual URLs).
+2. Items pass a cheap pre-filter (duplicates, length, obvious junk).
+3. A scoring cascade tries local engines first, then falls back to Claude or the IC LLM canister.
+4. Items are ranked by composite score; the briefing shows the top N plus one serendipity pick.
+5. Validations / flags persist to the IC canister and (optionally) Nostr.
 
 ---
 
-## Monetization: Three Revenue Pillars
+## Tech stack
 
-Aegis implements a sustainable economic model using ICP tokens (ICRC-1/2) with three revenue pillars:
-
-### Pillar 1: Compute & Intelligence
-
-| Tier | Engine | Cost | Where |
-|------|--------|------|-------|
-| **0th (Free)** | Ollama / OpenAI-compatible | 0 — local server | User-hosted |
-| **1st (Free)** | WebLLM (Llama 3.1 8B q4f16) | 0 — browser-local via WebGPU | Client-side |
-| **2nd (BYOK)** | Anthropic Claude (claude-sonnet-4-20250514) | User's API key | Off-chain (Vercel) |
-| **3rd (Free)** | IC LLM (Llama 3.1 8B) | 0 ICP — cycles paid by canister | On-chain (IC) |
-| **3.5th (Alpha)** | Anthropic Claude (server key) | Free during alpha | Off-chain (Vercel) |
-| **4th (Fallback)** | Heuristic filter | 0 | Client-side |
-
-When Ollama is enabled, it is tried first — local LLM server with zero cost and zero latency. When WebLLM is enabled, it is tried next — browser-local AI via WebGPU with no API calls. BYOK users get Claude API next (highest quality). IC LLM on-chain scoring provides free decentralized fallback. The server-side Claude key (Tier 3.5) is free during alpha and will move to a Pro subscription plan.
-
-### Pillar 2: Quality Assurance Deposits (Non-Custodial)
-
-> Deposits are **not required** to publish signals. New users and users in good standing publish for free. A deposit is only required when your published signals are **repeatedly flagged as low-quality** by the community — as an anti-spam measure.
-
-When a deposit is required (reputation below threshold), users attach ICP (0.001–1.0 ICP) as a quality assurance bond. Community members vote to validate or flag signals through objective peer review:
-
-```
-Publisher with low reputation deposits ICP as quality bond
-  → 3 validates (community consensus) → Deposit returned + Trust Score improved
-  → 3 flags (community consensus)     → Deposit forfeited as quality assurance cost
-  → 30 days with no verdict           → Deposit auto-returned (no issue found)
-```
-
-**Quality determination process**: Content is first scored by AI (IC LLM or Claude) using objective metrics (originality, insight, credibility). Community peer review then requires a minimum of 3 independent votes to reach consensus. This two-layer process (AI scoring + community consensus) ensures objectivity.
-
-**Non-custodial design**: The canister operator has no withdrawal capability. Protocol revenue (forfeited deposits) is automatically distributed to a hardcoded protocol wallet or converted to cycles for canister operation. The canister only holds active deposits pending resolution. All code is [open source on GitHub](https://github.com/dwebxr/aegis).
-
-**ICRC-2 flow**: Client `icrc2_approve` → Canister `icrc2_transfer_from` (deposit hold) → On resolution: `icrc1_transfer` (return to depositor or auto-distribute).
-
-**Trust Score**: `T = 5.0 + (qualitySignals / totalSignals) × 5.0` — ranges 0–10. Starts at 5.0 (neutral).
-
-**Engagement Index**: `E = validationRatio × avgComposite` — measures how effectively a user's signals engage the community (0–10 scale).
-
-**Auto-return**: Deposits that receive no community verdict within 30 days are automatically returned to the depositor. "No verdict = no issue found." This is processed by a recurring on-chain timer, ensuring no funds are permanently locked.
-
-Double-voting is prevented by tracking voters per signal. Self-voting is blocked. Deposit records and voter lists persist across canister upgrades.
-
-### Pillar 3: D2A Content Provision Fee (Trust-Tiered)
-
-When content is successfully delivered via the D2A protocol, a trust-based fee is collected from the receiver. The fee scales with the sender's trustworthiness — combining WoT social graph position and local behavioral reputation:
-
-```
-Content delivered via D2A
-  → Effective trust = WoT score × 0.6 + behavioral reputation × 0.4
-  → Trust tier determines fee:
-      Trusted (≥0.8): Free    — WoT-backed peers exchange for free
-      Known   (≥0.4): 0.001  ICP — peers with some track record
-      Unknown (≥0.0): 0.002  ICP — new peers (default)
-      Restricted (<0): rejected — blocked peers, no delivery
-  → Fee split (paid tiers): 80% → Content provider, 20% → auto-distributed (cycles or protocol wallet)
-```
-
-**Behavioral reputation** is tracked locally (localStorage). Each Validate on D2A-received content improves the sender's reputation; each Flag degrades it. Peers automatically upgrade from Unknown → Known → Trusted as the user validates their content. Peers scoring below −5 are auto-blocked.
-
-**Non-custodial**: The 20% protocol share is immediately distributed — either converted to cycles (if canister cycles are below threshold) or sent to the hardcoded protocol wallet. No funds accumulate in the canister beyond active deposits.
-
-When the D2A agent starts, it attempts to pre-approve the canister for a 0.1 ICP allowance via ICRC-2. If the wallet has insufficient funds, the agent starts in **trusted-only mode** — free exchanges with WoT-backed peers still work. Fees for paid tiers are collected automatically via `icrc2_transfer_from` and distributed via `icrc1_transfer`.
-
-Fee collection only occurs when both peers include their IC principal in their presence broadcast. Peers without principals can still exchange content — just without the fee mechanism.
+- **Frontend / API:** Next.js 15 (App Router), React 18, TypeScript
+- **Backend canister:** Motoko on Internet Computer (`dfx` 0.30.2+)
+- **AI:** Anthropic Claude (server), WebLLM / MediaPipe / Ollama (local), `mo:llm` (IC)
+- **Auth:** Internet Identity (`@dfinity/auth-client` v3)
+- **Decentralized messaging:** Nostr (`nostr-tools`)
+- **PWA:** Serwist (service worker)
+- **Hosting:** Vercel (Next.js) + IC mainnet (canister)
+- **Observability:** Sentry (optional via DSN)
 
 ---
 
-## D2A Protocol: Device-to-Agent Communication
-
-> 📜 **Spec**: the wire-format reference for D2A v1.0 lives at [`docs/D2A_PROTOCOL.md`](docs/D2A_PROTOCOL.md) — message formats, handshake state machine, constants inventory, and security model. Independent implementations welcome.
->
-> 🔌 **API reference**: every public HTTP endpoint is documented in [`docs/openapi.yaml`](docs/openapi.yaml) (OpenAPI 3.1) and browseable interactively at [aegis-ai.xyz/api-docs](https://aegis-ai.xyz/api-docs).
->
-> 📰 **Subscribe in any RSS reader**: `https://aegis-ai.xyz/api/feed/rss?principal=<your-principal>` (Atom variant at `/api/feed/atom`). Auto-updates whenever your briefing regenerates.
->
-> 📦 **TypeScript SDK**: [`@aegis/d2a-client`](packages/d2a-client/README.md) — discover, handshake, and exchange scored content with live Aegis agents from Node, the browser, or React Native. `npm install @aegis/d2a-client nostr-tools`.
-
-D2A enables Aegis agents to discover each other and exchange quality content directly — no central server, no platform algorithm, no data harvesting. All communication happens over Nostr relays using ephemeral encrypted events.
-
-### Identity & Profile
-
-Each agent's identity derives deterministically from their Internet Computer principal:
-
-```
-sk = SHA-256(principal_bytes ‖ "aegis-nostr-v1")
-pk = secp256k1_pubkey(sk)
-```
-
-No additional key management. The Nostr keypair is always reproducible from the IC login.
-
-Agents have a full **Nostr Kind 0 profile** (display name, avatar, bio, website, banner) editable from the D2A Activity tab. Profile changes are signed and published to relays, making the agent visible to any Nostr client. The profile uses merge-on-write: existing fields set by other clients are preserved unless explicitly overwritten or cleared.
-
-### Phase 1: Presence Broadcast
-
-Every 5 minutes, each agent publishes a **NIP-78 replaceable event** (Kind 30078) advertising:
-
-```json
-{
-  "kind": 30078,
-  "tags": [
-    ["d", "aegis-agent-profile"],
-    ["capacity", "5"],
-    ["principal", "rluf3-eiaaa-aaaam-qgjuq-cai"],
-    ["interest", "machine-learning"],
-    ["interest", "rust"],
-    ["interest", "cryptography"]
-  ],
-  "content": "{\"entries\":[{\"hash\":\"a1b2c3...\",\"topic\":\"ml\",\"score\":8.5},...],\"generatedAt\":1700000000000}"
-}
-```
-
-Topics are drawn from the user's top 20 high-affinity topics (affinity ≥ 0.2). `capacity` indicates how many items the agent can accept per cycle. `principal` is the agent's IC principal (used for D2A fee settlement). The `content` field carries a JSON manifest of the agent's top 50 quality items (SHA-256 truncated hashes), enabling peers to diff and offer only novel content. Being a replaceable event, only the latest version persists on relays.
-
-### Phase 2: Peer Discovery
-
-Every 60 seconds, the agent queries relays for other agents' profiles from the past 15 minutes. Peers are ranked by **Jaccard resonance**:
-
-```
-resonance = |myTopics ∩ peerTopics| / |myTopics ∪ peerTopics|
-```
-
-Only peers with resonance ≥ 0.3 are considered. This ensures content exchange happens between agents with genuinely overlapping interests — not random noise.
-
-### Phase 3: Content Negotiation (Handshake)
-
-D2A uses a 4-message handshake over **ephemeral Nostr events** (Kind 21078). All payloads are encrypted with NIP-44 (XChaCha20-Poly1305) — relay operators cannot read the exchange.
-
-```
-Agent A                          Relay                          Agent B
-   │                               │                               │
-   │──── OFFER (topic, score) ─────►│──── encrypted event ─────────►│
-   │                               │                               │
-   │                               │◄──── ACCEPT ──────────────────│
-   │◄──── encrypted event ─────────│                               │
-   │                               │                               │
-   │──── DELIVER (full content) ───►│──── encrypted event ─────────►│
-   │                               │                               │
-```
-
-1. **OFFER**: Agent A diffs its content against Agent B's manifest, selects a novel quality item (composite ≥ 7.0) matching Agent B's topics. Sends topic, score, and 100-char preview.
-2. **ACCEPT/REJECT**: Agent B checks topic affinity (> 0), score (≥ 6), and sender reputation (not blocked). Accepts if all pass.
-3. **DELIVER**: Agent A sends the full content with all scores, topics, and V/C/L signals. A trust-tiered fee is charged to the receiver.
-
-Each handshake has a 30-second timeout. Failed deliveries mark the handshake as `rejected` (not `offered`), preventing deadlock loops.
-
-### Message Format
-
-Every D2A message is a Nostr event with:
-
-```json
-{
-  "kind": 21078,
-  "tags": [["p", "<recipient_pubkey>"], ["d2a", "aegis-d2a-offer"]],
-  "content": "<NIP-44 encrypted JSON>"
-}
-```
-
-Decrypted content:
-
-```json
-{
-  "type": "offer | accept | reject | deliver",
-  "fromPubkey": "...",
-  "toPubkey": "...",
-  "payload": { ... }
-}
-```
-
-### Delivery Payload
-
-When content is delivered, the full evaluation travels with it:
-
-```json
-{
-  "text": "Full article text...",
-  "author": "Original Author",
-  "scores": { "originality": 8, "insight": 9, "credibility": 7, "composite": 8.2 },
-  "verdict": "quality",
-  "topics": ["machine-learning", "transformers"],
-  "vSignal": 9,
-  "cContext": 7,
-  "lSlop": 2
-}
-```
-
-The receiving agent rejects deliveries from undiscovered peers (not in the known peers map) and applies a resonance check (≥ 0.1) before injecting the content into its feed, providing a two-layer defense against irrelevant or unsolicited deliveries.
-
-### Security Properties
-
-| Property | Mechanism |
-|----------|-----------|
-| **Confidentiality** | NIP-44 (XChaCha20-Poly1305) — relay operators cannot read content |
-| **Authentication** | Nostr event signatures (secp256k1) — cannot forge sender identity |
-| **Identity binding** | Keypair derived from IC Principal — tied to Internet Identity |
-| **No persistence** | Kind 21078 is ephemeral — relays are not required to store events |
-| **No central authority** | Any Nostr relay works — no single point of failure or censorship |
-| **Sybil resistance** | Trust-tiered D2A fees — trusted peers (WoT-backed) exchange free, unknown peers pay ICP |
-| **Reputation isolation** | Behavioral reputation is local — peers cannot manipulate their own score |
-
----
-
-## x402 D2A Briefing API
-
-Aegis exposes a paid API for AI agents (like [Coo](https://x.com/Coo_aiagent)) to purchase curated briefings using the [x402 protocol](https://x402.org) — HTTP-native micropayments with USDC on Base.
-
-### Endpoints
-
-| Endpoint | Auth | Description |
-|----------|------|-------------|
-| `GET /api/d2a/briefing?principal=<id>` | x402 ($0.01 USDC) | Individual curated briefing with V/C/L scored items |
-| `GET /api/d2a/briefing` | x402 ($0.01 USDC) | Global aggregated briefings from all D2A opt-in users |
-| `GET /api/d2a/briefing/changes?since=<ISO8601>` | None | Lightweight diff — item hashes for briefings newer than `since` |
-| `GET /api/d2a/info` | None | Service metadata, pricing, scoring model |
-| `GET /api/d2a/health` | None | Health check (IC canister + x402 config) |
-
-### Query Parameters (Briefing)
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `principal` | string | — | IC principal for user-specific briefing |
-| `since` | ISO 8601 | — | Exclude briefings generated before this timestamp |
-| `limit` | number | 50 (individual) / 5 (global) | Max items (max 100 / 10) |
-| `offset` | number | 0 | Pagination offset |
-| `topics` | string | — | Comma-separated topic filter (case-insensitive OR) |
-| `preview` | `"true"` | — | Truncate content to 200 chars (requires `X402_FREE_TIER_ENABLED`) |
-
-### Payment Flow
-
-```
-AI Agent                        Aegis                        x402 Facilitator
-   │                              │                              │
-   │── GET /api/d2a/briefing ────►│                              │
-   │◄── 402 + PAYMENT-REQUIRED ──│                              │
-   │                              │                              │
-   │ [sign EIP-3009 USDC auth]   │                              │
-   │                              │                              │
-   │── GET + PAYMENT-SIGNATURE ──►│── POST /verify ─────────────►│
-   │                              │◄── valid ────────────────────│
-   │                              │                              │
-   │◄── 200 + briefing JSON ─────│── POST /settle ─────────────►│
-   │                              │◄── tx hash ─────────────────│
-```
-
-### Response Format (Individual — `?principal=<id>`)
-
-```json
-{
-  "version": "1.0",
-  "generatedAt": "2025-01-15T12:00:00Z",
-  "source": "aegis",
-  "summary": { "totalEvaluated": 42, "totalBurned": 15, "qualityRate": 0.64 },
-  "pagination": { "offset": 0, "limit": 50, "total": 5, "hasMore": false },
-  "items": [{
-    "title": "...",
-    "content": "...",
-    "scores": { "originality": 8, "insight": 9, "credibility": 7, "composite": 8.2, "vSignal": 9, "cContext": 7, "lSlop": 2 },
-    "verdict": "quality",
-    "topics": ["machine-learning"],
-    "briefingScore": 7.5
-  }],
-  "serendipityPick": { ... },
-  "meta": { "scoringModel": "aegis-vcl-v1", "nostrPubkey": "...", "topics": [...] }
-}
-```
-
-### Response Format (Global — no `principal` param)
-
-When `?principal=` is omitted, returns aggregated summaries from all D2A opt-in users. Supports `?offset=` and `?limit=` (default 5, max 10) pagination.
-
-```json
-{
-  "version": "1.0",
-  "type": "global",
-  "generatedAt": "2025-01-15T12:00:00Z",
-  "pagination": { "offset": 0, "limit": 5, "total": 42, "hasMore": true },
-  "contributors": [{
-    "principal": "rluf3-eiaaa-...",
-    "generatedAt": "2025-01-15T11:00:00Z",
-    "summary": { "totalEvaluated": 10, "totalBurned": 3, "qualityRate": 0.7 },
-    "topItems": [
-      { "title": "...", "topics": ["ml"], "briefingScore": 8.2, "verdict": "quality" }
-    ]
-  }],
-  "aggregatedTopics": ["machine-learning", "web3"],
-  "totalEvaluated": 120,
-  "totalQualityRate": 0.65
-}
-```
-
-### Response Format (Changes — `/api/d2a/briefing/changes?since=<ISO8601>`)
-
-Lightweight diff endpoint for A2A cost optimization — check for new items before fetching full briefings.
-
-```json
-{
-  "since": "2025-01-15T00:00:00.000Z",
-  "checkedAt": "2025-01-15T12:00:00.000Z",
-  "changes": [{
-    "action": "added",
-    "itemHash": "a1b2c3...",
-    "title": "Breaking: New ML Paper",
-    "sourceUrl": "https://arxiv.org/abs/...",
-    "composite": 8.5,
-    "generatedAt": "2025-01-15T11:30:00.000Z"
-  }]
-}
-```
-
-### Configuration
-
-```bash
-X402_RECEIVER_ADDRESS=0x...           # EVM address to receive USDC payments
-X402_NETWORK=eip155:84532             # Base Sepolia (testnet) or eip155:8453 (mainnet)
-X402_PRICE=$0.01                      # Price per briefing in USD
-X402_FACILITATOR_URL=https://x402.org/facilitator
-X402_FREE_TIER_ENABLED=true           # Enable ?preview=true (truncated content, no payment)
-AEGIS_A2A_ALLOWED_ORIGINS=https://a2a.example.com  # Additional CORS origins for A2A consumers
-```
-
-When `X402_RECEIVER_ADDRESS` is not set, the briefing endpoint serves ungated (free) — useful for development.
-
----
-
-## Features
-
-### Multi-Tier AI Scoring Pipeline
-- **Tier 0**: Ollama / OpenAI-compatible — free, local server, zero latency (when enabled)
-- **Tier 1**: MediaPipe (Gemma 3 1B / 4 E2B, mobile) or WebLLM (Llama 3.1 8B, desktop) — free, browser-local via WebGPU, no data leaves device (when enabled)
-- **Tier 2**: Claude API BYOK — premium V/C/L scoring with user's own API key
-- **Tier 3**: IC LLM (Llama 3.1 8B) — free, fully on-chain, no API key
-- **Tier 3.5**: Claude API server key — free during alpha (future Pro subscription)
-- **Tier 4**: Heuristic fallback — local, instant, no network call
-- Automatic fallback: BYOK users (0→1→2→3→4), non-BYOK users (0→1→3→3.5→4)
-
-### WoT Filter Pipeline
-- **Demo mode**: Preset feeds, heuristic scoring, Pro locked (no login)
-- **Lite mode**: Heuristic scoring only (free, no API calls, login required)
-- **Pro mode**: WoT social graph + AI scoring with serendipity detection
-- Trust scoring from Nostr follow graph (2-hop, mutual follows, hop proximity)
-- Weighted composite: quality × 0.7 + trust × quality × 0.3
-- Serendipity detection: low-trust + high-quality items surfaced with type badges
-- Nostr account linking: use your existing npub's follow graph as WoT root
-- WoT graph cached in localStorage with configurable TTL
-- Cost tracking with daily records, monthly analytics, and competitor comparison
-
-### Quality Assurance Deposits
-- Publish signals free while in good standing; deposit 0.001–1.0 ICP required only when reputation drops (anti-spam)
-- Community validation: 3 validates (consensus) → deposit returned + trust score updated
-- Community flagging: 3 flags (consensus) → deposit forfeited as quality assurance cost
-- Auto-return: 30 days with no verdict → deposit returned automatically
-- Trust Score gauge (0–10) and Engagement Index in Analytics dashboard
-- Non-custodial: forfeited deposits auto-distributed, no operator withdrawal
-- ICRC-2 approve/transfer_from pattern with pre-debit rollback safety
-
-### D2A Content Provision Fee (Trust-Tiered)
-- Dynamic trust-based fees: Free (trusted) / 0.001 ICP (known) / 0.002 ICP (unknown)
-- Effective trust = WoT score × 0.6 + local behavioral reputation × 0.4
-- Validate/Flag on D2A content adjusts sender's local reputation → tier upgrades/downgrades
-- Auto-block at reputation score ≤ −5 (restricted tier, deliveries rejected)
-- 80/20 split: 80% to content provider, 20% auto-distributed (cycles or protocol wallet)
-- ICRC-2 pre-approval on agent start (0.1 ICP) — optional; agent starts in trusted-only mode without ICP
-
-### Content Manifest Diff Streaming
-- Presence events carry SHA-256 content manifests (top 50 quality items, 32-char truncated hashes)
-- Before offering content, agents diff their items against the peer's manifest
-- Only novel content (not already in peer's manifest) is offered — eliminates redundant delivery
-- Backward-compatible: peers without manifests fall back to topic-matching
-
-### Content Translation
-- Multi-backend translation: IC LLM (free, on-chain), Ollama (local), WebLLM (browser), Claude BYOK (premium)
-- 10 target languages: English, Japanese, Chinese, Korean, Spanish, French, German, Portuguese, Italian, Russian
-- 3 policies: Manual (per-post button), High quality (auto above threshold), All posts
-- LLM-based language detection: skips content already in target language
-- Translation cache with SHA-256 key dedup, 7-day TTL
-
-### Personalization Engine
-- Learns from Validate/Flag feedback — topic affinities, author trust, quality threshold calibration
-- Profile stored in localStorage (primary) with IC canister sync
-- After 3+ feedback events, AI scoring becomes personalized
-
-### D2A Activity Tab
-- **Agent Profile Card** — avatar (44px, green border when active), display name, masked npub with Copy button, peer count, sent/received stats, and optional bio/website display
-- **Edit Profile modal** — edit display name, avatar (upload via nostr.build with NIP-98 auth), bio, website, and banner URL; publishes Kind 0 to Nostr relays with merge-on-write (preserves fields set by other clients, empty string clears a field)
-- **Profile caching** — localStorage cache for instant display on load, background relay fetch for freshest data, stale-request cancellation on principal change
-- **Real-time Activity Log** — presence broadcasts, peer discovery, offer/accept/reject/deliver events with type-specific icons and relative timestamps (collapsible, 5 default / 20 expanded, capped at 50 entries)
-- **Rich Empty States** with dynamic progress checklist (identity → broadcasting → discovering peers → negotiating) and actionable guidance
-- Published tab description clarifies that validated quality items serve as D2A curation signals
-- D2A message payload validation — type guards enforce correct payload shape per message type (offer, deliver, accept, reject)
-- D2A protocol types use discriminated union (`D2AOfferMessage | D2AAcceptMessage | D2ARejectMessage | D2ADeliverMessage`) for compile-time type safety
-
-### Dashboard & Briefing
-- **Latest mode (default)**: Reverse-chronological feed with automatic Slop exclusion — clean, flat list sorted by `createdAt`
-- **Ranked mode**: Quality-ranked feed with story clustering (Jaccard similarity, Union-Find) — toggle via Latest/Ranked buttons or CommandPalette
-- Sort mode persisted to localStorage; both modes support all verdict filters (all, quality, slop, validated, bookmarked) and source filters
-- **Top 3 + Topic Spotlight** hero cards with 16:9 thumbnails and inline Validate/Flag buttons
-- YouTube content auto-embeds as playable iframe in hero cards (Top3, Spotlight hero)
-- Unreviewed Queue, Saved Items, and Agent Knowledge in collapsible sections with lazy rendering
-- Activity Trends and Topic Breakdown moved to Analytics tab (action/observation separation)
-- Validated items excluded from Top3 and Spotlight to always surface actionable content
-- Cascading dedup: Top3 → Spotlight → Discoveries → Queue → Saved (no item appears twice)
-- Ranks content by composite score, topic relevance, author trust, and recency
-- Surfaces 3 priority items + 1 serendipity pick (high novelty, outside your bubble)
-- Shareable briefings via Nostr NIP-23 long-form events with `/b/[naddr]` public pages
-- Background ingestion from configured sources with quick heuristic pre-filter
-
-### Signal Publishing
-- Deterministic Nostr keypair derived from IC Principal (no extra key management)
-- Agent Kind 0 profile (name, avatar, bio, website) published to relays and visible to any Nostr client
-- Self-evaluated posts published as Kind 1 events with `aegis-score` tags
-- Image attachment via nostr.build (NIP-92 imeta tag, JPEG/PNG/GIF/WebP, max 5MB)
-- Client-side signing — private key never leaves the browser
-- Optional PoQ stake attachment with range slider UI
-
-### Keyboard Navigation & Command Palette
-- Vim-style J/K navigation through feed items with visual focus ring
-- L/Enter to expand, H/Escape to collapse, V to validate, F to flag, O to open source URL
-- Cmd+K / Ctrl+K command palette with fuzzy search, arrow key selection, and instant execution
-- Input/textarea/select detection — keyboard shortcuts disabled when typing in form fields
-- Smooth scroll-into-view on focus change
-
-### Onboarding & UX
-- Landing hero for new visitors with feature overview and "Explore Demo" / "Login" CTAs
-- Terminology tooltips on hover for domain-specific terms (V-Signal, C-Context, L-Slop, WoT, D2A, Serendipity, etc.)
-- Centralized glossary of 12 terms — importable from `lib/glossary.ts`
-- Actionable empty states: Dashboard, Briefing, and D2A Activity link to Sources / Incinerator / Settings when no content exists
-- Sidebar navigation descriptions updated for clarity; active state with stronger visual indicator
-- Mobile touch targets meet 48px accessibility minimum
-- Settings gear icon visible in collapsed sidebar mode
-- Settings organized into sub-tabs: General, Agent, Feeds, Data, Account — with deep-link support from Dashboard
-- Agent summary card on Dashboard with quick "Edit in Settings" link to Settings > Agent
-- Export CSV/JSON with period and content type scope selectors in Settings > Data
-- Account danger zone for local data deletion in Settings > Account
-- Offline page shows cached evaluation availability with "View Cached Dashboard" button
-- Heuristic fallback notification — users are informed when AI is unavailable and scoring falls back to heuristics
-- Error notifications persist 5 seconds (info/success remain 2.5s); all notifications have a dismiss button
-
-### Accessibility
-- Content cards: `role="button"`, `tabIndex={0}`, `aria-expanded` for keyboard-accessible expand/collapse
-- Validate/Flag buttons: `aria-label="Validate content"`, `aria-label="Flag as slop"`
-- Briefing filtered-out toggle: `aria-expanded` state
-- Notification toasts: dismiss button with `aria-label="Dismiss notification"`
-
-### Performance
-- Dashboard computations (Top3, Spotlight, Clustering) guarded by `homeMode` — zero cost in Feed mode; Activity Trends and Topic Breakdown computed in Analytics tab only
-- `clusterByStory` sorted early-break: O(n²) reduced to ~O(n×k) where k = items within 48h window (15x fewer comparisons at N=171)
-- `computeDashboardActivity` / `computeTopicTrends`: single-pass day/week bucketing replaces multi-pass filter loops
-- Cache-first loading: `cacheChecked` flag prevents loading spinner flash — cached content displays instantly on revisit
-- IC pagination timeout (15s per page via `withTimeout`) prevents indefinite hangs on slow/unreachable canisters
-- Progressive content display: each IC page merges into state immediately (no waiting for all pages to complete)
-- `syncTime()` timeout (5s) on actor creation prevents IC time-sync from blocking content loads
-- Scoring cache uses `Map` (O(1) lookup) instead of `Record` with FIFO pruning via insertion order
-- Image backfill delay reduced from 800ms to 300ms per item (24s → 9s for 30 items)
-- Timestamp refresh interval increased from 30s to 60s (50% fewer re-renders)
-- HTTP cache headers map capped at 200 entries (defense-in-depth against memory growth)
-- Client-side fetch timeouts set 5s below server maxDuration (avoids client-side timeout masking server errors)
-
-### Runtime Safety
-- IC sync auto-retry: transient failures retry once (3s delay); only consecutive failures trigger offline status
-- Retry timer cleanup: tracked in ref and cleared on auth change / unmount (no orphaned timers)
-- syncStatus leak fix: `handleICSessionError` early return now sets offline status before exiting
-- Preference storage validates nested structures (topic affinities, author trust, calibration) before loading
-- IC-to-local data conversion validates types at runtime instead of unsafe `as` casts
-- useEffect async operations use cancellation flags to prevent stale state updates after unmount
-- Notification dedup logic and D2A checklist logic extracted as pure testable functions (no re-implementation in tests)
-- ReadableStream readers wrapped in try-finally for guaranteed cleanup on error (ogimage)
-- IC delegation/signature expiry detection fires `aegis:session-expired` event (covers 5 @dfinity/agent error patterns)
-- All localStorage catch blocks log diagnostically (no silent swallowing)
-- Health endpoint `/api/health` separates required services (`anthropicKey`, `icCanister`) from advisory services (`sentryDsn`, `kvStore`); missing advisory services populate `warnings[]` without changing `status` to `"degraded"`
-
-### API Hardening
-- Request body size limits on all POST routes (64KB for analyze, 512KB default)
-- Nostr relay URL length cap (2000 chars), pubkey array cap (50), hashtag array cap (30)
-- SSRF protection via `blockPrivateUrl` / `blockPrivateRelay` on all external-facing routes
-- Security headers: `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`, `Permissions-Policy`
-- Dependencies pinned (no `^` ranges) for reproducible builds
-- Daily API budget shared across Vercel instances via Vercel KV (Redis), with in-memory fallback
-
-### Multi-Source Ingestion
-- RSS/Atom feeds (YouTube, note.com, blogs — with thumbnail extraction, ETag conditional fetch)
-- Feed auto-discovery from any blog/site URL
-- Quick Add presets: YouTube channel, Google News topic, GitHub releases, Bluesky account, Reddit subreddit, Mastodon account, Farcaster user — auto-generates feed URL from a platform URL or handle, with per-platform badge display (e.g. YOUTUBE, BLUESKY instead of generic RSS)
-- Platform URL detection: YouTube `/channel/UCxxx`, `@handle`, `/c/name`; GitHub `owner/repo`; Bluesky `profile/handle`; Farcaster `@username` or Warpcast URL
-- Nostr relay queries (by pubkey or global)
-- Farcaster Hub API (Pinata) — free username resolution + cast fetching, no API key required
-- Direct URL article extraction
-- X (Twitter) API search
-- Article-level dedup (URL + content fingerprint SHA-256) to avoid redundant API calls
-- Adaptive fetch intervals (scales with source activity, exponential backoff on errors)
-- Auto-disable after 5 consecutive failures with user notification
-- CSV export with RFC-compliant escaping (handles commas, quotes, newlines in all fields)
-- OPML import/export — migrate feeds from Feedly, Inoreader, or any RSS reader; export as OPML 2.0 with platform folders
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 15 (App Router), React 18, TypeScript |
-| Styling | Tailwind CSS v4 + shadcn/ui, dark theme |
-| Backend API | Next.js API Routes (Vercel Serverless) |
-| AI (Free) | IC LLM Canister — Llama 3.1 8B (on-chain, mo:llm 2.1.0) |
-| AI (Premium) | Anthropic Claude (claude-sonnet-4-20250514) + BYOK + fallback heuristics |
-| AI (Local Server) | Ollama / OpenAI-compatible API (any local LLM, optional) |
-| AI (Local Browser) | WebLLM (@mlc-ai/web-llm, Llama 3.1 8B q4f16 via WebGPU, optional) |
-| Blockchain | Internet Computer (Motoko canister, dfx 0.30.2) |
-| Payments | x402 protocol (@x402/next 2.3.0, USDC on Base) |
-| Tokens | ICP Ledger ICRC-1/2 (staking, D2A fees) |
-| Auth | Internet Identity (@dfinity/auth-client 2.4.1) |
-| Nostr | nostr-tools 2.23.1, @noble/hashes (key derivation) |
-| Packages | mops (mo:llm 2.1.0, mo:json 1.4.0) |
-| Deploy | Vercel (frontend), IC mainnet (backend) |
-| CI/CD | GitHub Actions (lint → test → security audit → build on push/PR) |
-| Monitoring | Vercel Analytics + Speed Insights, Sentry (@sentry/nextjs, auth/cookie scrubbing, conditional on DSN) |
-| Test | Jest + ts-jest (6809 unit/integration tests, 393 suites) + Playwright E2E (299 tests, 12 specs, 1 intentional skip) |
-
-## Project Structure
-
-```
-aegis/
-├── app/
-│   ├── page.tsx                         # Main app page
-│   ├── layout.tsx                       # Root layout + metadata + icons
-│   ├── error.tsx                        # App error boundary (Sentry capture + retry)
-│   ├── global-error.tsx                 # Root layout error boundary (Sentry capture)
-│   ├── b/[naddr]/page.tsx               # Shared briefing viewer (Nostr NIP-23)
-│   ├── offline/page.tsx                 # PWA offline fallback
-│   ├── favicon.ico                      # Browser tab icon
-│   └── api/
-│       ├── analyze/route.ts             # Claude V/C/L scoring + fallback
-│       ├── health/route.ts              # Health check + IC canister connectivity
-│       ├── upload/image/route.ts        # Image upload proxy (nostr.build)
-│       ├── push/send/route.ts           # Web Push notification sender
-│       ├── d2a/
-│       │   ├── briefing/route.ts        # x402-gated briefing API ($0.01 USDC)
-│       │   ├── info/route.ts            # Free metadata (pricing, scoring model)
-│       │   └── health/route.ts          # D2A service health check
-│       └── fetch/
-│           ├── url/route.ts             # URL article extraction
-│           ├── rss/route.ts             # RSS feed parsing (ETag/Last-Modified conditional)
-│           ├── twitter/route.ts         # X API search
-│           ├── nostr/route.ts           # Nostr relay query
-│           ├── farcaster/route.ts      # Farcaster Hub API proxy (resolve + feed)
-│           ├── ogimage/route.ts        # OG image URL extraction (thumbnail backfill)
-│           ├── briefing/route.ts       # Shared briefing fetch (Nostr NIP-23)
-│           └── discover-feed/route.ts   # RSS feed auto-discovery from any URL
-├── components/
-│   ├── layout/                          # AppShell, Sidebar, MobileNav
-│   ├── tabs/                            # Dashboard (Top3, Spotlight, Discoveries, YouTube embed), Briefing, Incinerator, Sources, Analytics (Activity Trends, Topic Breakdown, KPI, Charts, D2A Agent), D2A Activity, Settings (sub-tab orchestrator)
-│   ├── settings/                        # Settings sub-tab sections
-│   │   ├── GeneralSection.tsx           # Theme toggle + push notification preferences
-│   │   ├── AgentSection.tsx             # Interests, blocked authors, burn patterns, quality threshold, D2A params
-│   │   ├── FeedSection.tsx              # Filter mode (Lite/Pro), AI scoring (BYOK), Ollama, WebLLM
-│   │   ├── DataSection.tsx              # Export CSV/JSON (scoped), clear cache, reset preferences
-│   │   ├── AccountSection.tsx           # IC principal, Nostr account, about, danger zone (delete local data)
-│   │   └── styles.ts                    # Shared card/button/pill styles for settings sections
-│   ├── ui/                              # ContentCard, ScoreBar, SignalComposer, LandingHero, Tooltip, NostrAccountLink, WoTPromptBanner, CommandPalette, ShareBriefingModal, AgentProfileEditModal, D2ABadge, D2ANetworkMini, AgentStatusBadge, StatCard, ScoreRing, MiniChart, BarChart, BriefingClassificationBadge, IncineratorViz, NotificationToggle, DemoBanner, TabErrorBoundary
-│   ├── shared/                          # SharedBriefingView (public /b/[naddr] page)
-│   ├── filtering/                       # CostInsights, FilterModeSelector, SerendipityBadge
-│   ├── onboarding/                      # OnboardingFlow (guided setup wizard)
-│   ├── sources/                         # ManualInput
-│   ├── auth/                            # LoginButton, UserBadge
-│   └── Providers.tsx                    # Notification + Auth + Content + Preference + Source + FilterMode + Agent
-├── contexts/
-│   ├── NotificationContext.tsx          # Global notification system (toast) for all providers
-│   ├── AuthContext.tsx                   # Internet Identity auth state
-│   ├── ContentContext.tsx               # Content CRUD + IC sync + error notifications
-│   ├── PreferenceContext.tsx            # Preference learning lifecycle
-│   ├── SourceContext.tsx                # RSS/Nostr source management + IC sync
-│   ├── AgentContext.tsx                 # D2A agent lifecycle + agent profile state + activity log + error notifications
-│   ├── FilterModeContext.tsx            # Lite/Pro filter mode (persisted to localStorage)
-│   └── DemoContext.tsx                  # Demo mode for unauthenticated users
-├── lib/
-│   ├── preferences/
-│   │   ├── types.ts                     # UserPreferenceProfile, constants
-│   │   ├── engine.ts                    # learn(), getContext(), hasEnoughData()
-│   │   └── storage.ts                   # localStorage R/W + structural validation
-│   ├── briefing/
-│   │   ├── ranker.ts                    # briefingScore, generateBriefing, serendipity
-│   │   ├── serialize.ts                 # Briefing → NIP-23 long-form content serializer
-│   │   ├── sync.ts                      # Sync briefing snapshot to IC canister
-│   │   └── types.ts                     # BriefingState, BriefingItem
-│   ├── dashboard/
-│   │   └── utils.ts                     # Shared dashboard computation (top3, spotlight, activity, validation)
-│   ├── d2a/
-│   │   ├── activity.ts                  # D2A content detection + sender extraction helpers
-│   │   ├── manifest.ts                  # Content manifest + SHA-256 hashing + diff logic
-│   │   ├── reputation.ts               # Local peer reputation tracker (behavioral trust)
-│   │   ├── types.ts                     # D2ABriefingResponse, D2ABriefingItem
-│   │   ├── cors.ts                      # CORS headers for D2A API (configurable via D2A_CORS_ORIGINS)
-│   │   ├── x402Server.ts               # x402 resource server config (ExactEvmScheme)
-│   │   └── briefingProvider.ts          # Briefing data provider (IC canister fetch)
-│   ├── wot/
-│   │   ├── graph.ts                     # WoT graph builder (2-hop Nostr follow expansion)
-│   │   ├── scorer.ts                    # Trust scoring (hop proximity + mutual follows)
-│   │   ├── cache.ts                     # localStorage cache with TTL
-│   │   └── types.ts                     # WoTGraph, WoTNode, WoTScore, WoTCacheEntry
-│   ├── filtering/
-│   │   ├── pipeline.ts                  # Filter pipeline (quality gate → WoT → weighted composite)
-│   │   ├── serendipity.ts              # Serendipity detection (low trust + high quality)
-│   │   ├── costTracker.ts              # Daily cost records (localStorage, 90-day window)
-│   │   └── types.ts                     # FilterConfig, FilteredItem, FilterPipelineResult
-│   ├── ingestion/
-│   │   ├── scheduler.ts                 # Background fetch cycle (adaptive intervals, enrichment)
-│   │   ├── quickFilter.ts              # Heuristic pre-filter (Tier 4 fallback)
-│   │   ├── dedup.ts                     # Article-level dedup (URL + SHA-256 fingerprint)
-│   │   └── sourceState.ts              # Source runtime state (backoff, health, adaptive timing)
-│   ├── nostr/
-│   │   ├── identity.ts                  # IC Principal -> Nostr keypair (SHA-256 derivation)
-│   │   ├── profile.ts                   # Kind 0 agent profile (cache, fetch, merge-on-write publish)
-│   │   ├── linkAccount.ts              # npub import, localStorage CRUD, relay profile fetch
-│   │   ├── publish.ts                   # Event signing + relay publish + publishAndPartition
-│   │   ├── encrypt.ts                   # NIP-44 encrypt/decrypt (XChaCha20-Poly1305)
-│   │   └── types.ts                     # Nostr kind constants + mergeRelays utility
-│   ├── agent/
-│   │   ├── protocol.ts                  # D2A constants (kinds, tags, thresholds, timings)
-│   │   ├── discovery.ts                 # Presence broadcast + peer discovery + Jaccard resonance
-│   │   ├── handshake.ts                # Offer/accept/reject/deliver messaging + payload validation
-│   │   ├── manager.ts                   # AgentManager orchestrator (lifecycle + error recovery + activity log)
-│   │   └── types.ts                     # AgentProfile, HandshakeState, D2AMessage (discriminated union), ActivityLogEntry
-│   ├── ic/
-│   │   ├── config.ts                    # IC config getters (canister ID, host, derivation origin)
-│   │   ├── agent.ts                     # HttpAgent creation (re-exports config)
-│   │   ├── actor.ts                     # Canister actor factory (async with syncTime)
-│   │   ├── icpLedger.ts                # ICP Ledger actor (ICRC-1/2 balance, approve, allowance)
-│   │   └── declarations/               # Candid types + IDL factory
-│   ├── api/
-│   │   ├── rateLimit.ts                 # Per-IP rate limiter + body size guard for API routes
-│   │   └── dailyBudget.ts              # Daily API budget (Vercel KV shared, in-memory fallback)
-│   ├── scoring/
-│   │   ├── types.ts                     # ScoringEngine type + ScoreParseResult interface
-│   │   ├── cache.ts                     # Scoring result cache (SHA-256 fingerprint, 24h TTL, FIFO)
-│   │   ├── prompt.ts                    # Shared V/C/L scoring prompt (used by all AI tiers)
-│   │   └── parseResponse.ts            # Shared JSON response parser (fence strip, clamp, composite)
-│   ├── ollama/
-│   │   ├── types.ts                     # OllamaConfig, OllamaStatus, defaults
-│   │   ├── storage.ts                   # localStorage persistence for Ollama config
-│   │   └── engine.ts                    # Ollama/OpenAI-compatible scoring engine
-│   ├── webllm/
-│   │   ├── engine.ts                    # Browser-local AI scoring (WebGPU, Llama 3.1 8B)
-│   │   ├── webgpu.d.ts                  # Minimal WebGPU type declarations (navigator.gpu)
-│   │   └── types.ts                     # WebLLMStatus type
-│   ├── reputation/
-│   │   └── publishGate.ts               # Publish Signal reputation gating (localStorage)
-│   ├── config.ts                          # APP_URL constant (NEXT_PUBLIC_APP_URL env var with fallback)
-│   ├── glossary.ts                        # Domain term definitions (V-Signal, WoT, D2A, etc.)
-│   ├── apiKey/
-│   │   └── storage.ts                   # BYOK API key storage (localStorage, never sent to server)
-│   ├── types/                           # ContentItem, API response types, source types
-│   ├── utils/
-│       ├── scores.ts                    # Score computation + relativeTime
-│       ├── errors.ts                    # errMsg(), errMsgShort(), isTimeout(), handleICSessionError()
-│       ├── hashing.ts                   # SHA-256 content fingerprinting (dedup + manifest)
-│       ├── url.ts                       # extractUrl(), SSRF protection (blockPrivateUrl/blockPrivateRelay)
-│       ├── csv.ts                       # CSV export (RFC-compliant escaping)
-│       ├── export.ts                    # Content export (CSV/JSON with period + type scope filtering)
-│       ├── timeout.ts                   # withTimeout() — Promise.race with timer cleanup
-│       ├── math.ts                      # Shared clamp() utility
-│       ├── youtube.ts                   # YouTube video ID extraction from URL patterns
-│       └── statusEmitter.ts            # Generic status emitter factory (used by Ollama/WebLLM engines)
-│   ├── offline/
-│   │   └── actionQueue.ts              # IndexedDB-backed queue for IC operations during offline
-│   ├── onboarding/
-│   │   └── state.ts                     # Onboarding wizard state machine (step progression)
-│   └── sources/
-│       ├── catalog.ts                   # Source catalog (preset feeds + Quick Add definitions)
-│       ├── discovery.ts                 # Source auto-discovery (domain validation tracking)
-│       ├── platformFeed.ts              # Platform URL detection + RSS URL generation (YouTube, GitHub, Bluesky, Reddit, Mastodon, Farcaster, Google News)
-│       └── storage.ts                   # Source config localStorage R/W
-├── hooks/
-│   ├── useKeyboardNav.ts               # J/K/L/H/V/F/O keyboard navigation + Cmd+K palette
-│   ├── usePushNotification.ts          # Web Push subscription management
-│   ├── useOnlineStatus.ts              # Online/offline detection + reconnect callback
-│   └── useNotifications.ts             # In-app toast notification system
-├── __tests__/                           # 6809 Jest tests across 393 suites
-├── e2e/                                 # Playwright E2E tests (299 tests, 12 specs)
-├── canisters/
-│   └── aegis_backend/
-│       ├── main.mo                      # Motoko canister (persistent actor, staking, D2A, IC LLM)
-│       ├── types.mo                     # Type definitions (incl. StakeRecord, UserReputation, D2AMatchRecord)
-│       ├── ledger.mo                    # ICRC-1/2 ICP Ledger + CMC interface module
-│       └── aegis_backend.did            # Candid interface
-├── .github/workflows/ci.yml             # GitHub Actions CI (lint → test → security audit → build)
-├── ROLLBACK.md                          # Vercel + IC canister rollback procedures
-├── PRE_DEPLOY.md                        # Pre-deployment env var checklist
-├── instrumentation-client.ts             # Sentry client-side init + navigation instrumentation
-├── sentry.server.config.ts              # Sentry server-side init (auth header/cookie scrubbing)
-├── sentry.edge.config.ts                # Sentry edge runtime init (auth header/cookie scrubbing)
-├── instrumentation.ts                   # Next.js instrumentation hook (Sentry)
-├── public/                              # Icons (apple-touch-icon, favicons, PWA)
-├── mops.toml                            # Motoko package manager (mo:llm, mo:json)
-├── dfx.json                             # IC project config (packtool: mops sources)
-└── next.config.mjs                      # Webpack polyfills + Serwist PWA + Sentry
-```
-
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- Node.js 20+
-- [dfx](https://internetcomputer.org/docs/current/developer-docs/getting-started/install/) (for canister development)
+- Node.js **≥ 20**
+- npm (other package managers untested; only `npm` is used in scripts)
+- (Optional) [`dfx`](https://internetcomputer.org/docs/current/developer-docs/setup/install/) **0.30.2+** if you plan to modify the Motoko canister
 
-### Local Development
+### Install
 
 ```bash
+git clone https://github.com/dwebxr/aegis.git
+cd aegis
 npm install
-cp .env.example .env.local  # Add your ANTHROPIC_API_KEY
-npm run dev
 ```
+
+### Configure
+
+Copy the template and fill in what you need. The dev build talks to the production IC canister by default, so most variables are optional.
+
+```bash
+cp .env.example .env.local
+```
+
+Minimum to enable AI scoring (everything else falls back to local / heuristic):
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Full list of supported variables lives in [`.env.example`](.env.example). Highlights:
+
+| Variable | Required? | Purpose |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | recommended | Server-side AI scoring via Claude |
+| `NEXT_PUBLIC_CANISTER_ID` | optional | Override the default IC canister |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | optional | Web Push notifications |
+| `PUSH_SERVER_PRIVATE_KEY` | optional | Push-token canister authz (Ed25519 base64, register as canister controller) |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | optional | Distributed rate limiting |
+| `NEXT_PUBLIC_SENTRY_DSN` | optional | Error tracking |
+| `X402_*` | optional | Micropayment paywall |
+
+### Run
+
+```bash
+npm run dev          # http://localhost:3000
+```
+
+### Build
+
+```bash
+npm run build
+npm start
+```
+
+---
+
+## Basic usage
+
+1. Open the app. Sign in with **Internet Identity** to enable per-user persistence (or run anonymously for a local-only session).
+2. Add sources: paste an RSS / Atom URL, import an OPML file, add a Nostr pubkey, or paste a single article URL.
+3. Wait for the next ingestion cycle (a few minutes), or trigger a refresh.
+4. Open the **Briefing** tab. Items are ranked by composite Value / Context / Slop score.
+5. Mark items as **quality** or **slop** — these update your reputation and feed back into ranking.
+
+Optional:
+
+- Translate any item from the item menu (requires a translation backend; see `.env.example`).
+- Generate an audio briefing (uses the Web Speech API; works fully offline).
+- Enable D2A in **Settings** to share briefings with other agents (experimental).
+
+---
+
+## Project structure
+
+```
+.
+├─ app/                          # Next.js App Router
+│  ├─ api/                       # Route handlers (analyze, briefing, fetch, push, ...)
+│  ├─ page.tsx                   # Main app shell
+│  └─ sw.ts                      # Service worker source (serwist)
+├─ canisters/
+│  └─ aegis_backend/             # Motoko canister (evaluations, sources, D2A, push subs)
+├─ components/                   # React components (tabs, UI primitives)
+├─ contexts/                     # React contexts (auth, content, sources, agent)
+├─ lib/
+│  ├─ scoring/                   # V/C/L scoring cascade + cache
+│  ├─ briefing/                  # Briefing ranker + serendipity
+│  ├─ ingestion/                 # Scheduler, fetchers, quick filter
+│  ├─ nostr/                     # Identity, publish, NIP-44 encrypt
+│  ├─ agent/                     # D2A protocol (manager, handshake, discovery)
+│  ├─ ic/                        # Canister actor, server identity, IC LLM
+│  ├─ translation/               # Multi-backend translation
+│  ├─ preferences/               # User preference learning
+│  └─ utils/                     # URL/SSRF helpers, errors, scores, ...
+├─ packages/
+│  └─ d2a-client/                # Standalone D2A SDK
+├─ scripts/                      # Backup, rollback, smoke tests, deploy helpers
+└─ __tests__/                    # Jest + Playwright tests
+```
+
+---
+
+## Development
 
 ### Tests
 
 ```bash
-npm test              # Jest unit + integration tests (6809 tests, 393 suites)
-npm run test:watch    # Watch mode
-npx playwright test   # E2E tests — requires dev server (npm run dev)
+npm test                 # Jest (unit + integration)
+npm run test:watch
+npm run test:coverage
+npm run test:e2e         # Playwright — requires `npm run dev` running
+npm run lint
 ```
 
-### Environment Variables
+### Canister
 
-```bash
-# Required
-ANTHROPIC_API_KEY=sk-ant-...
-
-# IC Mainnet (default)
-NEXT_PUBLIC_IC_HOST=https://icp-api.io
-NEXT_PUBLIC_CANISTER_ID=rluf3-eiaaa-aaaam-qgjuq-cai
-NEXT_PUBLIC_INTERNET_IDENTITY_URL=https://identity.internetcomputer.org
-
-# IC Local (for canister development)
-# NEXT_PUBLIC_IC_HOST=http://127.0.0.1:4943
-# NEXT_PUBLIC_CANISTER_ID=uxrrr-q7777-77774-qaaaq-cai
-# NEXT_PUBLIC_INTERNET_IDENTITY_URL=http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai
-
-# Push Notifications (optional)
-NEXT_PUBLIC_VAPID_PUBLIC_KEY=...      # VAPID public key
-VAPID_PRIVATE_KEY=...                 # VAPID private key
-VAPID_SUBJECT=mailto:admin@example.com
-
-# Canonical app URL (optional — defaults to https://aegis-ai.xyz)
-NEXT_PUBLIC_APP_URL=https://aegis-ai.xyz
-
-# D2A CORS (optional — defaults to ICP canister + app URL)
-D2A_CORS_ORIGINS=https://example.com,https://other.com
-
-# x402 D2A Payment Gateway (optional)
-X402_RECEIVER_ADDRESS=0x...           # EVM address for USDC payments
-X402_NETWORK=eip155:84532             # Base Sepolia (or eip155:8453 for mainnet)
-X402_PRICE=$0.01                      # Per-briefing price
-X402_FACILITATOR_URL=https://x402.org/facilitator
-
-# Vercel KV / Upstash Redis (optional — falls back to in-memory per-instance)
-KV_REST_API_URL=...               # Vercel KV REST endpoint
-KV_REST_API_TOKEN=...             # Vercel KV auth token
-
-# Sentry Error Tracking (optional — no-op if DSN not set)
-NEXT_PUBLIC_SENTRY_DSN=...            # Sentry DSN for error tracking
-SENTRY_ORG=...                        # Sentry org slug (for source map upload)
-SENTRY_PROJECT=...                    # Sentry project slug
-SENTRY_AUTH_TOKEN=...                 # Sentry auth token
-```
-
-### Canister Development
+If you edit `canisters/aegis_backend/main.mo`, start a local replica:
 
 ```bash
 dfx start --background
-dfx deploy aegis_backend
-
-# Mainnet
-DFX_WARNING=-mainnet_plaintext_identity dfx deploy aegis_backend --network ic --identity default
+dfx deploy aegis_backend --network local
 ```
 
-## Canister Interface
+Pre-deploy safety:
 
-```candid
-service : {
-  // Queries
-  getProfile : (principal) -> (opt UserProfile) query;
-  getEvaluation : (text) -> (opt ContentEvaluation) query;
-  getUserEvaluations : (principal, nat, nat) -> (vec ContentEvaluation) query;
-  getUserAnalytics : (principal) -> (AnalyticsResult) query;
-  getUserSourceConfigs : (principal) -> (vec SourceConfigEntry) query;
-  getUserReputation : (principal) -> (UserReputation) query;
-  getSignalStake : (text) -> (opt StakeRecord) query;
-  getUserD2AMatches : (principal, nat, nat) -> (vec D2AMatchRecord) query;
-  getEngagementIndex : (principal) -> (float64) query;
-
-  // Updates
-  saveEvaluation : (ContentEvaluation) -> (text);
-  updateEvaluation : (text, bool, bool) -> (bool);
-  batchSaveEvaluations : (vec ContentEvaluation) -> (nat);
-  updateDisplayName : (text) -> (bool);
-  saveSourceConfig : (SourceConfigEntry) -> (text);
-  deleteSourceConfig : (text) -> (bool);
-  saveSignal : (PublishedSignal) -> (text);
-  publishWithStake : (PublishedSignal, nat) -> (Result);
-  validateSignal : (text) -> (Result);
-  flagSignal : (text) -> (Result);
-  recordD2AMatch : (text, principal, text, nat) -> (Result);
-  analyzeOnChain : (text, vec text) -> (Result);
-
-  // D2A Briefing Snapshots
-  saveLatestBriefing : (text) -> (bool);              // Save serialized briefing JSON
-  getLatestBriefing : (principal) -> (opt text) query; // Retrieve latest briefing
-  getGlobalBriefingSummaries : (nat, nat) -> (record { items; total }) query; // Paginated global briefings (d2aEnabled users only)
-
-  // User Settings (Nostr link + D2A toggle — synced across devices)
-  saveUserSettings : (UserSettings) -> (bool);
-  getUserSettings : (principal) -> (opt UserSettings) query;
-
-  // Push Notifications
-  registerPushSubscription : (text, text, text) -> (bool);
-  unregisterPushSubscription : (text) -> (bool);
-  getPushSubscriptions : (principal) -> (vec PushSubscription) query;
-  removePushSubscriptions : (principal, vec text) -> (bool);
-  getPushSubscriptionCount : () -> (nat) query;
-
-  // Treasury (non-custodial — no operator withdrawal)
-  getTreasuryBalance : () -> (nat);                  // Transparency: anyone can check
-  sweepProtocolFees : () -> (Result);                // Anyone can trigger surplus distribution
-  topUpCycles : () -> (Result);                      // Anyone can trigger cycles top-up
-}
+```bash
+npm run canister:backup          # snapshot live wasm + status
+npm run canister:rollback        # restore from snapshot
+scripts/canister-smoke-test.sh   # real assertions against a local replica
 ```
 
-## Non-Custodial Design
+### D2A SDK
 
-Aegis follows a non-custodial architecture for all on-chain fund management:
+The agent-to-agent client lives in [`packages/d2a-client`](packages/d2a-client):
 
-- **No operator withdrawal**: The `withdrawTreasury` function has been removed. The canister controller cannot withdraw user funds.
-- **Hardcoded distribution**: Protocol revenue is automatically sent to a hardcoded wallet address or converted to cycles. No configurable destinations.
-- **Active deposits only**: The canister only holds ICP for deposits pending community review. Once resolved (validated or flagged), funds are immediately distributed.
-- **Self-sustaining cycles**: When the canister's cycles balance drops below threshold, protocol revenue is automatically converted to cycles via the Cycles Minting Canister (CMC), with a 30-day recurring timer as fallback.
-- **Public sweep functions**: `sweepProtocolFees()` and `topUpCycles()` can be called by anyone — not restricted to the controller.
-- **Open source**: All canister code is publicly auditable on [GitHub](https://github.com/dwebxr/aegis).
+```bash
+npm run sdk:install
+npm run sdk:build
+npm run sdk:test
+```
 
-**Auto-return**: Deposits pending for 30+ days without community verdict are automatically returned. "No verdict = no issue found." A recurring on-chain timer processes expired deposits monthly.
+### Operational docs
 
-### Progressive Decentralization
-
-Aegis follows a staged decentralization roadmap to balance security with trustlessness:
-
-| Phase | Status | Controller | Description |
-|-------|--------|------------|-------------|
-| **Phase 1** | Current | Developer-held | Code is open source on GitHub. On-chain logic enforces non-custodial fund management. Controller retained for critical bug fixes. |
-| **Phase 2** | Planned | Blackhole canister or SNS DAO | Once the protocol is stable, controller will be transferred to a blackhole canister (immutable) or an SNS (Service Nervous System) DAO for community governance. |
-
-**Why not renounce immediately?** Premature controller renunciation risks permanent fund lockup if a critical bug is discovered. The current phase prioritizes code transparency and on-chain enforcement while retaining the ability to patch vulnerabilities.
-
-> **Disclaimer**: This protocol's source code is publicly available. The operator does not exercise the authority to modify or manipulate the automatic distribution logic defined by the smart contract without individual user consent under normal operations. (本プロトコルのソースコードは公開されており、運営者はスマートコントラクトによって定義された自動分配ロジックを、ユーザーの個別の同意なく変更・操作する権限を（通常運用において）行使しません。)
+- [`PRE_DEPLOY.md`](PRE_DEPLOY.md) — pre-deploy checklist
+- [`ROLLBACK.md`](ROLLBACK.md) — rollback procedure
+- [`SECURITY.md`](SECURITY.md) — vulnerability disclosure
 
 ---
 
-## FAQ
+## Roadmap
 
-### Do I need cryptocurrency to use Aegis?
+Items below describe direction, not commitments. Some prototypes already exist in the repo behind feature flags.
 
-**No.** Content filtering (both Lite and Pro modes) works without any crypto, wallet, or deposit. D2A exchanges between trusted peers (Nostr follow graph) are also free. You only need ICP for publishing quality signals or D2A exchanges with unknown peers.
+- **Stable D2A protocol v1.** Lock the encrypted agent-to-agent message format and SDK surface.
+- **Cross-agent reputation graph.** Use Nostr Web-of-Trust + on-chain validations to weight items from agents you trust.
+- **Decentralised scoring market.** Let third-party agents offer scoring services; users pick the model they trust.
+- **Mobile-first UX.** Background ingestion in the service worker, native share-target intent handling.
+- **Local-only mode.** Run the full briefing pipeline without contacting any server (Ollama / MediaPipe / WebLLM only).
+- **Public D2A testnet.** A non-production canister so external agents can experiment without affecting mainnet state.
 
-### Is Aegis expensive to run?
+---
 
-**Lite mode costs nothing** — it runs entirely client-side with heuristic scoring (no API calls).
+## Contributing
 
-Pro mode uses the multi-tier AI scoring pipeline. Ollama (Tier 0, when enabled), WebLLM (Tier 1, when enabled), and IC LLM (Tier 3) are all free. BYOK users (Tier 2) pay their own Claude API costs (~$0.01/day, ~50 articles/day). The server-side Claude key (Tier 3.5) is free during alpha; after alpha, it will move to a Pro subscription plan. You can also bring your own API key (Settings > Feeds) — roughly $2/month for typical usage.
+Pull requests are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full setup, test, and review workflow. Issues and discussions live on GitHub.
 
-### Why not just use a P2P small-world network?
+For security issues, **do not** open a public issue. Use [GitHub private vulnerability reporting](https://github.com/dwebxr/aegis/security/advisories/new) — details in [`SECURITY.md`](SECURITY.md).
 
-You can — that's exactly what **Lite mode** does. Nostr's Web of Trust is a small-world network, and Lite mode filters content purely through trust-graph proximity. No AI, no API calls, no cost.
-
-**Pro mode adds** what P2P alone cannot do:
-- Discover quality content *outside* your follow graph (serendipity detection)
-- Evaluate content across languages
-- Detect quality degradation trends
-- Break out of echo chambers with scored recommendations
-
-### What happens to my deposit if I publish bad signals?
-
-If your published signals are consistently rated as low-quality by the community (3+ flags reach consensus), your deposit is forfeited. This creates a direct economic incentive to only publish genuine quality signals. Deposits that receive no community verdict within 30 days are automatically returned — no verdict means no issue found.
-
-### Do I need a deposit to publish signals?
-
-**Not initially.** New users can publish signals freely. A deposit is only required if your signals are repeatedly rated as low-quality by the network. Think of it as a spam prevention measure — good publishers never need to deposit. Reputation recovers naturally over time (+1 per week of inactivity).
-
-### Do I need to deposit ICP before I can use Aegis?
-
-**No.** You can browse, filter, score, curate content, and publish signals indefinitely without any deposit. Deposits are only triggered as an anti-spam measure for publishers whose signals are consistently flagged.
-
-## Community
-
-- [Discord](https://discord.gg/85JVzJaatT)
-- [Medium](https://medium.com/aegis-ai)
-- [X](https://x.com/Coo_aiagent)
-- [GitHub](https://github.com/dwebxr/aegis)
+---
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 dwebxr and Aegis contributors.
+
+---
+
+## Disclaimer
+
+This protocol's source code is publicly available. The operator does not exercise the authority to modify or manipulate the automatic distribution logic defined by the smart contract without individual user consent under normal operations.
+
+本プロトコルのソースコードは公開されており、運営者はスマートコントラクトによって定義された自動分配ロジックを、ユーザーの個別の同意なく変更・操作する権限を（通常運用において）行使しません。
