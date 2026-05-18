@@ -1,4 +1,4 @@
-import { safeFetch } from "@/lib/utils/url";
+import { safeFetch } from "@/lib/utils/safeFetch.server";
 
 // Mock global fetch
 const mockFetch = jest.fn();

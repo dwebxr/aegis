@@ -709,7 +709,7 @@ export const SourcesTab: React.FC<SourcesTabProps> = ({ onAnalyze, isAnalyzing, 
                       />
                     )}
                     <div className="flex-1 min-w-0">
-                      {item.link ? (
+                      {item.link && /^https?:\/\//i.test(item.link) ? (
                         <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-body-sm text-secondary-foreground font-semibold overflow-hidden text-ellipsis whitespace-nowrap block no-underline">{item.title}</a>
                       ) : (
                         <div className="text-body-sm text-secondary-foreground font-semibold overflow-hidden text-ellipsis whitespace-nowrap">{item.title}</div>

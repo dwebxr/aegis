@@ -11,6 +11,7 @@ import { SerendipityBadge } from "@/components/filtering/SerendipityBadge";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { BriefingClassificationBadge } from "@/components/ui/BriefingClassificationBadge";
 import { useContent } from "@/contexts/ContentContext";
+import { useAgent } from "@/contexts/AgentContext";
 import { useAudioBriefing } from "@/hooks/useAudioBriefing";
 import type { TrackSource } from "@/lib/audio/types";
 import { unlockSpeech } from "@/lib/audio/webspeech";
@@ -48,6 +49,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const [digestLoading, setDigestLoading] = useState(false);
   const [digestError, setDigestError] = useState<string | null>(null);
   const { syncBriefing } = useContent();
+  const { isEnabled: d2aEnabled } = useAgent();
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
 
@@ -107,10 +109,13 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const briefingRef = useRef(briefing);
   briefingRef.current = briefing;
   useEffect(() => {
+    // Briefings are exposed publicly via getGlobalBriefingSummaries / getLatestBriefing.
+    // Only sync when the user has opted into D2A sharing.
+    if (!d2aEnabled) return;
     if (briefingRef.current.priority.length > 0) {
       syncBriefing(briefingRef.current, nostrKeys?.pk ?? null);
     }
-  }, [briefingSyncKey, syncBriefing, nostrKeys?.pk]);
+  }, [briefingSyncKey, syncBriefing, nostrKeys?.pk, d2aEnabled]);
 
   useEffect(() => {
     try {

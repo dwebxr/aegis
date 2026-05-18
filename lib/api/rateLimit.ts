@@ -135,11 +135,24 @@ export function checkBodySize(request: NextRequest, maxBytes = DEFAULT_MAX_BODY)
 }
 
 // Parses JSON body with a 400 response on failure. For routes that compose their own rate-limit/body-size checks.
+// Reads the body as raw bytes first and enforces maxBytes — Content-Length can be
+// missing or spoofed on chunked requests, so the post-read cap is the real defense.
 export async function parseJsonBody<T = Record<string, unknown>>(
   request: NextRequest,
+  maxBytes = DEFAULT_MAX_BODY,
 ): Promise<{ body: T; error?: undefined } | { body?: undefined; error: NextResponse }> {
+  let raw: string;
   try {
-    const body = await request.json() as T;
+    const buf = await request.arrayBuffer();
+    if (buf.byteLength > maxBytes) {
+      return { error: NextResponse.json({ error: "Request body too large" }, { status: 413 }) };
+    }
+    raw = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+  } catch {
+    return { error: NextResponse.json({ error: "Invalid request body" }, { status: 400 }) };
+  }
+  try {
+    const body = JSON.parse(raw) as T;
     return { body };
   } catch {
     return { error: NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }) };
@@ -153,9 +166,11 @@ export async function guardAndParse<T = Record<string, unknown>>(
 ): Promise<{ body: T; error?: undefined } | { body?: undefined; error: NextResponse }> {
   const limited = rateLimit(request, opts?.limit, opts?.windowMs);
   if (limited) return { error: limited };
+  // checkBodySize is a fast-path against the declared Content-Length; the real
+  // byte-level enforcement happens inside parseJsonBody after consuming the body.
   const tooLarge = checkBodySize(request, opts?.maxBytes);
   if (tooLarge) return { error: tooLarge };
-  return parseJsonBody<T>(request);
+  return parseJsonBody<T>(request, opts?.maxBytes);
 }
 
 // Same as guardAndParse but uses Vercel KV for distributed limits — windowSec
@@ -168,7 +183,7 @@ export async function distributedGuardAndParse<T = Record<string, unknown>>(
   if (limited) return { error: limited };
   const tooLarge = checkBodySize(request, opts?.maxBytes);
   if (tooLarge) return { error: tooLarge };
-  return parseJsonBody<T>(request);
+  return parseJsonBody<T>(request, opts?.maxBytes);
 }
 
 export function rateLimit(request: NextRequest, limit = 30, windowMs = 60_000): NextResponse | null {

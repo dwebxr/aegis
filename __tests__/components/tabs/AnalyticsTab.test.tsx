@@ -28,6 +28,35 @@ jest.mock("@/components/ui/D2ANetworkMini", () => ({
   D2ANetworkMini: () => null,
 }));
 
+// AnalyticsTab transitively imports AuthContext (via SourceQualitySection →
+// SourceContext → AuthContext) which depends on @dfinity/auth-client. That
+// package is ESM-only and ts-jest can't transform it, so stub the context
+// surface to what the rendered components actually read.
+jest.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    isAuthenticated: false,
+    identity: null,
+    principal: null,
+    principalText: null,
+    isLoading: false,
+    login: jest.fn(),
+    logout: jest.fn(),
+  }),
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+jest.mock("@/contexts/SourceContext", () => ({
+  useSources: () => ({
+    sources: [],
+    addSource: jest.fn(),
+    removeSource: jest.fn(),
+    updateSource: jest.fn(),
+    setEnabled: jest.fn(),
+    findById: jest.fn(),
+  }),
+  SourceProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 const now = Date.now();
 const dayMs = 86400000;
 

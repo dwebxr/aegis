@@ -20,3 +20,4 @@ export async function createBackendActorAsync(identity?: Identity): Promise<_SER
     canisterId: getCanisterId(),
   });
 }
+

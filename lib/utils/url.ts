@@ -1,3 +1,6 @@
+// Client-safe URL helpers — no Node.js builtins. The server-only SSRF-safe
+// fetcher (safeFetch, DNS-resolution based private-IP block) lives in
+// lib/utils/safeFetch.server.ts so this file remains bundleable in the browser.
 export function extractUrl(text: string | null): string | null {
   if (!text) return null;
   const trimmed = text.trim();
@@ -52,28 +55,6 @@ export function blockPrivateUrl(urlString: string): string | null {
   return blockPrivateHostname(parsed.hostname);
 }
 
-// SSRF-safe: every redirect target is re-validated via blockPrivateUrl before following.
-export async function safeFetch(
-  url: string,
-  init?: RequestInit,
-  maxRedirects = 5,
-): Promise<Response> {
-  let current = url;
-  for (let i = 0; i <= maxRedirects; i++) {
-    const blocked = blockPrivateUrl(current);
-    if (blocked) throw new Error(blocked);
-    const res = await fetch(current, { ...init, redirect: "manual" });
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get("location");
-      if (!location) return res;
-      current = new URL(location, current).href;
-      continue;
-    }
-    return res;
-  }
-  throw new Error("Too many redirects");
-}
-
 export function blockPrivateRelay(relayUrl: string): string | null {
   let parsed: URL;
   try {
@@ -88,3 +69,7 @@ export function blockPrivateRelay(relayUrl: string): string | null {
 
   return blockPrivateHostname(parsed.hostname);
 }
+
+// safeFetch lives in lib/utils/safeFetch.server.ts — import it directly from
+// server-side code. It is NOT re-exported here because that would pull
+// node:net / node:dns into the client bundle via this client-safe module.

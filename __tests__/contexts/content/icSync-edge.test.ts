@@ -237,7 +237,7 @@ describe("syncToIC — enqueue failure", () => {
     const setPendingActions = jest.fn();
     const addNotification = jest.fn();
 
-    syncToICFresh(Promise.reject(new Error("IC down")), "saveEvaluation", { itemId: "down" }, setSyncStatus, setPendingActions, addNotification);
+    syncToICFresh(Promise.reject(new Error("IC down")), "saveEvaluation", { itemId: "down" }, setSyncStatus, setPendingActions, addNotification, "p-test");
 
     await new Promise(r => setTimeout(r, 100));
 
@@ -258,9 +258,9 @@ describe("drainOfflineQueue — mixed actions", () => {
   }
 
   it("processes multiple actions in order", async () => {
-    await enqueueAction("updateEvaluation", { id: "a1", validated: true, flagged: false });
-    await enqueueAction("saveEvaluation", { itemId: "a2" });
-    await enqueueAction("updateEvaluation", { id: "a3", validated: false, flagged: true });
+    await enqueueAction("updateEvaluation", { id: "a1", validated: true, flagged: false }, principal.toText());
+    await enqueueAction("saveEvaluation", { itemId: "a2" }, principal.toText());
+    await enqueueAction("updateEvaluation", { id: "a3", validated: false, flagged: true }, principal.toText());
 
     const actor = makeMockActor();
     const contentRef = { current: [makeItem({ id: "a2" })] };
@@ -276,8 +276,8 @@ describe("drainOfflineQueue — mixed actions", () => {
   });
 
   it("partial failure leaves remaining in queue", async () => {
-    await enqueueAction("updateEvaluation", { id: "ok1", validated: true, flagged: false });
-    await enqueueAction("updateEvaluation", { id: "fail1", validated: false, flagged: true });
+    await enqueueAction("updateEvaluation", { id: "ok1", validated: true, flagged: false }, principal.toText());
+    await enqueueAction("updateEvaluation", { id: "fail1", validated: false, flagged: true }, principal.toText());
 
     const actor = makeMockActor({
       updateEvaluation: jest.fn()
@@ -290,18 +290,18 @@ describe("drainOfflineQueue — mixed actions", () => {
 
     await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus);
 
-    const remaining = await dequeueAll();
+    const remaining = await dequeueAll(principal.toText());
     expect(remaining).toHaveLength(1);
     expect((remaining[0].payload as { id: string }).id).toBe("fail1");
     expect(remaining[0].retries).toBe(1);
   });
 
   it("drops actions that reach MAX_RETRIES and still processes others", async () => {
-    await enqueueAction("updateEvaluation", { id: "drop-me", validated: true, flagged: false });
-    const actions = await dequeueAll();
+    await enqueueAction("updateEvaluation", { id: "drop-me", validated: true, flagged: false }, principal.toText());
+    const actions = await dequeueAll(principal.toText());
     for (let i = 0; i < 5; i++) await incrementRetries(actions[0].id!);
 
-    await enqueueAction("updateEvaluation", { id: "keep-me", validated: true, flagged: false });
+    await enqueueAction("updateEvaluation", { id: "keep-me", validated: true, flagged: false }, principal.toText());
 
     const actor = makeMockActor();
     const contentRef = { current: [] as ContentItem[] };

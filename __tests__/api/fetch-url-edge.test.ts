@@ -4,7 +4,17 @@ import { _resetRateLimits } from "@/lib/api/rateLimit";
 // Mock @extractus/article-extractor to test code paths beyond input validation
 const mockExtract = jest.fn();
 jest.mock("@extractus/article-extractor", () => ({
-  extract: (...args: unknown[]) => mockExtract(...args),
+  extractFromHtml: (...args: unknown[]) => mockExtract(...args),
+}));
+
+// Bypass safeFetch — the route now fetches HTML server-side before extraction.
+jest.mock("@/lib/utils/safeFetch.server", () => ({
+  safeFetch: jest.fn(async () => ({
+    ok: true,
+    status: 200,
+    headers: new Headers({ "content-type": "text/html" }),
+    arrayBuffer: async () => new TextEncoder().encode("<html><body>mock</body></html>").buffer,
+  })),
 }));
 
 import { POST } from "@/app/api/fetch/url/route";

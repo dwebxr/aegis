@@ -123,13 +123,14 @@ export function syncToIC<T extends "saveEvaluation" | "updateEvaluation">(
   setSyncStatus: (s: ContentSyncStatus) => void,
   setPendingActions: React.Dispatch<React.SetStateAction<number>>,
   addNotification: (msg: string, type: NotificationType) => void,
+  principal: string | null,
 ) {
   promise.then(undefined, async (err: unknown) => {
     console.warn("[content] IC sync failed:", errMsg(err));
     setSyncStatus("offline");
     try {
       // The conditional type narrows for callers; the enqueue side is generic.
-      await enqueueAction(actionType, payload as never);
+      await enqueueAction(actionType, payload as never, principal);
       setPendingActions(p => p + 1);
       addNotification("Saved locally \u2014 will sync when online", "info");
     } catch (qErr) {
@@ -147,7 +148,7 @@ export async function drainOfflineQueue(
   setSyncStatus: (s: ContentSyncStatus) => void,
   addNotification?: (msg: string, type: NotificationType) => void,
 ) {
-  const actions = await dequeueAll();
+  const actions = await dequeueAll(principal.toText());
   if (actions.length === 0) return;
   console.info(`[offline-queue] Draining ${actions.length} pending action(s)`);
   const MAX_RETRIES = 5;
@@ -188,7 +189,7 @@ export async function drainOfflineQueue(
   if (droppedCount > 0) {
     addNotification?.(`${droppedCount} offline change(s) could not be synced and were discarded`, "error");
   }
-  const remaining = await dequeueAll();
+  const remaining = await dequeueAll(principal.toText());
   setPendingActions(remaining.length);
   if (remaining.length === 0) {
     setSyncStatus("synced");

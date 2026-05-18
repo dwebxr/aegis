@@ -28,6 +28,7 @@ describe("syncToIC — LARP fix: no floating async catch handler", () => {
       setSyncStatus,
       setPendingActions,
       addNotification,
+      "p-test",
     );
 
     await new Promise(r => setTimeout(r, 10));
@@ -47,6 +48,7 @@ describe("syncToIC — LARP fix: no floating async catch handler", () => {
       setSyncStatus,
       setPendingActions,
       addNotification,
+      "p-test",
     );
 
     await new Promise(r => setTimeout(r, 50));

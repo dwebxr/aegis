@@ -6,6 +6,8 @@
 const mockSafeFetch = jest.fn();
 jest.mock("@/lib/utils/url", () => ({
   blockPrivateUrl: jest.fn(() => null),
+}));
+jest.mock("@/lib/utils/safeFetch.server", () => ({
   safeFetch: mockSafeFetch,
 }));
 

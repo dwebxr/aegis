@@ -22,7 +22,7 @@ module.exports = {
     }],
   },
   transformIgnorePatterns: [
-    "node_modules/(?!(@noble|nostr-tools|@scure|uuid|@extractus)/)",
+    "node_modules/(?!(@noble|nostr-tools|@scure|uuid|@extractus|@pwshub|@adobe|domhandler|domutils|dom-serializer|entities|htmlparser2|css-select|css-what|nth-check|boolbase)/)",
   ],
   testPathIgnorePatterns: ["/node_modules/", "/.claude/", "/.next/", "/e2e/"],
   collectCoverageFrom: [

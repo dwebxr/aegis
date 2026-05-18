@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardAndParse } from "@/lib/api/rateLimit";
-import { safeFetch } from "@/lib/utils/url";
+import { safeFetch } from "@/lib/utils/safeFetch.server";
 import { errMsg } from "@/lib/utils/errors";
 import { getOgCached, setOgCache } from "@/lib/cache/ogimage";
 

@@ -20,7 +20,7 @@ import { dequeueAll } from "@/lib/offline/actionQueue";
 import type { SaveEvaluationPayload, UpdateEvaluationPayload } from "@/lib/offline/actionQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import type { ContentState, ContentSyncStatus, PreferenceCallbacks } from "./content/types";
-import { loadCachedContent, saveCachedContent, truncatePreservingActioned } from "./content/cache";
+import { loadCachedContent, saveCachedContent, clearCachedContent, truncatePreservingActioned } from "./content/cache";
 import { runScoringCascade } from "./content/scoring";
 import { toICEvaluation, syncToIC, drainOfflineQueue, loadFromICCanister } from "./content/icSync";
 import { isDuplicateItem, deduplicateItems, filterNewItems } from "./content/dedup";
@@ -69,28 +69,54 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const syncRetryTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const backfillCleanupRef = useRef<(() => void) | null>(null);
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
+  const principalText = principal ? principal.toText() : null;
+  const prevPrincipalRef = useRef<string | null>(null);
 
+  // Load cached content scoped to the current principal. Re-runs on principal
+  // change (login/logout/account switch) so User A's cache never leaks to B.
   useEffect(() => {
     let cancelled = false;
-    loadCachedContent().then(items => {
+    const previous = prevPrincipalRef.current;
+    const changed = previous !== principalText;
+    // Storage purge only when switching between two distinct authenticated
+    // principals — logging the same user back in must NOT destroy their cache.
+    const isAccountSwitch = changed && previous !== null && principalText !== null;
+    prevPrincipalRef.current = principalText;
+
+    const next = async () => {
+      if (changed && previous !== null) {
+        // Drop in-memory state so a stale view of the previous user is never
+        // rendered while the new bucket is being loaded.
+        setContent([]);
+        setPendingActions(0);
+      }
+      if (isAccountSwitch) {
+        try {
+          await clearCachedContent(previous);
+        } catch (err) {
+          console.warn("[content] Failed to purge cache for previous principal:", errMsg(err));
+        }
+      }
+      const items = await loadCachedContent(principalText);
       if (!cancelled && items.length > 0) {
         setContent(items);
       }
-    }).catch(err => {
+    };
+    next().catch(err => {
       console.warn("[content] Failed to load cached content:", errMsg(err));
     }).finally(() => {
       if (!cancelled) setCacheChecked(true);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [principalText]);
 
   const doSyncToIC = useCallback(<T extends "saveEvaluation" | "updateEvaluation">(
     promise: Promise<unknown>,
     actionType: T,
     payload: T extends "saveEvaluation" ? SaveEvaluationPayload : UpdateEvaluationPayload,
   ) => {
-    syncToIC(promise, actionType, payload, setSyncStatus, setPendingActions, addNotification);
-  }, [addNotification]);
+    syncToIC(promise, actionType, payload, setSyncStatus, setPendingActions, addNotification, principalText);
+  }, [addNotification, principalText]);
 
   useEffect(() => {
     let stale = false;
@@ -137,17 +163,17 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   useEffect(() => {
     let cancelled = false;
-    dequeueAll().then(a => {
+    dequeueAll(principalText).then(a => {
       if (!cancelled) setPendingActions(a.length);
     }).catch((err) => {
       console.warn("[content] Failed to load pending action count:", errMsg(err));
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [principalText]);
 
   useEffect(() => {
-    saveCachedContent(content);
-  }, [content]);
+    saveCachedContent(content, principalText);
+  }, [content, principalText]);
 
   useEffect(() => {
     const updateTimestamps = () => {

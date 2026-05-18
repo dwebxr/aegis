@@ -31,7 +31,7 @@ beforeEach(() => {
 
 describe("loadCachedContent — validation edge cases", () => {
   it("rejects items where scores is a string", async () => {
-    localStorage.setItem("aegis-content-cache", JSON.stringify([
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify([
       { id: "x", text: "t", source: "rss", createdAt: 1, verdict: "q", validated: true, flagged: false, scores: "not-obj" },
     ]));
     const result = await loadCachedContent();
@@ -40,7 +40,7 @@ describe("loadCachedContent — validation edge cases", () => {
 
   it("accepts items where scores.composite is NaN (typeof NaN === 'number')", async () => {
     // NaN serializes to null in JSON, so composite becomes null after JSON.parse
-    localStorage.setItem("aegis-content-cache", JSON.stringify([
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify([
       { id: "x", text: "t", source: "rss", createdAt: 1, verdict: "q", validated: true, flagged: false, scores: { composite: null } },
     ]));
     const result = await loadCachedContent();
@@ -49,28 +49,28 @@ describe("loadCachedContent — validation edge cases", () => {
   });
 
   it("rejects null and undefined entries in array", async () => {
-    localStorage.setItem("aegis-content-cache", JSON.stringify([null, undefined, false, 0, ""]));
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify([null, undefined, false, 0, ""]));
     const result = await loadCachedContent();
     expect(result).toHaveLength(0);
   });
 
   it("accepts items with extra fields (forwards compatibility)", async () => {
     const item = { ...makeItem({ id: "extended" }), futureField: "hello", anotherField: 42 };
-    localStorage.setItem("aegis-content-cache", JSON.stringify([item]));
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify([item]));
     const result = await loadCachedContent();
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("extended");
   });
 
   it("handles empty array in localStorage", async () => {
-    localStorage.setItem("aegis-content-cache", JSON.stringify([]));
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify([]));
     const result = await loadCachedContent();
     expect(result).toEqual([]);
   });
 
   it("handles very large dataset from cache", async () => {
     const items = Array.from({ length: 500 }, (_, i) => makeItem({ id: `big-${i}` }));
-    localStorage.setItem("aegis-content-cache", JSON.stringify(items));
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify(items));
     const result = await loadCachedContent();
     expect(result).toHaveLength(500);
   });
@@ -102,7 +102,7 @@ describe("saveCachedContent — debounce edge cases", () => {
     saveCachedContent([]);
     jest.advanceTimersByTime(1100);
 
-    const raw = localStorage.getItem("aegis-content-cache");
+    const raw = localStorage.getItem("aegis-content-cache:anon");
     if (raw) {
       expect(JSON.parse(raw)).toEqual([]);
     }

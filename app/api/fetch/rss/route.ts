@@ -3,8 +3,10 @@ import * as Sentry from "@sentry/nextjs";
 import Parser from "rss-parser";
 import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
-import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
+import { blockPrivateUrl } from "@/lib/utils/url";
+import { safeFetch } from "@/lib/utils/safeFetch.server";
 import { stripHtmlToText } from "@/lib/utils/text";
+import { safeRssLink } from "./safeRssLink";
 
 export const maxDuration = 30;
 
@@ -143,7 +145,7 @@ function buildItems(feed: { items?: Parser.Item[] }, limit: number) {
     return {
       title: item.title || "",
       content: textContent.slice(0, 5000),
-      link: item.link || "",
+      link: safeRssLink(item.link),
       author: item.creator || rawAuthor || "",
       publishedDate: item.pubDate || item.isoDate || "",
       imageUrl,

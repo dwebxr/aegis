@@ -354,7 +354,7 @@ describe("syncToIC", () => {
 
     const failingPromise = Promise.reject(new Error("Network error"));
 
-    syncToIC(failingPromise, "saveEvaluation", { itemId: "x" }, setSyncStatus, setPendingActions, addNotification);
+    syncToIC(failingPromise, "saveEvaluation", { itemId: "x" }, setSyncStatus, setPendingActions, addNotification, "p-test");
 
     // Wait for async catch handler
     await new Promise(r => setTimeout(r, 50));
@@ -363,7 +363,7 @@ describe("syncToIC", () => {
     expect(setPendingActions).toHaveBeenCalled();
     expect(addNotification).toHaveBeenCalledWith(expect.stringContaining("locally"), "info");
 
-    const queued = await dequeueAll();
+    const queued = await dequeueAll("p-test");
     expect(queued).toHaveLength(1);
     expect(queued[0].type).toBe("saveEvaluation");
   });
@@ -373,13 +373,13 @@ describe("syncToIC", () => {
     const setPendingActions = jest.fn();
     const addNotification = jest.fn();
 
-    syncToIC(Promise.resolve(), "saveEvaluation", { itemId: "noop" }, setSyncStatus, setPendingActions, addNotification);
+    syncToIC(Promise.resolve(), "saveEvaluation", { itemId: "noop" }, setSyncStatus, setPendingActions, addNotification, "p-test");
 
     await new Promise(r => setTimeout(r, 50));
 
     expect(setSyncStatus).not.toHaveBeenCalled();
     expect(addNotification).not.toHaveBeenCalled();
-    const queued = await dequeueAll();
+    const queued = await dequeueAll("p-test");
     expect(queued).toHaveLength(0);
   });
 });
@@ -395,7 +395,7 @@ describe("drainOfflineQueue", () => {
   }
 
   it("replays updateEvaluation actions", async () => {
-    await enqueueAction("updateEvaluation", { id: "item1", validated: true, flagged: false });
+    await enqueueAction("updateEvaluation", { id: "item1", validated: true, flagged: false }, principal.toText());
 
     const actor = makeMockActor();
     const contentRef = { current: [] as ContentItem[] };
@@ -410,7 +410,7 @@ describe("drainOfflineQueue", () => {
   });
 
   it("replays saveEvaluation actions with matching content item", async () => {
-    await enqueueAction("saveEvaluation", { itemId: "save-me" });
+    await enqueueAction("saveEvaluation", { itemId: "save-me" }, principal.toText());
 
     const actor = makeMockActor();
     const item = makeItem({ id: "save-me" });
@@ -424,7 +424,7 @@ describe("drainOfflineQueue", () => {
   });
 
   it("skips saveEvaluation when content item not found", async () => {
-    await enqueueAction("saveEvaluation", { itemId: "missing" });
+    await enqueueAction("saveEvaluation", { itemId: "missing" }, principal.toText());
 
     const actor = makeMockActor();
     const contentRef = { current: [] as ContentItem[] };
@@ -437,11 +437,11 @@ describe("drainOfflineQueue", () => {
   });
 
   it("drops actions after 5 retries", async () => {
-    await enqueueAction("updateEvaluation", { id: "retry-me", validated: true, flagged: false });
+    await enqueueAction("updateEvaluation", { id: "retry-me", validated: true, flagged: false }, principal.toText());
 
     // Manually increment retries to 5
     const { incrementRetries } = await import("@/lib/offline/actionQueue");
-    const actions = await dequeueAll();
+    const actions = await dequeueAll(principal.toText());
     for (let i = 0; i < 5; i++) {
       await incrementRetries(actions[0].id!);
     }
@@ -456,12 +456,12 @@ describe("drainOfflineQueue", () => {
     // Should not call actor methods for dropped action
     expect(actor.updateEvaluation).not.toHaveBeenCalled();
     // Queue should be empty after dropping
-    const remaining = await dequeueAll();
+    const remaining = await dequeueAll(principal.toText());
     expect(remaining).toHaveLength(0);
   });
 
   it("increments retries on replay failure", async () => {
-    await enqueueAction("updateEvaluation", { id: "fail-me", validated: true, flagged: false });
+    await enqueueAction("updateEvaluation", { id: "fail-me", validated: true, flagged: false }, principal.toText());
 
     const actor = makeMockActor();
     (actor.updateEvaluation as unknown as jest.Mock).mockRejectedValue(new Error("IC error"));
@@ -471,7 +471,7 @@ describe("drainOfflineQueue", () => {
 
     await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus);
 
-    const remaining = await dequeueAll();
+    const remaining = await dequeueAll(principal.toText());
     expect(remaining).toHaveLength(1);
     expect(remaining[0].retries).toBe(1);
   });

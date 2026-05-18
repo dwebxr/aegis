@@ -1,14 +1,18 @@
 import type { ContentItem } from "@/lib/types/content";
 import { errMsg } from "@/lib/utils/errors";
-import { isIDBAvailable, idbGet, idbPut, STORE_CONTENT_CACHE } from "@/lib/storage/idb";
+import { isIDBAvailable, idbGet, idbPut, idbDelete, STORE_CONTENT_CACHE } from "@/lib/storage/idb";
 
-const CONTENT_CACHE_KEY = "aegis-content-cache";
-const IDB_CONTENT_KEY = "items";
+const CONTENT_CACHE_KEY_PREFIX = "aegis-content-cache";
+const IDB_CONTENT_KEY_PREFIX = "items";
 const MAX_CACHED_ITEMS = 200;
 const SAVE_DEBOUNCE_MS = 1000;
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let useIDB = false;
+
+function scopedKey(prefix: string, principal: string | null | undefined): string {
+  return principal ? `${prefix}:${principal}` : `${prefix}:anon`;
+}
 
 function isFiniteInRange(v: unknown): boolean {
   return Number.isFinite(v) && (v as number) >= 0 && (v as number) <= 10;
@@ -61,11 +65,13 @@ export function truncatePreservingActioned(items: ContentItem[]): ContentItem[] 
   return items.filter(c => preservedIds.has(c.id));
 }
 
-export async function loadCachedContent(): Promise<ContentItem[]> {
+export async function loadCachedContent(principal?: string | null): Promise<ContentItem[]> {
   useIDB = isIDBAvailable();
+  const idbKey = scopedKey(IDB_CONTENT_KEY_PREFIX, principal);
+  const lsKey = scopedKey(CONTENT_CACHE_KEY_PREFIX, principal);
   if (useIDB) {
     try {
-      const data = await idbGet<unknown>(STORE_CONTENT_CACHE, IDB_CONTENT_KEY);
+      const data = await idbGet<unknown>(STORE_CONTENT_CACHE, idbKey);
       if (data) return validateContentItems(data);
     } catch (err) {
       console.warn("[content] IDB load failed, trying localStorage:", errMsg(err));
@@ -73,7 +79,7 @@ export async function loadCachedContent(): Promise<ContentItem[]> {
   }
   if (typeof globalThis.localStorage === "undefined") return [];
   try {
-    const raw = localStorage.getItem(CONTENT_CACHE_KEY);
+    const raw = localStorage.getItem(lsKey);
     if (!raw) return [];
     return validateContentItems(JSON.parse(raw));
   } catch (err) {
@@ -82,17 +88,19 @@ export async function loadCachedContent(): Promise<ContentItem[]> {
   }
 }
 
-export function saveCachedContent(items: ContentItem[]): void {
+export function saveCachedContent(items: ContentItem[], principal?: string | null): void {
   if (saveTimer) clearTimeout(saveTimer);
+  const idbKey = scopedKey(IDB_CONTENT_KEY_PREFIX, principal);
+  const lsKey = scopedKey(CONTENT_CACHE_KEY_PREFIX, principal);
   saveTimer = setTimeout(() => {
     saveTimer = null;
     const truncated = truncatePreservingActioned(items);
     if (useIDB) {
-      idbPut(STORE_CONTENT_CACHE, IDB_CONTENT_KEY, truncated).catch(err => {
+      idbPut(STORE_CONTENT_CACHE, idbKey, truncated).catch(err => {
         console.warn("[content] IDB save failed, falling back to localStorage:", errMsg(err));
         if (typeof globalThis.localStorage !== "undefined") {
           try {
-            localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncated));
+            localStorage.setItem(lsKey, JSON.stringify(truncated));
           } catch (lsErr) {
             console.error("[content] Both IDB and localStorage save failed:", errMsg(lsErr));
           }
@@ -100,12 +108,37 @@ export function saveCachedContent(items: ContentItem[]): void {
       });
     } else if (typeof globalThis.localStorage !== "undefined") {
       try {
-        localStorage.setItem(CONTENT_CACHE_KEY, JSON.stringify(truncated));
+        localStorage.setItem(lsKey, JSON.stringify(truncated));
       } catch (err) {
         console.error("[content] localStorage save failed (quota?):", errMsg(err));
       }
     }
   }, SAVE_DEBOUNCE_MS);
+}
+
+export async function clearCachedContent(principal?: string | null): Promise<void> {
+  // Drop both the principal-scoped key and the legacy unscoped key — the legacy
+  // key could still contain another account's data from before this migration.
+  const idbKeys = [scopedKey(IDB_CONTENT_KEY_PREFIX, principal), "items"];
+  const lsKeys = [scopedKey(CONTENT_CACHE_KEY_PREFIX, principal), "aegis-content-cache"];
+  if (isIDBAvailable()) {
+    for (const k of idbKeys) {
+      try {
+        await idbDelete(STORE_CONTENT_CACHE, k);
+      } catch (err) {
+        console.warn("[content] IDB delete failed for", k, errMsg(err));
+      }
+    }
+  }
+  if (typeof globalThis.localStorage !== "undefined") {
+    for (const k of lsKeys) {
+      try {
+        localStorage.removeItem(k);
+      } catch (err) {
+        console.warn("[content] localStorage remove failed for", k, errMsg(err));
+      }
+    }
+  }
 }
 
 export function _resetContentCache(): void {

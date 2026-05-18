@@ -1,15 +1,25 @@
-import { POST } from "@/app/api/fetch/url/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";
 import { _resetUrlCache } from "@/lib/cache/urlExtract";
 
 jest.mock("@extractus/article-extractor", () => ({
-  extract: jest.fn(),
+  extractFromHtml: jest.fn(),
 }));
 
-import { extract } from "@extractus/article-extractor";
+// Bypass safeFetch — the route fetches HTML server-side before extraction.
+jest.mock("@/lib/utils/safeFetch.server", () => ({
+  safeFetch: jest.fn(async () => ({
+    ok: true,
+    status: 200,
+    headers: new Headers({ "content-type": "text/html" }),
+    arrayBuffer: async () => new TextEncoder().encode("<html><body>mock</body></html>").buffer,
+  })),
+}));
 
-const mockExtract = extract as jest.MockedFunction<typeof extract>;
+import { POST } from "@/app/api/fetch/url/route";
+import { extractFromHtml } from "@extractus/article-extractor";
+
+const mockExtract = extractFromHtml as jest.MockedFunction<typeof extractFromHtml>;
 
 function makeRequest(body: Record<string, unknown>): NextRequest {
   return new NextRequest("http://localhost:3000/api/fetch/url", {

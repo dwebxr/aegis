@@ -1,4 +1,4 @@
-import { generatePushToken } from "@/lib/api/pushToken";
+import { generatePushToken, isAllowedPushEndpoint } from "@/lib/api/pushToken";
 import { createHmac } from "crypto";
 
 describe("generatePushToken", () => {
@@ -71,5 +71,75 @@ describe("generatePushToken", () => {
     process.env.VAPID_PRIVATE_KEY = "k";
     expect(() => generatePushToken("")).not.toThrow();
     expect(generatePushToken("")).toHaveLength(32);
+  });
+});
+
+describe("isAllowedPushEndpoint — accepted Web Push services", () => {
+  it.each([
+    "https://fcm.googleapis.com/fcm/send/abc123",
+    "https://fcm.googleapis.com/wp/abc",
+    "https://updates.push.services.mozilla.com/wpush/v2/gAAAA",
+    "https://web.push.apple.com/QABCD",
+  ])("accepts %s", (endpoint) => {
+    expect(isAllowedPushEndpoint(endpoint)).toBe(true);
+  });
+
+  it.each([
+    "https://sub.push.apple.com/abc",
+    "https://wns2-bl2p.notify.windows.com/?token=AwYAAAA",
+  ])("accepts host suffix match: %s", (endpoint) => {
+    expect(isAllowedPushEndpoint(endpoint)).toBe(true);
+  });
+
+  it("treats hostname case-insensitively", () => {
+    expect(isAllowedPushEndpoint("https://FCM.GOOGLEAPIS.COM/fcm/send/x")).toBe(true);
+    expect(isAllowedPushEndpoint("https://Web.Push.Apple.com/X")).toBe(true);
+  });
+
+  it("ignores port (URL.hostname strips it)", () => {
+    expect(isAllowedPushEndpoint("https://fcm.googleapis.com:443/fcm/send/x")).toBe(true);
+  });
+});
+
+describe("isAllowedPushEndpoint — rejected hosts", () => {
+  it.each([
+    "https://attacker.com/relay",
+    "https://api.example.com/push",
+    "https://fcm.googleapis.com.attacker.com/x",   // hostname spoof
+    "https://attacker.notify.windows.com.evil.com/x",
+    "https://internal/push",
+  ])("rejects unrelated public host: %s", (endpoint) => {
+    expect(isAllowedPushEndpoint(endpoint)).toBe(false);
+  });
+
+  it("rejects http:// (TLS required)", () => {
+    expect(isAllowedPushEndpoint("http://fcm.googleapis.com/fcm/send/x")).toBe(false);
+  });
+
+  it("rejects non-URL protocols", () => {
+    expect(isAllowedPushEndpoint("javascript:alert(1)")).toBe(false);
+    expect(isAllowedPushEndpoint("data:text/plain;base64,SGVsbG8=")).toBe(false);
+    expect(isAllowedPushEndpoint("file:///etc/passwd")).toBe(false);
+    expect(isAllowedPushEndpoint("ftp://fcm.googleapis.com/x")).toBe(false);
+  });
+
+  it("rejects malformed / empty inputs", () => {
+    expect(isAllowedPushEndpoint("")).toBe(false);
+    expect(isAllowedPushEndpoint("not-a-url")).toBe(false);
+    expect(isAllowedPushEndpoint("https://")).toBe(false);
+  });
+
+  it("rejects suffix-bypass attempts", () => {
+    // .push.apple.com suffix must require a leading dot — bare match shouldn't pass.
+    expect(isAllowedPushEndpoint("https://faux-push.apple.com.evil/x")).toBe(false);
+    expect(isAllowedPushEndpoint("https://notnotify.windows.com.evil/x")).toBe(false);
+  });
+
+  it("rejects requests pointing at private addresses even with valid scheme", () => {
+    // Hostname allowlist runs at URL level — IP literals not on the list are
+    // rejected outright, so SSRF can't slip in through the push send path.
+    expect(isAllowedPushEndpoint("https://127.0.0.1/")).toBe(false);
+    expect(isAllowedPushEndpoint("https://169.254.169.254/")).toBe(false);
+    expect(isAllowedPushEndpoint("https://10.0.0.1/")).toBe(false);
   });
 });

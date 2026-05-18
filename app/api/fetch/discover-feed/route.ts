@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg, isTimeout } from "@/lib/utils/errors";
-import { blockPrivateUrl, safeFetch } from "@/lib/utils/url";
+import { blockPrivateUrl } from "@/lib/utils/url";
+import { safeFetch } from "@/lib/utils/safeFetch.server";
 import { detectPlatformFeed, extractYouTubeChannelId } from "@/lib/sources/platformFeed";
 
 export const maxDuration = 30;

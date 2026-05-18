@@ -179,7 +179,7 @@ describe("validateContentItems — score bounds via loadCachedContent", () => {
   });
 
   function cacheItems(items: unknown[]) {
-    localStorage.setItem("aegis-content-cache", JSON.stringify(items));
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify(items));
   }
 
   const validItem = {

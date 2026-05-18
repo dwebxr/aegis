@@ -21,6 +21,10 @@ jest.mock("@/contexts/ContentContext", () => ({
   useContent: () => ({ syncBriefing: jest.fn() }),
 }));
 
+jest.mock("@/contexts/AgentContext", () => ({
+  useAgent: () => ({ isEnabled: false }),
+}));
+
 const { BriefingTab } = require("@/components/tabs/BriefingTab");
 
 const makeItem = (overrides: Partial<ContentItem> = {}): ContentItem => ({

@@ -1,14 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { extract } from "@extractus/article-extractor";
+import { extractFromHtml } from "@extractus/article-extractor";
 import { guardAndParse } from "@/lib/api/rateLimit";
 import { blockPrivateUrl } from "@/lib/utils/url";
+import { safeFetch } from "@/lib/utils/safeFetch.server";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
 import { stripHtmlToText } from "@/lib/utils/text";
 import { type ExtractionResult, getUrlCached, setUrlCache } from "@/lib/cache/urlExtract";
 
+const MAX_HTML_BYTES = 5_000_000;
+
 export const maxDuration = 30;
+
+// SSRF-safe fetch + extract: hostname/IP are validated by safeFetch on every
+// redirect hop, so article-extractor never sees a raw URL that could resolve
+// to a private network.
+async function fetchAndExtract(url: string) {
+  const res = await safeFetch(url, {
+    headers: { "user-agent": "AegisBot/1.0 (+https://aegis-ai.xyz)" },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("html") && !contentType.includes("text")) {
+    throw new Error(`Unsupported content type: ${contentType}`);
+  }
+  const buf = await res.arrayBuffer();
+  if (buf.byteLength > MAX_HTML_BYTES) throw new Error("Response too large");
+  const html = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+  return extractFromHtml(html, url);
+}
 
 async function extractOne(url: string): Promise<ExtractionResult> {
   const cached = getUrlCached(url);
@@ -28,7 +49,7 @@ async function extractOne(url: string): Promise<ExtractionResult> {
 
   let article;
   try {
-    article = await withTimeout(extract(url), 15_000, "Article extraction timed out");
+    article = await withTimeout(fetchAndExtract(url), 15_000, "Article extraction timed out");
   } catch (err) {
     console.error("[fetch/url] Extract failed:", url, errMsg(err));
     Sentry.captureException(err, { tags: { route: "fetch-url", failure: "extract" }, extra: { url } });

@@ -23,7 +23,7 @@ interface InputSubscription {
   keys: { p256dh: string; auth: string };
 }
 
-function makeSub(endpoint = "https://push.example.com/1"): InputSubscription {
+function makeSub(endpoint = "https://fcm.googleapis.com/fcm/send/1"): InputSubscription {
   return { endpoint, keys: { p256dh: "k", auth: "a" } };
 }
 
@@ -88,7 +88,7 @@ describe("POST /api/push/send — error paths", () => {
   });
 
   it("returns 400 when subscriptions exceeds the cap", async () => {
-    const big: InputSubscription[] = Array.from({ length: 6 }, (_, i) => makeSub(`https://push.example.com/${i}`));
+    const big: InputSubscription[] = Array.from({ length: 6 }, (_, i) => makeSub(`https://fcm.googleapis.com/fcm/send/${i}`));
     const res = await POST(makeRequest(withToken("abc-123", big)));
     expect(res.status).toBe(400);
     const data = await res.json();
@@ -96,16 +96,16 @@ describe("POST /api/push/send — error paths", () => {
   });
 
   it("returns expiredEndpoints for 404 responses", async () => {
-    const subs = [makeSub("https://push.example.com/gone404")];
+    const subs = [makeSub("https://fcm.googleapis.com/fcm/send/gone404")];
     mockSendNotification.mockRejectedValue({ statusCode: 404 });
 
     const res = await POST(makeRequest(withToken("abc-123", subs)));
     const data = await res.json();
-    expect(data.expiredEndpoints).toEqual(["https://push.example.com/gone404"]);
+    expect(data.expiredEndpoints).toEqual(["https://fcm.googleapis.com/fcm/send/gone404"]);
   });
 
   it("does not mark non-410/404 errors as expired", async () => {
-    const subs = [makeSub("https://push.example.com/fail")];
+    const subs = [makeSub("https://fcm.googleapis.com/fcm/send/fail")];
     mockSendNotification.mockRejectedValue({ statusCode: 500 });
 
     const res = await POST(makeRequest(withToken("abc-123", subs)));

@@ -3,7 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import webpush from "web-push";
 import { Principal } from "@dfinity/principal";
 import { rateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
-import { generatePushToken } from "@/lib/api/pushToken";
+import { generatePushToken, isAllowedPushEndpoint } from "@/lib/api/pushToken";
 import { errMsg } from "@/lib/utils/errors";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 
@@ -27,7 +27,7 @@ const MAX_SUBSCRIPTIONS = 5;
 function isValidSubscription(s: unknown): s is InputSubscription {
   if (!s || typeof s !== "object") return false;
   const sub = s as Record<string, unknown>;
-  if (typeof sub.endpoint !== "string" || !sub.endpoint.startsWith("https://")) return false;
+  if (typeof sub.endpoint !== "string" || !isAllowedPushEndpoint(sub.endpoint)) return false;
   const keys = sub.keys as Record<string, unknown> | undefined;
   if (!keys || typeof keys !== "object") return false;
   return typeof keys.p256dh === "string" && typeof keys.auth === "string";

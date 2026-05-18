@@ -24,7 +24,7 @@ interface InputSubscription {
   keys: { p256dh: string; auth: string };
 }
 
-function makeSub(endpoint = "https://push.example.com/1"): InputSubscription {
+function makeSub(endpoint = "https://fcm.googleapis.com/fcm/send/1"): InputSubscription {
   return { endpoint, keys: { p256dh: "k", auth: "a" } };
 }
 
@@ -79,7 +79,7 @@ describe("POST /api/push/send", () => {
   it("returns 400 for an invalid subscription shape", async () => {
     const res = await POST(makeRequest({
       principal: "abc-123",
-      subscriptions: [{ endpoint: "https://push.example.com/x" }],
+      subscriptions: [{ endpoint: "https://fcm.googleapis.com/fcm/send/x" }],
       token: "anything",
     }));
     expect(res.status).toBe(400);
@@ -104,10 +104,10 @@ describe("POST /api/push/send", () => {
   });
 
   it("returns 403 when token was issued for a different endpoint set", async () => {
-    const tokenForA = generatePushToken("abc-123", ["https://push.example.com/A"]);
+    const tokenForA = generatePushToken("abc-123", ["https://fcm.googleapis.com/fcm/send/A"]);
     const res = await POST(makeRequest({
       principal: "abc-123",
-      subscriptions: [makeSub("https://push.example.com/B")],
+      subscriptions: [makeSub("https://fcm.googleapis.com/fcm/send/B")],
       token: tokenForA,
     }));
     expect(res.status).toBe(403);
@@ -116,8 +116,8 @@ describe("POST /api/push/send", () => {
   it("sends notifications to provided subscriptions", async () => {
     mockSendNotification.mockResolvedValue({ statusCode: 201 });
     const subs = [
-      { endpoint: "https://push.example.com/1", keys: { p256dh: "key1", auth: "auth1" } },
-      { endpoint: "https://push.example.com/2", keys: { p256dh: "key2", auth: "auth2" } },
+      { endpoint: "https://fcm.googleapis.com/fcm/send/1", keys: { p256dh: "key1", auth: "auth1" } },
+      { endpoint: "https://fcm.googleapis.com/fcm/send/2", keys: { p256dh: "key2", auth: "auth2" } },
     ];
 
     const res = await POST(makeRequest(withToken("abc-123", subs, { title: "Test", body: "Hello" })));
@@ -128,14 +128,14 @@ describe("POST /api/push/send", () => {
   });
 
   it("returns expiredEndpoints for 410 Gone responses", async () => {
-    const subs = [makeSub("https://push.example.com/expired")];
+    const subs = [makeSub("https://fcm.googleapis.com/fcm/send/expired")];
     mockSendNotification.mockRejectedValue({ statusCode: 410 });
 
     const res = await POST(makeRequest(withToken("abc-123", subs)));
     const data = await res.json();
     expect(data.sent).toBe(0);
     expect(data.failed).toBe(1);
-    expect(data.expiredEndpoints).toEqual(["https://push.example.com/expired"]);
+    expect(data.expiredEndpoints).toEqual(["https://fcm.googleapis.com/fcm/send/expired"]);
   });
 
   it("rate limits after 5 requests", async () => {

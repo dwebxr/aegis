@@ -30,6 +30,10 @@ jest.mock("@/contexts/ContentContext", () => ({
   useContent: () => ({ syncBriefing: jest.fn() }),
 }));
 
+jest.mock("@/contexts/AgentContext", () => ({
+  useAgent: () => ({ isEnabled: false }),
+}));
+
 jest.mock("@/lib/apiKey/storage", () => ({
   getUserApiKey: () => null,
 }));

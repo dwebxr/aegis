@@ -154,6 +154,7 @@ describe("ContentContext IC integration", () => {
       expect.any(Function),
       expect.any(Function),
       expect.any(Function),
+      expect.any(String),
     );
   });
 
@@ -175,6 +176,7 @@ describe("ContentContext IC integration", () => {
       expect.any(Function),
       expect.any(Function),
       expect.any(Function),
+      expect.any(String),
     );
   });
 
@@ -196,6 +198,7 @@ describe("ContentContext IC integration", () => {
       expect.any(Function),
       expect.any(Function),
       expect.any(Function),
+      expect.any(String),
     );
   });
 

@@ -3,15 +3,11 @@ import { POST as discoverPost } from "@/app/api/fetch/discover-feed/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";
 
-jest.mock("@/lib/utils/url", () => {
-  const actual = jest.requireActual("@/lib/utils/url");
-  return {
-    ...actual,
-    safeFetch: jest.fn(),
-  };
-});
+jest.mock("@/lib/utils/safeFetch.server", () => ({
+  safeFetch: jest.fn(),
+}));
 
-import { safeFetch } from "@/lib/utils/url";
+import { safeFetch } from "@/lib/utils/safeFetch.server";
 const mockSafeFetch = safeFetch as jest.MockedFunction<typeof safeFetch>;
 
 function makeRequest(url: string, body: Record<string, unknown>): NextRequest {

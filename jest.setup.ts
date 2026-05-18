@@ -6,6 +6,11 @@ console.warn = noop;
 console.error = noop;
 console.debug = noop;
 
+// server-only throws when imported outside an RSC/server context; in jest we
+// exercise the same files from a node-like environment where that guard is a
+// false positive. Stub it to a no-op.
+jest.mock("server-only", () => ({}));
+
 // Mock our Tooltip wrapper so tests don't need TooltipProvider.
 // Tooltip content renders as hidden span (preserves aria-label testing).
 jest.mock("@/components/ui/tooltip", () => {

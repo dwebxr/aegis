@@ -38,6 +38,22 @@ persistent actor AegisBackend {
   let FLAG_THRESHOLD : Nat = 3; // Flags needed to slash stake
   let DEPOSIT_EXPIRY_NS : Int = 30 * 24 * 60 * 60 * 1_000_000_000; // 30 days in nanoseconds
 
+  // Per-field UTF-8 byte caps, enforced via textBytes(). Counting bytes
+  // (not code points) blocks 200KB of CJK slipping under a 50KB cap. Names
+  // cannot be changed without an explicit migration (M0169) — persistent
+  // actor `let` fields are part of the stable schema.
+  let MAX_EVAL_TEXT : Nat = 50_000;
+  let MAX_EVAL_REASON : Nat = 10_000;
+  let MAX_EVAL_URL : Nat = 4_000;
+  let MAX_SOURCE_CONFIG_JSON : Nat = 20_000;
+  let MAX_PUSH_ENDPOINT : Nat = 2_000;
+  let MAX_PUSH_KEY : Nat = 512;
+  let MAX_BATCH_EVALS : Nat = 100;
+
+  func textBytes(s : Text) : Nat {
+    Blob.toArray(Text.encodeUtf8(s)).size();
+  };
+
   // — Non-custodial: protocol wallet + cycles top-up —
 
   let PROTOCOL_WALLET : Principal = Principal.fromText("lg3sn-xvuag-vrcgb-xkhyo-4tlui-dw23v-sgtz3-573c7-obhuo-apcx6-uqe");
@@ -94,6 +110,10 @@ persistent actor AegisBackend {
   // A2A Offer / Receipt storage
   var stableOffers : [(Text, Types.Offer)] = [];
   var stableReceipts : [(Text, Types.Receipt)] = [];
+  // Offer ID -> owner Principal. Tracked separately to keep Types.Offer
+  // backward-compatible. Legacy offers without an entry are immutable
+  // (only controllers can delete) — see put_offer / delete_offer.
+  var stableOfferOwners : [(Text, Principal)] = [];
 
   // — Runtime state (rebuilt from stable on upgrade) —
 
@@ -138,6 +158,7 @@ persistent actor AegisBackend {
   // A2A Offer / Receipt runtime state
   transient var offers = HashMap.HashMap<Text, Types.Offer>(16, Text.equal, Text.hash);
   transient var receipts = HashMap.HashMap<Text, Types.Receipt>(16, Text.equal, Text.hash);
+  transient var offerOwners = HashMap.HashMap<Text, Principal>(16, Text.equal, Text.hash);
 
   // Owner -> evaluation IDs index for fast user queries
   transient var ownerIndex = HashMap.HashMap<Principal, Buffer.Buffer<Text>>(16, Principal.equal, Principal.hash);
@@ -188,6 +209,7 @@ persistent actor AegisBackend {
     stableUserPreferences := Iter.toArray(userPreferences.entries());
     stableOffers := Iter.toArray(offers.entries());
     stableReceipts := Iter.toArray(receipts.entries());
+    stableOfferOwners := Iter.toArray(offerOwners.entries());
   };
 
   system func postupgrade() {
@@ -248,6 +270,10 @@ persistent actor AegisBackend {
       receipts.put(hash, receipt);
     };
     stableReceipts := [];
+    for ((id, owner) in stableOfferOwners.vals()) {
+      offerOwners.put(id, owner);
+    };
+    stableOfferOwners := [];
     initCertCache();
   };
 
@@ -447,7 +473,22 @@ persistent actor AegisBackend {
     let caller = msg.caller;
     requireAuthenticated(caller);
 
-    let isNew = evaluations.get(eval.id) == null;
+    if (textBytes(eval.text) > MAX_EVAL_TEXT) { Debug.trap("eval text too large") };
+    if (textBytes(eval.reason) > MAX_EVAL_REASON) { Debug.trap("eval reason too large") };
+    switch (eval.sourceUrl) {
+      case (?u) { if (textBytes(u) > MAX_EVAL_URL) { Debug.trap("sourceUrl too large") } };
+      case null {};
+    };
+
+    let isNew = switch (evaluations.get(eval.id)) {
+      case (?existing) {
+        if (not Principal.equal(existing.owner, caller)) {
+          Debug.trap("not owner");
+        };
+        false;
+      };
+      case null { true };
+    };
 
     let tagged : Types.ContentEvaluation = {
       id = eval.id;
@@ -540,12 +581,28 @@ persistent actor AegisBackend {
     let caller = msg.caller;
     requireAuthenticated(caller);
 
+    if (evals.size() > MAX_BATCH_EVALS) { Debug.trap("batch too large") };
+
     var saved : Nat = 0;
     var newCount : Nat = 0;
     var newQuality : Nat = 0;
     var newSlop : Nat = 0;
-    for (eval in evals.vals()) {
-      let isNew = evaluations.get(eval.id) == null;
+    label batch for (eval in evals.vals()) {
+      if (textBytes(eval.text) > MAX_EVAL_TEXT) { continue batch };
+      if (textBytes(eval.reason) > MAX_EVAL_REASON) { continue batch };
+      switch (eval.sourceUrl) {
+        case (?u) { if (textBytes(u) > MAX_EVAL_URL) { continue batch } };
+        case null {};
+      };
+
+      let existing = evaluations.get(eval.id);
+      switch (existing) {
+        case (?e) {
+          if (not Principal.equal(e.owner, caller)) { continue batch };
+        };
+        case null {};
+      };
+      let isNew = existing == null;
 
       let tagged : Types.ContentEvaluation = {
         id = eval.id;
@@ -617,6 +674,10 @@ persistent actor AegisBackend {
   public shared(msg) func saveSourceConfig(config : Types.SourceConfigEntry) : async Text {
     let caller = msg.caller;
     requireAuthenticated(caller);
+
+    if (textBytes(config.configJson) > MAX_SOURCE_CONFIG_JSON) {
+      Debug.trap("configJson too large");
+    };
 
     let tagged : Types.SourceConfigEntry = {
       id = config.id;
@@ -742,6 +803,16 @@ persistent actor AegisBackend {
     let caller = msg.caller;
     requireAuthenticated(caller);
 
+    let isNew = switch (signals.get(signal.id)) {
+      case (?existing) {
+        if (not Principal.equal(existing.owner, caller)) {
+          Debug.trap("not owner");
+        };
+        false;
+      };
+      case null { true };
+    };
+
     let tagged : Types.PublishedSignal = {
       id = signal.id;
       owner = caller;
@@ -755,7 +826,9 @@ persistent actor AegisBackend {
     };
 
     signals.put(tagged.id, tagged);
-    addToPrincipalIndex(signalOwnerIndex, caller, tagged.id);
+    if (isNew) {
+      addToPrincipalIndex(signalOwnerIndex, caller, tagged.id);
+    };
     tagged.id;
   };
 
@@ -1345,6 +1418,10 @@ persistent actor AegisBackend {
     let caller = msg.caller;
     requireAuthenticated(caller);
 
+    if (textBytes(endpoint) > MAX_PUSH_ENDPOINT) { return false };
+    if (textBytes(p256dh) > MAX_PUSH_KEY) { return false };
+    if (textBytes(auth) > MAX_PUSH_KEY) { return false };
+
     let newSub : Types.PushSubscription = {
       endpoint = endpoint;
       keys = { p256dh = p256dh; auth = auth };
@@ -1762,6 +1839,14 @@ persistent actor AegisBackend {
   public shared(msg) func saveLatestBriefing(briefingJson : Text) : async Bool {
     requireAuthenticated(msg.caller);
     if (Text.size(briefingJson) > 500_000) { return false }; // 500KB max
+    // Only persist briefings for users who have opted into D2A sharing.
+    // getLatestBriefing/getGlobalBriefingSummaries are public reads, so
+    // accepting briefings from non-d2aEnabled users would leak private data.
+    let enabled = switch (userSettings.get(msg.caller)) {
+      case (?s) { s.d2aEnabled };
+      case null { false };
+    };
+    if (not enabled) { return false };
     let snapshot : Types.D2ABriefingSnapshot = {
       owner = msg.caller;
       briefingJson = briefingJson;
@@ -1772,6 +1857,12 @@ persistent actor AegisBackend {
   };
 
   public query func getLatestBriefing(p : Principal) : async ?Text {
+    // Only expose briefings of users who have opted into D2A sharing.
+    let enabled = switch (userSettings.get(p)) {
+      case (?s) { s.d2aEnabled };
+      case null { false };
+    };
+    if (not enabled) { return null };
     switch (briefings.get(p)) {
       case (?snapshot) { ?snapshot.briefingJson };
       case null { null };
@@ -1833,6 +1924,10 @@ persistent actor AegisBackend {
       d2aEnabled = settings.d2aEnabled;
       updatedAt = Time.now();
     });
+    // Toggle off → purge any previously synced briefing so it stops being public.
+    if (not settings.d2aEnabled) {
+      briefings.delete(caller);
+    };
     true;
   };
 
@@ -1870,7 +1965,21 @@ persistent actor AegisBackend {
     if (Text.size(offer.title) + Text.size(offer.description) > MAX_OFFER_TEXT) {
       Debug.trap("offer title + description exceeds 10KB");
     };
+    switch (offerOwners.get(offer.id)) {
+      case (?existingOwner) {
+        if (not Principal.equal(existingOwner, caller)) {
+          Debug.trap("not owner");
+        };
+      };
+      case null {
+        // Legacy offer (no recorded owner) is immutable except by controller.
+        if (offers.get(offer.id) != null and not Principal.isController(caller)) {
+          Debug.trap("legacy offer is immutable");
+        };
+      };
+    };
     offers.put(offer.id, offer);
+    offerOwners.put(offer.id, caller);
   };
 
   public query func get_offers(limit : Nat, offset : Nat) : async [Types.Offer] {
@@ -1892,7 +2001,22 @@ persistent actor AegisBackend {
   public shared ({ caller }) func delete_offer(id : Text) : async Bool {
     requireAuthenticated(caller);
     switch (offers.get(id)) {
-      case (?_) { offers.delete(id); true };
+      case (?_) {
+        switch (offerOwners.get(id)) {
+          case (?owner) {
+            if (not Principal.equal(owner, caller) and not Principal.isController(caller)) {
+              return false;
+            };
+          };
+          case null {
+            // Legacy offer without recorded owner — only controller may delete.
+            if (not Principal.isController(caller)) { return false };
+          };
+        };
+        offers.delete(id);
+        offerOwners.delete(id);
+        true;
+      };
       case null { false };
     };
   };

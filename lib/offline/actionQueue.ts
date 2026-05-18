@@ -34,6 +34,10 @@ interface QueuedActionBase {
   id?: number; // auto-incremented by IndexedDB
   createdAt: number;
   retries: number;
+  // Principal (text) that enqueued the action. Used to scope dequeue so a
+  // different logged-in user can't replay another user's queued saves.
+  // null = anonymous / pre-scoping legacy entry (dropped on dequeue).
+  principal: string | null;
 }
 
 function openDB(): Promise<IDBDatabase> {
@@ -64,16 +68,38 @@ function withDB<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBR
 export async function enqueueAction<T extends QueuedActionType>(
   type: T,
   payload: QueuedActionPayloadFor<T>,
+  principal: string | null,
 ): Promise<void> {
   await withDB("readwrite", store => {
     // The discriminated union narrows fine for callers, but TS can't prove the
     // generic here aligns with one branch — cast at the IDB boundary.
-    store.add({ type, payload, createdAt: Date.now(), retries: 0 } as Omit<QueuedAction, "id">);
+    store.add({ type, payload, createdAt: Date.now(), retries: 0, principal } as Omit<QueuedAction, "id">);
   });
 }
 
-export function dequeueAll(): Promise<QueuedAction[]> {
-  return withDB("readonly", store => store.getAll());
+/** Returns queued actions for the given principal only. Entries with a different
+ *  principal (or missing principal — legacy/pre-scoping) are deleted to prevent
+ *  cross-account replay. Called with `principal === null` (logged-out) is a no-op
+ *  so the queue isn't wiped during transient unauthenticated states. */
+export function dequeueAll(principal: string | null): Promise<QueuedAction[]> {
+  if (principal === null) return Promise.resolve([]);
+  return openDB().then(db => new Promise<QueuedAction[]>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.getAll();
+    const matched: QueuedAction[] = [];
+    req.onsuccess = () => {
+      for (const a of (req.result as QueuedAction[]) ?? []) {
+        if (a.principal === principal) {
+          matched.push(a);
+        } else if (a.id != null) {
+          store.delete(a.id);
+        }
+      }
+    };
+    tx.oncomplete = () => { db.close(); resolve(matched); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  }));
 }
 
 export function removeAction(id: number): Promise<void> {

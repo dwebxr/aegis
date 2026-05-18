@@ -128,7 +128,7 @@ describe("loadCachedContent", () => {
 
   it("loads valid items from localStorage", async () => {
     const item = makeItem({ id: "cached-1" });
-    localStorage.setItem("aegis-content-cache", JSON.stringify([item]));
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify([item]));
 
     const result = await loadCachedContent();
     expect(result).toHaveLength(1);
@@ -138,7 +138,7 @@ describe("loadCachedContent", () => {
   it("filters out invalid items from localStorage", async () => {
     const valid = makeItem({ id: "valid" });
     const invalid = { id: "invalid", text: "missing fields" };
-    localStorage.setItem("aegis-content-cache", JSON.stringify([valid, invalid]));
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify([valid, invalid]));
 
     const result = await loadCachedContent();
     expect(result).toHaveLength(1);
@@ -146,13 +146,13 @@ describe("loadCachedContent", () => {
   });
 
   it("returns empty array for corrupt JSON in localStorage", async () => {
-    localStorage.setItem("aegis-content-cache", "{broken json");
+    localStorage.setItem("aegis-content-cache:anon", "{broken json");
     const result = await loadCachedContent();
     expect(result).toEqual([]);
   });
 
   it("returns empty array for non-array JSON in localStorage", async () => {
-    localStorage.setItem("aegis-content-cache", JSON.stringify({ not: "array" }));
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify({ not: "array" }));
     const result = await loadCachedContent();
     expect(result).toEqual([]);
   });
@@ -174,7 +174,7 @@ describe("loadCachedContent", () => {
       42,
       "string",
     ];
-    localStorage.setItem("aegis-content-cache", JSON.stringify(testCases));
+    localStorage.setItem("aegis-content-cache:anon", JSON.stringify(testCases));
     const result = await loadCachedContent();
     expect(result).toHaveLength(0);
   });
@@ -187,14 +187,14 @@ describe("saveCachedContent", () => {
   it("does not save immediately (debounced)", () => {
     saveCachedContent([makeItem({ id: "s1" })]);
     // Before debounce fires, localStorage should be empty
-    expect(localStorage.getItem("aegis-content-cache")).toBeNull();
+    expect(localStorage.getItem("aegis-content-cache:anon")).toBeNull();
   });
 
   it("writes to localStorage after debounce elapses", () => {
     const items = [makeItem({ id: "debounce-1" })];
     saveCachedContent(items);
     jest.advanceTimersByTime(1000);
-    const stored = localStorage.getItem("aegis-content-cache");
+    const stored = localStorage.getItem("aegis-content-cache:anon");
     expect(stored).not.toBeNull();
     const parsed = JSON.parse(stored!);
     expect(parsed).toHaveLength(1);
@@ -206,7 +206,7 @@ describe("saveCachedContent", () => {
     saveCachedContent([makeItem({ id: "b" })]);
     saveCachedContent([makeItem({ id: "c" })]);
     jest.advanceTimersByTime(1000);
-    const stored = localStorage.getItem("aegis-content-cache");
+    const stored = localStorage.getItem("aegis-content-cache:anon");
     expect(stored).not.toBeNull();
     const parsed = JSON.parse(stored!);
     expect(parsed).toHaveLength(1);
@@ -217,7 +217,7 @@ describe("saveCachedContent", () => {
     const items = Array.from({ length: 250 }, (_, i) => makeItem({ id: `i-${i}` }));
     saveCachedContent(items);
     jest.advanceTimersByTime(1000);
-    const stored = localStorage.getItem("aegis-content-cache");
+    const stored = localStorage.getItem("aegis-content-cache:anon");
     expect(stored).not.toBeNull();
     const parsed = JSON.parse(stored!);
     expect(parsed.length).toBeLessThanOrEqual(200);
