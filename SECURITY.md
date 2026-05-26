@@ -33,8 +33,7 @@ We aim for coordinated disclosure: once a fix ships in production, you receive c
 - **Outdated browser** behavior on browsers older than the targeted set in `package.json` `engines`.
 - **Self-XSS** that requires the victim to paste hostile JavaScript into devtools.
 - **Missing security headers** that do not enable a concrete attack on Aegis (e.g. `Permissions-Policy` flags for features Aegis does not use).
-- **CVEs in dev-only dependencies** that do not ship in the production bundle. Run `npm audit --production` to confirm.
-- **Moderate-or-lower transitive CVEs in `dompurify` via `@scalar/api-reference-react`** — documented as accepted in [`PRE_DEPLOY.md`](./PRE_DEPLOY.md#known-accepted-limitations) because the attack vector (user-injected HTML on `/api-docs`) is not reachable.
+- **CVEs in dev-only dependencies** that do not ship in the production bundle. Run `npm audit --omit=dev` to confirm (currently reports 0).
 
 ## Safe harbor
 

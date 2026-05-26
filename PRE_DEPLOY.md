@@ -70,7 +70,7 @@ vercel --prod
 - [ ] `npm test` — all suites pass
 - [ ] `npm run lint` — clean
 - [ ] `npm run build` — succeeds
-- [ ] `npm audit --audit-level=critical` — exits 0
+- [ ] `npm run audit:guard` — passes (fails on any high/critical); `npm audit` currently reports 0
 - [ ] Local production build smoke test: `npm run build && npm start`
 - [ ] If touching `canisters/`: dry-run the upgrade against `dfx start --clean` (see ROLLBACK.md)
 - [ ] If touching auth or session code: manual login flow on staging (II + linked Nostr)
@@ -101,32 +101,35 @@ Implications operators need to know:
 
 ## Known accepted limitations
 
-### Dev-dependency audit vulnerabilities (4 LOW)
+### Dependency audit: clean
 
-`npm audit` reports 4 LOW-severity vulnerabilities in the dev chain: `@tootallnate/once` → `http-proxy-agent` → `jsdom` → `jest-environment-jsdom`. All four are dev-only; none ship in the production bundle (`npm audit --production` reports 0 vulnerabilities).
+`npm audit` reports **0 vulnerabilities** on both the full tree and the
+production tree (`--omit=dev`). This is maintained, not incidental — the
+limitations previously listed here have been resolved:
 
-The suggested `npm audit fix` downgrades `jest-environment-jsdom` to `27.0.0`, which is a breaking semver-major downgrade that rearranges the jsdom API. The fix is **accepted as-is** until the jsdom upstream maintainers ship a non-breaking patch. Verification command:
+- The production-chain moderates (the `@coinbase/cdp-sdk` → legacy
+  `@solana/web3.js` v1 subtree, plus `ws` and `brace-expansion`) cleared once
+  `ws` was pinned to 8.21.0 and `@coinbase/cdp-sdk` resolved to 1.50.0, which
+  drops the legacy Solana v1 chain (`jayson` / `rpc-websockets` / `uuid@8.3.2`).
+- The dev-only `@tootallnate/once` advisory (jsdom → jest-environment-jsdom
+  chain) is patched in place by the `@tootallnate/once: 2.0.1` override — a
+  non-breaking patch within `http-proxy-agent`'s declared `"2"` range, so no
+  semver-major jest/jsdom downgrade is required.
+- The `dompurify` CVEs on `/api-docs` cleared once `@scalar/api-reference-react`
+  reached 0.9.38.
 
+Verification + standing guardrail:
 ```sh
-npm audit --production    # must report "found 0 vulnerabilities"
+npm audit --omit=dev     # production tree — must report "found 0 vulnerabilities"
+npm audit                # full tree — also 0
+npm run audit:guard      # automated — fails the build on any high/critical
 ```
 
-### dompurify CVEs in /api-docs (7 MODERATE, transitive)
-
-`npm audit` reports 7 moderate-severity XSS-class CVEs in `dompurify@<=3.3.1`, transitive through `@scalar/api-reference-react@0.9.22` (already on latest available version — upstream patch pending). dompurify only loads on `/api-docs`, which renders the **repo-controlled** `docs/openapi.yaml`. There is no user-supplied HTML on this page; the XSS vectors require attacker-controlled input that this page does not accept. Risk: bounded.
-
-Verification + monitoring:
-```sh
-npm run audit:guard                              # automated — fails build on any high/critical
-npm view @scalar/api-reference-react version    # manual — check for upstream bump past 0.9.22
-```
-
-`npm run audit:guard` (`scripts/audit-guard.sh`) is the automated guardrail: it
-fails non-zero on any `high` or `critical` severity, so a moderate→high
-escalation cannot ship silently.
-
-Trigger to re-evaluate: `audit:guard` fails OR Scalar ships a version pinning
-a patched dompurify.
+`npm run audit:guard` (`scripts/audit-guard.sh`) is the standing guardrail: it
+fails non-zero on any `high` or `critical` severity, so a future moderate→high
+escalation cannot ship silently. If a new moderate appears that cannot be
+patched in-range, document it here with its reachability analysis before
+accepting it.
 
 ### Task #32 — Qwen3 / Llama4Scout cycle-cost verification
 
