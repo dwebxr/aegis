@@ -64,7 +64,7 @@
     "twitter-api-v2": "1.29.0",
     "uuid": "^14.0.0",
     "web-push": "3.6.7",
-    "ws": "8.19.0"
+    "ws": "8.21.0"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
@@ -96,6 +96,11 @@
   "overrides": {
     "axios": "1.16.1",
     "fast-uri": "3.1.2",
-    "postcss": "$postcss"
+    "postcss": "$postcss",
+    "@tootallnate/once": "2.0.1",
+    "viem": {
+      ".": "2.49.0",
+      "ws": "8.21.0"
+    }
   }
 }
