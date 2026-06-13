@@ -7,6 +7,9 @@ module.exports = {
   setupFiles: ["<rootDir>/jest.setup.ts"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    // Production safeFetch uses undici's fetch; tests mock global.fetch. Route
+    // undici → a stub that delegates fetch to global.fetch so mocks intercept.
+    "^undici$": "<rootDir>/__mocks__/undici.js",
   },
   transform: {
     "^.+\\.[jt]sx?$": ["ts-jest", {

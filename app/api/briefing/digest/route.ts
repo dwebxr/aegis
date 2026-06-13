@@ -30,6 +30,25 @@ export async function POST(request: NextRequest) {
 
   const articles = body.articles.slice(0, 5);
 
+  // Validate shape BEFORE consuming the daily budget counter: these fields are
+  // interpolated unguarded into the prompt below (a.score.toFixed, a.topics.join),
+  // so a malformed item would otherwise throw an unhandled 500 — after recordApiCall.
+  for (const a of articles) {
+    if (
+      typeof a !== "object" || a === null ||
+      typeof (a as DigestArticle).title !== "string" ||
+      typeof (a as DigestArticle).text !== "string" ||
+      !Number.isFinite((a as DigestArticle).score) ||
+      !Array.isArray((a as DigestArticle).topics) ||
+      !(a as DigestArticle).topics.every((t) => typeof t === "string")
+    ) {
+      return NextResponse.json(
+        { error: "Invalid article: expected { title: string, text: string, score: number, topics: string[] }" },
+        { status: 400 },
+      );
+    }
+  }
+
   const { key: apiKey, isUser: isUserKey } = resolveAnthropicKey(request);
 
   if (!apiKey) {

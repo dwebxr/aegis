@@ -1,6 +1,7 @@
 import { POST } from "@/app/api/briefing/digest/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";
+import { recordApiCall } from "@/lib/api/dailyBudget";
 
 const mockFetch = jest.fn();
 const originalFetch = global.fetch;
@@ -56,6 +57,21 @@ describe("POST /api/briefing/digest", () => {
   it("returns 400 for empty articles array", async () => {
     const res = await POST(makeRequest({ articles: [] }));
     expect(res.status).toBe(400);
+  });
+
+  it.each([
+    ["score is not a number", [{ title: "x", text: "y", score: "high", topics: ["a"] }]],
+    ["score is NaN/Infinity", [{ title: "x", text: "y", score: Infinity, topics: ["a"] }]],
+    ["topics is not an array", [{ title: "x", text: "y", score: 5, topics: null }]],
+    ["topics contains non-strings", [{ title: "x", text: "y", score: 5, topics: [1, 2] }]],
+    ["title is not a string", [{ title: 5, text: "y", score: 5, topics: ["a"] }]],
+    ["article is not an object", ["just a string"]],
+  ])("returns 400 when %s (and does NOT consume the budget counter)", async (_label, articles) => {
+    (recordApiCall as jest.Mock).mockClear();
+    const res = await POST(makeRequest({ articles }));
+    expect(res.status).toBe(400);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(recordApiCall).not.toHaveBeenCalled();
   });
 
   it("returns 503 when no API key available", async () => {

@@ -10,6 +10,7 @@ jest.mock("nostr-tools/pool", () => ({
 }));
 
 jest.mock("ws", () => ({
+  __esModule: true,
   default: jest.fn(),
 }));
 

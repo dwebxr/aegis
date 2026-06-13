@@ -78,6 +78,10 @@ if (typeof setInterval !== "undefined") {
 }
 
 function getClientIP(request: NextRequest): string {
+  // On Vercel, x-forwarded-for is overwritten by the platform (the client cannot
+  // spoof it) and the leftmost hop equals x-real-ip — so trusting the first hop
+  // here is safe. Do NOT "harden" this by reordering without accounting for the
+  // deployment's proxy chain; behind an extra trusted proxy use x-vercel-forwarded-for.
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     || request.headers.get("x-real-ip")
     || "unknown";

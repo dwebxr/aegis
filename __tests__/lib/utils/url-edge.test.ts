@@ -32,8 +32,28 @@ describe("blockPrivateHostname — edge cases", () => {
   it("allows regular public IPs", () => {
     expect(blockPrivateHostname("1.1.1.1")).toBeNull();
     expect(blockPrivateHostname("8.8.8.8")).toBeNull();
-    expect(blockPrivateHostname("203.0.113.1")).toBeNull();
-    expect(blockPrivateHostname("255.255.255.255")).toBeNull();
+    expect(blockPrivateHostname("93.184.216.34")).toBeNull();
+    expect(blockPrivateHostname("23.215.0.137")).toBeNull();
+  });
+
+  it("blocks special-use / reserved ranges (RFC 6890)", () => {
+    // 203.0.113.0/24 is TEST-NET-3 and 255.255.255.255 is broadcast — these are
+    // NOT public; 198.18.0.0/15 and 240.0.0.0/4 can route internally in some envs.
+    expect(blockPrivateHostname("203.0.113.1")).not.toBeNull();
+    expect(blockPrivateHostname("255.255.255.255")).not.toBeNull();
+    expect(blockPrivateHostname("198.18.0.1")).not.toBeNull();
+    expect(blockPrivateHostname("192.0.2.1")).not.toBeNull();
+    expect(blockPrivateHostname("240.0.0.1")).not.toBeNull();
+    expect(blockPrivateHostname("[fec0::1]")).not.toBeNull();
+    expect(blockPrivateHostname("[2001:db8::1]")).not.toBeNull();
+  });
+
+  it("denies non-global-unicast IPv6 but allows real global unicast", () => {
+    for (const ip of ["[64:ff9b::1]", "[5f00::1]", "[100::1]", "[2001::1]", "[2002:a00:1::1]", "[ff02::1]"]) {
+      expect(blockPrivateHostname(ip)).not.toBeNull();
+    }
+    expect(blockPrivateHostname("[2606:4700:4700::1111]")).toBeNull();
+    expect(blockPrivateHostname("[2001:4860:4860::8888]")).toBeNull();
   });
 
   it("handles domains that look like IPs but aren't", () => {

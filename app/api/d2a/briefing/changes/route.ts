@@ -87,6 +87,22 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
   }
 }
 
+// With no receiver configured the paywall cannot be enforced. In production that
+// must fail closed (503) rather than silently serve the paid feed for free; in
+// dev it stays open for local testing.
+if (!X402_RECEIVER && process.env.NODE_ENV === "production") {
+  console.warn("[d2a/briefing/changes] X402_RECEIVER_ADDRESS unset in production — endpoint will return 503 (fail-closed)");
+}
+const noReceiverHandler = async (request: NextRequest): Promise<NextResponse> => {
+  if (process.env.NODE_ENV === "production") {
+    return withCors(
+      NextResponse.json({ error: "Payment endpoint not configured" }, { status: 503 }),
+      request.headers.get("origin"),
+    );
+  }
+  return handleGet(request);
+};
+
 export const GET = X402_RECEIVER
   ? X402_FREE_TIER
     ? async (request: NextRequest) => {
@@ -94,7 +110,7 @@ export const GET = X402_RECEIVER
         return withX402(handleGet, x402Config, resourceServer)(request);
       }
     : withX402(handleGet, x402Config, resourceServer)
-  : handleGet;
+  : noReceiverHandler;
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);
