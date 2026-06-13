@@ -50,8 +50,53 @@ persistent actor AegisBackend {
   let MAX_PUSH_KEY : Nat = 512;
   let MAX_BATCH_EVALS : Nat = 100;
 
+  // Input caps for the signal / display-name / analyze paths. `transient` keeps
+  // these out of the stable schema so they can be retuned freely on upgrade
+  // (a persistent `let` would retain its old value). Bytes, not code points.
+  transient let MAX_SIGNAL_ID : Nat = 256;
+  transient let MAX_NOSTR_ID : Nat = 128;
+  transient let MAX_SIGNAL_TOPICS : Nat = 30;
+  transient let MAX_TOPIC_BYTES : Nat = 100;
+  transient let MAX_DISPLAY_NAME : Nat = 512;
+  transient let MAX_ANALYZE_TOPICS : Nat = 20;
+  transient let MAX_ANALYZE_TOPIC_BYTES : Nat = 200;
+  transient let MAX_BRIEFING_JSON : Nat = 500_000;
+  transient let MAX_PREFERENCES_JSON : Nat = 500_000;
+
   func textBytes(s : Text) : Nat {
     Blob.toArray(Text.encodeUtf8(s)).size();
+  };
+
+  // Shared field validation for PublishedSignal: size caps on every stored field
+  // plus value-range checks on scores (Nat8 axes bound to 0-10; compositeScore
+  // must be finite and in 0-10 — a NaN/Inf would poison getEngagementIndex's
+  // running sum). Returns an error message, or null when valid. Reused by the
+  // financial publishWithStake path in the staking-safety round.
+  func validateSignalFields(signal : Types.PublishedSignal) : ?Text {
+    if (textBytes(signal.id) == 0) { return ?"Signal id is required" };
+    if (textBytes(signal.id) > MAX_SIGNAL_ID) { return ?"Signal id too large" };
+    if (textBytes(signal.text) > MAX_EVAL_TEXT) { return ?"Signal text too large" };
+    switch (signal.nostrPubkey) {
+      case (?p) { if (textBytes(p) > MAX_NOSTR_ID) { return ?"nostrPubkey too large" } };
+      case null {};
+    };
+    switch (signal.nostrEventId) {
+      case (?e) { if (textBytes(e) > MAX_NOSTR_ID) { return ?"nostrEventId too large" } };
+      case null {};
+    };
+    if (signal.topics.size() > MAX_SIGNAL_TOPICS) { return ?"Too many topics" };
+    for (t in signal.topics.vals()) {
+      if (textBytes(t) > MAX_TOPIC_BYTES) { return ?"Topic too large" };
+    };
+    let s = signal.scores;
+    if (s.originality > 10 or s.insight > 10 or s.credibility > 10) {
+      return ?"Score out of range (0-10)";
+    };
+    // The negated bounded comparison rejects NaN and ±Inf as well as out-of-range.
+    if (not (s.compositeScore >= 0.0 and s.compositeScore <= 10.0)) {
+      return ?"compositeScore out of range (0-10)";
+    };
+    null;
   };
 
   // — Non-custodial: protocol wallet + cycles top-up —
@@ -656,6 +701,8 @@ persistent actor AegisBackend {
     let caller = msg.caller;
     requireAuthenticated(caller);
 
+    if (textBytes(name) > MAX_DISPLAY_NAME) { Debug.trap("Display name too large") };
+
     let profile = ensureProfile(caller);
     let updated : Types.UserProfile = {
       principal = profile.principal;
@@ -802,6 +849,11 @@ persistent actor AegisBackend {
   public shared(msg) func saveSignal(signal : Types.PublishedSignal) : async Text {
     let caller = msg.caller;
     requireAuthenticated(caller);
+
+    switch (validateSignalFields(signal)) {
+      case (?errText) { Debug.trap(errText) };
+      case null {};
+    };
 
     let isNew = switch (signals.get(signal.id)) {
       case (?existing) {
@@ -1779,6 +1831,15 @@ persistent actor AegisBackend {
     if (Text.size(text) == 0) {
       return #err("Text is required");
     };
+    if (textBytes(text) > MAX_EVAL_TEXT) {
+      return #err("Text too large");
+    };
+    if (userTopics.size() > MAX_ANALYZE_TOPICS) {
+      return #err("Too many topics");
+    };
+    for (t in userTopics.vals()) {
+      if (textBytes(t) > MAX_ANALYZE_TOPIC_BYTES) { return #err("Topic too large") };
+    };
 
     let prompt = buildScoringPrompt(text, userTopics);
 
@@ -1838,7 +1899,7 @@ persistent actor AegisBackend {
 
   public shared(msg) func saveLatestBriefing(briefingJson : Text) : async Bool {
     requireAuthenticated(msg.caller);
-    if (Text.size(briefingJson) > 500_000) { return false }; // 500KB max
+    if (textBytes(briefingJson) > MAX_BRIEFING_JSON) { return false }; // 500KB max (UTF-8 bytes)
     // Only persist briefings for users who have opted into D2A sharing.
     // getLatestBriefing/getGlobalBriefingSummaries are public reads, so
     // accepting briefings from non-d2aEnabled users would leak private data.
@@ -1938,7 +1999,7 @@ persistent actor AegisBackend {
   public shared(msg) func saveUserPreferences(preferencesJson : Text, lastUpdated : Int) : async Bool {
     let caller = msg.caller;
     requireAuthenticated(caller);
-    if (Text.size(preferencesJson) > 500_000) { return false };
+    if (textBytes(preferencesJson) > MAX_PREFERENCES_JSON) { return false };
 
     switch (userPreferences.get(caller)) {
       case (?existing) {
