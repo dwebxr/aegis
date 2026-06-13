@@ -21,6 +21,7 @@ Aegis ingests content from RSS, Nostr, and public web pages, scores each item wi
 - **Translation (optional).** Per-item translation across 10 languages using the same cascade (Ollama → local LLM → Claude → IC LLM).
 - **Internet Identity auth.** Per-user evaluations, source configs, and reputation persisted on the IC canister.
 - **Nostr publishing.** Push your "this is quality" / "this is slop" signals to Nostr relays with NIP-44 encryption for private fields.
+- **Staked signals + on-chain reputation (optional).** Back a published signal with an ICP deposit; the community validates or flags it, the stake is returned (validated) or slashed to the protocol (flagged), and the outcome updates an on-chain reputation score.
 - **D2A agent-to-agent exchange (experimental).** Encrypted agent-to-agent content swap with on-chain receipts. Protocol is in flux; expect breaking changes.
 - **x402 payment gateway (experimental).** Optional micropayment paywall for premium briefing endpoints.
 
@@ -96,6 +97,7 @@ Full list of supported variables lives in [`.env.example`](.env.example). Highli
 |---|---|---|
 | `ANTHROPIC_API_KEY` | recommended | Server-side AI scoring via Claude |
 | `NEXT_PUBLIC_CANISTER_ID` | optional | Override the default IC canister |
+| `NEXT_PUBLIC_INTERNET_IDENTITY_URL` | optional | Internet Identity provider (defaults to `https://id.ai`, II's primary origin) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | optional | Web Push notifications |
 | `PUSH_SERVER_PRIVATE_KEY` | optional | Push-token canister authz (Ed25519 base64, register as canister controller) |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | optional | Distributed rate limiting |
@@ -142,7 +144,7 @@ Optional:
 │  ├─ page.tsx                   # Main app shell
 │  └─ sw.ts                      # Service worker source (serwist)
 ├─ canisters/
-│  └─ aegis_backend/             # Motoko canister (evaluations, sources, D2A, push subs)
+│  └─ aegis_backend/             # Motoko canister (evaluations, sources, staking/reputation, D2A, push subs)
 ├─ components/                   # React components (tabs, UI primitives)
 ├─ contexts/                     # React contexts (auth, content, sources, agent)
 ├─ lib/
@@ -190,7 +192,11 @@ Pre-deploy safety:
 npm run canister:backup          # snapshot live wasm + status
 npm run canister:rollback        # restore from snapshot
 scripts/canister-smoke-test.sh   # real assertions against a local replica
+scripts/canister-stake-test.sh   # staking financial flows (mock ledger, install→upgrade)
 ```
+
+Mainnet upgrades use Enhanced Orthogonal Persistence — pass `--wasm-memory-persistence keep`
+to `dfx deploy aegis_backend --network ic --mode upgrade` so canister state is preserved.
 
 ### D2A SDK
 
