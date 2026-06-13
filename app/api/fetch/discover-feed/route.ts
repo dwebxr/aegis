@@ -3,6 +3,7 @@ import { guardAndParse } from "@/lib/api/rateLimit";
 import { errMsg, isTimeout } from "@/lib/utils/errors";
 import { blockPrivateUrl } from "@/lib/utils/url";
 import { safeFetch } from "@/lib/utils/safeFetch.server";
+import { readCappedText } from "@/lib/utils/httpBody.server";
 import { detectPlatformFeed, extractYouTubeChannelId } from "@/lib/sources/platformFeed";
 
 export const maxDuration = 30;
@@ -47,45 +48,41 @@ export async function POST(request: NextRequest) {
     });
 
     if (res.ok) {
-      const cl = parseInt(res.headers?.get("content-length") || "0", 10);
-      if (cl > 5_000_000) {
-        console.warn("[discover-feed] Skipping oversized response:", cl);
-      } else {
-        const raw = await res.text();
-        const html = raw.length > 2_000_000 ? raw.slice(0, 2_000_000) : raw;
+      // Stream-read with a hard 2MB cap. A Content-Length pre-check is bypassable
+      // (chunked responses omit it), so cap the actual bytes read instead.
+      const html = await readCappedText(res, 2_000_000);
 
-        const host = parsedUrl.hostname.replace("www.", "");
-        if ((host === "youtube.com" || host === "m.youtube.com") && feeds.length === 0) {
-          const channelId = extractYouTubeChannelId(html);
-          if (channelId) {
-            feeds.push({ url: `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, title: "YouTube Channel", type: "atom" });
-          }
+      const host = parsedUrl.hostname.replace("www.", "");
+      if ((host === "youtube.com" || host === "m.youtube.com") && feeds.length === 0) {
+        const channelId = extractYouTubeChannelId(html);
+        if (channelId) {
+          feeds.push({ url: `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, title: "YouTube Channel", type: "atom" });
         }
+      }
 
-        const linkRegex = /<link[^>]+rel=["']alternate["'][^>]*>/gi;
-        let match;
-        let iters = 0;
-        while ((match = linkRegex.exec(html)) !== null && iters++ < 100) {
-          const tag = match[0];
-          const typeMatch = tag.match(/type=["']([^"']+)["']/);
-          const hrefMatch = tag.match(/href=["']([^"']+)["']/);
-          const titleMatch = tag.match(/title=["']([^"']+)["']/);
+      const linkRegex = /<link[^>]+rel=["']alternate["'][^>]*>/gi;
+      let match;
+      let iters = 0;
+      while ((match = linkRegex.exec(html)) !== null && iters++ < 100) {
+        const tag = match[0];
+        const typeMatch = tag.match(/type=["']([^"']+)["']/);
+        const hrefMatch = tag.match(/href=["']([^"']+)["']/);
+        const titleMatch = tag.match(/title=["']([^"']+)["']/);
 
-          if (hrefMatch && typeMatch) {
-            const type = typeMatch[1].toLowerCase();
-            if (type.includes("rss") || type.includes("atom") || type.includes("xml")) {
-              let feedUrl = hrefMatch[1];
-              if (feedUrl.startsWith("/")) {
-                feedUrl = `${parsedUrl.origin}${feedUrl}`;
-              } else if (!feedUrl.startsWith("http")) {
-                feedUrl = new URL(feedUrl, url).href;
-              }
-              feeds.push({
-                url: feedUrl,
-                title: titleMatch?.[1],
-                type: type.includes("atom") ? "atom" : "rss",
-              });
+        if (hrefMatch && typeMatch) {
+          const type = typeMatch[1].toLowerCase();
+          if (type.includes("rss") || type.includes("atom") || type.includes("xml")) {
+            let feedUrl = hrefMatch[1];
+            if (feedUrl.startsWith("/")) {
+              feedUrl = `${parsedUrl.origin}${feedUrl}`;
+            } else if (!feedUrl.startsWith("http")) {
+              feedUrl = new URL(feedUrl, url).href;
             }
+            feeds.push({
+              url: feedUrl,
+              title: titleMatch?.[1],
+              type: type.includes("atom") ? "atom" : "rss",
+            });
           }
         }
       }

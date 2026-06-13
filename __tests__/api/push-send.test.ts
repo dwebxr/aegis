@@ -162,7 +162,7 @@ describe("POST /api/push/send", () => {
     const t1 = generatePushToken("abc", ["https://e/1", "https://e/2"]);
     const t2 = generatePushToken("abc", ["https://e/1", "https://e/2"]);
     expect(t1).toBe(t2);
-    expect(t1.length).toBe(32);
+    expect(t1.length).toBe(64);
   });
 
   it("generatePushToken is endpoint-order-independent", () => {

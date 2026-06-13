@@ -47,7 +47,9 @@ export async function POST(request: NextRequest) {
   });
 
   if (!res.ok) {
-    console.error("[translate] Claude API error:", res.status, String(res.raw).slice(0, 200));
+    // Log only the status — never the raw upstream body, which can echo request
+    // fragments. Detailed triage goes through Sentry/Anthropic's own logs.
+    console.error("[translate] Claude API error:", res.status);
     return NextResponse.json({ error: `Claude API error: ${res.status}` }, { status: 502 });
   }
 

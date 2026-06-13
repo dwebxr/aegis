@@ -42,26 +42,27 @@ export async function GET(request: NextRequest) {
   if (cycles.status === "low") warnings.push(`canister cycles below 2T threshold (balance=${cycles.balance})`);
 
   const deploy = getDeployMeta();
-  const response = NextResponse.json(
-    {
-      status: allOk ? "ok" : "degraded",
-      ...(warnings.length > 0 && { warnings }),
-      timestamp: new Date().toISOString(),
-      version: deploy.version,
-      node: process.version,
-      region: deploy.region,
-      checks,
-      publicRoutes: [
-        "/api/feed/rss",
-        "/api/feed/atom",
-        "/api-docs",
-        "/openapi.yaml",
-      ],
-      flags: getFlagSnapshot(),
-    },
-    // 503 on degraded so uptime monitors alert on HTTP status alone.
-    { status: allOk ? 200 : 503 },
-  );
+  // status/version/timestamp stay public so uptime monitors alert on HTTP status
+  // alone. The detailed checks/flags (which env vars are set, feature-flag state)
+  // are internal config — gate them behind an optional bearer token. When
+  // HEALTH_DETAIL_TOKEN is unset, behavior is unchanged (ops tooling keeps working);
+  // set it to stop leaking config posture to anonymous callers.
+  const detailToken = process.env.HEALTH_DETAIL_TOKEN?.trim();
+  const showDetail = !detailToken || request.headers.get("authorization") === `Bearer ${detailToken}`;
+  const body: Record<string, unknown> = {
+    status: allOk ? "ok" : "degraded",
+    ...(warnings.length > 0 && { warnings }),
+    timestamp: new Date().toISOString(),
+    version: deploy.version,
+  };
+  if (showDetail) {
+    body.node = process.version;
+    body.region = deploy.region;
+    body.checks = checks;
+    body.publicRoutes = ["/api/feed/rss", "/api/feed/atom", "/api-docs", "/openapi.yaml"];
+    body.flags = getFlagSnapshot();
+  }
+  const response = NextResponse.json(body, { status: allOk ? 200 : 503 });
   response.headers.set("Cache-Control", "no-store");
   return response;
 }

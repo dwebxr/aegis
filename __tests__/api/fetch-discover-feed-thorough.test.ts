@@ -71,8 +71,13 @@ describe("POST /api/fetch/discover-feed — thorough coverage", () => {
   // ─── Oversized content handling ───
 
   describe("oversized response handling", () => {
-    it("skips body parsing when Content-Length > 5MB", async () => {
-      const textMock = jest.fn().mockResolvedValue("<html></html>");
+    it("reads and caps the body regardless of a large Content-Length (no Content-Length skip)", async () => {
+      // A huge Content-Length must NOT cause a skip (it is bypassable via chunked
+      // responses); the body is read with a hard byte cap instead. Here the mock
+      // exposes only text() (no body stream), so readCappedText caps via text().
+      const textMock = jest.fn().mockResolvedValue(
+        "<html><head><link rel='alternate' type='application/rss+xml' href='/capped.xml'/></head></html>",
+      );
       global.fetch = jest.fn().mockImplementation(async (_url: string, opts?: { method?: string }) => {
         if (opts?.method === "HEAD") {
           return { ok: false, headers: new Headers() };
@@ -86,8 +91,9 @@ describe("POST /api/fetch/discover-feed — thorough coverage", () => {
 
       const res = await POST(makeRequest({ url: "https://example.com" }));
       expect(res.status).toBe(200);
-      // text() should NOT have been called since content-length > 5MB
-      expect(textMock).not.toHaveBeenCalled();
+      expect(textMock).toHaveBeenCalled();
+      const data = await res.json();
+      expect(data.feeds.some((f: { url: string }) => f.url.endsWith("/capped.xml"))).toBe(true);
     });
 
     it("truncates HTML at 2MB when response is between 2-5MB", async () => {

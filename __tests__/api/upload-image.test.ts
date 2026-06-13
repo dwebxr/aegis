@@ -152,7 +152,7 @@ describe("POST /api/upload/image", () => {
       expect(data.url).toBe("https://nostr.build/i/abc123.jpg");
     });
 
-    it("forwards Authorization header to nostr.build", async () => {
+    it("does NOT forward the client's Authorization header to nostr.build", async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ status: "success", data: [{ url: "https://nostr.build/i/authed.jpg" }] }),
@@ -168,8 +168,22 @@ describe("POST /api/upload/image", () => {
       const res = await POST(req);
       expect(res.status).toBe(200);
 
+      // Client-supplied credentials must never be relayed to the third-party host.
       const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
-      expect(fetchCall[1].headers).toHaveProperty("Authorization", "Nostr eyJraW5kIjoyNzIzNX0=");
+      expect(fetchCall[1].headers).not.toHaveProperty("Authorization");
+    });
+
+    it("uses the server-side NOSTR_BUILD_AUTHORIZATION secret when configured", async () => {
+      process.env.NOSTR_BUILD_AUTHORIZATION = "Bearer server-only-secret";
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: "success", data: [{ url: "https://nostr.build/i/s.jpg" }] }),
+      });
+      const res = await POST(makeUploadRequest(makeImageBlob("image/jpeg")));
+      expect(res.status).toBe(200);
+      const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+      expect(fetchCall[1].headers).toHaveProperty("Authorization", "Bearer server-only-secret");
+      delete process.env.NOSTR_BUILD_AUTHORIZATION;
     });
 
     it("does not send Authorization header when none provided", async () => {

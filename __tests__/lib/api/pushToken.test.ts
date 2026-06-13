@@ -9,14 +9,14 @@ describe("generatePushToken", () => {
     else process.env.VAPID_PRIVATE_KEY = ORIG_KEY;
   });
 
-  it("returns a 32-character hex string with a configured key", () => {
+  it("returns a 64-character hex string with a configured key", () => {
     process.env.VAPID_PRIVATE_KEY = "secret-key";
     const token = generatePushToken("aaaaa-bbbbb-ccccc-ddddd-eee");
-    expect(token).toHaveLength(32);
-    expect(token).toMatch(/^[a-f0-9]{32}$/);
+    expect(token).toHaveLength(64);
+    expect(token).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it("matches the explicit HMAC-SHA256-truncated reference output", () => {
+  it("matches the explicit HMAC-SHA256 reference output", () => {
     process.env.VAPID_PRIVATE_KEY = "deterministic-secret";
     const principal = "principal-1";
     const endpoints = ["https://push.example.com/a", "https://push.example.com/b"];
@@ -26,8 +26,7 @@ describe("generatePushToken", () => {
     const canonical = [...endpoints].map(e => e.toLowerCase()).sort().join("\0");
     const expected = createHmac("sha256", "deterministic-secret")
       .update(`${principal}\0${canonical}`)
-      .digest("hex")
-      .slice(0, 32);
+      .digest("hex");
     expect(generatePushToken(principal, endpoints)).toBe(expected);
   });
 
@@ -56,21 +55,20 @@ describe("generatePushToken", () => {
     const token = generatePushToken("any");
     const expected = createHmac("sha256", "")
       .update("any\0")
-      .digest("hex")
-      .slice(0, 32);
+      .digest("hex");
     expect(token).toBe(expected);
   });
 
   it("handles unicode principals safely", () => {
     process.env.VAPID_PRIVATE_KEY = "k";
     const token = generatePushToken("公主-😀");
-    expect(token).toHaveLength(32);
+    expect(token).toHaveLength(64);
   });
 
   it("handles empty principal", () => {
     process.env.VAPID_PRIVATE_KEY = "k";
     expect(() => generatePushToken("")).not.toThrow();
-    expect(generatePushToken("")).toHaveLength(32);
+    expect(generatePushToken("")).toHaveLength(64);
   });
 });
 

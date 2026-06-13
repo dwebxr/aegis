@@ -58,10 +58,14 @@ export async function POST(request: NextRequest) {
   const upstream = new FormData();
   upstream.append("file", file);
 
+  // Do NOT forward the client's Authorization header to nostr.build — that would
+  // leak whatever credential the browser sent (e.g. an IC delegation or bearer
+  // token) to a third party. Uploads go anonymously; for an authenticated
+  // nostr.build account, configure a server-side NOSTR_BUILD_AUTHORIZATION secret.
   const headers: Record<string, string> = {};
-  const authHeader = request.headers.get("authorization");
-  if (authHeader) {
-    headers["Authorization"] = authHeader;
+  const serverAuth = process.env.NOSTR_BUILD_AUTHORIZATION?.trim();
+  if (serverAuth) {
+    headers["Authorization"] = serverAuth;
   }
 
   let res: Response;

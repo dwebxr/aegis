@@ -95,7 +95,7 @@ describe("/api/push/token — endpoint allowlist", () => {
     }));
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.token).toMatch(/^[a-f0-9]{32}$/);
+    expect(data.token).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("rejects (400) when ANY endpoint is off-allowlist (attacker relay)", async () => {
@@ -188,7 +188,7 @@ describe("/api/push/token — canister authz (subscription ownership)", () => {
     }));
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.token).toMatch(/^[a-f0-9]{32}$/);
+    expect(data.token).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("returns 502 when canister read throws", async () => {

@@ -49,5 +49,7 @@ export function generatePushToken(principal: string, endpoints: string[] = []): 
   const secret = process.env.VAPID_PRIVATE_KEY || "";
   const canonical = [...endpoints].map(e => e.toLowerCase()).sort().join("\0");
   const message = `${principal}\0${canonical}`;
-  return createHmac("sha256", secret).update(message).digest("hex").slice(0, 32);
+  // Full 256-bit digest (the token is recomputed for verification, never stored,
+  // so widening from the old 128-bit truncation does not invalidate anything).
+  return createHmac("sha256", secret).update(message).digest("hex");
 }
