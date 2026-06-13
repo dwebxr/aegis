@@ -35,7 +35,7 @@ const { Principal } = realPrincipalModule;
 
 // ── Mock IC config ──
 jest.mock("@/lib/ic/agent", () => ({
-  getInternetIdentityUrl: () => "https://identity.ic0.app",
+  getInternetIdentityUrl: () => "https://id.ai",
   getDerivationOrigin: () => "https://test.icp0.io",
 }));
 

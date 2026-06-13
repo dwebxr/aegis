@@ -7,7 +7,12 @@ export function getHost(): string {
 }
 
 export function getInternetIdentityUrl(): string {
-  return (process.env.NEXT_PUBLIC_INTERNET_IDENTITY_URL || (isLocal ? "http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai" : "https://identity.internetcomputer.org")).trim();
+  // Non-local default is id.ai — II's PRIMARY origin. A non-primary origin
+  // (identity.internetcomputer.org, identity.ic0.app) makes II's popup redirect
+  // to id.ai, after which AuthClient's event.origin filter drops the messages and
+  // login fails. Production sets NEXT_PUBLIC_INTERNET_IDENTITY_URL=https://id.ai;
+  // this keeps the env-unset fallback (preview/CI/contributors) on the same origin.
+  return (process.env.NEXT_PUBLIC_INTERNET_IDENTITY_URL || (isLocal ? "http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai" : "https://id.ai")).trim();
 }
 
 export function getCanisterId(): string {

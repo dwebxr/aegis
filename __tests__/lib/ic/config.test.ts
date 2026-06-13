@@ -59,10 +59,10 @@ describe("IC config utilities", () => {
       expect(getInternetIdentityUrl()).toBe("https://custom-ii.io");
     });
 
-    it("returns default IC identity URL", async () => {
+    it("returns default IC identity URL (id.ai — II primary origin)", async () => {
       delete process.env.NEXT_PUBLIC_INTERNET_IDENTITY_URL;
       const { getInternetIdentityUrl } = await import("@/lib/ic/config");
-      expect(getInternetIdentityUrl()).toBe("https://identity.internetcomputer.org");
+      expect(getInternetIdentityUrl()).toBe("https://id.ai");
     });
   });
 

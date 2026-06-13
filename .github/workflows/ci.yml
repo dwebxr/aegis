@@ -73,7 +73,7 @@ jobs:
         env:
           NEXT_PUBLIC_CANISTER_ID: rluf3-eiaaa-aaaam-qgjuq-cai
           NEXT_PUBLIC_IC_HOST: https://icp-api.io
-          NEXT_PUBLIC_INTERNET_IDENTITY_URL: https://identity.ic0.app
+          NEXT_PUBLIC_INTERNET_IDENTITY_URL: https://id.ai
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -99,7 +99,7 @@ jobs:
         env:
           NEXT_PUBLIC_CANISTER_ID: rluf3-eiaaa-aaaam-qgjuq-cai
           NEXT_PUBLIC_IC_HOST: https://icp-api.io
-          NEXT_PUBLIC_INTERNET_IDENTITY_URL: https://identity.ic0.app
+          NEXT_PUBLIC_INTERNET_IDENTITY_URL: https://id.ai
 
   canister-upgrade:
     # Catches M0169 (stable field renamed/removed) at PR time. Spins up a
