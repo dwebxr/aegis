@@ -49,12 +49,8 @@ jobs:
 
       - run: npm ci
 
-      - run: npm audit --audit-level=critical
-        name: Security audit (critical — blocks deployment)
-
-      - run: npm audit --audit-level=high
-        name: Security audit (high — advisory)
-        continue-on-error: true
+      - run: npm run audit:guard
+        name: Security audit (audit:guard — blocks on any high/critical)
 
   e2e:
     runs-on: ubuntu-latest

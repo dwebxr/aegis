@@ -481,7 +481,7 @@ The Aegis TypeScript implementation lives at <https://github.com/dwebxr/aegis>. 
 - `lib/nostr/encrypt.ts` — NIP-44 v2 wrapper (`encryptMessage`, `decryptMessage`).
 - `lib/nostr/types.ts` — Nostr kind constants and default relay list.
 
-A second implementation in another language MAY use these files as a translation reference. The decision-points list at the top of [`growth-suite.md`](../.claude/plans/growth-suite.md) records the current spec stance on points that could legitimately be specified differently.
+A second implementation in another language MAY use these files as a translation reference. Where a point could legitimately be specified differently, this document is the authoritative statement of the current spec stance.
 
 The runtime API endpoint `/api/d2a/info` returns a machine-readable summary of the protocol surface that an external implementation may cache.
 

@@ -7,10 +7,11 @@ if (dsn) {
     dsn,
     environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
     tracesSampleRate: 0.1,
-    // Forward console.warn/error so edge-runtime logs reach Sentry — not
-    // just Vercel stdout. Existing explicit Sentry.captureException calls
-    // dedupe via Sentry's fingerprinting, so this won't double-fire.
-    integrations: [Sentry.captureConsoleIntegration({ levels: ["warn", "error"] })],
+    // Forward only console.error to Sentry (incidents). console.warn stays in
+    // Vercel stdout: warn-level diagnostics carry pubkeys/feed URLs and dominate
+    // the event volume, so capturing them would leak PII and inflate quota. The
+    // beforeSend below still strips request headers/cookies/query from what is sent.
+    integrations: [Sentry.captureConsoleIntegration({ levels: ["error"] })],
     beforeSend(event) {
       if (event.request) {
         if (event.request.headers) {

@@ -11,7 +11,7 @@ if (dsn) {
     // fetcher errors, KV import failures) reach Sentry — not just Vercel
     // stdout. Existing explicit Sentry.captureException calls dedupe via
     // Sentry's fingerprinting, so this won't double-fire on same event.
-    integrations: [Sentry.captureConsoleIntegration({ levels: ["warn", "error"] })],
+    integrations: [Sentry.captureConsoleIntegration({ levels: ["error"] })],
     beforeSend(event) {
       if (event.request) {
         if (event.request.headers) {
