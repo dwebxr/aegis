@@ -73,6 +73,7 @@ export interface PublishedSignal {
 }
 
 export type StakeStatus =
+  | { pending: null }
   | { active: null }
   | { returned: null }
   | { slashed: null };

@@ -69,6 +69,7 @@ module {
   // ── Staking / Reputation types ──
 
   public type StakeStatus = {
+    #pending;    // Stake created, deposit transfer not yet confirmed (not validatable)
     #active;     // Stake is live, awaiting community review
     #returned;   // Validated — stake returned to owner
     #slashed;    // Flagged — stake sent to protocol treasury

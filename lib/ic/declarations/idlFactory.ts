@@ -65,7 +65,7 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     topics: IDL.Vec(IDL.Text),
     createdAt: IDL.Int,
   });
-  const StakeStatus = IDL.Variant({ active: IDL.Null, returned: IDL.Null, slashed: IDL.Null });
+  const StakeStatus = IDL.Variant({ pending: IDL.Null, active: IDL.Null, returned: IDL.Null, slashed: IDL.Null });
   const StakeRecord = IDL.Record({
     id: IDL.Text,
     owner: IDL.Principal,

@@ -5,6 +5,11 @@
       "type": "motoko",
       "main": "canisters/aegis_backend/main.mo"
     },
+    "mock_ledger": {
+      "type": "motoko",
+      "main": "canisters/mock_ledger/main.mo",
+      "comment": "TEST-ONLY mock ICRC ledger for local staking tests. Do NOT deploy to --network ic."
+    },
     "internet_identity": {
       "type": "pull",
       "id": "rdmx6-jaaaa-aaaaa-aaadq-cai"

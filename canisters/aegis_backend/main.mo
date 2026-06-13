@@ -12,6 +12,7 @@ import Iter "mo:base/Iter";
 import Nat "mo:base/Nat";
 import Nat8 "mo:base/Nat8";
 import Nat64 "mo:base/Nat64";
+import Option "mo:base/Option";
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Text "mo:base/Text";
@@ -31,6 +32,17 @@ persistent actor AegisBackend {
   // — ICP Ledger canister reference —
 
   let ICP_LEDGER : Ledger.LedgerActor = actor "ryjl3-tyaaa-aaaaa-aaaba-cai";
+
+  // Test-only ledger override (transient → always null in production after upgrade).
+  // Lets local tests point the financial flows at a mock ICRC ledger. Controller-
+  // only; MUST never be set on mainnet. All ledger calls go through ledger().
+  transient var ledgerOverride : ?Ledger.LedgerActor = null;
+  func ledger() : Ledger.LedgerActor { Option.get(ledgerOverride, ICP_LEDGER) };
+
+  // Re-entrancy guard for the deposit-return sweep. IC timers are sequential, so
+  // this is defence-in-depth against any future overlapping invocation. Transient
+  // so an interrupted upgrade can never leave it stuck true.
+  transient var maintenanceRunning : Bool = false;
   let ICP_FEE : Nat = 10_000; // 0.0001 ICP
   let MIN_STAKE : Nat = 100_000; // 0.001 ICP minimum
   let MAX_STAKE : Nat = 100_000_000; // 1.0 ICP maximum
@@ -159,6 +171,10 @@ persistent actor AegisBackend {
   // backward-compatible. Legacy offers without an entry are immutable
   // (only controllers can delete) — see put_offer / delete_offer.
   var stableOfferOwners : [(Text, Principal)] = [];
+  // txHash -> first submitter Principal. Binds a receipt to its submitter so it
+  // can't be overwritten by another caller. Legacy receipts without an entry are
+  // controller-only to update (see submit_receipt).
+  var stableReceiptOwners : [(Text, Principal)] = [];
 
   // — Runtime state (rebuilt from stable on upgrade) —
 
@@ -203,6 +219,7 @@ persistent actor AegisBackend {
   // A2A Offer / Receipt runtime state
   transient var offers = HashMap.HashMap<Text, Types.Offer>(16, Text.equal, Text.hash);
   transient var receipts = HashMap.HashMap<Text, Types.Receipt>(16, Text.equal, Text.hash);
+  transient var receiptOwners = HashMap.HashMap<Text, Principal>(16, Text.equal, Text.hash);
   transient var offerOwners = HashMap.HashMap<Text, Principal>(16, Text.equal, Text.hash);
 
   // Owner -> evaluation IDs index for fast user queries
@@ -255,6 +272,7 @@ persistent actor AegisBackend {
     stableOffers := Iter.toArray(offers.entries());
     stableReceipts := Iter.toArray(receipts.entries());
     stableOfferOwners := Iter.toArray(offerOwners.entries());
+    stableReceiptOwners := Iter.toArray(receiptOwners.entries());
   };
 
   system func postupgrade() {
@@ -319,6 +337,10 @@ persistent actor AegisBackend {
       offerOwners.put(id, owner);
     };
     stableOfferOwners := [];
+    for ((hash, owner) in stableReceiptOwners.vals()) {
+      receiptOwners.put(hash, owner);
+    };
+    stableReceiptOwners := [];
     initCertCache();
   };
 
@@ -957,14 +979,14 @@ persistent actor AegisBackend {
 
   /// Distribute protocol revenue: if cycles are low, convert ICP to cycles via CMC;
   /// otherwise send ICP to the hardcoded PROTOCOL_WALLET.
-  func distributeProtocolRevenue(amount : Nat) : async () {
+  func distributeProtocolRevenue(amount : Nat) : async Result.Result<(), Text> {
     let net = if (amount > ICP_FEE) { amount - ICP_FEE } else { 0 };
-    if (net == 0) return;
+    if (net == 0) return #ok();
 
     if (ExperimentalCycles.balance() < CYCLES_THRESHOLD) {
       // Cycles low → convert this revenue to cycles via CMC
       try {
-        let xferResult = await ICP_LEDGER.icrc1_transfer({
+        let xferResult = await ledger().icrc1_transfer({
           from_subaccount = null;
           to = { owner = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
                  subaccount = ?principalToSubaccount(SELF) };
@@ -975,20 +997,23 @@ persistent actor AegisBackend {
         });
         switch (xferResult) {
           case (#Ok(blockIdx)) {
+            // notify_top_up is best-effort; the transfer already succeeded.
             ignore await CMC.notify_top_up({
               block_index = Nat64.fromNat(blockIdx);
               canister_id = SELF;
             });
+            #ok();
           };
-          case (#Err(_)) {}; // Transfer failed; funds stay for sweepProtocolFees
+          case (#Err(_)) { #err("CMC transfer failed; funds retained") };
         };
       } catch (e) {
         Debug.print("[canister] distributeProtocolRevenue cycles top-up failed: " # Error.message(e));
+        #err("CMC top-up trapped: " # Error.message(e));
       };
     } else {
       // Cycles sufficient → send to protocol wallet
       try {
-        ignore await ICP_LEDGER.icrc1_transfer({
+        let r = await ledger().icrc1_transfer({
           from_subaccount = null;
           to = { owner = PROTOCOL_WALLET; subaccount = null };
           amount = net;
@@ -996,8 +1021,13 @@ persistent actor AegisBackend {
           memo = null;
           created_at_time = null;
         });
+        switch (r) {
+          case (#Ok(_)) { #ok() };
+          case (#Err(_)) { #err("Wallet transfer failed; funds retained") };
+        };
       } catch (e) {
         Debug.print("[canister] distributeProtocolRevenue wallet transfer failed: " # Error.message(e));
+        #err("Wallet transfer trapped: " # Error.message(e));
       };
     };
   };
@@ -1021,15 +1051,28 @@ persistent actor AegisBackend {
       } else if (stakeAmount > MAX_STAKE) {
         #err("Stake too high: maximum is " # Nat.toText(MAX_STAKE) # " e8s (1.0 ICP)");
       } else {
-        // Pre-debit: create records before async call
         let stakeId = signal.id # "-stake";
 
+        // Validate inputs + reject id reuse BEFORE any state write. The collision
+        // guard stops an attacker from overwriting a victim's existing stake/signal
+        // (the rollback below would otherwise delete the victim's record). Signal
+        // ids are random UUIDs client-side, so id front-running is infeasible.
+        switch (validateSignalFields(signal)) {
+          case (?errText) { return #err(errText) };
+          case null {};
+        };
+        if (signals.get(signal.id) != null or stakes.get(stakeId) != null or signalStakeIndex.get(signal.id) != null) {
+          return #err("Signal id already exists");
+        };
+
+        // Create the stake as #pending — NOT validatable/flaggable — and do NOT
+        // credit reputation until the deposit transfer actually clears.
         let stakeRecord : Types.StakeRecord = {
           id = stakeId;
           owner = caller;
           signalId = signal.id;
           amount = stakeAmount;
-          status = #active;
+          status = #pending;
           validationCount = 0;
           flagCount = 0;
           createdAt = Time.now();
@@ -1038,21 +1081,9 @@ persistent actor AegisBackend {
         stakes.put(stakeId, stakeRecord);
         signalStakeIndex.put(signal.id, stakeId);
 
-        let rep = ensureReputation(caller);
-        let updatedRep : Types.UserReputation = {
-          principal = rep.principal;
-          trustScore = rep.trustScore;
-          totalStaked = rep.totalStaked + stakeAmount;
-          totalReturned = rep.totalReturned;
-          totalSlashed = rep.totalSlashed;
-          qualitySignals = rep.qualitySignals;
-          slopSignals = rep.slopSignals;
-        };
-        reputations.put(caller, updatedRep);
-
         // Transfer ICP from caller to this canister via ICRC-2
         let transferErr : ?Text = try {
-          let xferResult = await ICP_LEDGER.icrc2_transfer_from({
+          let xferResult = await ledger().icrc2_transfer_from({
             spender_subaccount = null;
             from = { owner = caller; subaccount = null };
             to = { owner = SELF; subaccount = null };
@@ -1079,13 +1110,26 @@ persistent actor AegisBackend {
 
         switch (transferErr) {
           case (?errText) {
-            // Rollback pre-debited records
+            // Deposit did not clear — drop the #pending records. Reputation was
+            // never touched, so there is nothing to revert there.
             stakes.delete(stakeId);
             signalStakeIndex.delete(signal.id);
-            reputations.put(caller, rep);
             #err(errText);
           };
           case null {
+            // Deposit cleared: promote #pending → #active, credit reputation, and
+            // persist the signal.
+            putStakeUpdate(stakeId, stakeRecord, #active, 0, 0, null);
+            let rep = ensureReputation(caller);
+            reputations.put(caller, {
+              principal = rep.principal;
+              trustScore = rep.trustScore;
+              totalStaked = rep.totalStaked + stakeAmount;
+              totalReturned = rep.totalReturned;
+              totalSlashed = rep.totalSlashed;
+              qualitySignals = rep.qualitySignals;
+              slopSignals = rep.slopSignals;
+            });
             let tagged : Types.PublishedSignal = {
               id = signal.id;
               owner = caller;
@@ -1166,14 +1210,34 @@ persistent actor AegisBackend {
         return #ok(false);
       };
 
-      // Threshold reached: return stake to owner (pre-debit pattern)
+      // Threshold reached: return stake to owner. Pre-mark #returned BEFORE the
+      // await so no concurrent path (flag, expiry sweep) can touch this stake while
+      // the refund is in flight — that status guard is what prevents a double
+      // refund. created_at_time stays null: a stake can be returned long after it
+      // was created (voting > 24h, expiry at 30 days) and a non-null creation
+      // timestamp would trip the ledger's #TooOld transaction-window check.
+      //
+      // On a failed refund we roll the resolving vote back to #active with the
+      // pre-increment count AND drop this caller from the voter set, so the SAME
+      // validator can retry (otherwise a fresh distinct voter would be required).
+      let revertVote = func() {
+        putStakeUpdate(stakeId, stake, #active, stake.validationCount, stake.flagCount, null);
+        switch (signalVoters.get(signalId)) {
+          case (?voters) {
+            let kept = Buffer.Buffer<Principal>(voters.size());
+            for (v in voters.vals()) { if (not Principal.equal(v, caller)) { kept.add(v) } };
+            signalVoters.put(signalId, kept);
+          };
+          case null {};
+        };
+      };
       putStakeUpdate(stakeId, stake, #returned, newCount, stake.flagCount, ?Time.now());
 
       let returnAmount = if (stake.amount > ICP_FEE) { stake.amount - ICP_FEE } else { 0 };
       var transferOk = true;
       if (returnAmount > 0) {
         let transferResult = try {
-          await ICP_LEDGER.icrc1_transfer({
+          await ledger().icrc1_transfer({
             from_subaccount = null;
             to = { owner = stake.owner; subaccount = null };
             amount = returnAmount;
@@ -1184,14 +1248,14 @@ persistent actor AegisBackend {
         } catch (e) {
           Debug.print("[canister] validateSignal stake return failed: " # Error.message(e));
           transferOk := false;
-          putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
+          revertVote();
           #Err(#TemporarilyUnavailable);
         };
         switch (transferResult) {
           case (#Err(_)) {
             if (transferOk) {
               transferOk := false;
-              putStakeUpdate(stakeId, stake, #active, newCount, stake.flagCount, null);
+              revertVote();
             };
           };
           case (#Ok(_)) {};
@@ -1265,12 +1329,13 @@ persistent actor AegisBackend {
         return #ok(false);
       };
 
-      // Threshold reached: forfeit stake (auto-distribute to protocol wallet or cycles)
+      // Threshold reached: forfeit the stake. Mark #slashed and record the
+      // reputation hit. The forfeited ICP stays in the canister and is collected
+      // later by sweepProtocolFees / dailyMaintenance. We deliberately do NOT
+      // transfer inline: distributeProtocolRevenue cannot report failure, so an
+      // inline transfer here could neither be confirmed nor rolled back.
       putStakeUpdate(stakeId, stake, #slashed, stake.validationCount, newCount, ?Time.now());
       resolveReputation(stake.owner, 0, 1, 0, stake.amount);
-
-      // Auto-distribute forfeited deposit
-      await distributeProtocolRevenue(stake.amount);
 
       #ok(true);
     } catch (e) {
@@ -1329,7 +1394,7 @@ persistent actor AegisBackend {
 
       // Transfer fee from receiver (caller) to this canister first
       let transferResult = try {
-        await ICP_LEDGER.icrc2_transfer_from({
+        await ledger().icrc2_transfer_from({
           spender_subaccount = null;
           from = { owner = caller; subaccount = null };
           to = { owner = SELF; subaccount = null };
@@ -1371,7 +1436,7 @@ persistent actor AegisBackend {
       let senderNet = if (senderPayout > ICP_FEE) { senderPayout - ICP_FEE } else { 0 };
       if (senderNet > 0) {
         try {
-          let _r = await ICP_LEDGER.icrc1_transfer({
+          let _r = await ledger().icrc1_transfer({
             from_subaccount = null;
             to = { owner = senderPrincipal; subaccount = null };
             amount = senderNet;
@@ -1385,8 +1450,9 @@ persistent actor AegisBackend {
         };
       };
 
-      // Distribute protocol's 20% share (cycles top-up or protocol wallet)
-      await distributeProtocolRevenue(protocolPayout);
+      // Distribute protocol's 20% share (cycles top-up or protocol wallet).
+      // Best-effort: on failure the funds stay in the canister for sweepProtocolFees.
+      ignore await distributeProtocolRevenue(protocolPayout);
 
       #ok(matchId);
     } catch (e) {
@@ -1584,7 +1650,10 @@ persistent actor AegisBackend {
     var total : Nat = 0;
     for ((_, stake) in stakes.entries()) {
       switch (stake.status) {
-        case (#active) { total += stake.amount };
+        // #pending is reserved too: its deposit may have cleared the ledger even
+        // if an upgrade interrupted the #pending→#active transition, so it must
+        // NOT be swept as surplus.
+        case (#active or #pending) { total += stake.amount };
         case (_) {};
       };
     };
@@ -1594,7 +1663,7 @@ persistent actor AegisBackend {
   /// Get the canister's total ICP balance (transparency).
   public shared ({ caller }) func getTreasuryBalance() : async Nat {
     requireAuthenticated(caller);
-    await ICP_LEDGER.icrc1_balance_of({
+    await ledger().icrc1_balance_of({
       owner = SELF;
       subaccount = null;
     });
@@ -1602,14 +1671,16 @@ persistent actor AegisBackend {
 
   /// Internal: sweep surplus to protocol wallet or cycles.
   func doSweep() : async Result.Result<Text, Text> {
-    let totalBalance = await ICP_LEDGER.icrc1_balance_of({
+    let totalBalance = await ledger().icrc1_balance_of({
       owner = SELF; subaccount = null;
     });
     let reserved = calcActiveStakeTotal();
     let surplus = if (totalBalance > reserved + ICP_FEE) { totalBalance - reserved - ICP_FEE } else { 0 };
     if (surplus == 0) { return #err("No surplus to sweep") };
-    await distributeProtocolRevenue(surplus + ICP_FEE);
-    #ok("Processed " # Nat.toText(surplus) # " e8s surplus");
+    switch (await distributeProtocolRevenue(surplus + ICP_FEE)) {
+      case (#ok()) { #ok("Processed " # Nat.toText(surplus) # " e8s surplus") };
+      case (#err(e)) { #err("Sweep transfer failed: " # e) };
+    };
   };
 
   /// Sweep any accumulated surplus to protocol wallet or cycles.
@@ -1624,48 +1695,132 @@ persistent actor AegisBackend {
     await doSweep();
   };
 
+  // Test-only: point the financial flows at a mock ICRC ledger by its canister id.
+  // Controller-only, and the override is transient (cleared on upgrade) so it can
+  // never persist to mainnet. NEVER call this on the production canister.
+  public shared ({ caller }) func setTestLedger(p : Principal) : async () {
+    requireController(caller);
+    ledgerOverride := ?(actor (Principal.toText(p)) : Ledger.LedgerActor);
+  };
+
+  // Ops visibility: stakes left #pending (e.g. a deposit transfer interrupted by an
+  // upgrade). These are reserved by calcActiveStakeTotal so they are not swept.
+  public query func getStuckPendingStakes() : async [Types.StakeRecord] {
+    let buf = Buffer.Buffer<Types.StakeRecord>(4);
+    for ((_, stake) in stakes.entries()) {
+      switch (stake.status) { case (#pending) { buf.add(stake) }; case (_) {} };
+    };
+    Buffer.toArray(buf);
+  };
+
+  // Controller resolution for a stranded #pending stake. The controller inspects
+  // the ledger off-chain to decide whether the deposit actually cleared:
+  //  - depositCleared = false → roll back (no ICP moved).
+  //  - depositCleared = true  → the ICP is stuck in the canister (the publish was
+  //    interrupted before #active); refund it to the owner. The signal was never
+  //    persisted, so promotion is not possible — refunding is the correct outcome.
+  public shared ({ caller }) func reconcilePendingStake(signalId : Text, depositCleared : Bool) : async Result.Result<Text, Text> {
+    requireController(caller);
+    let stakeId = switch (signalStakeIndex.get(signalId)) {
+      case (?id) { id };
+      case null { return #err("No stake found for this signal") };
+    };
+    let stake = switch (stakes.get(stakeId)) {
+      case (?s) { s };
+      case null { return #err("Stake record not found") };
+    };
+    switch (stake.status) {
+      case (#pending) {
+        if (not depositCleared) {
+          stakes.delete(stakeId);
+          signalStakeIndex.delete(signalId);
+          #ok("Rolled back stranded pending stake (no deposit)");
+        } else {
+          putStakeUpdate(stakeId, stake, #returned, 0, 0, ?Time.now());
+          let returnAmount = if (stake.amount > ICP_FEE) { stake.amount - ICP_FEE } else { 0 };
+          if (returnAmount == 0) { return #ok("Resolved (amount below fee)") };
+          try {
+            let r = await ledger().icrc1_transfer({
+              from_subaccount = null;
+              to = { owner = stake.owner; subaccount = null };
+              amount = returnAmount;
+              fee = ?ICP_FEE;
+              memo = null;
+              created_at_time = null;
+            });
+            switch (r) {
+              case (#Ok(_)) { #ok("Refunded stranded deposit to owner") };
+              case (#Err(_)) { putStakeUpdate(stakeId, stake, #pending, 0, 0, null); #err("Refund transfer failed; left pending") };
+            };
+          } catch (e) {
+            putStakeUpdate(stakeId, stake, #pending, 0, 0, null);
+            #err("Refund trapped: " # Error.message(e));
+          };
+        };
+      };
+      case (_) { #err("Stake is not pending") };
+    };
+  };
+
   /// Return deposits that have been active for longer than DEPOSIT_EXPIRY_NS (30 days).
   /// "No community verdict = no issue found" — deposit returned automatically.
   func resolveExpiredDeposits() : async () {
-    let now = Time.now();
-    let expired = Buffer.Buffer<(Text, Types.StakeRecord)>(8);
-    for ((stakeId, stake) in stakes.entries()) {
-      switch (stake.status) {
-        case (#active) {
-          if (now - stake.createdAt > DEPOSIT_EXPIRY_NS) {
-            expired.add((stakeId, stake));
+    if (maintenanceRunning) return;
+    maintenanceRunning := true;
+    try {
+      let now = Time.now();
+      // Snapshot only the IDs. At payout time each stake is RE-READ from current
+      // state, so a stake that was validated/flagged (or already returned) during
+      // an earlier await is skipped — preventing a double refund.
+      let expiredIds = Buffer.Buffer<Text>(8);
+      for ((stakeId, stake) in stakes.entries()) {
+        switch (stake.status) {
+          case (#active) {
+            if (now - stake.createdAt > DEPOSIT_EXPIRY_NS) { expiredIds.add(stakeId) };
           };
-        };
-        case (_) {};
-      };
-    };
-    for ((stakeId, stake) in expired.vals()) {
-      putStakeUpdate(stakeId, stake, #returned, stake.validationCount, stake.flagCount, ?now);
-      let returnAmount = if (stake.amount > ICP_FEE) { stake.amount - ICP_FEE } else { 0 };
-      if (returnAmount > 0) {
-        try {
-          let result = await ICP_LEDGER.icrc1_transfer({
-            from_subaccount = null;
-            to = { owner = stake.owner; subaccount = null };
-            amount = returnAmount;
-            fee = ?ICP_FEE;
-            memo = null;
-            created_at_time = null;
-          });
-          switch (result) {
-            case (#Ok(_)) {
-              resolveReputation(stake.owner, 1, 0, stake.amount, 0);
-            };
-            case (#Err(_)) {
-              // Revert to active so next maintenance cycle retries
-              putStakeUpdate(stakeId, stake, #active, stake.validationCount, stake.flagCount, null);
-            };
-          };
-        } catch (e) {
-          Debug.print("[canister] resolveExpiredDeposits return failed: " # Error.message(e));
-          putStakeUpdate(stakeId, stake, #active, stake.validationCount, stake.flagCount, null);
+          case (_) {};
         };
       };
+      for (stakeId in expiredIds.vals()) {
+        switch (stakes.get(stakeId)) {
+          case (?cur) {
+            let stillExpired = now - cur.createdAt > DEPOSIT_EXPIRY_NS;
+            switch (cur.status) {
+              case (#active) {
+                if (stillExpired) {
+                  // Mark #returned BEFORE the await so no other path touches it mid-flight.
+                  putStakeUpdate(stakeId, cur, #returned, cur.validationCount, cur.flagCount, ?now);
+                  let returnAmount = if (cur.amount > ICP_FEE) { cur.amount - ICP_FEE } else { 0 };
+                  if (returnAmount > 0) {
+                    try {
+                      let result = await ledger().icrc1_transfer({
+                        from_subaccount = null;
+                        to = { owner = cur.owner; subaccount = null };
+                        amount = returnAmount;
+                        fee = ?ICP_FEE;
+                        memo = null;
+                        created_at_time = null;
+                      });
+                      switch (result) {
+                        case (#Ok(_)) { resolveReputation(cur.owner, 1, 0, cur.amount, 0) };
+                        // Revert to active so a later maintenance cycle retries.
+                        case (#Err(_)) { putStakeUpdate(stakeId, cur, #active, cur.validationCount, cur.flagCount, null) };
+                      };
+                    } catch (e) {
+                      Debug.print("[canister] resolveExpiredDeposits return failed: " # Error.message(e));
+                      putStakeUpdate(stakeId, cur, #active, cur.validationCount, cur.flagCount, null);
+                    };
+                  };
+                };
+              };
+              case (_) {};
+            };
+          };
+          case null {};
+        };
+      };
+    } finally {
+      maintenanceRunning := false;
     };
   };
 
@@ -2082,11 +2237,19 @@ persistent actor AegisBackend {
     };
   };
 
-  // Skip if already verified — prevents grief by re-submission
+  // First submitter owns the receipt; others cannot overwrite it. A verified
+  // receipt is immutable. Legacy receipts with no recorded owner are controller-
+  // only, so a pre-existing txHash can't be hijacked after this upgrade.
   public shared ({ caller }) func submit_receipt(receipt : Types.Receipt) : async () {
     requireAuthenticated(caller);
     switch (receipts.get(receipt.txHash)) {
-      case (?existing) { if (existing.verified) { return } };
+      case (?existing) {
+        if (existing.verified) { return };
+        switch (receiptOwners.get(receipt.txHash)) {
+          case (?owner) { if (not Principal.equal(owner, caller)) { return } };
+          case null { if (not Principal.isController(caller)) { return } };
+        };
+      };
       case null {};
     };
     receipts.put(receipt.txHash, {
@@ -2097,6 +2260,9 @@ persistent actor AegisBackend {
       amount = receipt.amount;
       verified = false;
     });
+    if (receiptOwners.get(receipt.txHash) == null) {
+      receiptOwners.put(receipt.txHash, caller);
+    };
   };
 
   /// Get canister cycles balance for monitoring.
