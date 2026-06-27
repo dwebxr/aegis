@@ -11,6 +11,22 @@ console.debug = noop;
 // false positive. Stub it to a no-op.
 jest.mock("server-only", () => ({}));
 
+// Default-mock DNS resolution. safeFetch's SSRF preflight (preCheckHost) calls
+// node:dns/promises.lookup on the target host; with the real resolver, fetch
+// suites that exercise routes (discover-feed, ogimage, rss, ...) do real DNS and
+// become slow + flaky under CI load (the discover-feed rate-limit test timed out
+// at 5s; the suite ran 15s). Resolve any host to a public IP so the preflight
+// passes instantly and the mocked fetch takes over — no real network. Suites that
+// assert specific DNS behaviour (safeFetch-dns, fetch-url-ssrf) declare their own
+// jest.mock("node:dns/promises", ...), which overrides this default per file.
+jest.mock("node:dns/promises", () => ({
+  __esModule: true,
+  lookup: jest.fn(async (_hostname: string, opts?: { all?: boolean }) => {
+    const record = { address: "8.8.8.8", family: 4 };
+    return opts && opts.all ? [record] : record;
+  }),
+}));
+
 // Mock our Tooltip wrapper so tests don't need TooltipProvider.
 // Tooltip content renders as hidden span (preserves aria-label testing).
 jest.mock("@/components/ui/tooltip", () => {

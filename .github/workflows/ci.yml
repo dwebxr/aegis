@@ -112,7 +112,10 @@ jobs:
 
       - name: Install dfx
         run: |
-          DFX_VERSION=0.30.2 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          # DFXVM_INIT_YES makes dfxvm non-interactive — without it the installer
+          # tries to prompt, fails on the CI runner ("not a terminal"), and dfx is
+          # never installed (downstream steps then hit "dfx: command not found").
+          DFXVM_INIT_YES=1 DFX_VERSION=0.30.2 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
           echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
 
       - name: Install mops
