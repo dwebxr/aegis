@@ -19,6 +19,14 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "tailwindcss"
         update-types: ["version-update:semver-major"]
+      # eslint 9/10 require flat config; eslint-config-next (Next 15) targets
+      # eslint 8. Bump as part of the Next 16 / ESLint CLI migration, not before.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      # @types/node tracks the supported runtime floor (engines >=20 / CI Node 20).
+      # A major past the floor types against APIs the floor lacks (false-green builds).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       patches:
         update-types: ["patch"]
