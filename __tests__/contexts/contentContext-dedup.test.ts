@@ -73,14 +73,23 @@ describe("isDuplicateItem", () => {
     expect(isDuplicateItem(item, existing)).toBe(true);
   });
 
-  it("handles large existing array efficiently", () => {
+  it("handles a large existing array efficiently and correctly", () => {
     const existing = Array.from({ length: 10000 }, (_, i) =>
       makeItem({ sourceUrl: `https://site.com/article-${i}`, text: `text ${i}` }),
     );
-    const start = performance.now();
+    // Correctness at scale (deterministic): a unique item is not flagged, and a
+    // match deep in a 10k array IS still detected.
     const notDup = makeItem({ sourceUrl: "https://unique-url.com", text: "unique" });
+    expect(isDuplicateItem(notDup, existing)).toBe(false);
+    const dup = makeItem({ sourceUrl: "https://site.com/article-9999", text: "text 9999" });
+    expect(isDuplicateItem(dup, existing)).toBe(true);
+    // Catastrophe guard only: an O(n^2) regression on 10k items would take
+    // seconds. A tight sub-100ms wall-clock bound flakes under coverage
+    // instrumentation and shared CI runners, so use a generous ceiling that
+    // still catches a genuine algorithmic blow-up.
+    const start = performance.now();
     isDuplicateItem(notDup, existing);
-    expect(performance.now() - start).toBeLessThan(100);
+    expect(performance.now() - start).toBeLessThan(2000);
   });
 
   it("detects duplicate with www vs non-www URL", () => {
