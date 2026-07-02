@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Principal } from "@dfinity/principal";
 import * as Sentry from "@sentry/nextjs";
-import { rateLimit, parseJsonBody } from "@/lib/api/rateLimit";
+import { distributedRateLimit, parseJsonBody } from "@/lib/api/rateLimit";
 import { generatePushToken, isAllowedPushEndpoint } from "@/lib/api/pushToken";
 import { createServerControllerActorAsync } from "@/lib/ic/actor.server";
 import { errMsg } from "@/lib/utils/errors";
@@ -15,7 +15,7 @@ export const maxDuration = 15;
 const MAX_ENDPOINTS = 5;
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 10, 60_000);
+  const limited = await distributedRateLimit(request, 10, 60);
   if (limited) return limited;
 
   if (!process.env.VAPID_PRIVATE_KEY) {

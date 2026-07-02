@@ -37,6 +37,7 @@ import { LandingHero } from "@/components/ui/LandingHero";
 import { WoTPromptBanner } from "@/components/ui/WoTPromptBanner";
 import { getLinkedAccount, saveLinkedAccount, syncLinkedAccountToIC, fetchNostrProfile, parseICSettings } from "@/lib/nostr/linkAccount";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
+import { D2A_SUBSYSTEM_ENABLED } from "@/lib/agent/config";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 // Nostr publishing + NIP-98 auth + ICP ledger only execute on user actions
@@ -304,16 +305,27 @@ function AegisAppInner() {
         const rawSettings = icSettings[0];
         if (rawSettings) {
           const { account: icAccount, d2aEnabled: icD2A } = parseICSettings(rawSettings);
-          setD2AEnabled(icD2A);
+          // While D2A is dormant the effective opt-in is always false; any on-chain
+          // opt-in is proactively cleared below (which purges the public briefing).
+          const effectiveD2A = D2A_SUBSYSTEM_ENABLED && icD2A;
+          setD2AEnabled(effectiveD2A);
 
           const localAccount = getLinkedAccount();
+
+          if (!D2A_SUBSYSTEM_ENABLED && icD2A) {
+            // Dormant but previously opted in on-chain: the inert toggle can't write
+            // d2aEnabled=false, so an old briefing snapshot would stay publicly
+            // readable. Write it now — the canister purges the snapshot on d2aEnabled
+            // false. Idempotent: the next load sees icD2A=false and skips this.
+            void syncLinkedAccountToIC(identity, icAccount ?? localAccount, false).catch(err => console.warn("[nostr] D2A dormancy opt-out failed:", errMsg(err)));
+          }
 
           if (!localAccount && icAccount) {
             // IC has linked account that localStorage doesn't — restore
             saveLinkedAccount(icAccount);
             setLinkedAccount(icAccount);
           } else if (localAccount && !icAccount) {
-            void syncLinkedAccountToIC(identity, localAccount, icD2A).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
+            void syncLinkedAccountToIC(identity, localAccount, effectiveD2A).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
           }
 
           // Hydrate displayName + followCount from relays if the stored count is 0

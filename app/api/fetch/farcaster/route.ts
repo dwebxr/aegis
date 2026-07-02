@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { guardAndParse } from "@/lib/api/rateLimit";
+import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 30;
@@ -93,7 +93,7 @@ function extractImageUrl(embeds?: Array<{ url?: string }>): string | undefined {
 }
 
 export async function POST(request: NextRequest) {
-  const { body, error } = await guardAndParse<{ action?: string; username?: string; fid?: number; limit?: number; cursor?: string }>(request, { limit: 20 });
+  const { body, error } = await distributedGuardAndParse<{ action?: string; username?: string; fid?: number; limit?: number; cursor?: string }>(request, { limit: 20 });
   if (error) return error;
 
   const { action } = body;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { guardAndParse } from "@/lib/api/rateLimit";
+import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateRelay } from "@/lib/utils/url";
 import { withTimeout } from "@/lib/utils/timeout";
@@ -9,7 +9,7 @@ import { loadServerPool } from "@/lib/nostr/serverPool";
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
-  const { body, error } = await guardAndParse<{ relays?: string[]; pubkeys?: string[]; hashtags?: string[]; limit?: number; since?: number }>(request);
+  const { body, error } = await distributedGuardAndParse<{ relays?: string[]; pubkeys?: string[]; hashtags?: string[]; limit?: number; since?: number }>(request);
   if (error) return error;
   const { relays, pubkeys, hashtags, limit = 20, since } = body;
 

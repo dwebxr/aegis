@@ -120,4 +120,6 @@ service : {
   get_receipt : (text) -> (opt Receipt) query;
   verify_payment_manual : (text) -> (bool);
   get_a2a_stats : () -> (record { offerCount : nat; receiptCount : nat }) query;
+  setD2APaymentsEnabled : (bool) -> ();
+  isD2APaymentsEnabled : () -> (bool) query;
 };

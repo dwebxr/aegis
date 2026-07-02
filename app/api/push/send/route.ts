@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import webpush from "web-push";
 import { Principal } from "@dfinity/principal";
-import { rateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
+import { distributedRateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
 import { generatePushToken, isAllowedPushEndpoint } from "@/lib/api/pushToken";
 import { errMsg } from "@/lib/utils/errors";
 import { isFeatureEnabled } from "@/lib/featureFlags";
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Push delivery disabled" }, { status: 503 });
   }
 
-  const limited = rateLimit(request, 5, 60_000);
+  const limited = await distributedRateLimit(request, 5, 60);
   if (limited) return limited;
   const tooLarge = checkBodySize(request);
   if (tooLarge) return tooLarge;

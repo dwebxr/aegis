@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { extractFromHtml } from "@extractus/article-extractor";
-import { guardAndParse } from "@/lib/api/rateLimit";
+import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { blockPrivateUrl } from "@/lib/utils/url";
 import { safeFetch } from "@/lib/utils/safeFetch.server";
+import { readCappedText } from "@/lib/utils/httpBody.server";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
 import { stripHtmlToText } from "@/lib/utils/text";
@@ -25,9 +26,10 @@ async function fetchAndExtract(url: string) {
   if (!contentType.includes("html") && !contentType.includes("text")) {
     throw new Error(`Unsupported content type: ${contentType}`);
   }
-  const buf = await res.arrayBuffer();
-  if (buf.byteLength > MAX_HTML_BYTES) throw new Error("Response too large");
-  const html = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+  // Streamed, hard-capped read — never buffers an unbounded chunked body (no
+  // Content-Length) into function memory before the size check. Oversize bodies
+  // are truncated to the cap and still extracted, matching fetch/discover-feed.
+  const html = await readCappedText(res, MAX_HTML_BYTES);
   return extractFromHtml(html, url);
 }
 
@@ -87,7 +89,7 @@ async function extractOne(url: string): Promise<ExtractionResult> {
 }
 
 export async function POST(request: NextRequest) {
-  const { body, error } = await guardAndParse<{ url?: string; urls?: string[] }>(request);
+  const { body, error } = await distributedGuardAndParse<{ url?: string; urls?: string[] }>(request);
   if (error) return error;
 
   const { url, urls } = body;

@@ -4,14 +4,14 @@ import { decode } from "nostr-tools/nip19";
 import type { AddressPointer } from "nostr-tools/nip19";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
 import { loadServerPool } from "@/lib/nostr/serverPool";
-import { rateLimit } from "@/lib/api/rateLimit";
+import { distributedRateLimit } from "@/lib/api/rateLimit";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 30;
 
 export async function GET(request: NextRequest) {
-  const limited = rateLimit(request, 30, 60_000);
+  const limited = await distributedRateLimit(request, 30, 60);
   if (limited) return limited;
 
   const naddr = request.nextUrl.searchParams.get("naddr");

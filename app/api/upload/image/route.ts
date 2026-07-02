@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { rateLimit } from "@/lib/api/rateLimit";
+import { distributedRateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 30;
@@ -24,7 +24,7 @@ function detectImageType(header: Uint8Array): string | null {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, 10, 60_000);
+  const limited = await distributedRateLimit(request, 10, 60);
   if (limited) return limited;
 
   let formData: FormData;

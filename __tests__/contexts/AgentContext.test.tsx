@@ -49,6 +49,10 @@ class MockAgentManager {
   }
 }
 
+// D2A is dormant by default in production (security redesign pending). These tests
+// exercise the manager-start path that re-enabling will restore, so force the flag
+// ON here. The default-OFF behaviour is covered by agentContext-d2a-disabled.test.tsx.
+jest.mock("@/lib/agent/config", () => ({ __esModule: true, D2A_SUBSYSTEM_ENABLED: true }));
 jest.mock("@/lib/agent/manager", () => ({ __esModule: true, AgentManager: MockAgentManager }));
 jest.mock("@/lib/agent/handshake", () => ({ __esModule: true, sendComment: (...a: unknown[]) => mockSendComment(...a) }));
 jest.mock("@/lib/d2a/comments", () => ({

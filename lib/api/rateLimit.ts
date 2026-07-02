@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getKV, _resetKVCache } from "./kvStore";
+import { errMsg } from "@/lib/utils/errors";
 
 // Re-export _resetKVCache for tests that already import it from rateLimit.
 export { _resetKVCache };
@@ -13,24 +14,37 @@ export async function distributedRateLimit(
   const store = await getKV();
   if (!store) return rateLimit(request, limit, windowSec * 1000);
 
-  const ip = getClientIP(request);
-  const windowKey = `aegis:rl:${ip}:${Math.floor(Date.now() / (windowSec * 1000))}`;
+  try {
+    const ip = getClientIP(request);
+    const windowKey = `aegis:rl:${ip}:${Math.floor(Date.now() / (windowSec * 1000))}`;
 
-  const count = await store.incr(windowKey);
-  if (count === 1) {
-    await store.expire(windowKey, windowSec);
+    const count = await store.incr(windowKey);
+    if (count === 1) {
+      await store.expire(windowKey, windowSec);
+    }
+
+    if (count > limit) {
+      // The distributed count already says DENY — never fall back to the weaker
+      // in-memory limiter here (that could let an over-limit client through). A
+      // failing ttl() only degrades the Retry-After hint, not the decision.
+      let retryAfter = windowSec;
+      try {
+        const ttl = await store.ttl(windowKey);
+        if (ttl > 0) retryAfter = ttl;
+      } catch { /* ttl unavailable — use the full window */ }
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Try again later." },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } },
+      );
+    }
+
+    return null;
+  } catch (err) {
+    // A transient KV/Upstash error BEFORE we know the count (incr/expire) must not
+    // 500 the route — fail safe to the per-instance in-memory limiter.
+    console.warn("[rateLimit] KV error; falling back to in-memory:", errMsg(err));
+    return rateLimit(request, limit, windowSec * 1000);
   }
-
-  if (count > limit) {
-    const ttl = await store.ttl(windowKey);
-    const retryAfter = ttl > 0 ? ttl : windowSec;
-    return NextResponse.json(
-      { error: "Rate limit exceeded. Try again later." },
-      { status: 429, headers: { "Retry-After": String(retryAfter) } },
-    );
-  }
-
-  return null;
 }
 
 // Caller-supplied bucket key (e.g. IC principal) caps independent traffic axes separately from per-IP.
@@ -43,19 +57,28 @@ export async function distributedRateLimitByKey(
   const store = await getKV();
   if (!store) return inMemoryRateLimitByKey(key, limit, windowSec * 1000, errorMessage);
 
-  const windowKey = `aegis:rl:key:${key}:${Math.floor(Date.now() / (windowSec * 1000))}`;
-  const count = await store.incr(windowKey);
-  if (count === 1) await store.expire(windowKey, windowSec);
+  try {
+    const windowKey = `aegis:rl:key:${key}:${Math.floor(Date.now() / (windowSec * 1000))}`;
+    const count = await store.incr(windowKey);
+    if (count === 1) await store.expire(windowKey, windowSec);
 
-  if (count > limit) {
-    const ttl = await store.ttl(windowKey);
-    const retryAfter = ttl > 0 ? ttl : windowSec;
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 429, headers: { "Retry-After": String(retryAfter) } },
-    );
+    if (count > limit) {
+      // Already over the distributed limit → deny; don't fall back to in-memory.
+      let retryAfter = windowSec;
+      try {
+        const ttl = await store.ttl(windowKey);
+        if (ttl > 0) retryAfter = ttl;
+      } catch { /* ttl unavailable — use the full window */ }
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } },
+      );
+    }
+    return null;
+  } catch (err) {
+    console.warn("[rateLimit] KV error; falling back to in-memory:", errMsg(err));
+    return inMemoryRateLimitByKey(key, limit, windowSec * 1000, errorMessage);
   }
-  return null;
 }
 
 interface WindowEntry {

@@ -20,6 +20,7 @@ import type { AnalyzeResponse } from "@/lib/types/api";
 import type { UserContext } from "@/lib/preferences/types";
 import { errMsg } from "@/lib/utils/errors";
 import { scoreItemWithHeuristics } from "@/lib/filtering/pipeline";
+import { withTimeout } from "@/lib/utils/timeout";
 import { fetchRSS, fetchNostr, fetchURL, fetchFarcaster, type RawItem, type FetcherCallbacks } from "./fetchers";
 
 const MAX_ITEMS_PER_SOURCE = 5;
@@ -239,6 +240,11 @@ export class IngestionScheduler {
         const errorsBefore = state.errorCount;
         const items = await this.fetchSource(source, key);
         if (state.errorCount > errorsBefore) continue;
+        // A 429 records a Retry-After backoff (rateLimitedUntil/nextFetchAt) WITHOUT
+        // bumping errorCount, so the guard above doesn't catch it. Skip before
+        // recordSourceSuccess below, which would otherwise clobber the honoured
+        // Retry-After with the default ~20-min success interval.
+        if (state.rateLimitedUntil > now) continue;
 
         const passed = items.filter(raw => quickSlopFilter(raw.text));
 
@@ -253,9 +259,18 @@ export class IngestionScheduler {
         const scores: number[] = [];
 
         for (const raw of toScore) {
+          // Bound the scoring cascade: a WebLLM/MediaPipe generation that never
+          // settles (WebGPU device loss on tab backgrounding) would leave runCycle's
+          // `try` unreached-`finally`, pinning `this.running=true` and silently
+          // freezing ALL future ingestion. Time out (→ skip item) so the cycle
+          // always completes and resets `running`. Matches the manual-path timeout.
           const scored = this.callbacks.getSkipAI?.()
             ? scoreItemWithHeuristics(raw, source.type, source.platform)
-            : await this.scoreItem(raw, userContext, source.type, source.platform);
+            : await withTimeout(
+                this.scoreItem(raw, userContext, source.type, source.platform),
+                20_000,
+                "scoring timed out",
+              ).catch(() => null);
           this.dedup.markSeen(raw.sourceUrl, raw.text);
           if (scored) {
             if (source.savedSourceId) scored.savedSourceId = source.savedSourceId;

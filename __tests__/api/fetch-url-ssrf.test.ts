@@ -66,6 +66,7 @@ function fetchResponse(opts: {
     ok: status >= 200 && status < 300,
     headers,
     arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+    text: async () => new TextDecoder().decode(buffer),
   } as unknown as Response;
 }
 
@@ -120,16 +121,25 @@ describe("POST /api/fetch/url — SSRF defense", () => {
     expect(mockExtractFromHtml).not.toHaveBeenCalled();
   });
 
-  it("rejects oversized HTML before passing to extractor (5MB cap)", async () => {
+  it("caps oversized HTML at the 5MB limit before passing to extractor", async () => {
     mockLookup.mockResolvedValueOnce([{ address: "8.8.8.8", family: 4 }]);
-    const huge = new Uint8Array(6_000_000); // 6MB > 5MB cap
+    const huge = new Uint8Array(6_000_000).fill(0x61); // 6MB of 'a' > 5MB cap
     mockFetch.mockResolvedValueOnce(
       fetchResponse({ status: 200, contentType: "text/html", bytes: huge }),
     );
+    mockExtractFromHtml.mockResolvedValueOnce({
+      title: "Capped",
+      content: "This article body is comfortably longer than the fifty character minimum the route enforces.",
+    });
 
     const res = await POST(makeRequest({ url: "https://huge.example.com/" }));
-    expect(res.status).toBe(502);
-    expect(mockExtractFromHtml).not.toHaveBeenCalled();
+
+    // readCappedText streams and hard-caps at 5MB — the extractor is still invoked,
+    // but only ever with the capped body, never the full 6MB (no unbounded buffering).
+    expect(mockExtractFromHtml).toHaveBeenCalled();
+    const htmlArg = mockExtractFromHtml.mock.calls[0][0] as string;
+    expect(htmlArg.length).toBeLessThanOrEqual(5_000_000);
+    expect(res.status).toBe(200);
   });
 
   it("passes fetched HTML body to extractFromHtml (not the URL)", async () => {
