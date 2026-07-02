@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import Parser from "rss-parser";
-import { guardAndParse } from "@/lib/api/rateLimit";
+import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { blockPrivateUrl } from "@/lib/utils/url";
 import { safeFetch } from "@/lib/utils/safeFetch.server";
+import { readCappedText } from "@/lib/utils/httpBody.server";
 import { stripHtmlToText } from "@/lib/utils/text";
 import { safeRssLink } from "./safeRssLink";
 
 export const maxDuration = 30;
+
+// Hard cap on the RSS/Atom body we buffer — prevents a hostile feed from OOMing
+// the function with a huge/slow chunked response (res.text() has no bound).
+const MAX_RSS_BYTES = 5_000_000;
 
 function feedErrorResponse(err: unknown, feedUrl: string, context: string): NextResponse {
   console.error(`[fetch/rss] ${context}:`, feedUrl, errMsg(err));
@@ -76,7 +81,7 @@ function extractImage(item: Record<string, unknown>, rawContent: string): string
 }
 
 export async function POST(request: NextRequest) {
-  const { body, error } = await guardAndParse<{ feedUrl?: string; limit?: number; etag?: string; lastModified?: string }>(request);
+  const { body, error } = await distributedGuardAndParse<{ feedUrl?: string; limit?: number; etag?: string; lastModified?: string }>(request);
   if (error) return error;
   const { feedUrl, limit: rawLimit, etag, lastModified } = body;
   const limit = typeof rawLimit === "number" && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 50) : 20;
@@ -114,7 +119,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Feed returned HTTP ${res.status}` }, { status: 502 });
     }
 
-    const xml = await res.text();
+    const xml = await readCappedText(res, MAX_RSS_BYTES);
     const feed = await parser.parseString(xml);
 
     const response = NextResponse.json({

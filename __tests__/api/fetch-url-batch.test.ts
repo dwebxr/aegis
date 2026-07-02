@@ -13,6 +13,7 @@ jest.mock("@/lib/utils/safeFetch.server", () => ({
     status: 200,
     headers: new Headers({ "content-type": "text/html" }),
     arrayBuffer: async () => new TextEncoder().encode("<html><body>mock</body></html>").buffer,
+    text: async () => "<html><body>mock</body></html>",
   })),
 }));
 

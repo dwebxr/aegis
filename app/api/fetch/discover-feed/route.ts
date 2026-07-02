@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { guardAndParse } from "@/lib/api/rateLimit";
+import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { errMsg, isTimeout } from "@/lib/utils/errors";
 import { blockPrivateUrl } from "@/lib/utils/url";
 import { safeFetch } from "@/lib/utils/safeFetch.server";
@@ -11,7 +11,7 @@ export const maxDuration = 30;
 const COMMON_PATHS = ["/feed", "/rss", "/feed.xml", "/atom.xml", "/rss.xml", "/index.xml"];
 
 export async function POST(request: NextRequest) {
-  const { body, error } = await guardAndParse<{ url?: string }>(request, { limit: 15 });
+  const { body, error } = await distributedGuardAndParse<{ url?: string }>(request, { limit: 15 });
   if (error) return error;
 
   const { url } = body;

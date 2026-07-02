@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { guardAndParse } from "@/lib/api/rateLimit";
+import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { safeFetch } from "@/lib/utils/safeFetch.server";
 import { errMsg } from "@/lib/utils/errors";
 import { getOgCached, setOgCache } from "@/lib/cache/ogimage";
@@ -60,7 +60,7 @@ async function extractOgImage(url: string): Promise<string | null> {
 }
 
 export async function POST(request: NextRequest) {
-  const { body, error } = await guardAndParse<{ url?: string; urls?: string[] }>(request, { limit: 60 });
+  const { body, error } = await distributedGuardAndParse<{ url?: string; urls?: string[] }>(request, { limit: 60 });
   if (error) return error;
 
   const { url, urls } = body;

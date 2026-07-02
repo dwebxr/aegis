@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { Principal } from "@dfinity/principal";
 import { withX402 } from "@x402/next";
-import { rateLimit } from "@/lib/api/rateLimit";
+import { distributedRateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 import { getLatestBriefing, getGlobalBriefingSummaries } from "@/lib/d2a/briefingProvider";
 import { resourceServer, X402_NETWORK, X402_PRICE, X402_RECEIVER } from "@/lib/d2a/x402Server";
@@ -26,7 +26,7 @@ const x402Config = {
 };
 
 async function handleGet(request: NextRequest): Promise<NextResponse> {
-  const limited = rateLimit(request, 30, 60_000);
+  const limited = await distributedRateLimit(request, 30, 60);
   if (limited) return limited;
 
   const origin = request.headers.get("origin");
