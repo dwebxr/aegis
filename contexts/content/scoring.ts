@@ -146,7 +146,7 @@ export async function runScoringCascade(
               originality: a.originality,
               insight: a.insight,
               credibility: a.credibility,
-              composite: a.compositeScore,
+              composite: Math.max(0, Math.min(10, a.compositeScore)),
               verdict: ("quality" in a.verdict ? "quality" : "slop") as Verdict,
               reason: a.reason,
               topics: a.topics,

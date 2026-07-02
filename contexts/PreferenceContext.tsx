@@ -97,7 +97,11 @@ export function PreferenceProvider({ children }: { children: React.ReactNode }) 
 
     return () => {
       cancelled = true;
-      const ident = identityRef.current;
+      // Use the identity captured by THIS effect run, not identityRef.current:
+      // useCurrentRef mutates the ref during render, so on logout (A→null) the ref
+      // already holds null by cleanup time and the pending debounced sync for A
+      // would be silently dropped. The closure `identity` is still A here.
+      const ident = identity;
       if (icSyncTimeoutRef.current && ident) {
         clearTimeout(icSyncTimeoutRef.current);
         icSyncTimeoutRef.current = null;

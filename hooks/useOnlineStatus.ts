@@ -9,7 +9,11 @@ export function useOnlineStatus(onReconnect?: () => void): boolean {
   const callbackRef = useRef(onReconnect);
   callbackRef.current = onReconnect;
 
-  const wasOfflineRef = useRef(false);
+  // Initialise from the actual connectivity at mount, not a blind false: a PWA
+  // *opened* while offline (subway/flight) queues actions, and on reconnect the
+  // 'online' handler must fire the drain callback. Hard-coding false meant the
+  // cold-start-offline case never drained until a full reload.
+  const wasOfflineRef = useRef(typeof navigator !== "undefined" ? !navigator.onLine : false);
 
   const handleOnline = useCallback(() => {
     setIsOnline(true);

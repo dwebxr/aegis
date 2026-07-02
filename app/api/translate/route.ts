@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { distributedRateLimit, checkBodySize, parseJsonBody } from "@/lib/api/rateLimit";
 import { callAnthropic, ANTHROPIC_DEFAULT_MODEL } from "@/lib/api/anthropic";
 import { requireUserByokKey } from "@/lib/api/byok";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 30;
 
@@ -38,13 +40,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const res = await callAnthropic({
-    apiKey,
-    model: ANTHROPIC_DEFAULT_MODEL,
-    maxTokens: 4000,
-    messages: [{ role: "user", content: prompt }],
-    timeoutMs: 25_000,
-  });
+  let res;
+  try {
+    res = await callAnthropic({
+      apiKey,
+      model: ANTHROPIC_DEFAULT_MODEL,
+      maxTokens: 4000,
+      messages: [{ role: "user", content: prompt }],
+      timeoutMs: 25_000,
+    });
+  } catch (err) {
+    // callAnthropic throws (not {ok:false}) on a network error or the 25s timeout
+    // abort — without this the exception propagates uncaught, with no route-tagged
+    // Sentry context (unlike the sibling briefing/digest route).
+    console.error("[translate] Claude API call failed:", errMsg(err));
+    Sentry.captureException(err, { tags: { route: "translate", failure: "anthropic" } });
+    return NextResponse.json({ error: "Translation service unavailable" }, { status: 502 });
+  }
 
   if (!res.ok) {
     // Log only the status — never the raw upstream body, which can echo request
