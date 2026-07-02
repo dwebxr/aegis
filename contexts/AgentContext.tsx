@@ -128,6 +128,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, principalText, nostrKeys, refreshAgentProfile]);
 
   const toggleAgent = useCallback(() => {
+    if (!D2A_SUBSYSTEM_ENABLED) return; // Dormant — the Start/Stop toggle is inert.
     setD2AEnabled(prev => {
       const next = !prev;
       if (identity) {
@@ -136,6 +137,13 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, [identity]);
+
+  // Exposed setter is inert while the subsystem is dormant, so a restored IC
+  // setting (d2aEnabled=true) or any external caller cannot silently re-activate
+  // D2A privacy behaviour (e.g. BriefingTab publishing briefings on-chain).
+  const setD2AEnabledGuarded = useCallback((enabled: boolean) => {
+    if (D2A_SUBSYSTEM_ENABLED) setD2AEnabled(enabled);
+  }, []);
 
   const setWoTGraph = useCallback((graph: WoTGraph | null) => {
     setWotGraphState(graph);
@@ -312,11 +320,15 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     }
   }, [agentState, addNotification]);
 
+  // Expose the EFFECTIVE enabled state: while the master switch is off, every
+  // consumer (BriefingTab's on-chain sync gate, the status UI) must see D2A as
+  // disabled regardless of the internal toggle/restored setting.
+  const effectiveEnabled = D2A_SUBSYSTEM_ENABLED && isEnabled;
   const value = useMemo(() => ({
-    agentState, isEnabled, toggleAgent, setD2AEnabled, setWoTGraph, wotGraph,
+    agentState, isEnabled: effectiveEnabled, toggleAgent, setD2AEnabled: setD2AEnabledGuarded, setWoTGraph, wotGraph,
     agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys,
     sendComment: handleSendComment, d2aComments,
-  }), [agentState, isEnabled, toggleAgent, setWoTGraph, wotGraph,
+  }), [agentState, effectiveEnabled, toggleAgent, setD2AEnabledGuarded, setWoTGraph, wotGraph,
     agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys,
     handleSendComment, d2aComments]);
 

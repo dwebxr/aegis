@@ -98,6 +98,10 @@ describe("AgentProvider — D2A dormant (D2A_SUBSYSTEM_ENABLED=false)", () => {
 
     expect(managerInstances).toHaveLength(0);
     expect(result.current.agentState.isActive).toBe(false);
+    // The EFFECTIVE enabled flag stays false so downstream privacy gates (e.g.
+    // BriefingTab's on-chain briefing sync, which reads useAgent().isEnabled) never
+    // fire — the master switch must win over the internal toggle / restored setting.
+    expect(result.current.isEnabled).toBe(false);
     // And no ICP allowance pre-approval was attempted.
     expect(mockCreateLedgerActor).not.toHaveBeenCalled();
   });
