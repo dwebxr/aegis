@@ -24,8 +24,14 @@ export async function distributedRateLimit(
     }
 
     if (count > limit) {
-      const ttl = await store.ttl(windowKey);
-      const retryAfter = ttl > 0 ? ttl : windowSec;
+      // The distributed count already says DENY — never fall back to the weaker
+      // in-memory limiter here (that could let an over-limit client through). A
+      // failing ttl() only degrades the Retry-After hint, not the decision.
+      let retryAfter = windowSec;
+      try {
+        const ttl = await store.ttl(windowKey);
+        if (ttl > 0) retryAfter = ttl;
+      } catch { /* ttl unavailable — use the full window */ }
       return NextResponse.json(
         { error: "Rate limit exceeded. Try again later." },
         { status: 429, headers: { "Retry-After": String(retryAfter) } },
@@ -34,8 +40,8 @@ export async function distributedRateLimit(
 
     return null;
   } catch (err) {
-    // A transient KV/Upstash error must not 500 the route — fail safe to the
-    // per-instance in-memory limiter (weaker, but available) instead of throwing.
+    // A transient KV/Upstash error BEFORE we know the count (incr/expire) must not
+    // 500 the route — fail safe to the per-instance in-memory limiter.
     console.warn("[rateLimit] KV error; falling back to in-memory:", errMsg(err));
     return rateLimit(request, limit, windowSec * 1000);
   }
@@ -57,8 +63,12 @@ export async function distributedRateLimitByKey(
     if (count === 1) await store.expire(windowKey, windowSec);
 
     if (count > limit) {
-      const ttl = await store.ttl(windowKey);
-      const retryAfter = ttl > 0 ? ttl : windowSec;
+      // Already over the distributed limit → deny; don't fall back to in-memory.
+      let retryAfter = windowSec;
+      try {
+        const ttl = await store.ttl(windowKey);
+        if (ttl > 0) retryAfter = ttl;
+      } catch { /* ttl unavailable — use the full window */ }
       return NextResponse.json(
         { error: errorMessage },
         { status: 429, headers: { "Retry-After": String(retryAfter) } },
