@@ -228,4 +228,6 @@ export interface _SERVICE {
   get_receipt: ActorMethod<[string], [] | [Receipt]>;
   verify_payment_manual: ActorMethod<[string], boolean>;
   get_a2a_stats: ActorMethod<[], { offerCount: bigint; receiptCount: bigint }>;
+  setD2APaymentsEnabled: ActorMethod<[boolean], void>;
+  isD2APaymentsEnabled: ActorMethod<[], boolean>;
 }

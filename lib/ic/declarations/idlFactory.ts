@@ -156,6 +156,8 @@ export const idlFactory = ({ IDL }: { IDL: any }) => {
     verified: IDL.Bool,
   });
   return IDL.Service({
+    setD2APaymentsEnabled: IDL.Func([IDL.Bool], [], []),
+    isD2APaymentsEnabled: IDL.Func([], [IDL.Bool], ["query"]),
     getProfile: IDL.Func([IDL.Principal], [IDL.Opt(UserProfile)], ["query"]),
     getEvaluation: IDL.Func([IDL.Text], [IDL.Opt(ContentEvaluation)], ["query"]),
     getUserEvaluations: IDL.Func([IDL.Principal, IDL.Nat, IDL.Nat], [IDL.Vec(ContentEvaluation)], ["query"]),
