@@ -43,6 +43,15 @@ persistent actor AegisBackend {
   // this is defence-in-depth against any future overlapping invocation. Transient
   // so an interrupted upgrade can never leave it stuck true.
   transient var maintenanceRunning : Bool = false;
+
+  // D2A payment kill switch. transient + default false = fail-safe: D2A fees stay
+  // OFF across upgrades until a controller explicitly re-enables (gated on the D2A
+  // subsystem security redesign — key rotation + handleDelivery hardening +
+  // idempotent/pending payment accounting). recordD2AMatch checks this FIRST,
+  // before any transfer or state write. Client-side suspension alone is theater:
+  // existing tabs / old bundles / pre-approved allowances still reach the canister.
+  transient var d2aPaymentsEnabled : Bool = false;
+
   let ICP_FEE : Nat = 10_000; // 0.0001 ICP
   let MIN_STAKE : Nat = 100_000; // 0.001 ICP minimum
   let MAX_STAKE : Nat = 100_000_000; // 1.0 ICP maximum
@@ -760,10 +769,11 @@ persistent actor AegisBackend {
     // entry would leak. Update the owner index to reflect the new owner.
     switch (sourceConfigs.get(tagged.id)) {
       case (?existing) {
-        if (not Principal.equal(existing.owner, tagged.owner)) {
-          removeFromPrincipalIndex(sourceConfigOwnerIndex, existing.owner, tagged.id);
-          addToPrincipalIndex(sourceConfigOwnerIndex, tagged.owner, tagged.id);
-        };
+        // Ownership guard (matches saveSignal/saveEvaluation/put_offer): never let
+        // one caller overwrite or seize another owner's config. This previously
+        // reassigned ownership to the caller, enabling cross-user config hijack +
+        // feed injection on the victim's next sync.
+        if (not Principal.equal(existing.owner, caller)) { Debug.trap("not owner") };
       };
       case null {
         addToPrincipalIndex(sourceConfigOwnerIndex, tagged.owner, tagged.id);
@@ -773,7 +783,13 @@ persistent actor AegisBackend {
     tagged.id;
   };
 
-  public query func getUserSourceConfigs(p : Principal) : async [Types.SourceConfigEntry] {
+  public shared query (msg) func getUserSourceConfigs(p : Principal) : async [Types.SourceConfigEntry] {
+    // Source configs hold private feed/relay URLs — only the owner (or a controller)
+    // may read them. An authenticated query carries msg.caller; anonymous/other
+    // principals get an empty result. (Clients call this via their own II identity.)
+    if (not (Principal.equal(msg.caller, p) or Principal.isController(msg.caller))) {
+      return [];
+    };
     let result = Buffer.Buffer<Types.SourceConfigEntry>(4);
     for ((_, config) in sourceConfigs.entries()) {
       if (Principal.equal(config.owner, p)) {
@@ -824,9 +840,13 @@ persistent actor AegisBackend {
   // every source config in the canister (O(total)); this one looks up
   // the user's entry in the owner index first (O(1) hash lookup) and
   // then slices the index buffer (O(limit)).
-  public query func getUserSourceConfigsPaginated(
+  public shared query (msg) func getUserSourceConfigsPaginated(
     p : Principal, offset : Nat, limit : Nat
   ) : async { items : [Types.SourceConfigEntry]; total : Nat; hasMore : Bool } {
+    // Owner/controller only — see getUserSourceConfigs.
+    if (not (Principal.equal(msg.caller, p) or Principal.isController(msg.caller))) {
+      return { items = []; total = 0; hasMore = false };
+    };
     switch (sourceConfigOwnerIndex.get(p)) {
       case null { { items = []; total = 0; hasMore = false } };
       case (?buf) {
@@ -1378,6 +1398,13 @@ persistent actor AegisBackend {
     let caller = msg.caller;
     requireAuthenticated(caller);
 
+    // Kill switch — checked FIRST, before the re-entrancy guard, any ledger
+    // transfer, or any state/accounting write. D2A payments are disabled pending
+    // the D2A subsystem security redesign.
+    if (not d2aPaymentsEnabled) {
+      return #err("D2A payments are disabled");
+    };
+
     switch (acquireGuard(caller)) {
       case (#err(m)) { return #err(m) };
       case (#ok()) {};
@@ -1703,6 +1730,16 @@ persistent actor AegisBackend {
     ledgerOverride := ?(actor (Principal.toText(p)) : Ledger.LedgerActor);
   };
 
+  // Controller-only kill switch for D2A payments (default OFF). Re-enabling is
+  // gated on the D2A subsystem redesign. transient var → resets to OFF on upgrade,
+  // so payments cannot silently come back after a deploy.
+  public shared ({ caller }) func setD2APaymentsEnabled(enabled : Bool) : async () {
+    requireController(caller);
+    d2aPaymentsEnabled := enabled;
+  };
+
+  public query func isD2APaymentsEnabled() : async Bool { d2aPaymentsEnabled };
+
   // Ops visibility: stakes left #pending (e.g. a deposit transfer interrupted by an
   // upgrade). These are reserved by calcActiveStakeTotal so they are not swept.
   public query func getStuckPendingStakes() : async [Types.StakeRecord] {
@@ -1912,7 +1949,7 @@ persistent actor AegisBackend {
           case (#err(_)) { 5 : Nat8 };
         };
         let compositeScore = switch (Json.getAsFloat(json, "composite")) {
-          case (#ok(v)) { v };
+          case (#ok(v)) { Float.max(0.0, Float.min(10.0, v)) };
           case (#err(_)) {
             // Calculate from sub-scores
             let o = Float.fromInt(Nat8.toNat(originality));
@@ -2127,7 +2164,13 @@ persistent actor AegisBackend {
 
   // — User Settings (cross-device sync) —
 
-  public query func getUserSettings(p : Principal) : async ?Types.UserSettings {
+  public shared query (msg) func getUserSettings(p : Principal) : async ?Types.UserSettings {
+    // Contains the user's linked Nostr identity (PII). Only the owner or a
+    // controller may read it; other/anonymous callers get null. Previously any
+    // caller could map principal → linked Nostr npub.
+    if (not (Principal.equal(msg.caller, p) or Principal.isController(msg.caller))) {
+      return null;
+    };
     userSettings.get(p);
   };
 
