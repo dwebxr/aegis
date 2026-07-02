@@ -9,6 +9,7 @@ import { useNotify } from "./NotificationContext";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { AgentManager } from "@/lib/agent/manager";
 import { D2A_APPROVE_AMOUNT } from "@/lib/agent/protocol";
+import { D2A_SUBSYSTEM_ENABLED } from "@/lib/agent/config";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 // createICPLedgerActorAsync / ICP_FEE are only needed on agent start (a
 // post-auth user action). Imported dynamically below to keep landing-page
@@ -144,6 +145,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleSendComment = useCallback(async (peerPubkey: string, payload: D2ACommentPayload) => {
+    if (!D2A_SUBSYSTEM_ENABLED) return;
     if (!nostrKeys) throw new Error("No Nostr keys available");
     await sendCommentMsg(nostrKeys.sk, nostrKeys.pk, peerPubkey, payload, DEFAULT_RELAYS);
     const stored: StoredComment = {
@@ -159,7 +161,10 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, [nostrKeys]);
 
   useEffect(() => {
-    if (!isAuthenticated || !principalText || !identity || !isEnabled || !nostrKeys) {
+    // D2A_SUBSYSTEM_ENABLED gates the ENTIRE subsystem off (default) pending the
+    // security redesign: with it false the manager never starts, so no presence,
+    // discovery, offer/accept/deliver, or allowance pre-approval ever runs.
+    if (!D2A_SUBSYSTEM_ENABLED || !isAuthenticated || !principalText || !identity || !isEnabled || !nostrKeys) {
       if (managerRef.current) {
         managerRef.current.stop();
         managerRef.current = null;
