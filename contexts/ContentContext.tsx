@@ -187,8 +187,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const doDrainQueue = useCallback(async () => {
     const actor = actorRef.current;
     if (!actor || !isAuthenticated || !principal) return;
-    await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus, addNotification);
-  }, [isAuthenticated, principal, addNotification]);
+    // Tell the drain whether the cache has reconciled, so an item-not-found is retried
+    // (ran before the cache loaded) vs dropped (genuinely evicted) — not left stuck.
+    const contentReconciled = contentLoadedFor === principalText;
+    await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus, addNotification, contentReconciled);
+  }, [isAuthenticated, principal, addNotification, contentLoadedFor, principalText]);
   drainQueueRef.current = doDrainQueue;
 
   const isOnline = useOnlineStatus(doDrainQueue);

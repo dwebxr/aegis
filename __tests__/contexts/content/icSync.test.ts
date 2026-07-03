@@ -423,7 +423,7 @@ describe("drainOfflineQueue", () => {
     expect(actor.saveEvaluation).toHaveBeenCalled();
   });
 
-  it("skips saveEvaluation when content item not found", async () => {
+  it("drops saveEvaluation when item not found and cache is reconciled", async () => {
     await enqueueAction("saveEvaluation", { itemId: "missing" }, principal.toText());
 
     const actor = makeMockActor();
@@ -431,9 +431,29 @@ describe("drainOfflineQueue", () => {
     const setPendingActions = jest.fn();
     const setSyncStatus = jest.fn();
 
+    // contentReconciled defaults true → the item is genuinely gone (e.g. evicted by the
+    // 200-item truncation) → drop it rather than leave it permanently stuck.
     await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus);
 
     expect(actor.saveEvaluation).not.toHaveBeenCalled();
+    expect(await dequeueAll(principal.toText())).toHaveLength(0); // dropped, not stuck
+  });
+
+  it("retries saveEvaluation (does not drop) when the cache has not reconciled yet", async () => {
+    await enqueueAction("saveEvaluation", { itemId: "not-loaded-yet" }, principal.toText());
+
+    const actor = makeMockActor();
+    const contentRef = { current: [] as ContentItem[] };
+    const setPendingActions = jest.fn();
+    const setSyncStatus = jest.fn();
+
+    // contentReconciled = false → the drain ran before the cache loaded → keep + retry.
+    await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus, undefined, false);
+
+    expect(actor.saveEvaluation).not.toHaveBeenCalled();
+    const remaining = await dequeueAll(principal.toText());
+    expect(remaining).toHaveLength(1);    // retained, not dropped
+    expect(remaining[0].retries).toBe(1); // retry incremented
   });
 
   it("drops actions after 5 retries", async () => {

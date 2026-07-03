@@ -147,6 +147,11 @@ export async function drainOfflineQueue(
   setPendingActions: React.Dispatch<React.SetStateAction<number>>,
   setSyncStatus: (s: ContentSyncStatus) => void,
   addNotification?: (msg: string, type: NotificationType) => void,
+  // Whether the local content cache has finished loading for this principal. false →
+  // an item-not-found is a transient pre-load miss (retry); true → a genuine eviction
+  // (drop, since the itemId-only payload can't be reconstructed). Defaults true so
+  // callers that don't distinguish keep the original drop-on-missing behavior.
+  contentReconciled: boolean = true,
 ) {
   const actions = await dequeueAll(principal.toText());
   if (actions.length === 0) return;
@@ -174,13 +179,21 @@ export async function drainOfflineQueue(
         const { itemId } = action.payload;
         const item = contentRef.current.find(c => c.id === itemId);
         if (!item) {
-          // The item isn't in the loaded content YET (e.g. the drain ran before the
-          // content cache finished loading). An evaluated item is validated/flagged
-          // so truncation preserves it — this is a transient miss, not a permanent
-          // eviction. Retry on a later cycle instead of silently dropping the user's
-          // evaluation; it only falls away via the MAX_RETRIES path (which notifies).
-          console.warn(`[offline-queue] Referenced item ${itemId} not in local content yet; will retry action ${actionId}`);
-          await incrementRetries(actionId);
+          if (!contentReconciled) {
+            // The content cache hasn't loaded for this principal yet (the drain ran
+            // before it finished) — transient miss, retry on a later cycle.
+            console.warn(`[offline-queue] Referenced item ${itemId} not in local content yet; will retry action ${actionId}`);
+            await incrementRetries(actionId);
+            continue;
+          }
+          // Content IS reconciled and the item is genuinely gone — e.g. an unvalidated
+          // freshly-scored item evicted by the 200-item cache truncation (saveEvaluation
+          // is queued for such items, not only validated/flagged ones). The payload
+          // holds only itemId, so it can't be reconstructed; drop it and surface the
+          // loss rather than leave a permanently stuck pending-sync action.
+          console.warn(`[offline-queue] Referenced item ${itemId} no longer in local content, dropping action ${actionId}`);
+          droppedCount++;
+          await removeAction(actionId);
           continue;
         }
         await actor.saveEvaluation(toICEvaluation(item, principal));
