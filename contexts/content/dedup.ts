@@ -8,6 +8,9 @@ const TRACKING_PARAMS = new Set([
 export function normalizeUrl(raw: string): string {
   try {
     const url = new URL(raw);
+    // Treat http and https as the same article — a feed that switches scheme
+    // (or lists both) otherwise dedups as two distinct items.
+    if (url.protocol === "http:" || url.protocol === "https:") url.protocol = "https:";
     url.hostname = url.hostname.replace(/^www\./, "");
     url.pathname = url.pathname.replace(/\/+$/, "") || "/";
     for (const key of Array.from(url.searchParams.keys())) {
