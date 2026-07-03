@@ -191,7 +191,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   // partial content would retry-miss the queued item, and the once-per-principal guard
   // would then block the correct re-drain once the real cached content arrives.
   useEffect(() => {
-    if (!isAuthenticated || !actorRef.current || contentLoadedFor !== principalText) return;
+    // actorPrincipalRef check: during a direct A→B switch actorRef can still be A's
+    // actor here, so require it to belong to the current principal before draining (and
+    // before consuming the once-per-principal guard). doDrainQueue enforces the same
+    // gate as a backstop.
+    if (!isAuthenticated || !actorRef.current || actorPrincipalRef.current !== principalText
+        || contentLoadedFor !== principalText) return;
     if (postLoadDrainKeyRef.current === principalText) return;
     postLoadDrainKeyRef.current = principalText;
     drainQueueRef.current().catch((err: unknown) =>
