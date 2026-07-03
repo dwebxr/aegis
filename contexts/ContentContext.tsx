@@ -74,7 +74,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   // Which principal the in-memory `content` currently reflects. The persist effect
   // uses it to avoid writing a stale (previous-user) `content` into the new
   // principal's — or the anonymous — cache bucket during a login/logout transition.
-  const contentLoadedForRef = useRef<string | null>(null);
+  // STATE (not a ref) so that reconciling it re-runs the persist effect — otherwise an
+  // item added during a slow, empty cache load would never get persisted (the load
+  // sets this without any other render).
+  const [contentLoadedFor, setContentLoadedFor] = useState<string | null>(null);
 
   // Load cached content scoped to the current principal. Re-runs on principal
   // change (login/logout/account switch) so User A's cache never leaks to B.
@@ -104,8 +107,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
       const items = await loadCachedContent(principalText);
       if (!cancelled) {
         if (items.length > 0) setContent(items);
-        // `content` now reflects this principal — the persist effect may write again.
-        contentLoadedForRef.current = principalText;
+        // `content` now reflects this principal — re-runs the persist effect, which
+        // also flushes anything added to `content` while the cache was still loading.
+        setContentLoadedFor(principalText);
       }
     };
     next().catch(err => {
@@ -201,9 +205,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     // Skip while the principal just changed and the load effect hasn't yet
     // reconciled `content` to it — otherwise the previous user's content would be
     // written into the new (e.g. anonymous, on logout) cache bucket.
-    if (contentLoadedForRef.current !== principalText) return;
+    if (contentLoadedFor !== principalText) return;
     saveCachedContent(content, principalText);
-  }, [content, principalText]);
+  }, [content, principalText, contentLoadedFor]);
 
   useEffect(() => {
     const updateTimestamps = () => {
