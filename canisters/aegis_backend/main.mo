@@ -84,6 +84,51 @@ persistent actor AegisBackend {
   transient let MAX_BRIEFING_JSON : Nat = 500_000;
   transient let MAX_PREFERENCES_JSON : Nat = 500_000;
 
+  // C6: cap Receipt / D2A-match Text fields (short IDs/hashes) — reject oversized
+  // before persisting so a cheap call can't store near-max-message strings.
+  transient let MAX_RECEIPT_FIELD : Nat = 256;
+
+  // C7: bound on-chain LLM calls (LLM.prompt burns canister cycles). Per-caller AND
+  // global fixed-window quota + a tracked-caller cap. transient → resets on upgrade
+  // (best-effort abuse control, not a stable invariant).
+  transient let LLM_PER_CALLER_PER_MIN : Nat = 60;
+  transient let LLM_GLOBAL_PER_MIN : Nat = 600;
+  transient let LLM_MAX_TRACKED_CALLERS : Nat = 10_000;
+  transient let LLM_WINDOW_NS : Int = 60 * 1_000_000_000;
+  transient var llmPerCaller = HashMap.HashMap<Principal, (Int, Nat)>(64, Principal.equal, Principal.hash);
+  transient var llmGlobalWindowStart : Int = 0;
+  transient var llmGlobalCount : Nat = 0;
+
+  // Records an on-chain-LLM call and returns an error message if it exceeds quota
+  // (must be checked BEFORE the cycle-burning LLM.prompt). The global window caps
+  // total burn regardless of caller count / Sybil principals; the per-caller window
+  // caps one principal; the size cap bounds transient memory (a rare clear just
+  // resets everyone's window). Synchronous — no await, so it's atomic.
+  func checkLlmQuota(caller : Principal) : ?Text {
+    let now = Time.now();
+    if (now - llmGlobalWindowStart >= LLM_WINDOW_NS) {
+      llmGlobalWindowStart := now;
+      llmGlobalCount := 0;
+    };
+    if (llmGlobalCount >= LLM_GLOBAL_PER_MIN) {
+      return ?"On-chain LLM is busy; try again shortly";
+    };
+    if (llmPerCaller.size() >= LLM_MAX_TRACKED_CALLERS) {
+      llmPerCaller := HashMap.HashMap<Principal, (Int, Nat)>(64, Principal.equal, Principal.hash);
+    };
+    let (start, count) = switch (llmPerCaller.get(caller)) {
+      case (?entry) { entry };
+      case null { (now, 0) };
+    };
+    let (winStart, winCount) = if (now - start >= LLM_WINDOW_NS) { (now, 0) } else { (start, count) };
+    if (winCount >= LLM_PER_CALLER_PER_MIN) {
+      return ?"Rate limited: too many on-chain LLM calls; try again shortly";
+    };
+    llmPerCaller.put(caller, (winStart, winCount + 1));
+    llmGlobalCount += 1;
+    null;
+  };
+
   func textBytes(s : Text) : Nat {
     Blob.toArray(Text.encodeUtf8(s)).size();
   };
@@ -1411,6 +1456,10 @@ persistent actor AegisBackend {
     };
 
     let result : Result.Result<Text, Text> = try {
+      // C6: cap match fields BEFORE any ledger transfer (never charge then reject).
+      if (textBytes(matchId) > MAX_RECEIPT_FIELD or textBytes(contentHash) > MAX_RECEIPT_FIELD) {
+        return #err("Match field too large");
+      };
       if (feeAmount < ICP_FEE * 3) {
         return #err("Fee too low to cover transfer costs");
       };
@@ -1839,7 +1888,11 @@ persistent actor AegisBackend {
                         created_at_time = null;
                       });
                       switch (result) {
-                        case (#Ok(_)) { resolveReputation(cur.owner, 1, 0, cur.amount, 0) };
+                        // C5(b): un-reviewed 30-day expiry returns the stake but
+                        // earns NO quality point (qualityDelta 0). "Nobody flagged
+                        // it" is not "the community validated it" — crediting quality
+                        // let throwaway signals farm reputation by flying under review.
+                        case (#Ok(_)) { resolveReputation(cur.owner, 0, 0, cur.amount, 0) };
                         // Revert to active so a later maintenance cycle retries.
                         case (#Err(_)) { putStakeUpdate(stakeId, cur, #active, cur.validationCount, cur.flagCount, null) };
                       };
@@ -2020,6 +2073,9 @@ persistent actor AegisBackend {
     let caller = msg.caller;
     requireAuthenticated(caller);
 
+    // C7: bound on-chain LLM cycle burn before the expensive LLM.prompt.
+    switch (checkLlmQuota(caller)) { case (?m) { return #err(m) }; case null {} };
+
     if (Text.size(text) == 0) {
       return #err("Text is required");
     };
@@ -2056,6 +2112,9 @@ persistent actor AegisBackend {
   public shared(msg) func translateOnChain(prompt : Text) : async Result.Result<Text, Text> {
     let caller = msg.caller;
     requireAuthenticated(caller);
+
+    // C7: bound on-chain LLM cycle burn before the expensive LLM.prompt.
+    switch (checkLlmQuota(caller)) { case (?m) { return #err(m) }; case null {} };
 
     if (Text.size(prompt) == 0) {
       return #err("Prompt is required");
@@ -2294,6 +2353,15 @@ persistent actor AegisBackend {
         };
       };
       case null {};
+    };
+    // C6: cap field sizes on CREATE only — grandfather any pre-cap receipt so a
+    // verifier/owner can still update an existing (possibly larger) record.
+    if (receipts.get(receipt.txHash) == null
+        and (textBytes(receipt.txHash) > MAX_RECEIPT_FIELD
+          or textBytes(receipt.chain) > MAX_RECEIPT_FIELD
+          or textBytes(receipt.contentHash) > MAX_RECEIPT_FIELD
+          or textBytes(receipt.payer) > MAX_RECEIPT_FIELD)) {
+      return;
     };
     receipts.put(receipt.txHash, {
       txHash = receipt.txHash;
