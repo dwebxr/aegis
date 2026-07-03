@@ -2073,9 +2073,6 @@ persistent actor AegisBackend {
     let caller = msg.caller;
     requireAuthenticated(caller);
 
-    // C7: bound on-chain LLM cycle burn before the expensive LLM.prompt.
-    switch (checkLlmQuota(caller)) { case (?m) { return #err(m) }; case null {} };
-
     if (Text.size(text) == 0) {
       return #err("Text is required");
     };
@@ -2090,6 +2087,10 @@ persistent actor AegisBackend {
     };
 
     let prompt = buildScoringPrompt(text, userTopics);
+
+    // C7: charge the LLM quota only after the cheap input checks, immediately before
+    // the cycle-burning prompt — so invalid/empty requests can't exhaust it for free.
+    switch (checkLlmQuota(caller)) { case (?m) { return #err(m) }; case null {} };
 
     let response = try {
       await LLM.prompt(#Llama3_1_8B, prompt);
@@ -2113,9 +2114,6 @@ persistent actor AegisBackend {
     let caller = msg.caller;
     requireAuthenticated(caller);
 
-    // C7: bound on-chain LLM cycle burn before the expensive LLM.prompt.
-    switch (checkLlmQuota(caller)) { case (?m) { return #err(m) }; case null {} };
-
     if (Text.size(prompt) == 0) {
       return #err("Prompt is required");
     };
@@ -2131,6 +2129,9 @@ persistent actor AegisBackend {
       };
       result;
     } else { prompt };
+
+    // C7: charge the LLM quota after validation, immediately before the prompt.
+    switch (checkLlmQuota(caller)) { case (?m) { return #err(m) }; case null {} };
 
     let response = try {
       await LLM.prompt(#Llama3_1_8B, cappedPrompt);
@@ -2354,13 +2355,14 @@ persistent actor AegisBackend {
       };
       case null {};
     };
-    // C6: cap field sizes on CREATE only — grandfather any pre-cap receipt so a
-    // verifier/owner can still update an existing (possibly larger) record.
-    if (receipts.get(receipt.txHash) == null
-        and (textBytes(receipt.txHash) > MAX_RECEIPT_FIELD
-          or textBytes(receipt.chain) > MAX_RECEIPT_FIELD
-          or textBytes(receipt.contentHash) > MAX_RECEIPT_FIELD
-          or textBytes(receipt.payer) > MAX_RECEIPT_FIELD)) {
+    // C6: cap field sizes (txHash/chain/contentHash/payer are short IDs/hashes).
+    // Enforced on create AND update: a create-only guard was bypassable (create with
+    // short fields, then resubmit the same txHash with huge ones). Mainnet has zero
+    // receipts today, so nothing legitimate is grandfathered out.
+    if (textBytes(receipt.txHash) > MAX_RECEIPT_FIELD
+        or textBytes(receipt.chain) > MAX_RECEIPT_FIELD
+        or textBytes(receipt.contentHash) > MAX_RECEIPT_FIELD
+        or textBytes(receipt.payer) > MAX_RECEIPT_FIELD) {
       return;
     };
     receipts.put(receipt.txHash, {
