@@ -89,7 +89,7 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
 
 // Receiver configured → x402 paywall; receiver unset → served free. Free-when-unset
 // is INTENTIONAL (this deployment runs the briefing free). Do not "harden" to 503.
-export const GET = X402_RECEIVER
+const dispatchGet = X402_RECEIVER
   ? X402_FREE_TIER
     ? async (request: NextRequest) => {
         if (request.nextUrl.searchParams.get("preview") === "true") return handleGet(request);
@@ -97,6 +97,13 @@ export const GET = X402_RECEIVER
       }
     : withX402(handleGet, x402Config, resourceServer)
   : handleGet;
+
+// Never cache: a diff feed of paid/principal-specific briefings must not leak via CDN.
+export const GET = async (request: NextRequest): Promise<Response> => {
+  const res = await dispatchGet(request);
+  res.headers.set("Cache-Control", "no-store, private");
+  return res;
+};
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);

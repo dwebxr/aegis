@@ -33,12 +33,13 @@ describe("GET /api/d2a/info", () => {
     expect(data.sourceUrl).toBe("https://aegis.dwebxr.xyz");
   });
 
-  it("lists briefing endpoint with x402 auth", async () => {
+  it("lists briefing endpoint with receiver-derived auth (none when x402 unset)", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.endpoints.briefing.url).toBe("/api/d2a/briefing");
     expect(data.endpoints.briefing.method).toBe("GET");
-    expect(data.endpoints.briefing.auth).toBe("x402");
+    // X402_RECEIVER is empty in test env → briefing is served free, so auth = "none".
+    expect(data.endpoints.briefing.auth).toBe("none");
   });
 
   it("lists info endpoint with no auth", async () => {

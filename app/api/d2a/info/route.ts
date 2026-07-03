@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       briefing: {
         url: "/api/d2a/briefing",
         method: "GET",
-        auth: "x402",
+        auth: X402_RECEIVER ? "x402" : "none",
         price: X402_PRICE,
         network: X402_NETWORK,
         currency: "USDC",

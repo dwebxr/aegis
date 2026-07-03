@@ -131,7 +131,7 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
 // Receiver configured → x402 paywall; receiver unset → served free. Free-when-unset
 // is INTENTIONAL: this deployment runs the briefing free (no EVM receiver). Do not
 // "harden" the unset branch to 503 — that breaks the operator's free-access usage.
-export const GET = X402_RECEIVER
+const dispatchGet = X402_RECEIVER
   ? X402_FREE_TIER
     ? async (request: NextRequest) => {
         if (request.nextUrl.searchParams.get("preview") === "true") return handleGet(request);
@@ -139,6 +139,14 @@ export const GET = X402_RECEIVER
       }
     : withX402(handleGet, x402Config, resourceServer)
   : handleGet;
+
+// Never let a CDN/edge cache this endpoint: a cached paid or principal-specific
+// briefing could be served to an unpaid/other client (x402 cache-leakage, Attack III).
+export const GET = async (request: NextRequest): Promise<Response> => {
+  const res = await dispatchGet(request);
+  res.headers.set("Cache-Control", "no-store, private");
+  return res;
+};
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);

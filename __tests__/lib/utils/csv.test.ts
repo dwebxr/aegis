@@ -26,6 +26,17 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 }
 
 describe("csvEscape", () => {
+  it("prefixes a quote to defuse spreadsheet formula/DDE injection", () => {
+    expect(csvEscape("=cmd|'/c calc'!A0")).toBe("'=cmd|'/c calc'!A0");
+    expect(csvEscape("+1234567890")).toBe("'+1234567890");
+    expect(csvEscape("-2+3")).toBe("'-2+3");
+    expect(csvEscape("@SUM(A1)")).toBe("'@SUM(A1)");
+    // A formula containing a comma is both defused AND CSV-quoted.
+    expect(csvEscape("=SUM(A1,A2)")).toBe("\"'=SUM(A1,A2)\"");
+    // Non-leading special chars are safe (not treated as a formula).
+    expect(csvEscape("a=b+c")).toBe("a=b+c");
+  });
+
   it("returns plain string unchanged", () => {
     expect(csvEscape("hello")).toBe("hello");
   });

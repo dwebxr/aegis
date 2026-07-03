@@ -105,11 +105,13 @@ describe("GET /api/d2a/health", () => {
     expect(data.checks.icCanister).toBe("error (403)");
   });
 
-  it("status is 'degraded' when x402 not configured and IC reachable", async () => {
-    // X402_RECEIVER is empty in test env
+  it("status is 'ok' when x402 unconfigured but IC reachable (free-access is valid)", async () => {
+    // X402_RECEIVER is empty in test env. Health reflects reachability only — an
+    // unset receiver (free-access deployment) is NOT a degraded state.
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.status).toBe("degraded");
+    expect(data.status).toBe("ok");
+    expect(res.status).toBe(200);
   });
 
   it("status is 'degraded' when IC unreachable even if x402 configured", async () => {

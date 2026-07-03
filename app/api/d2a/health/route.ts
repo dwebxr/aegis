@@ -18,7 +18,10 @@ export async function GET(request: NextRequest) {
 
   checks.icCanister = await checkIcCanisterReachable("[d2a/health]");
 
-  const allOk = checks.icCanister === "reachable" && checks.x402Receiver !== "not configured";
+  // Health reflects reachability only. An unset x402 receiver is a valid free-access
+  // deployment (the briefing routes serve 200 by design), not a degraded state — the
+  // receiver status is still reported in `checks` for visibility.
+  const allOk = checks.icCanister === "reachable";
 
   const deploy = getDeployMeta();
   const response = NextResponse.json(
