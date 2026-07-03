@@ -62,6 +62,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const [pendingCount, setPendingCount] = useState(0);
   const pendingItemsRef = useRef<ContentItem[]>([]);
   const actorRef = useRef<_SERVICE | null>(null);
+  // The principal actorRef's actor was created for, so drains can confirm the actor
+  // matches the current principal before replaying queued actions under it.
+  const actorPrincipalRef = useRef<string | null>(null);
   const contentRef = useCurrentRef(content);
   const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const drainQueueRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -137,11 +140,16 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   useEffect(() => {
     let stale = false;
+    // Principal this actor-creation is for — recorded alongside the actor so drains can
+    // verify actorRef belongs to the CURRENT principal (on a direct A→B switch actorRef
+    // still holds A's actor until B's async create resolves).
+    const effectPrincipal = principalText;
     if (isAuthenticated && identity) {
       createBackendActorAsync(identity)
         .then(actor => {
           if (stale) return;
           actorRef.current = actor;
+          actorPrincipalRef.current = effectPrincipal;
           setSyncStatus("idle");
           // Drain the offline queue BEFORE loading from IC. Otherwise the fast
           // getUserEvaluations query can resolve before the slower queued update
@@ -192,7 +200,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   const doDrainQueue = useCallback(async () => {
     const actor = actorRef.current;
-    if (!actor || !isAuthenticated || !principal) return;
+    // Only drain when actorRef is the CURRENT principal's actor. During a direct A→B
+    // switch it can still be A's until B's actor resolves; draining B's queued actions
+    // then would replay them under A's caller (cross-account write / silent drop).
+    if (!actor || !isAuthenticated || !principal || actorPrincipalRef.current !== principalText) return;
     // Tell the drain whether the cache has reconciled, so an item-not-found is retried
     // (ran before the cache loaded) vs dropped (genuinely evicted) — not left stuck.
     const contentReconciled = contentLoadedFor === principalText;
