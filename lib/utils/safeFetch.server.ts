@@ -12,6 +12,17 @@ import { checkPrivateAddress, makePrivateIPRejectingLookup } from "./ssrf";
 // there is no resolve-then-reconnect window for DNS rebinding to exploit.
 const ssrfDispatcher = new Agent({ connect: { lookup: makePrivateIPRejectingLookup() } });
 
+// Drop credential-bearing headers before following a cross-origin redirect, so a
+// caller's Authorization/Cookie can't leak to a different host (classic redirect
+// credential-leak). No caller currently passes such headers — this is a guardrail.
+function withoutCredentialHeaders(init: RequestInit | undefined): RequestInit | undefined {
+  if (!init?.headers) return init;
+  const h = new Headers(init.headers as HeadersInit);
+  h.delete("authorization");
+  h.delete("cookie");
+  return { ...init, headers: h };
+}
+
 // Best-effort pre-check for a clean, early error on obviously-private targets.
 // It is NOT the security boundary (a pre-resolve can race the real connection);
 // the connect-time lookup in ssrfDispatcher is. Hence resolution failure here is
@@ -39,6 +50,7 @@ export async function safeFetch(
   maxRedirects = 5,
 ): Promise<Response> {
   let current = url;
+  let currentInit = init;
   for (let i = 0; i <= maxRedirects; i++) {
     const blocked = blockPrivateUrl(current);
     if (blocked) throw new Error(blocked);
@@ -47,14 +59,19 @@ export async function safeFetch(
     if (pre) throw new Error(pre);
     type UndiciInit = NonNullable<Parameters<typeof undiciFetch>[1]>;
     const res = await undiciFetch(current, {
-      ...(init as unknown as UndiciInit),
+      ...(currentInit as unknown as UndiciInit),
       redirect: "manual",
       dispatcher: ssrfDispatcher,
     });
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get("location");
       if (!location) return res as unknown as Response;
-      current = new URL(location, current).href;
+      const next = new URL(location, current).href;
+      // Cross-origin hop → scrub credential headers so they don't reach a new host.
+      if (new URL(next).origin !== parsed.origin) {
+        currentInit = withoutCredentialHeaders(currentInit);
+      }
+      current = next;
       continue;
     }
     return res as unknown as Response;
