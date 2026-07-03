@@ -164,6 +164,20 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     };
   }, [isAuthenticated, identity, addNotification]);
 
+  // The actor-creation drain above can run before the content cache has loaded,
+  // leaving a queued saveEvaluation as a transient "item not found" retry. Re-drain
+  // once content is present for this principal — contentRef now reflects the loaded
+  // items — so it syncs within the session, not only on the next reconnect/reload.
+  // Guarded per-principal so it drains just once (not on every content change).
+  const postLoadDrainKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isAuthenticated || !actorRef.current || content.length === 0) return;
+    if (postLoadDrainKeyRef.current === principalText) return;
+    postLoadDrainKeyRef.current = principalText;
+    drainQueueRef.current().catch((err: unknown) =>
+      console.warn("[content] Post-load offline drain failed:", errMsg(err)));
+  }, [content, isAuthenticated, principalText]);
+
   const doDrainQueue = useCallback(async () => {
     const actor = actorRef.current;
     if (!actor || !isAuthenticated || !principal) return;

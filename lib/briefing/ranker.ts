@@ -49,12 +49,14 @@ function briefingScore(item: ContentItem, prefs: UserPreferenceProfile, now?: nu
   const currentTime = now ?? Date.now();
   const topics = item.topics ?? [];
 
-  // Sum only the top-K topic affinities (not all tags) — count-bias fix.
-  const topicRelevance = topics
-    .map(t => prefs.topicAffinities[t] || 0)
-    .sort((a, b) => b - a)
-    .slice(0, MAX_SCORED_TOPICS)
-    .reduce((sum, a) => sum + a, 0);
+  // Penalties (disliked topics, negative affinity) always count IN FULL; only the
+  // positive bonus is capped to the top-K. So broad/imprecise tagging can neither bury
+  // a negative preference nor inflate the score on tag COUNT alone.
+  const affinities = topics.map(t => prefs.topicAffinities[t] || 0);
+  const topicRelevance =
+    affinities.filter(a => a < 0).reduce((sum, a) => sum + a, 0) +
+    affinities.filter(a => a > 0).sort((a, b) => b - a).slice(0, MAX_SCORED_TOPICS)
+      .reduce((sum, a) => sum + a, 0);
 
   const authorBoost = prefs.authorTrust[item.author]?.trust || 0;
 

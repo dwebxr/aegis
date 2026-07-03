@@ -34,6 +34,18 @@ describe("dequeueAll — principal filtering", () => {
     ]);
   });
 
+  it("queueSize(principal) counts only that principal's actions", async () => {
+    await enqueueAction("saveEvaluation", { itemId: "a1" }, "alice");
+    await enqueueAction("saveEvaluation", { itemId: "a2" }, "alice");
+    await enqueueAction("saveEvaluation", { itemId: "b1" }, "bob");
+    expect(await queueSize("alice")).toBe(2);
+    expect(await queueSize("bob")).toBe(1);
+    expect(await queueSize("carol")).toBe(0); // no entries
+    expect(await queueSize(null)).toBe(0);    // logged out → 0
+    expect(await queueSize("")).toBe(0);      // logged out → 0
+    expect(await queueSize()).toBe(3);        // undefined → legacy total across principals
+  });
+
   it("preserves entries belonging to other principals (non-destructive dequeue)", async () => {
     await enqueueAction("saveEvaluation", { itemId: "a1" }, "alice");
     await enqueueAction("saveEvaluation", { itemId: "b1" }, "bob");

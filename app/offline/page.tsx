@@ -2,15 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { queueSize } from "@/lib/offline/actionQueue";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function OfflinePage() {
+  const { principalText } = useAuth();
   const [pending, setPending] = useState(0);
 
   useEffect(() => {
-    queueSize()
+    // Scope to the current principal (dequeueAll leaves other principals' entries).
+    queueSize(principalText)
       .then(setPending)
       .catch(e => { console.debug("[offline] IndexedDB unavailable:", e); });
-  }, []);
+  }, [principalText]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0a0f1e] text-slate-200 font-sans text-center p-8">

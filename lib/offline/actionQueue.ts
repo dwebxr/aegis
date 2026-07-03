@@ -127,6 +127,24 @@ export function clearQueue(): Promise<void> {
   return withDB("readwrite", store => { store.clear(); });
 }
 
-export function queueSize(): Promise<number> {
-  return withDB("readonly", store => store.count());
+/** Number of pending actions. Pass a principal to count only THAT principal's actions
+ *  (what the current user will actually drain) — required now that dequeueAll leaves
+ *  other principals' entries in place, so a raw total would show one user a permanent
+ *  "pending sync" badge for another user's preserved actions. `null`/"" → 0 (logged
+ *  out drains nothing); `undefined` → total across all principals (legacy callers). */
+export function queueSize(principal?: string | null): Promise<number> {
+  if (principal === undefined) return withDB("readonly", store => store.count());
+  if (principal === null || principal === "") return Promise.resolve(0);
+  return openDB().then(db => new Promise<number>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const req = tx.objectStore(STORE_NAME).getAll();
+    let n = 0;
+    req.onsuccess = () => {
+      for (const a of (req.result as QueuedAction[]) ?? []) {
+        if (a.principal === principal) n++;
+      }
+    };
+    tx.oncomplete = () => { db.close(); resolve(n); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  }));
 }
