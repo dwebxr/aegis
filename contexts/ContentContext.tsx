@@ -78,6 +78,10 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   // item added during a slow, empty cache load would never get persisted (the load
   // sets this without any other render).
   const [contentLoadedFor, setContentLoadedFor] = useState<string | null>(null);
+  // Gates the post-load offline drain to once per cache-load cycle. Reset on every
+  // principal change (in the load effect below) — including logout→login as the SAME
+  // principal — so a fresh session re-drains rather than being blocked by a stale key.
+  const postLoadDrainKeyRef = useRef<string | null>(null);
 
   // Load cached content scoped to the current principal. Re-runs on principal
   // change (login/logout/account switch) so User A's cache never leaks to B.
@@ -89,6 +93,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     // principals — logging the same user back in must NOT destroy their cache.
     const isAccountSwitch = changed && previous !== null && principalText !== null;
     prevPrincipalRef.current = principalText;
+    // Re-arm the post-load drain for this (re-)entered session — otherwise logout→login
+    // as the same principal keeps the stale key and the post-load drain never re-runs.
+    if (changed) postLoadDrainKeyRef.current = null;
 
     const next = async () => {
       if (changed && previous !== null) {
@@ -175,7 +182,6 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   // Gating on contentLoadedFor (not content.length) is essential: draining on stale or
   // partial content would retry-miss the queued item, and the once-per-principal guard
   // would then block the correct re-drain once the real cached content arrives.
-  const postLoadDrainKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isAuthenticated || !actorRef.current || contentLoadedFor !== principalText) return;
     if (postLoadDrainKeyRef.current === principalText) return;
