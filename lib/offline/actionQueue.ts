@@ -77,24 +77,24 @@ export async function enqueueAction<T extends QueuedActionType>(
   });
 }
 
-/** Returns queued actions for the given principal only. Entries with a different
- *  principal (or missing principal — legacy/pre-scoping) are deleted to prevent
- *  cross-account replay. Called with `principal === null` (logged-out) is a no-op
- *  so the queue isn't wiped during transient unauthenticated states. */
+/** Returns queued actions for the given principal only. Every other entry (a
+ *  different principal, or a legacy/pre-scoping entry with no principal) is LEFT IN
+ *  PLACE — not returned and NOT deleted — so it survives until its owner logs back in
+ *  on this device. The principal filter here already prevents cross-account replay, so
+ *  the previous behaviour of deleting other principals' entries only caused silent
+ *  data loss on shared devices (and returning legacy no-principal entries to whoever
+ *  logged in first would mis-attribute them). Called with `principal === null`
+ *  (logged-out) is a no-op so the queue isn't wiped during transient unauth states. */
 export function dequeueAll(principal: string | null): Promise<QueuedAction[]> {
   if (principal === null) return Promise.resolve([]);
   return openDB().then(db => new Promise<QueuedAction[]>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
+    const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
     const req = store.getAll();
     const matched: QueuedAction[] = [];
     req.onsuccess = () => {
       for (const a of (req.result as QueuedAction[]) ?? []) {
-        if (a.principal === principal) {
-          matched.push(a);
-        } else if (a.id != null) {
-          store.delete(a.id);
-        }
+        if (a.principal === principal) matched.push(a);
       }
     };
     tx.oncomplete = () => { db.close(); resolve(matched); };

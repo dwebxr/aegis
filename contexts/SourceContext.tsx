@@ -87,6 +87,10 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const identityRef = useCurrentRef(identity);
   const isAuthRef = useCurrentRef(isAuthenticated);
   const principalTextRef = useCurrentRef(principalText);
+  // Per-source-id write chains: serialize saveSourceConfig calls for the same source
+  // so a rapid off→on→off toggle can't land out of order and persist the opposite of
+  // the current UI state (the canister ends on whichever write *finishes* last).
+  const saveChainsRef = useRef<Map<string, Promise<unknown>>>(new Map());
 
   function getActor(): _SERVICE | null {
     if (!isAuthRef.current || !identityRef.current) return null;
@@ -102,13 +106,17 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       }
       return;
     }
-    void actor.saveSourceConfig(savedToIC(source, ident.getPrincipal()))
+    const prev = saveChainsRef.current.get(source.id) ?? Promise.resolve();
+    const next = prev
+      .catch(() => {}) // a prior write's failure must not block this one
+      .then(() => actor.saveSourceConfig(savedToIC(source, ident.getPrincipal())))
       .catch((err: unknown) => {
         console.error("[sources] IC save FAILED:", errMsg(err));
         setSyncStatus("error");
         setSyncError("Failed to save source to IC");
         addNotification("Source saved locally but IC sync failed", "error");
       });
+    saveChainsRef.current.set(source.id, next);
   }, [addNotification]);
 
   useEffect(() => {

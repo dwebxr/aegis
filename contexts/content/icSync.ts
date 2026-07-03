@@ -174,8 +174,13 @@ export async function drainOfflineQueue(
         const { itemId } = action.payload;
         const item = contentRef.current.find(c => c.id === itemId);
         if (!item) {
-          console.warn(`[offline-queue] Referenced item ${itemId} no longer in local content, dropping action ${actionId}`);
-          await removeAction(actionId);
+          // The item isn't in the loaded content YET (e.g. the drain ran before the
+          // content cache finished loading). An evaluated item is validated/flagged
+          // so truncation preserves it — this is a transient miss, not a permanent
+          // eviction. Retry on a later cycle instead of silently dropping the user's
+          // evaluation; it only falls away via the MAX_RETRIES path (which notifies).
+          console.warn(`[offline-queue] Referenced item ${itemId} not in local content yet; will retry action ${actionId}`);
+          await incrementRetries(actionId);
           continue;
         }
         await actor.saveEvaluation(toICEvaluation(item, principal));

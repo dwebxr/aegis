@@ -40,21 +40,28 @@ export function classifyItem(item: ContentItem, prefs: UserPreferenceProfile): B
   return "mixed";
 }
 
+// Bound how many of an item's topics contribute to the personalization bonus, so a
+// broadly/imprecisely tagged item can't outrank a focused one on tag COUNT alone.
+const MAX_SCORED_TOPICS = 3;
+
 function briefingScore(item: ContentItem, prefs: UserPreferenceProfile, now?: number): number {
   const baseScore = item.scores.composite;
   const currentTime = now ?? Date.now();
+  const topics = item.topics ?? [];
 
-  const topicRelevance = item.topics?.reduce((sum, t) =>
-    sum + (prefs.topicAffinities[t] || 0), 0) || 0;
+  // Sum only the top-K topic affinities (not all tags) — count-bias fix.
+  const topicRelevance = topics
+    .map(t => prefs.topicAffinities[t] || 0)
+    .sort((a, b) => b - a)
+    .slice(0, MAX_SCORED_TOPICS)
+    .reduce((sum, a) => sum + a, 0);
 
   const authorBoost = prefs.authorTrust[item.author]?.trust || 0;
 
-  const recentBonus = item.topics?.reduce((sum, t) => {
-    const isRecent = prefs.recentTopics.some(rt =>
-      rt.topic === t && currentTime - rt.timestamp < RECENT_TOPIC_WINDOW_MS,
-    );
-    return sum + (isRecent ? 0.3 : 0);
-  }, 0) || 0;
+  const recentTopicCount = topics.filter(t =>
+    prefs.recentTopics.some(rt => rt.topic === t && currentTime - rt.timestamp < RECENT_TOPIC_WINDOW_MS),
+  ).length;
+  const recentBonus = Math.min(recentTopicCount, MAX_SCORED_TOPICS) * 0.3;
 
   const ageHours = (currentTime - item.createdAt) / 3600000;
   const halfLife = adaptiveHalfLife(prefs.activityHistogram, currentTime);
@@ -81,32 +88,23 @@ function serendipityScore(item: ContentItem, prefs: UserPreferenceProfile): numb
 }
 
 function deduplicateBySource(items: ContentItem[]): ContentItem[] {
-  const urlToItem = new Map<string, ContentItem>();
-  const textToItem = new Map<string, ContentItem>();
-  const kept = new Map<string, ContentItem>(); // id → item
-
-  for (const item of items) {
+  // Sort by composite DESC so the best item claims each URL/text key first, then
+  // greedily skip any item whose normalized URL OR exact text is already claimed.
+  // (The prior index-mutation approach left a text-duplicate in the result when it
+  // also matched a *different* item by URL — only one of the two matches was ever
+  // evicted, and the stale index entries could mis-compare later items.)
+  // generateBriefing re-ranks the result, so the composite-DESC order here is fine.
+  const seenUrls = new Set<string>();
+  const seenTexts = new Set<string>();
+  const kept: ContentItem[] = [];
+  for (const item of [...items].sort((a, b) => b.scores.composite - a.scores.composite)) {
     const normUrl = item.sourceUrl ? normalizeUrl(item.sourceUrl) : null;
-    const existingByUrl = normUrl ? urlToItem.get(normUrl) : undefined;
-    const existingByText = textToItem.get(item.text);
-    const duplicate = existingByUrl || existingByText;
-
-    if (duplicate) {
-      if (item.scores.composite > duplicate.scores.composite) {
-        // Replace the lower-scored duplicate
-        kept.delete(duplicate.id);
-        kept.set(item.id, item);
-        if (normUrl) urlToItem.set(normUrl, item);
-        textToItem.set(item.text, item);
-      }
-    } else {
-      kept.set(item.id, item);
-      if (normUrl) urlToItem.set(normUrl, item);
-      textToItem.set(item.text, item);
-    }
+    if ((normUrl && seenUrls.has(normUrl)) || seenTexts.has(item.text)) continue;
+    if (normUrl) seenUrls.add(normUrl);
+    seenTexts.add(item.text);
+    kept.push(item);
   }
-
-  return Array.from(kept.values());
+  return kept;
 }
 
 export function generateBriefing(
