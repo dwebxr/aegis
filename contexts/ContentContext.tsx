@@ -126,12 +126,18 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
           if (stale) return;
           actorRef.current = actor;
           setSyncStatus("idle");
-          loadFromICRef.current().catch((err: unknown) => {
-            console.warn("[content] Auto-loadFromIC after actor creation failed:", errMsg(err));
-          });
-          drainQueueRef.current().catch((err: unknown) => {
-            console.warn("[content] Auto-drain offline queue failed:", errMsg(err));
-          });
+          // Drain the offline queue BEFORE loading from IC. Otherwise the fast
+          // getUserEvaluations query can resolve before the slower queued update
+          // lands, and the stale canister read clobbers a just-queued optimistic
+          // action (the UI reverts a validated item until the next full reload).
+          drainQueueRef.current()
+            .catch((err: unknown) => console.warn("[content] Auto-drain offline queue failed:", errMsg(err)))
+            .finally(() => {
+              if (stale) return;
+              loadFromICRef.current().catch((err: unknown) => {
+                console.warn("[content] Auto-loadFromIC after actor creation failed:", errMsg(err));
+              });
+            });
         })
         .catch((err: unknown) => {
           if (stale) return;

@@ -70,8 +70,9 @@ describe("normalizeUrl", () => {
     expect(normalizeUrl("  NOT-A-URL  ")).toBe("not-a-url");
   });
 
-  it("preserves different protocols", () => {
-    expect(normalizeUrl("http://example.com/page")).toBe("http://example.com/page");
+  it("normalizes http and https to the same URL (a scheme switch dedups)", () => {
+    expect(normalizeUrl("http://example.com/page")).toBe("https://example.com/page");
+    expect(normalizeUrl("https://example.com/page")).toBe("https://example.com/page");
   });
 
   it("is idempotent", () => {

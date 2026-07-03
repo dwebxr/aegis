@@ -6,6 +6,7 @@ import { distributedRateLimit, checkBodySize, parseJsonBody } from "@/lib/api/ra
 import { generatePushToken, isAllowedPushEndpoint } from "@/lib/api/pushToken";
 import { errMsg } from "@/lib/utils/errors";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { timingSafeEqual } from "node:crypto";
 
 export const maxDuration = 30;
 
@@ -77,7 +78,12 @@ export async function POST(request: NextRequest) {
   const subscriptions = body.subscriptions as InputSubscription[];
 
   const expected = generatePushToken(body.principal, subscriptions.map(s => s.endpoint));
-  if (!body.token || body.token !== expected) {
+  const provided = typeof body.token === "string" ? body.token : "";
+  const expectedBuf = Buffer.from(expected, "utf8");
+  const providedBuf = Buffer.from(provided, "utf8");
+  // Constant-time compare — the token is an HMAC, so a byte-wise !== is a timing
+  // side channel. Length-guard first (timingSafeEqual throws on length mismatch).
+  if (providedBuf.length !== expectedBuf.length || !timingSafeEqual(providedBuf, expectedBuf)) {
     return NextResponse.json({ error: "Invalid or missing push token" }, { status: 403 });
   }
 

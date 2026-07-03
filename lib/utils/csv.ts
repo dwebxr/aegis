@@ -1,8 +1,12 @@
 import type { ContentItem } from "@/lib/types/content";
 
 export function csvEscape(s: string): string {
-  const escaped = s.replace(/"/g, '""');
-  return /[,"\n\r]/.test(s) ? `"${escaped}"` : escaped;
+  // Neutralize spreadsheet formula/DDE injection: Excel/Sheets/LibreOffice treat a
+  // cell starting with = + - @ (or a leading tab/CR) as a formula. author/text/etc.
+  // come from untrusted feeds, so prefix a single quote to force literal text.
+  const defused = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  const escaped = defused.replace(/"/g, '""');
+  return /[,"\n\r]/.test(defused) ? `"${escaped}"` : escaped;
 }
 
 export function contentToCSV(items: ContentItem[]): string {
