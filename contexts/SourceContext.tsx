@@ -87,11 +87,27 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
   const identityRef = useCurrentRef(identity);
   const isAuthRef = useCurrentRef(isAuthenticated);
   const principalTextRef = useCurrentRef(principalText);
+  // Per-source-id write chains: serialize saveSourceConfig calls for the same source
+  // so a rapid off→on→off toggle can't land out of order and persist the opposite of
+  // the current UI state (the canister ends on whichever write *finishes* last).
+  const saveChainsRef = useRef<Map<string, Promise<unknown>>>(new Map());
 
   function getActor(): _SERVICE | null {
     if (!isAuthRef.current || !identityRef.current) return null;
     return actorRef.current;
   }
+
+  // Serialize IC writes per source id: saves AND deletes for the same source run in
+  // submission order, so a slow save can't land after a later delete (resurrecting a
+  // removed source) or vice-versa. The last user action on a source always wins.
+  const chainSourceWrite = useCallback(
+    (id: string, op: () => Promise<unknown>, onError: (err: unknown) => void): void => {
+      const prev = saveChainsRef.current.get(id) ?? Promise.resolve();
+      const next = prev.catch(() => {}).then(op).catch(onError);
+      saveChainsRef.current.set(id, next);
+    },
+    [],
+  );
 
   const saveToIC = useCallback((source: SavedSource): void => {
     const actor = getActor();
@@ -102,14 +118,17 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
       }
       return;
     }
-    void actor.saveSourceConfig(savedToIC(source, ident.getPrincipal()))
-      .catch((err: unknown) => {
+    chainSourceWrite(
+      source.id,
+      () => actor.saveSourceConfig(savedToIC(source, ident.getPrincipal())),
+      (err: unknown) => {
         console.error("[sources] IC save FAILED:", errMsg(err));
         setSyncStatus("error");
         setSyncError("Failed to save source to IC");
         addNotification("Source saved locally but IC sync failed", "error");
-      });
-  }, [addNotification]);
+      },
+    );
+  }, [addNotification, chainSourceWrite]);
 
   useEffect(() => {
     if (!isAuthenticated || !identity || !principalText) {
@@ -276,21 +295,25 @@ export function SourceProvider({ children }: { children: React.ReactNode }) {
 
     const actor = getActor();
     if (actor) {
-      actor.deleteSourceConfig(id)
-        .then(() => {
+      // Route the delete through the SAME per-id chain as saves, so a still-pending
+      // save for this source can't run after the delete and resurrect it.
+      chainSourceWrite(
+        id,
+        () => actor.deleteSourceConfig(id).then(() => {
           pendingDeletesRef.current.delete(id);
           if (pt) savePendingDeletes(pt, pendingDeletesRef.current);
-        })
-        .catch((err: unknown) => {
+        }),
+        (err: unknown) => {
           console.error("[sources] IC delete failed:", errMsg(err));
           setSyncStatus("error");
           setSyncError("Failed to delete source from IC");
           addNotification("Source removed locally but IC sync failed", "error");
-        });
+        },
+      );
     } else if (isAuthRef.current) {
       addNotification("Source removed locally — IC sync pending", "info");
     }
-  }, [persist, isDemoMode, addNotification]);
+  }, [persist, isDemoMode, addNotification, chainSourceWrite]);
 
   const toggleSource = useCallback((id: string) => {
     if (isDemoMode) return;

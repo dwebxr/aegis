@@ -30,6 +30,33 @@ function makeProfile(overrides: Partial<UserPreferenceProfile> = {}): UserPrefer
 }
 
 describe("generateBriefing", () => {
+  describe("topic bonus (top-K cap must not drop negative penalties)", () => {
+    it("applies a disliked-topic penalty even when the item has 3+ neutral tags", () => {
+      const now = Date.now();
+      const prefs = makeProfile({ topicAffinities: { spam: -1 } });
+      const clean = makeItem({ topics: ["a", "b", "c"], createdAt: now });
+      const spammy = makeItem({ topics: ["spam", "a", "b", "c"], createdAt: now });
+      const result = generateBriefing([clean, spammy], prefs, now);
+      // Broad tagging must NOT bury the -1 penalty behind three neutral tags.
+      expect(result.priority.map(p => p.item.id)).toEqual([clean.id, spammy.id]);
+      const cleanScore = result.priority.find(p => p.item.id === clean.id)!.briefingScore;
+      const spammyScore = result.priority.find(p => p.item.id === spammy.id)!.briefingScore;
+      expect(spammyScore).toBeLessThan(cleanScore);
+    });
+
+    it("caps the positive topic bonus at the top-3 affinities (tag-count can't inflate)", () => {
+      const now = Date.now();
+      const prefs = makeProfile({ topicAffinities: { a: 1, b: 1, c: 1, d: 1, e: 1 } });
+      const focused = makeItem({ topics: ["a", "b", "c"], createdAt: now });
+      const broad = makeItem({ topics: ["a", "b", "c", "d", "e"], createdAt: now });
+      const result = generateBriefing([focused, broad], prefs, now);
+      const fScore = result.priority.find(p => p.item.id === focused.id)!.briefingScore;
+      const bScore = result.priority.find(p => p.item.id === broad.id)!.briefingScore;
+      // Both cap at top-3 * 1 = 3; the two extra matching tags on `broad` add nothing.
+      expect(bScore).toBeCloseTo(fScore, 5);
+    });
+  });
+
   describe("empty and minimal content", () => {
     it("returns empty briefing for no content", () => {
       const result = generateBriefing([], makeProfile());

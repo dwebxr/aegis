@@ -2,23 +2,27 @@
 import React, { useState, useEffect } from "react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { queueSize } from "@/lib/offline/actionQueue";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
 export const SyncStatusBanner: React.FC = () => {
   const online = useOnlineStatus();
+  const { principalText } = useAuth();
   const [pending, setPending] = useState(0);
 
   useEffect(() => {
     let active = true;
     const check = () => {
-      queueSize()
+      // Scope to the current principal so another user's preserved queue entries
+      // (dequeueAll is non-destructive) don't show as this user's pending sync.
+      queueSize(principalText)
         .then(n => { if (active) setPending(n); })
         .catch(e => { console.debug("[sync] IndexedDB unavailable:", e); });
     };
     check();
     const interval = setInterval(check, 5_000);
     return () => { active = false; clearInterval(interval); };
-  }, []);
+  }, [principalText]);
 
   if (online && pending === 0) return null;
 

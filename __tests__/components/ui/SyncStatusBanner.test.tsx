@@ -11,10 +11,16 @@ jest.mock("@/hooks/useOnlineStatus", () => ({
   useOnlineStatus: () => mockOnline,
 }));
 
-// Mock queueSize
+// Mock queueSize (ignores the principal arg — the count is driven by mockQueueSize)
 let mockQueueSize = 0;
 jest.mock("@/lib/offline/actionQueue", () => ({
   queueSize: () => Promise.resolve(mockQueueSize),
+}));
+
+// Mock AuthContext so the real one (and its @dfinity ESM imports) isn't pulled in.
+jest.mock("@/contexts/AuthContext", () => ({
+  __esModule: true,
+  useAuth: () => ({ principalText: "test-principal" }),
 }));
 
 describe("SyncStatusBanner", () => {

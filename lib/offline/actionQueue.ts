@@ -77,24 +77,24 @@ export async function enqueueAction<T extends QueuedActionType>(
   });
 }
 
-/** Returns queued actions for the given principal only. Entries with a different
- *  principal (or missing principal — legacy/pre-scoping) are deleted to prevent
- *  cross-account replay. Called with `principal === null` (logged-out) is a no-op
- *  so the queue isn't wiped during transient unauthenticated states. */
+/** Returns queued actions for the given principal only. Every other entry (a
+ *  different principal, or a legacy/pre-scoping entry with no principal) is LEFT IN
+ *  PLACE — not returned and NOT deleted — so it survives until its owner logs back in
+ *  on this device. The principal filter here already prevents cross-account replay, so
+ *  the previous behaviour of deleting other principals' entries only caused silent
+ *  data loss on shared devices (and returning legacy no-principal entries to whoever
+ *  logged in first would mis-attribute them). Called with `principal === null`
+ *  (logged-out) is a no-op so the queue isn't wiped during transient unauth states. */
 export function dequeueAll(principal: string | null): Promise<QueuedAction[]> {
   if (principal === null) return Promise.resolve([]);
   return openDB().then(db => new Promise<QueuedAction[]>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
+    const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
     const req = store.getAll();
     const matched: QueuedAction[] = [];
     req.onsuccess = () => {
       for (const a of (req.result as QueuedAction[]) ?? []) {
-        if (a.principal === principal) {
-          matched.push(a);
-        } else if (a.id != null) {
-          store.delete(a.id);
-        }
+        if (a.principal === principal) matched.push(a);
       }
     };
     tx.oncomplete = () => { db.close(); resolve(matched); };
@@ -127,6 +127,24 @@ export function clearQueue(): Promise<void> {
   return withDB("readwrite", store => { store.clear(); });
 }
 
-export function queueSize(): Promise<number> {
-  return withDB("readonly", store => store.count());
+/** Number of pending actions. Pass a principal to count only THAT principal's actions
+ *  (what the current user will actually drain) — required now that dequeueAll leaves
+ *  other principals' entries in place, so a raw total would show one user a permanent
+ *  "pending sync" badge for another user's preserved actions. `null`/"" → 0 (logged
+ *  out drains nothing); `undefined` → total across all principals (legacy callers). */
+export function queueSize(principal?: string | null): Promise<number> {
+  if (principal === undefined) return withDB("readonly", store => store.count());
+  if (principal === null || principal === "") return Promise.resolve(0);
+  return openDB().then(db => new Promise<number>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const req = tx.objectStore(STORE_NAME).getAll();
+    let n = 0;
+    req.onsuccess = () => {
+      for (const a of (req.result as QueuedAction[]) ?? []) {
+        if (a.principal === principal) n++;
+      }
+    };
+    tx.oncomplete = () => { db.close(); resolve(n); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  }));
 }

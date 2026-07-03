@@ -1,8 +1,10 @@
 /**
- * Principal-scoped offline queue — fix for cross-account replay where
- * User A's pending action could be drained while logged in as User B and
- * replayed under B's identity (saveEvaluation would tag the item with B as
- * owner on the canister).
+ * Principal-scoped offline queue — prevents cross-account replay (User A's pending
+ * action drained while logged in as User B would tag the item with B as owner on the
+ * canister). dequeueAll is NON-DESTRUCTIVE: it RETURNS only the requested principal's
+ * entries and LEAVES every other entry in place (so A's actions survive until A logs
+ * back in). The principal filter alone prevents replay — deleting other entries only
+ * caused silent data loss on shared devices.
  *
  * Uses fake-indexeddb to exercise the real IDB layer end-to-end.
  */
@@ -32,21 +34,34 @@ describe("dequeueAll — principal filtering", () => {
     ]);
   });
 
-  it("silently deletes entries belonging to other principals on dequeue", async () => {
+  it("queueSize(principal) counts only that principal's actions", async () => {
+    await enqueueAction("saveEvaluation", { itemId: "a1" }, "alice");
+    await enqueueAction("saveEvaluation", { itemId: "a2" }, "alice");
+    await enqueueAction("saveEvaluation", { itemId: "b1" }, "bob");
+    expect(await queueSize("alice")).toBe(2);
+    expect(await queueSize("bob")).toBe(1);
+    expect(await queueSize("carol")).toBe(0); // no entries
+    expect(await queueSize(null)).toBe(0);    // logged out → 0
+    expect(await queueSize("")).toBe(0);      // logged out → 0
+    expect(await queueSize()).toBe(3);        // undefined → legacy total across principals
+  });
+
+  it("preserves entries belonging to other principals (non-destructive dequeue)", async () => {
     await enqueueAction("saveEvaluation", { itemId: "a1" }, "alice");
     await enqueueAction("saveEvaluation", { itemId: "b1" }, "bob");
     expect(await queueSize()).toBe(2);
 
     await dequeueAll("alice");
 
-    // Bob's entry was purged — preventing future cross-account replay.
-    expect(await queueSize()).toBe(1);
-    const remaining = await dequeueAll("alice");
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0].type === "saveEvaluation" && remaining[0].payload.itemId).toBe("a1");
+    // Bob's entry is NOT purged — it survives until Bob logs back in. No replay risk
+    // since dequeueAll only RETURNS the matching principal's actions.
+    expect(await queueSize()).toBe(2);
+    const bobQueue = await dequeueAll("bob");
+    expect(bobQueue).toHaveLength(1);
+    expect(bobQueue[0].type === "saveEvaluation" && bobQueue[0].payload.itemId).toBe("b1");
   });
 
-  it("drops legacy entries with missing principal (pre-scoping migration)", async () => {
+  it("preserves legacy entries with missing principal (not drained, not deleted)", async () => {
     // Simulate a legacy entry written before principal-scoping landed.
     // openDB is internal — replicate by enqueuing then mutating? Simpler:
     // open a raw IDB transaction and write a legacy-shaped record.
@@ -76,8 +91,8 @@ describe("dequeueAll — principal filtering", () => {
 
     expect(await queueSize()).toBe(1);
     const drained = await dequeueAll("alice");
-    expect(drained).toEqual([]);
-    expect(await queueSize()).toBe(0); // legacy entry was purged
+    expect(drained).toEqual([]); // legacy entry is NOT attributed to alice
+    expect(await queueSize()).toBe(1); // and NOT deleted — it survives (no misattribution, no loss)
   });
 
   it("dequeueAll(null) is a no-op — does NOT wipe other principals' data", async () => {
@@ -149,17 +164,16 @@ describe("dequeueAll — principal filtering", () => {
     ]);
     expect(await queueSize()).toBe(5);
 
-    // alice drains — gets her own entries; bob/carol entries get purged as
-    // collateral. Single-account-at-a-time semantics: this is the contract.
+    // alice drains — gets her own entries; bob/carol entries are PRESERVED.
     const aliceQueue = await dequeueAll("alice");
     expect(aliceQueue).toHaveLength(2);
     const aliceIds = aliceQueue.map((a) => (a.type === "saveEvaluation" ? a.payload.itemId : "")).sort();
     expect(aliceIds).toEqual(["a1", "a2"]);
 
-    // Queue now contains only alice's entries — others were collateral-purged.
-    expect(await queueSize()).toBe(2);
-    expect(await dequeueAll("bob")).toEqual([]);
-    expect(await dequeueAll("carol")).toEqual([]);
+    // Queue still holds all 5 — dequeueAll is non-destructive; bob/carol can drain later.
+    expect(await queueSize()).toBe(5);
+    expect(await dequeueAll("bob")).toHaveLength(2);
+    expect(await dequeueAll("carol")).toHaveLength(1);
   });
 
   it("interleaved enqueue + dequeue is safe (no lost updates for active principal)", async () => {
@@ -183,12 +197,13 @@ describe("enqueueAction — payload integrity per-principal", () => {
 
   it("treats principals as exact-match strings (case-sensitive)", async () => {
     await enqueueAction("saveEvaluation", { itemId: "x" }, "Alice");
-    // Wrong-case lookup returns [] AND purges the entry as collateral — so the
-    // canonical-case drain afterwards sees nothing. This is intentional: the
-    // queue is destructively partitioned, so client code must use a stable
-    // principal string (Principal.toText() is deterministic).
+    // Wrong-case lookup returns [] but does NOT purge the entry (non-destructive) —
+    // the canonical-case drain afterwards still sees it. Client code must still use a
+    // stable principal string (Principal.toText() is deterministic).
     expect(await dequeueAll("alice")).toEqual([]);
-    expect(await dequeueAll("Alice")).toEqual([]);
+    const drained = await dequeueAll("Alice");
+    expect(drained).toHaveLength(1);
+    expect(drained[0].type === "saveEvaluation" && drained[0].payload.itemId).toBe("x");
   });
 
   it("preserves Alice's entry when only Alice queries (no wrong-case purge)", async () => {

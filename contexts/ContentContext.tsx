@@ -62,6 +62,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const [pendingCount, setPendingCount] = useState(0);
   const pendingItemsRef = useRef<ContentItem[]>([]);
   const actorRef = useRef<_SERVICE | null>(null);
+  // The principal actorRef's actor was created for, so drains can confirm the actor
+  // matches the current principal before replaying queued actions under it.
+  const actorPrincipalRef = useRef<string | null>(null);
   const contentRef = useCurrentRef(content);
   const loadFromICRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const drainQueueRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -71,6 +74,17 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   const backfillFnRef = useRef<() => (() => void)>(() => () => {});
   const principalText = principal ? principal.toText() : null;
   const prevPrincipalRef = useRef<string | null>(null);
+  // Which principal the in-memory `content` currently reflects. The persist effect
+  // uses it to avoid writing a stale (previous-user) `content` into the new
+  // principal's — or the anonymous — cache bucket during a login/logout transition.
+  // STATE (not a ref) so that reconciling it re-runs the persist effect — otherwise an
+  // item added during a slow, empty cache load would never get persisted (the load
+  // sets this without any other render).
+  const [contentLoadedFor, setContentLoadedFor] = useState<string | null>(null);
+  // Gates the post-load offline drain to once per cache-load cycle. Reset on every
+  // principal change (in the load effect below) — including logout→login as the SAME
+  // principal — so a fresh session re-drains rather than being blocked by a stale key.
+  const postLoadDrainKeyRef = useRef<string | null>(null);
 
   // Load cached content scoped to the current principal. Re-runs on principal
   // change (login/logout/account switch) so User A's cache never leaks to B.
@@ -82,6 +96,9 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     // principals — logging the same user back in must NOT destroy their cache.
     const isAccountSwitch = changed && previous !== null && principalText !== null;
     prevPrincipalRef.current = principalText;
+    // Re-arm the post-load drain for this (re-)entered session — otherwise logout→login
+    // as the same principal keeps the stale key and the post-load drain never re-runs.
+    if (changed) postLoadDrainKeyRef.current = null;
 
     const next = async () => {
       if (changed && previous !== null) {
@@ -98,8 +115,11 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
         }
       }
       const items = await loadCachedContent(principalText);
-      if (!cancelled && items.length > 0) {
-        setContent(items);
+      if (!cancelled) {
+        if (items.length > 0) setContent(items);
+        // `content` now reflects this principal — re-runs the persist effect, which
+        // also flushes anything added to `content` while the cache was still loading.
+        setContentLoadedFor(principalText);
       }
     };
     next().catch(err => {
@@ -120,11 +140,16 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
 
   useEffect(() => {
     let stale = false;
+    // Principal this actor-creation is for — recorded alongside the actor so drains can
+    // verify actorRef belongs to the CURRENT principal (on a direct A→B switch actorRef
+    // still holds A's actor until B's async create resolves).
+    const effectPrincipal = principalText;
     if (isAuthenticated && identity) {
       createBackendActorAsync(identity)
         .then(actor => {
           if (stale) return;
           actorRef.current = actor;
+          actorPrincipalRef.current = effectPrincipal;
           setSyncStatus("idle");
           // Drain the offline queue BEFORE loading from IC. Otherwise the fast
           // getUserEvaluations query can resolve before the slower queued update
@@ -158,11 +183,37 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
     };
   }, [isAuthenticated, identity, addNotification]);
 
+  // The actor-creation drain above can run before the content cache has loaded,
+  // leaving a queued saveEvaluation as a transient "item not found" retry. Re-drain
+  // once the cache has RECONCILED for this principal (contentLoadedFor set by the load
+  // effect) so it syncs within the session, not only on the next reconnect/reload.
+  // Gating on contentLoadedFor (not content.length) is essential: draining on stale or
+  // partial content would retry-miss the queued item, and the once-per-principal guard
+  // would then block the correct re-drain once the real cached content arrives.
+  useEffect(() => {
+    // actorPrincipalRef check: during a direct A→B switch actorRef can still be A's
+    // actor here, so require it to belong to the current principal before draining (and
+    // before consuming the once-per-principal guard). doDrainQueue enforces the same
+    // gate as a backstop.
+    if (!isAuthenticated || !actorRef.current || actorPrincipalRef.current !== principalText
+        || contentLoadedFor !== principalText) return;
+    if (postLoadDrainKeyRef.current === principalText) return;
+    postLoadDrainKeyRef.current = principalText;
+    drainQueueRef.current().catch((err: unknown) =>
+      console.warn("[content] Post-load offline drain failed:", errMsg(err)));
+  }, [contentLoadedFor, isAuthenticated, principalText]);
+
   const doDrainQueue = useCallback(async () => {
     const actor = actorRef.current;
-    if (!actor || !isAuthenticated || !principal) return;
-    await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus, addNotification);
-  }, [isAuthenticated, principal, addNotification]);
+    // Only drain when actorRef is the CURRENT principal's actor. During a direct A→B
+    // switch it can still be A's until B's actor resolves; draining B's queued actions
+    // then would replay them under A's caller (cross-account write / silent drop).
+    if (!actor || !isAuthenticated || !principal || actorPrincipalRef.current !== principalText) return;
+    // Tell the drain whether the cache has reconciled, so an item-not-found is retried
+    // (ran before the cache loaded) vs dropped (genuinely evicted) — not left stuck.
+    const contentReconciled = contentLoadedFor === principalText;
+    await drainOfflineQueue(actor, principal, contentRef, setPendingActions, setSyncStatus, addNotification, contentReconciled);
+  }, [isAuthenticated, principal, addNotification, contentLoadedFor, principalText]);
   drainQueueRef.current = doDrainQueue;
 
   const isOnline = useOnlineStatus(doDrainQueue);
@@ -178,8 +229,12 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, [principalText]);
 
   useEffect(() => {
+    // Skip while the principal just changed and the load effect hasn't yet
+    // reconciled `content` to it — otherwise the previous user's content would be
+    // written into the new (e.g. anonymous, on logout) cache bucket.
+    if (contentLoadedFor !== principalText) return;
     saveCachedContent(content, principalText);
-  }, [content, principalText]);
+  }, [content, principalText, contentLoadedFor]);
 
   useEffect(() => {
     const updateTimestamps = () => {

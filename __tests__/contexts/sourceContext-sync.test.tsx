@@ -244,6 +244,43 @@ describe("doSync — pending deletes flush", () => {
   });
 });
 
+// ─── Per-id write ordering (delete must supersede a pending save) ───
+
+describe("per-source write ordering", () => {
+  it("routes a delete through the save chain so a pending save can't resurrect the source", async () => {
+    const calls: string[] = [];
+    let resolveSave: () => void = () => {};
+    mockSaveSourceConfig.mockImplementation(() => {
+      calls.push("save");
+      return new Promise<void>(r => { resolveSave = () => r(undefined); });
+    });
+    mockDeleteSourceConfig.mockImplementation(() => {
+      calls.push("delete");
+      return Promise.resolve(true);
+    });
+
+    renderAuth();
+    await waitFor(() => expect(captured.syncStatus).toBe("synced"));
+
+    // Add a source → saveToIC starts a save that we deliberately hold un-resolved.
+    await act(async () => { screen.getByTestId("add-rss").click(); });
+    expect(calls).toEqual(["save"]);
+    expect(captured.sources).toHaveLength(1);
+
+    // Remove it while that save is still in-flight. The delete is chained AFTER the
+    // pending save on the same id, so it must NOT have run yet.
+    await act(async () => { screen.getByTestId("remove-first").click(); });
+    expect(calls).toEqual(["save"]);          // delete queued behind the unresolved save
+    expect(captured.sources).toHaveLength(0); // removed locally immediately
+
+    // Resolve the save → the chained delete runs strictly AFTER it, so the source is
+    // never re-upserted on the canister after being deleted.
+    await act(async () => { resolveSave(); await Promise.resolve(); });
+    await waitFor(() => expect(calls).toEqual(["save", "delete"]));
+    expect(captured.sources).toHaveLength(0);
+  });
+});
+
 // ─── Content Key Based Deletion ───
 
 describe("content key based deletion", () => {
