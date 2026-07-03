@@ -117,6 +117,11 @@ export function saveCachedContent(items: ContentItem[], principal?: string | nul
 }
 
 export async function clearCachedContent(principal?: string | null): Promise<void> {
+  // Cancel any pending debounced save first. On an account switch this purge runs for
+  // the principal being left; a save scheduled just before it (capturing that
+  // principal's items + key) would otherwise fire ~1s later and rewrite the bucket we
+  // just deleted, defeating account-switch cache isolation.
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   // Drop both the principal-scoped key and the legacy unscoped key — the legacy
   // key could still contain another account's data from before this migration.
   const idbKeys = [scopedKey(IDB_CONTENT_KEY_PREFIX, principal), "items"];

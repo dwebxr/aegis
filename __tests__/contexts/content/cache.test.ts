@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import "fake-indexeddb/auto";
-import { truncatePreservingActioned, loadCachedContent, saveCachedContent, _resetContentCache } from "@/contexts/content/cache";
+import { truncatePreservingActioned, loadCachedContent, saveCachedContent, clearCachedContent, _resetContentCache } from "@/contexts/content/cache";
 import type { ContentItem } from "@/lib/types/content";
 
 // Reset IDB between tests
@@ -221,5 +221,15 @@ describe("saveCachedContent", () => {
     expect(stored).not.toBeNull();
     const parsed = JSON.parse(stored!);
     expect(parsed.length).toBeLessThanOrEqual(200);
+  });
+
+  it("clearCachedContent cancels a pending debounced save (no write-back after purge)", async () => {
+    // Schedule a save for alice, then purge alice's bucket (as an account switch does)
+    // before the debounce fires. The pending save must be cancelled so it can't rewrite
+    // the just-purged bucket ~1s later and defeat account-switch isolation.
+    saveCachedContent([makeItem({ id: "stale" })], "alice");
+    await clearCachedContent("alice");
+    jest.advanceTimersByTime(1000);
+    expect(localStorage.getItem("aegis-content-cache:alice")).toBeNull();
   });
 });
