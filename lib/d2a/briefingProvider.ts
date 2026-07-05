@@ -12,6 +12,36 @@ async function createActor(): Promise<_SERVICE> {
   return Actor.createActor<_SERVICE>(idlFactory, { agent, canisterId: getCanisterId() });
 }
 
+/** The on-chain briefingScore carries a recency-decay factor (exp(-λ·age),
+ *  half-life 7–24h) frozen at publish time — weeks-old content collapses to
+ *  ~1e-20, which preserves ordering but is useless for display or thresholds.
+ *  Serve a briefing-relative score instead: top priority item = 1, others
+ *  proportional. Applied at READ time so briefings already stored on-chain get
+ *  the same semantics. serendipityPick is left untouched: it carries a
+ *  serendipityScore (0–10-ish scale, no decay factor), not a briefingScore —
+ *  scaling it against the decayed item max would explode it. */
+function normalizeBriefingScores(parsed: D2ABriefingResponse): D2ABriefingResponse {
+  const positive = parsed.items
+    .map(i => i.briefingScore)
+    .filter(s => typeof s === "number" && Number.isFinite(s) && s > 0);
+  if (positive.length === 0) return parsed;
+  const max = Math.max(...positive);
+  // Floor keeps every RANKED item strictly positive: a fresh top item next to a
+  // weeks-older one can push the ratio below the 4-decimal resolution, and a
+  // consumer thresholding on `briefingScore > 0` must not lose an item that IS
+  // in the ranking. Ties at the floor are fine — ordering below this scale was
+  // already destroyed by the decay factor.
+  const SCORE_FLOOR = 0.0001;
+  const norm = (s: number) =>
+    typeof s === "number" && Number.isFinite(s) && s > 0
+      ? Math.max(SCORE_FLOOR, Math.round((s / max) * 10_000) / 10_000)
+      : 0;
+  return {
+    ...parsed,
+    items: parsed.items.map(i => ({ ...i, briefingScore: norm(i.briefingScore) })),
+  };
+}
+
 export async function getLatestBriefing(principalText?: string): Promise<D2ABriefingResponse | null> {
   if (!principalText) return null;
 
@@ -32,7 +62,7 @@ export async function getLatestBriefing(principalText?: string): Promise<D2ABrie
       console.warn("[briefingProvider] Briefing JSON has unexpected shape, ignoring");
       return null;
     }
-    return parsed as D2ABriefingResponse;
+    return normalizeBriefingScores(parsed as D2ABriefingResponse);
   } catch (err) {
     console.warn("[briefingProvider] Failed to parse briefing JSON:", err);
     return null;
@@ -58,15 +88,17 @@ export async function getGlobalBriefingSummaries(
 
   for (const [principal, briefingJson, generatedAt] of result.items) {
     try {
-      const parsed = JSON.parse(briefingJson) as D2ABriefingResponse;
+      const rawParsed = JSON.parse(briefingJson) as D2ABriefingResponse;
       if (
-        typeof parsed !== "object" || parsed === null ||
-        typeof parsed.summary?.totalEvaluated !== "number" ||
-        !Array.isArray(parsed.items)
+        typeof rawParsed !== "object" || rawParsed === null ||
+        typeof rawParsed.summary?.totalEvaluated !== "number" ||
+        !Array.isArray(rawParsed.items)
       ) {
         console.warn("[briefingProvider] Skipped malformed briefing from", principal.toText().slice(0, 12));
         continue;
       }
+      // Same briefing-relative score semantics as the per-principal read.
+      const parsed = normalizeBriefingScores(rawParsed);
 
       totalEvaluated += parsed.summary.totalEvaluated;
       totalQuality += parsed.summary.totalEvaluated - (parsed.summary.totalBurned || 0);

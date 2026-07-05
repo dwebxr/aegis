@@ -62,14 +62,25 @@ describe("briefingToD2AResponse", () => {
     expect(result.items[0].briefingScore).toBe(85);
   });
 
-  it("truncates title to 80 characters", () => {
+  it("truncates title to 80 characters with an ellipsis marker", () => {
     const longText = "A".repeat(200);
     const state = makeBriefingState({
       priority: [{ item: makeContentItem({ text: longText }), briefingScore: 90, isSerendipity: false, classification: "mixed" as const }],
     });
     const result = briefingToD2AResponse(state);
+    // 79 chars + "…" — consumers can tell a cut title from a complete one.
     expect(result.items[0].title).toHaveLength(80);
+    expect(result.items[0].title.endsWith("…")).toBe(true);
     expect(result.items[0].content).toBe(longText);
+  });
+
+  it("does NOT append an ellipsis to titles that fit", () => {
+    const shortText = "B".repeat(80);
+    const state = makeBriefingState({
+      priority: [{ item: makeContentItem({ text: shortText }), briefingScore: 90, isSerendipity: false, classification: "mixed" as const }],
+    });
+    const result = briefingToD2AResponse(state);
+    expect(result.items[0].title).toBe(shortText);
   });
 
   it("preserves full content in content field", () => {
