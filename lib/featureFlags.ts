@@ -16,7 +16,7 @@ export const FLAGS = {
   x402FreeTier: {
     envName: "X402_FREE_TIER_ENABLED",
     defaultValue: false,
-    description: "Allow ?preview=true queries on /api/d2a/briefing to bypass x402 payment gate.",
+    description: "Allow ?preview=true queries on /api/d2a/briefing, /api/d2a/briefing/changes and /api/d2a/briefing-jpyc to bypass the x402 payment gate.",
     scope: "server",
   },
   scoringCascade: {

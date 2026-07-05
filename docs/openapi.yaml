@@ -183,7 +183,7 @@ paths:
           description: When `X402_FREE_TIER_ENABLED`, set `true` to bypass payment.
           schema:
             type: string
-            enum: [true]
+            enum: ["true"]
         - name: offset
           in: query
           required: false
@@ -247,6 +247,127 @@ paths:
         '204':
           description: Preflight response with CORS headers.
 
+  /api/d2a/briefing-jpyc:
+    get:
+      tags: [D2A]
+      summary: JPYC-paid curated briefing via OpenPay (x402 v1, Polygon)
+      description: |
+        Same content and parameters as `/api/d2a/briefing`, but paid in
+        JPYC on Polygon (`eip155:137`) through the OpenPay gateway
+        (https://open-pay.jp). Speaks **x402 v1 with an OpenPay-flavored
+        EIP-3009 authorization — vanilla x402 clients are not
+        compatible.** Payment requirements come from the OpenPay catalog
+        (the 402 `accepts` payload is authoritative; prices may change
+        without notice). Settlement only happens after content is
+        successfully built — failed requests are never charged. When
+        `X402_FREE_TIER_ENABLED` is `true`, `?preview=true` returns a
+        truncated payload without payment.
+      operationId: getD2ABriefingJpyc
+      security:
+        - {}
+        - x402: []
+      parameters:
+        - name: principal
+          in: query
+          required: false
+          description: IC principal (text form) for a user-specific briefing.
+          schema:
+            type: string
+        - name: preview
+          in: query
+          required: false
+          description: When `X402_FREE_TIER_ENABLED`, set `true` to bypass payment.
+          schema:
+            type: string
+            enum: ["true"]
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          description: Per-user path default 50 / max 100; global path default 5 / max 10.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: since
+          in: query
+          required: false
+          description: ISO 8601 timestamp; excludes briefings generated before it.
+          schema:
+            type: string
+            format: date-time
+        - name: topics
+          in: query
+          required: false
+          description: Comma-separated topic filter (case-insensitive, OR logic).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: >
+            Per-user or global briefing. Paid responses carry an
+            `X-PAYMENT-RESPONSE` header (base64 OpenPay settle receipt).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/D2ABriefingResponse'
+                  - $ref: '#/components/schemas/GlobalBriefingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '402':
+          description: >
+            OpenPay x402 v1 payment required — body is
+            `{x402Version: 1, accepts, error}` where `accepts` holds the
+            single validated OpenPay payment requirement.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [x402Version, accepts, error]
+                properties:
+                  x402Version:
+                    type: integer
+                    enum: [1]
+                  accepts:
+                    type: array
+                    items:
+                      type: object
+                  error:
+                    type: string
+        '404':
+          description: No briefing available for principal, or no global briefings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: >
+            OpenPay gate unavailable — merchant not configured, catalog
+            unreachable, or this resource not (yet) registered in the
+            OpenPay catalog.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    options:
+      tags: [D2A]
+      summary: CORS preflight
+      operationId: d2aBriefingJpycOptions
+      responses:
+        '204':
+          description: Preflight response with CORS headers.
+
   /api/d2a/briefing/changes:
     get:
       tags: [D2A]
@@ -256,8 +377,15 @@ paths:
         generated after `since`. Useful for agents polling for new content
         without fetching full payloads. Only returns `"action": "added"`
         (true diff with updated/removed requires server-side snapshot
-        storage which is not implemented).
+        storage which is not implemented). When `X402_RECEIVER` is
+        configured, the endpoint is wrapped in the same x402 payment
+        middleware as `/api/d2a/briefing`. If `X402_FREE_TIER_ENABLED` is
+        `true`, `?preview=true` returns the diff without payment but with
+        `title`/`sourceUrl` redacted (hashes and ranks only).
       operationId: getD2ABriefingChanges
+      security:
+        - {}
+        - x402: []
       parameters:
         - name: since
           in: query
@@ -266,6 +394,15 @@ paths:
           schema:
             type: string
             format: date-time
+        - name: preview
+          in: query
+          required: false
+          description: >
+            When `X402_FREE_TIER_ENABLED`, set `true` to bypass payment;
+            `title`/`sourceUrl` are redacted to empty strings.
+          schema:
+            type: string
+            enum: ["true"]
       responses:
         '200':
           description: List of new items since `since`.
@@ -275,6 +412,12 @@ paths:
                 $ref: '#/components/schemas/ChangesResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '402':
+          description: x402 payment required (when receiver configured and preview disabled).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':
@@ -1161,8 +1304,11 @@ components:
       bearerFormat: x402
       description: |
         x402 payment protocol authorization (see https://x402.org). Applies
-        to `/api/d2a/briefing` when `X402_RECEIVER` is configured and
-        `preview=true` is not set.
+        to `/api/d2a/briefing` and `/api/d2a/briefing/changes` (x402 v2,
+        USDC) when `X402_RECEIVER` is configured, and to
+        `/api/d2a/briefing-jpyc` (OpenPay-flavored x402 v1, JPYC on
+        Polygon) when `OPENPAY_MERCHANT_ADDRESS` is configured — in both
+        cases `preview=true` (with the free tier enabled) bypasses payment.
 
   responses:
     BadRequest:
@@ -1457,9 +1603,12 @@ components:
           type: string
         title:
           type: string
+          description: Empty string when `preview=true` redaction applies.
         sourceUrl:
           type: string
-          format: uri
+          description: >
+            Item URL. Empty string when `preview=true` redaction applies,
+            so no `format: uri` constraint.
         composite:
           type: number
         generatedAt:
@@ -1607,7 +1756,7 @@ components:
           additionalProperties: true
         payment:
           type: object
-          required: [protocol, receiver, network, price, currency, usdcContract]
+          required: [protocol, receiver, network, price, currency, asset, usdcContract]
           properties:
             protocol:
               type: string
@@ -1620,9 +1769,28 @@ components:
               type: string
             currency:
               type: string
-              enum: [USDC]
+              description: >
+                Name of the network's default settlement asset per the
+                x402 registry (e.g. `USDC` on Base Sepolia, `USD Coin` on
+                Base mainnet); `unknown` if the network has no default asset.
+            asset:
+              type: [object, "null"]
+              description: >
+                Settlement asset the 402 payment requirements will demand
+                on this network; `null` when the network has no default
+                asset in the x402 registry.
+              properties:
+                address:
+                  type: string
+                name:
+                  type: string
+                decimals:
+                  type: integer
             usdcContract:
               type: string
+              description: >
+                Deprecated alias of `asset.address` (the key predates
+                non-USDC networks); `unknown` when `asset` is `null`.
         scoring:
           type: object
           required: [model, axes, legacy]
@@ -1659,6 +1827,13 @@ components:
             x402Version:
               type: integer
               enum: [2]
+            x402V1Endpoints:
+              type: array
+              description: >
+                Endpoints that speak OpenPay-flavored x402 v1 instead of
+                x402 v2 (currently the JPYC-paid briefing).
+              items:
+                type: string
 
     HealthResponse:
       type: object

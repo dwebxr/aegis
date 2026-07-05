@@ -60,8 +60,17 @@ describe("GET /api/d2a/info", () => {
     const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.payment.protocol).toBe("x402");
+    // Default network is eip155:84532 (Base Sepolia) → the advertised asset must
+    // be the Sepolia USDC the paywall actually demands, not Base-mainnet USDC,
+    // and the currency label comes from the same registry entry.
+    expect(data.payment.network).toBe("eip155:84532");
     expect(data.payment.currency).toBe("USDC");
-    expect(data.payment.usdcContract).toBe("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
+    expect(data.payment.asset).toEqual({
+      address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      name: "USDC",
+      decimals: 6,
+    });
+    expect(data.payment.usdcContract).toBe("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
   });
 
   it("includes scoring model description", async () => {
@@ -151,18 +160,80 @@ describe("GET /api/d2a/info", () => {
     expect(data.endpoints.briefing.params.preview).toContain("truncated");
   });
 
-  it("lists changes endpoint", async () => {
+  it("lists changes endpoint with receiver-derived auth (none when x402 unset)", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.endpoints.changes.url).toBe("/api/d2a/briefing/changes");
     expect(data.endpoints.changes.method).toBe("GET");
+    // X402_RECEIVER is empty in test env → changes is served free, so auth = "none".
+    // With a receiver configured the route is x402-wrapped, same as briefing.
     expect(data.endpoints.changes.auth).toBe("none");
+    expect(data.endpoints.changes.price).toBe(data.endpoints.briefing.price);
+    expect(data.endpoints.changes.network).toBe(data.endpoints.briefing.network);
   });
 
   it("changes endpoint documents required since param", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.endpoints.changes.params.since).toContain("required");
+  });
+
+  it("changes endpoint documents preview param", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.changes.params.preview).toContain("redacted");
+  });
+
+  it("lists the JPYC briefing endpoint as OpenPay-flavored x402 v1", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    const jpyc = data.endpoints.briefingJpyc;
+    expect(jpyc.url).toBe("/api/d2a/briefing-jpyc");
+    expect(jpyc.method).toBe("GET");
+    // OPENPAY_MERCHANT_ADDRESS is unset in the test env → the route 503s, so the
+    // manifest must say "unavailable", not "none" (there is no free fallback).
+    expect(jpyc.auth).toBe("unavailable");
+    expect(jpyc.x402Version).toBe(1);
+    expect(jpyc.network).toBe("eip155:137");
+    expect(jpyc.currency).toBe("JPYC");
+    // Price is catalog-driven — the manifest must not hardcode a value that drifts.
+    expect(jpyc.price).toContain("OpenPay catalog");
+    expect(jpyc.facilitator).toBe("https://open-pay.jp");
+    expect(jpyc.description).toContain("vanilla x402 clients are not compatible");
+  });
+
+  it("marks x402 versions per endpoint and lists v1 endpoints in compatibility", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.briefing.x402Version).toBe(2);
+    expect(data.endpoints.changes.x402Version).toBe(2);
+    expect(data.compatibility.x402Version).toBe(2);
+    expect(data.compatibility.x402V1Endpoints).toEqual(["/api/d2a/briefing-jpyc"]);
+  });
+});
+
+describe("GET /api/d2a/info with unsupported X402_NETWORK", () => {
+  const origNetwork = process.env.X402_NETWORK;
+
+  afterEach(() => {
+    if (origNetwork === undefined) delete process.env.X402_NETWORK;
+    else process.env.X402_NETWORK = origNetwork;
+    jest.resetModules();
+  });
+
+  it("still serves 200 and reports the asset as unknown (no module-load throw)", async () => {
+    // eip155:1 has no default asset in @x402/evm — the discovery route must keep
+    // serving (it's free and auth-none) rather than crash at import time.
+    process.env.X402_NETWORK = "eip155:1";
+    jest.resetModules();
+    const { GET: freshGET } = await import("@/app/api/d2a/info/route");
+    const res = await freshGET(makeRequest());
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.payment.network).toBe("eip155:1");
+    expect(data.payment.currency).toBe("unknown");
+    expect(data.payment.asset).toBeNull();
+    expect(data.payment.usdcContract).toBe("unknown");
   });
 });
 
