@@ -38,7 +38,13 @@ import { renderHook, act, cleanup, waitFor } from "@testing-library/react";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { ContentItem } from "@/lib/types/content";
 import type { ContentSyncStatus } from "@/contexts/content/types";
-import type { TranslationResult, TranslationPolicy } from "@/lib/translation/types";
+import {
+  TranslationBackendUnavailableError,
+  type TranslationBackend,
+  type TranslationResult,
+  type TranslationPolicy,
+  type TranslationSkip,
+} from "@/lib/translation/types";
 
 function makeItem(id: string, composite = 7): ContentItem {
   return {
@@ -69,12 +75,20 @@ function makeResult(over: Partial<TranslationResult> = {}): TranslationResult {
   };
 }
 
-function setPolicy(policy: TranslationPolicy, opts: Partial<{ minScore: number; targetLanguage: import("@/lib/translation/types").TranslationLanguage }> = {}) {
+function makeSkip(reason: TranslationSkip["reason"], attempted: number): TranslationSkip {
+  return { status: "skip", reason, attempted };
+}
+
+function setPolicy(policy: TranslationPolicy, opts: Partial<{
+  minScore: number;
+  targetLanguage: import("@/lib/translation/types").TranslationLanguage;
+  backend: TranslationBackend;
+}> = {}) {
   mockProfile = {
     translationPrefs: {
       targetLanguage: opts.targetLanguage ?? "ja",
       policy,
-      backend: "auto",
+      backend: opts.backend ?? "auto",
       minScore: opts.minScore ?? 6,
     },
   };
@@ -165,7 +179,7 @@ describe("useTranslation — manual translateItem", () => {
 
   it("isItemTranslating returns true while translation is in flight", async () => {
     setPolicy("manual");
-    let resolveFn: (value: TranslationResult | "failed" | "skip") => void = () => {};
+    let resolveFn: (value: TranslationResult | TranslationSkip) => void = () => {};
     mockTranslateContent.mockImplementationOnce(
       () => new Promise(resolve => { resolveFn = resolve; }),
     );
@@ -186,10 +200,10 @@ describe("useTranslation — manual translateItem", () => {
 });
 
 describe("useTranslation — outcome handling", () => {
-  it('"skip" outcome adds id to skip set so it is not retried', async () => {
+  it("structured skip outcome adds id to skip set so it is not retried", async () => {
     setPolicy("all");
     const item = makeItem("a");
-    mockTranslateContent.mockResolvedValueOnce("skip");
+    mockTranslateContent.mockResolvedValueOnce(makeSkip("already-in-target", 1));
 
     const { wrapper, patchItem } = harness([item]);
     const { rerender } = renderHook(wrapper);
@@ -221,7 +235,10 @@ describe("useTranslation — outcome handling", () => {
     expect(errCalls[0][0]).toMatch(/Translation failed.*All 2 translation backends failed/);
   });
 
-  it("notifies user on synchronous translateContent throw", async () => {
+  it("manual translateContent throw DOES notify (a silent manual failure is the bug class being fixed)", async () => {
+    // Pre-change behavior notified thrown failures for every caller kind —
+    // that must survive: a manual Translate tap that dies with no feedback is
+    // indistinguishable from "translation is broken".
     setPolicy("manual");
     mockTranslateContent.mockRejectedValueOnce(new Error("network gone"));
     const { wrapper } = harness([makeItem("a")]);
@@ -230,34 +247,119 @@ describe("useTranslation — outcome handling", () => {
     await act(async () => {
       result.current.translateItem("a");
     });
-    await waitFor(() => {
-      expect(mockAddNotification).toHaveBeenCalledWith(
-        expect.stringMatching(/Translation failed/),
-        "error",
-      );
-    });
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockAddNotification).toHaveBeenCalledTimes(1));
+    expect(mockAddNotification.mock.calls[0][0]).toMatch(/Translation failed.*network gone/);
+    expect(mockAddNotification.mock.calls[0][1]).toBe("error");
   });
 
-  it("does NOT show the legacy 'no translation backend available' notification anymore", async () => {
-    setPolicy("manual");
-    mockTranslateContent.mockRejectedValueOnce(new Error("IC LLM unavailable (retried once)"));
+  it("manual backend-unavailable errors notify with the backend-specific message", async () => {
+    setPolicy("manual", { backend: "ic" });
+    mockTranslateContent.mockRejectedValueOnce(
+      new TranslationBackendUnavailableError("ic", "IC requires authentication"),
+    );
     const { wrapper } = harness([makeItem("a")]);
     const { result } = renderHook(wrapper);
 
     await act(async () => {
       result.current.translateItem("a");
     });
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockAddNotification).toHaveBeenCalledTimes(1));
+    expect(mockAddNotification.mock.calls[0][0]).toContain("IC LLM");
+    expect(mockAddNotification.mock.calls[0][1]).toBe("error");
+  });
+
+  it("manual no-backend skip notifies too (a tap with no visible result is the same invisible failure)", async () => {
+    setPolicy("manual", { backend: "auto" });
+    mockTranslateContent.mockResolvedValueOnce(makeSkip("no-backend", 0));
+    const { wrapper } = harness([makeItem("a")]);
+    const { result } = renderHook(wrapper);
+
+    await act(async () => {
+      result.current.translateItem("a");
+    });
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockAddNotification).toHaveBeenCalledTimes(1));
+    expect(mockAddNotification.mock.calls[0][0]).toContain("自動翻訳のバックエンドがありません");
+  });
+
+  it("manual already-in-target skip stays silent (correct behavior, not a failure)", async () => {
+    setPolicy("manual", { backend: "auto" });
+    mockTranslateContent.mockResolvedValueOnce(makeSkip("already-in-target", 1));
+    const { wrapper } = harness([makeItem("a")]);
+    const { result } = renderHook(wrapper);
+
+    await act(async () => {
+      result.current.translateItem("a");
+    });
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
+    await new Promise(r => setTimeout(r, 20));
+    expect(mockAddNotification).not.toHaveBeenCalled();
+  });
+
+  it("auto no-backend skip with auto backend notifies exactly once per session", async () => {
+    setPolicy("all", { backend: "auto" });
+    mockTranslateContent.mockResolvedValue(makeSkip("no-backend", 0));
+    const { wrapper } = harness([makeItem("a"), makeItem("b")]);
+    renderHook(wrapper);
+
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(2));
     await waitFor(() => {
       expect(mockAddNotification).toHaveBeenCalledWith(
-        expect.stringMatching(/Translation failed: IC LLM unavailable/),
+        "自動翻訳のバックエンドがありません — Internet Identityでログインする、Settings→FeedsでローカルLLMを有効化、またはAPIキーを設定してください",
         "error",
       );
     });
-    // The legacy generic message must never fire — it gave no useful info.
-    expect(mockAddNotification).not.toHaveBeenCalledWith(
-      expect.stringMatching(/no translation backend available/),
-      "error",
+    const errCalls = mockAddNotification.mock.calls.filter(c => c[1] === "error");
+    expect(errCalls).toHaveLength(1);
+  });
+
+  it("auto explicit-backend unavailable error uses backend-specific message once per session", async () => {
+    setPolicy("all", { backend: "cloud" });
+    mockTranslateContent.mockRejectedValue(
+      new TranslationBackendUnavailableError("cloud", "Claude requires an API key"),
     );
+    const { wrapper } = harness([makeItem("a"), makeItem("b")]);
+    renderHook(wrapper);
+
+    await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        "選択した翻訳バックエンド(Cloud)が利用できません — Settings→Translationで変更してください",
+        "error",
+      );
+    });
+    const errCalls = mockAddNotification.mock.calls.filter(c => c[1] === "error");
+    expect(errCalls).toHaveLength(1);
+  });
+
+  it("auto all-backends-failed skips aggregate into one info notification per session", async () => {
+    setPolicy("all");
+    mockTranslateContent.mockResolvedValue(makeSkip("all-backends-failed", 1));
+    const { wrapper } = harness([makeItem("a"), makeItem("b")]);
+    renderHook(wrapper);
+
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(2));
+    await waitFor(() => {
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        "一部の記事を翻訳できませんでした(IC LLMが不安定な場合があります)。未翻訳の記事は展開してTranslateで再試行できます",
+        "info",
+      );
+    });
+    const infoCalls = mockAddNotification.mock.calls.filter(c => c[1] === "info");
+    expect(infoCalls).toHaveLength(1);
+  });
+
+  it("auto already-in-target skip does not notify", async () => {
+    setPolicy("all");
+    mockTranslateContent.mockResolvedValueOnce(makeSkip("already-in-target", 1));
+    const { wrapper } = harness([makeItem("a")]);
+    renderHook(wrapper);
+
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
+    await new Promise(r => setTimeout(r, 20));
+    expect(mockAddNotification).not.toHaveBeenCalled();
   });
 });
 
@@ -433,7 +535,7 @@ describe("useTranslation — isReady gate (cold-start race protection)", () => {
     mockIsAuthenticated = true;
     // First call: skip outcome (could happen via smart-model exception
     // during a manual click before isReady).
-    mockTranslateContent.mockResolvedValueOnce("skip");
+    mockTranslateContent.mockResolvedValueOnce(makeSkip("no-backend", 0));
 
     const patchItem = jest.fn();
     const items = [makeItem("a")];

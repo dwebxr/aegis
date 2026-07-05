@@ -40,6 +40,7 @@ const selectClass = "px-3 py-1 bg-overlay border border-subtle rounded-sm text-f
 export const TranslationSettings: React.FC<TranslationSettingsProps> = ({ mobile }) => {
   const { profile, setTranslationPrefs } = usePreferences();
   const prefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
+  const languageLabel = LANGUAGES.find(l => l.code === prefs.targetLanguage)?.label ?? prefs.targetLanguage;
 
   function update(partial: Partial<typeof prefs>) {
     setTranslationPrefs({ ...prefs, ...partial });
@@ -70,22 +71,39 @@ export const TranslationSettings: React.FC<TranslationSettingsProps> = ({ mobile
       </div>
 
       {prefs.policy !== "off" && (
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div className="text-body font-semibold text-secondary-foreground">Language</div>
-            <div className="text-caption text-muted-foreground mt-0.5">
-              Translate content into this language
+        <div className="mb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-body font-semibold text-secondary-foreground">Language</div>
+              <div className="text-caption text-muted-foreground mt-0.5">
+                Translate content into this language
+              </div>
             </div>
+            <select
+              value={prefs.targetLanguage}
+              onChange={e => update({ targetLanguage: e.target.value as TranslationLanguage })}
+              className={selectClass}
+            >
+              {LANGUAGES.map(l => (
+                <option key={l.code} value={l.code}>{l.nativeLabel} ({l.label})</option>
+              ))}
+            </select>
           </div>
-          <select
-            value={prefs.targetLanguage}
-            onChange={e => update({ targetLanguage: e.target.value as TranslationLanguage })}
-            className={selectClass}
-          >
-            {LANGUAGES.map(l => (
-              <option key={l.code} value={l.code}>{l.nativeLabel} ({l.label})</option>
-            ))}
-          </select>
+          {prefs.policy === "manual" && (
+            <div className="mt-2">
+              <div className="text-tiny text-disabled leading-normal">
+                Manualでは、記事を開いて Translate ボタンを押したときだけ翻訳されます
+              </div>
+              <button
+                type="button"
+                data-testid="aegis-translation-auto-cta"
+                onClick={() => update({ policy: "all" })}
+                className="mt-2 px-3 py-1 rounded-sm text-caption font-semibold cursor-pointer font-[inherit] bg-cyan-500/[0.09] border border-cyan-500/20 text-cyan-400"
+              >
+                Auto-translate all posts to {languageLabel}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

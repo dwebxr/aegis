@@ -95,7 +95,7 @@ jest.mock("@sentry/nextjs", () => ({
 
 import { translateContent } from "@/lib/translation/engine";
 import { storeTranslation } from "@/lib/translation/cache";
-import type { TranslationResult } from "@/lib/translation/types";
+import type { TranslationResult, TranslationSkip } from "@/lib/translation/types";
 import { _resetIcLlmCircuit } from "@/lib/ic/icLlmCircuitBreaker";
 
 const origFetch = globalThis.fetch;
@@ -123,7 +123,17 @@ afterAll(() => {
 
 function expectResult(r: Awaited<ReturnType<typeof translateContent>>): TranslationResult {
   expect(typeof r).toBe("object");
+  expect((r as { status?: unknown }).status).not.toBe("skip");
   return r as TranslationResult;
+}
+
+function expectSkip(
+  r: Awaited<ReturnType<typeof translateContent>>,
+  reason: TranslationSkip["reason"],
+  attempted: number,
+): TranslationSkip {
+  expect(r).toEqual({ status: "skip", reason, attempted });
+  return r as TranslationSkip;
 }
 
 describe("translateContent", () => {
@@ -274,7 +284,7 @@ describe("translateContent", () => {
     expect(mockTranslate).toHaveBeenCalled();
   });
 
-  it("returns 'skip' when response is ALREADY_IN_TARGET", async () => {
+  it("returns already-in-target skip when response is ALREADY_IN_TARGET", async () => {
     globalThis.fetch = jest.fn().mockImplementation(async () => {
       return mockResponse({
         choices: [{ message: { content: "ALREADY_IN_TARGET" } }],
@@ -287,7 +297,7 @@ describe("translateContent", () => {
       backend: "local",
     });
 
-    expect(result).toBe("skip");
+    expectSkip(result, "already-in-target", 1);
   });
 
   it("explicit backend throws with named reason when response is empty", async () => {
@@ -422,7 +432,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "no-backend", 0);
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
@@ -471,7 +481,7 @@ describe("translateContent", () => {
 
       // Empty cascade → silent skip → user sees original text, no
       // error notification, no API hit
-      expect(result).toBe("skip");
+      expectSkip(result, "no-backend", 0);
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
@@ -519,7 +529,7 @@ describe("translateContent", () => {
         isAuthenticated: false,
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "no-backend", 0);
       expect(icMock).not.toHaveBeenCalled();
     });
 
@@ -544,7 +554,7 @@ describe("translateContent", () => {
         isAuthenticated: true,
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "no-backend", 0);
       expect(icMock).not.toHaveBeenCalled();
       _resetIcLlmCircuit();
     });
@@ -623,7 +633,7 @@ describe("translateContent", () => {
         backend: "local",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "already-in-target", 1);
     });
   });
 
@@ -741,7 +751,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "all-backends-failed", 1);
     });
 
     it("explicit IC backend throws with named reason on validator rejection", async () => {
@@ -849,7 +859,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "all-backends-failed", 1);
     });
 
     it("auto cascade short-circuits on ALREADY_IN_TARGET from a local backend (does not retry later backends)", async () => {
@@ -870,7 +880,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "already-in-target", 1);
       expect(claudeCalls).not.toHaveBeenCalled();
     });
 
@@ -890,7 +900,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "all-backends-failed", 1);
     });
 
     it("auto cascade promotes 'identical to input' to skip for non-ja targets too (fr, via claude-byok)", async () => {
@@ -906,7 +916,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "already-in-target", 1);
     });
 
     it("auto cascade promotes 'identical to input' to skip even from a local backend", async () => {
@@ -927,7 +937,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "already-in-target", 1);
       // Skip is definitive — later backends are not tried
       expect(claudeCalls).not.toHaveBeenCalled();
     });
@@ -1132,7 +1142,7 @@ describe("translateContent", () => {
 
       // Ollama's no-kana is NOT promoted (not a smart model), cascade
       // continues. Claude-byok's no-kana IS promoted → skip.
-      expect(result).toBe("skip");
+      expectSkip(result, "all-backends-failed", 2);
     });
 
     it("identical-to-input from ic-llm promotes to skip", async () => {
@@ -1153,7 +1163,7 @@ describe("translateContent", () => {
         isAuthenticated: true,
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "all-backends-failed", 1);
     });
 
     it("empty raw response from a cascade backend is NOT promoted to skip, falls through", async () => {
@@ -1252,7 +1262,7 @@ describe("translateContent", () => {
       // Load failed × 2 (retry) fired on ollama, claude rejected by
       // validator (meta-commentary). Validator failure is in the
       // failures list, so not ALL failures are transport → silent skip.
-      expect(result).toBe("skip");
+      expectSkip(result, "all-backends-failed", 2);
     });
 
     it("throws diagnostic when cascade has only transport failures (no validator fails)", async () => {
@@ -1306,7 +1316,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "all-backends-failed", 2);
       const log = getTranslationDebugLog();
       const autoSkipEntry = log.find(e => e.backend === "auto" && e.outcome === "skip");
       expect(autoSkipEntry).toBeDefined();
@@ -1328,7 +1338,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "no-backend", 0);
       const log = getTranslationDebugLog();
       const autoSkipEntry = log.find(e => e.backend === "auto" && e.outcome === "skip");
       expect(autoSkipEntry).toBeDefined();
@@ -1458,7 +1468,7 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expect(result).toBe("skip");
+      expectSkip(result, "all-backends-failed", 2);
       expect(mockSentryCapture).not.toHaveBeenCalled();
       expect(mockSpanAttributes["translate.result"]).toBe("cascade-skip");
     });
@@ -1602,7 +1612,7 @@ describe("translateContent", () => {
           actorRef,
           isAuthenticated: true,
         });
-        expect(r).toBe("skip"); // transport-error on ic-llm → silent skip (cascade-exhausted)
+        expectSkip(r, "all-backends-failed", 1); // app-level ic-llm failure → silent skip
       }
 
       expect(_icLlmCircuitState()).toBe("open");
@@ -1618,7 +1628,7 @@ describe("translateContent", () => {
         actorRef,
         isAuthenticated: true,
       });
-      expect(r).toBe("skip");
+      expectSkip(r, "no-backend", 0);
       expect(icSpy).not.toHaveBeenCalled();
       _resetIcLlmCircuit();
     });
