@@ -256,8 +256,15 @@ paths:
         generated after `since`. Useful for agents polling for new content
         without fetching full payloads. Only returns `"action": "added"`
         (true diff with updated/removed requires server-side snapshot
-        storage which is not implemented).
+        storage which is not implemented). When `X402_RECEIVER` is
+        configured, the endpoint is wrapped in the same x402 payment
+        middleware as `/api/d2a/briefing`. If `X402_FREE_TIER_ENABLED` is
+        `true`, `?preview=true` returns the diff without payment but with
+        `title`/`sourceUrl` redacted (hashes and ranks only).
       operationId: getD2ABriefingChanges
+      security:
+        - {}
+        - x402: []
       parameters:
         - name: since
           in: query
@@ -266,6 +273,15 @@ paths:
           schema:
             type: string
             format: date-time
+        - name: preview
+          in: query
+          required: false
+          description: >
+            When `X402_FREE_TIER_ENABLED`, set `true` to bypass payment;
+            `title`/`sourceUrl` are redacted to empty strings.
+          schema:
+            type: string
+            enum: [true]
       responses:
         '200':
           description: List of new items since `since`.
@@ -275,6 +291,12 @@ paths:
                 $ref: '#/components/schemas/ChangesResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '402':
+          description: x402 payment required (when receiver configured and preview disabled).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':
@@ -1161,8 +1183,8 @@ components:
       bearerFormat: x402
       description: |
         x402 payment protocol authorization (see https://x402.org). Applies
-        to `/api/d2a/briefing` when `X402_RECEIVER` is configured and
-        `preview=true` is not set.
+        to `/api/d2a/briefing` and `/api/d2a/briefing/changes` when
+        `X402_RECEIVER` is configured and `preview=true` is not set.
 
   responses:
     BadRequest:

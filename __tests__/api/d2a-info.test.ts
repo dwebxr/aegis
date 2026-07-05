@@ -61,7 +61,10 @@ describe("GET /api/d2a/info", () => {
     const data = await res.json();
     expect(data.payment.protocol).toBe("x402");
     expect(data.payment.currency).toBe("USDC");
-    expect(data.payment.usdcContract).toBe("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
+    // Default network is eip155:84532 (Base Sepolia) → the advertised contract must
+    // be the Sepolia USDC the paywall actually demands, not Base-mainnet USDC.
+    expect(data.payment.network).toBe("eip155:84532");
+    expect(data.payment.usdcContract).toBe("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
   });
 
   it("includes scoring model description", async () => {
@@ -151,18 +154,28 @@ describe("GET /api/d2a/info", () => {
     expect(data.endpoints.briefing.params.preview).toContain("truncated");
   });
 
-  it("lists changes endpoint", async () => {
+  it("lists changes endpoint with receiver-derived auth (none when x402 unset)", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.endpoints.changes.url).toBe("/api/d2a/briefing/changes");
     expect(data.endpoints.changes.method).toBe("GET");
+    // X402_RECEIVER is empty in test env → changes is served free, so auth = "none".
+    // With a receiver configured the route is x402-wrapped, same as briefing.
     expect(data.endpoints.changes.auth).toBe("none");
+    expect(data.endpoints.changes.price).toBe(data.endpoints.briefing.price);
+    expect(data.endpoints.changes.network).toBe(data.endpoints.briefing.network);
   });
 
   it("changes endpoint documents required since param", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.endpoints.changes.params.since).toContain("required");
+  });
+
+  it("changes endpoint documents preview param", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.changes.params.preview).toContain("redacted");
   });
 });
 

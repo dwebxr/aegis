@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getDefaultAsset } from "@x402/evm";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
 import { X402_NETWORK, X402_PRICE, X402_RECEIVER } from "@/lib/d2a/x402Server";
 import { APP_URL } from "@/lib/config";
+
+// Same registry the ExactEvmScheme paywall settles against — keeps the advertised
+// contract in lockstep with the `asset` actually demanded in the 402 payment
+// requirements (a hardcoded Base-mainnet address here once diverged from the
+// Base-Sepolia default network and sent agents to the wrong USDC contract).
+const USDC_CONTRACT = getDefaultAsset(X402_NETWORK).address;
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);
@@ -35,10 +42,14 @@ export async function GET(request: NextRequest) {
       changes: {
         url: "/api/d2a/briefing/changes",
         method: "GET",
-        auth: "none",
+        auth: X402_RECEIVER ? "x402" : "none",
+        price: X402_PRICE,
+        network: X402_NETWORK,
+        currency: "USDC",
         description: "Lightweight diff endpoint — returns item hashes from briefings newer than since",
         params: {
           since: "(required) ISO 8601 timestamp",
+          preview: "(optional) 'true' to get hash-only diff (title/sourceUrl redacted) without x402 payment (requires X402_FREE_TIER_ENABLED)",
         },
       },
       info: { url: "/api/d2a/info", method: "GET", auth: "none" },
@@ -50,7 +61,7 @@ export async function GET(request: NextRequest) {
       network: X402_NETWORK,
       price: X402_PRICE,
       currency: "USDC",
-      usdcContract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      usdcContract: USDC_CONTRACT,
     },
     scoring: {
       model: "aegis-vcl-v1",
