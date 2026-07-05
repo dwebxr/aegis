@@ -36,7 +36,21 @@ jest.mock("@/contexts/AgentContext", () => ({
     isEnabled: mockAgentEnabled,
     agentState: { peers: [], activeHandshakes: [], pendingOffers: [] },
     toggleAgent: jest.fn(),
+    briefingShareEnabled: false,
+    setBriefingShareEnabled: jest.fn(),
   }),
+}));
+
+// AuthContext pulls @dfinity/auth-client (ESM) — mock it out; the
+// briefing-share toggle behavior has its own dedicated test file.
+jest.mock("@/contexts/AuthContext", () => ({
+  __esModule: true,
+  useAuth: () => ({ isAuthenticated: false, identity: null }),
+}));
+jest.mock("@/lib/nostr/linkAccount", () => ({
+  __esModule: true,
+  syncLinkedAccountToIC: jest.fn().mockResolvedValue(true),
+  getLinkedAccount: () => null,
 }));
 
 jest.mock("@/contexts/PreferenceContext", () => ({

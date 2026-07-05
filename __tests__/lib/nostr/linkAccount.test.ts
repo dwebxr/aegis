@@ -519,9 +519,14 @@ describe("syncLinkedAccountToIC", () => {
     });
   });
 
-  it("swallows errors (logs warning, does not throw)", async () => {
+  it("swallows errors (logs warning, does not throw) and reports failure as false", async () => {
     mockSaveUserSettings.mockRejectedValue(new Error("IC unreachable"));
-    await expect(syncLinkedAccountToIC(fakeIdentity, account, true)).resolves.toBeUndefined();
+    await expect(syncLinkedAccountToIC(fakeIdentity, account, true)).resolves.toBe(false);
+  });
+
+  it("reports success as true (the briefing-share toggle gates client state on it)", async () => {
+    mockSaveUserSettings.mockResolvedValue(undefined);
+    await expect(syncLinkedAccountToIC(fakeIdentity, account, true)).resolves.toBe(true);
   });
 });
 
@@ -534,17 +539,18 @@ describe("loadSettingsFromIC", () => {
       updatedAt: BigInt(1700000000000),
     }]);
     const result = await loadSettingsFromIC(fakeIdentity, "aaaaa-aa");
-    expect(result).not.toBeNull();
-    expect(result!.account).not.toBeNull();
-    expect(result!.account!.npub).toBe(FAKE_NPUB);
-    expect(result!.account!.pubkeyHex).toBe(FAKE_HEX);
-    expect(result!.d2aEnabled).toBe(true);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.settings).not.toBeNull();
+    expect(result.settings!.account!.npub).toBe(FAKE_NPUB);
+    expect(result.settings!.account!.pubkeyHex).toBe(FAKE_HEX);
+    expect(result.settings!.d2aEnabled).toBe(true);
   });
 
-  it("returns null when no settings stored", async () => {
+  it("returns ok with null settings when none stored (distinct from a failed read)", async () => {
     mockGetUserSettings.mockResolvedValue([]);
     const result = await loadSettingsFromIC(fakeIdentity, "aaaaa-aa");
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: true, settings: null });
   });
 
   it("returns null account when npub fields are empty", async () => {
@@ -555,15 +561,18 @@ describe("loadSettingsFromIC", () => {
       updatedAt: BigInt(0),
     }]);
     const result = await loadSettingsFromIC(fakeIdentity, "aaaaa-aa");
-    expect(result).not.toBeNull();
-    expect(result!.account).toBeNull();
-    expect(result!.d2aEnabled).toBe(false);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.settings!.account).toBeNull();
+    expect(result.settings!.d2aEnabled).toBe(false);
   });
 
-  it("swallows errors and returns null", async () => {
+  it("swallows errors and reports the read as FAILED (ok:false, not null settings)", async () => {
+    // The briefing-share toggle must abort its wholesale write on ok:false —
+    // conflating failure with "no settings" could wipe an on-chain account.
     mockGetUserSettings.mockRejectedValue(new Error("IC unreachable"));
     const result = await loadSettingsFromIC(fakeIdentity, "aaaaa-aa");
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false });
   });
 });
 

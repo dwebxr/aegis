@@ -49,7 +49,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const [digestLoading, setDigestLoading] = useState(false);
   const [digestError, setDigestError] = useState<string | null>(null);
   const { syncBriefing } = useContent();
-  const { isEnabled: d2aEnabled } = useAgent();
+  const { briefingShareEnabled } = useAgent();
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
 
@@ -110,12 +110,15 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   briefingRef.current = briefing;
   useEffect(() => {
     // Briefings are exposed publicly via getGlobalBriefingSummaries / getLatestBriefing.
-    // Only sync when the user has opted into D2A sharing.
-    if (!d2aEnabled) return;
+    // Only sync when the user has opted into public briefing sharing (decoupled
+    // from D2A dormancy — see BRIEFING_PUBLISH_ENABLED). Including the flag in
+    // deps means the current briefing publishes immediately on opt-in, not only
+    // on the next content change.
+    if (!briefingShareEnabled) return;
     if (briefingRef.current.priority.length > 0) {
       syncBriefing(briefingRef.current, nostrKeys?.pk ?? null);
     }
-  }, [briefingSyncKey, syncBriefing, nostrKeys?.pk, d2aEnabled]);
+  }, [briefingSyncKey, syncBriefing, nostrKeys?.pk, briefingShareEnabled]);
 
   useEffect(() => {
     try {

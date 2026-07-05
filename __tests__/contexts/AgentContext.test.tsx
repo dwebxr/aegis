@@ -52,7 +52,7 @@ class MockAgentManager {
 // D2A is dormant by default in production (security redesign pending). These tests
 // exercise the manager-start path that re-enabling will restore, so force the flag
 // ON here. The default-OFF behaviour is covered by agentContext-d2a-disabled.test.tsx.
-jest.mock("@/lib/agent/config", () => ({ __esModule: true, D2A_SUBSYSTEM_ENABLED: true }));
+jest.mock("@/lib/agent/config", () => ({ __esModule: true, D2A_SUBSYSTEM_ENABLED: true, BRIEFING_PUBLISH_ENABLED: true }));
 jest.mock("@/lib/agent/manager", () => ({ __esModule: true, AgentManager: MockAgentManager }));
 jest.mock("@/lib/agent/handshake", () => ({ __esModule: true, sendComment: (...a: unknown[]) => mockSendComment(...a) }));
 jest.mock("@/lib/d2a/comments", () => ({
@@ -210,7 +210,10 @@ describe("AgentProvider — refreshAgentProfile", () => {
 });
 
 describe("AgentProvider — toggleAgent", () => {
-  it("toggles isEnabled and syncs linked account to IC when identity present", async () => {
+  it("toggles isEnabled WITHOUT writing the on-chain d2aEnabled field", async () => {
+    // The on-chain field now means "public briefing sharing" and is owned by
+    // the briefing-share toggle exclusively — the D2A agent toggle must not
+    // clobber it (it used to write it via syncLinkedAccountToIC).
     mockAuthValue = { isAuthenticated: true, identity: { fake: true }, principalText: "principal-abc" };
     const { result } = renderHook(() => useAgent(), { wrapper });
     expect(result.current.isEnabled).toBe(false);
@@ -219,22 +222,28 @@ describe("AgentProvider — toggleAgent", () => {
       result.current.toggleAgent();
     });
     expect(result.current.isEnabled).toBe(true);
-    await waitFor(() => expect(mockSyncLinkedAccountToIC).toHaveBeenCalled());
-    expect(mockSyncLinkedAccountToIC.mock.calls[0][2]).toBe(true);
+    expect(mockSyncLinkedAccountToIC).not.toHaveBeenCalled();
 
     await act(async () => {
       result.current.toggleAgent();
     });
     expect(result.current.isEnabled).toBe(false);
+    expect(mockSyncLinkedAccountToIC).not.toHaveBeenCalled();
   });
 
-  it("toggleAgent without identity does not sync to IC", () => {
+  it("setBriefingShareEnabled flips its own flag without touching D2A isEnabled", async () => {
+    mockAuthValue = { isAuthenticated: true, identity: { fake: true }, principalText: "principal-abc" };
     const { result } = renderHook(() => useAgent(), { wrapper });
-    act(() => {
-      result.current.toggleAgent();
+    expect(result.current.briefingShareEnabled).toBe(false);
+
+    await act(async () => {
+      result.current.setBriefingShareEnabled(true);
     });
+    expect(result.current.briefingShareEnabled).toBe(true);
+    expect(result.current.isEnabled).toBe(false);
+    // The context setter does not write to IC itself — the settings toggle
+    // performs the canister write and only flips this on success.
     expect(mockSyncLinkedAccountToIC).not.toHaveBeenCalled();
-    expect(result.current.isEnabled).toBe(true);
   });
 });
 

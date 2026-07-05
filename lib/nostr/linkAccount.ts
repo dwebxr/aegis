@@ -155,23 +155,36 @@ export async function linkNostrAccount(
   return account;
 }
 
-// Fire-and-forget. Dynamic imports keep @dfinity/agent out of test bundles.
+// Dynamic imports keep @dfinity/agent out of test bundles.
+//
+// The on-chain field is still named `d2aEnabled` (persistent Candid field) but
+// it now means "public briefing sharing": the canister's only uses of it are
+// gating saveLatestBriefing, filtering the public briefing reads, and purging
+// the snapshot when set false. The briefing-sharing toggle is the only UI that
+// should decide its value.
+//
+// Returns true only when the canister write succeeded — callers that flip
+// client state on success (the briefing-share toggle) must check this, or
+// they'd start publishing against a canister that still rejects it. Legacy
+// fire-and-forget callers may ignore the result.
 export async function syncLinkedAccountToIC(
   identity: import("@dfinity/agent").Identity,
   account: LinkedNostrAccount | null,
-  d2aEnabled: boolean,
-): Promise<void> {
+  briefingShareEnabled: boolean,
+): Promise<boolean> {
   try {
     const { createBackendActorAsync } = await import("@/lib/ic/actor");
     const backend = await createBackendActorAsync(identity);
     await backend.saveUserSettings({
       linkedNostrNpub: account?.npub ? [account.npub] : [],
       linkedNostrPubkeyHex: account?.pubkeyHex ? [account.pubkeyHex] : [],
-      d2aEnabled,
+      d2aEnabled: briefingShareEnabled,
       updatedAt: BigInt(0), // Server overrides with Time.now()
     });
+    return true;
   } catch (err) {
     console.warn("[nostr] Failed to sync settings to IC:", errMsg(err));
+    return false;
   }
 }
 
@@ -196,10 +209,19 @@ export function parseICSettings(
   return { account, d2aEnabled: settings.d2aEnabled };
 }
 
+/** Reads the caller's on-chain settings. The result distinguishes "the read
+ *  FAILED" ({ok:false}) from "no settings saved yet" ({ok:true, settings:null})
+ *  — the briefing-share toggle must abort its wholesale saveUserSettings write
+ *  on a failed read, or a null local account could wipe an on-chain linked
+ *  account it simply couldn't see. */
+export type ICSettingsRead =
+  | { ok: true; settings: { account: LinkedNostrAccount | null; d2aEnabled: boolean } | null }
+  | { ok: false };
+
 export async function loadSettingsFromIC(
   identity: import("@dfinity/agent").Identity,
   principalText: string,
-): Promise<{ account: LinkedNostrAccount | null; d2aEnabled: boolean } | null> {
+): Promise<ICSettingsRead> {
   try {
     const { createBackendActorAsync } = await import("@/lib/ic/actor");
     const { Principal } = await import("@dfinity/principal");
@@ -207,10 +229,10 @@ export async function loadSettingsFromIC(
     const principal = Principal.fromText(principalText);
     const result = await backend.getUserSettings(principal);
 
-    if (result.length === 0) return null;
-    return parseICSettings(result[0]);
+    if (result.length === 0) return { ok: true, settings: null };
+    return { ok: true, settings: parseICSettings(result[0]) };
   } catch (err) {
     console.warn("[nostr] Failed to load settings from IC:", errMsg(err));
-    return null;
+    return { ok: false };
   }
 }
