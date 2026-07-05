@@ -1479,9 +1479,12 @@ components:
           type: string
         title:
           type: string
+          description: Empty string when `preview=true` redaction applies.
         sourceUrl:
           type: string
-          format: uri
+          description: >
+            Item URL. Empty string when `preview=true` redaction applies,
+            so no `format: uri` constraint.
         composite:
           type: number
         generatedAt:
@@ -1629,7 +1632,7 @@ components:
           additionalProperties: true
         payment:
           type: object
-          required: [protocol, receiver, network, price, currency, usdcContract]
+          required: [protocol, receiver, network, price, currency, asset, usdcContract]
           properties:
             protocol:
               type: string
@@ -1642,9 +1645,28 @@ components:
               type: string
             currency:
               type: string
-              enum: [USDC]
+              description: >
+                Name of the network's default settlement asset per the
+                x402 registry (e.g. `USDC` on Base Sepolia, `USD Coin` on
+                Base mainnet); `unknown` if the network has no default asset.
+            asset:
+              type: [object, "null"]
+              description: >
+                Settlement asset the 402 payment requirements will demand
+                on this network; `null` when the network has no default
+                asset in the x402 registry.
+              properties:
+                address:
+                  type: string
+                name:
+                  type: string
+                decimals:
+                  type: integer
             usdcContract:
               type: string
+              description: >
+                Deprecated alias of `asset.address` (the key predates
+                non-USDC networks); `unknown` when `asset` is `null`.
         scoring:
           type: object
           required: [model, axes, legacy]

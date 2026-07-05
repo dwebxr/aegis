@@ -6,13 +6,15 @@ import { X402_NETWORK, X402_PRICE, X402_RECEIVER } from "@/lib/d2a/x402Server";
 import { APP_URL } from "@/lib/config";
 
 // Same registry the ExactEvmScheme paywall settles against — keeps the advertised
-// contract in lockstep with the `asset` actually demanded in the 402 payment
-// requirements (a hardcoded Base-mainnet address here once diverged from the
-// Base-Sepolia default network and sent agents to the wrong USDC contract).
+// asset in lockstep with the one actually demanded in the 402 payment requirements
+// (a hardcoded Base-mainnet USDC address here once diverged from the Base-Sepolia
+// default network and sent agents to the wrong contract; a hardcoded "USDC" label
+// would likewise mislabel networks whose default asset is USDT0/MegaUSD/etc.).
 // Map lookup, not getDefaultAsset(): that throws for networks without a default
 // asset, and this free discovery route must keep serving (reporting the network
 // as configured) even when the operator picks a network the paywall can't settle.
-const USDC_CONTRACT = DEFAULT_STABLECOINS[X402_NETWORK]?.address ?? "unknown";
+const DEFAULT_ASSET = DEFAULT_STABLECOINS[X402_NETWORK] ?? null;
+const CURRENCY = DEFAULT_ASSET?.name ?? "unknown";
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
         auth: X402_RECEIVER ? "x402" : "none",
         price: X402_PRICE,
         network: X402_NETWORK,
-        currency: "USDC",
+        currency: CURRENCY,
         description: "Get curated briefing with scored content items",
         params: {
           principal: "(optional) IC principal for user-specific briefing",
@@ -48,7 +50,7 @@ export async function GET(request: NextRequest) {
         auth: X402_RECEIVER ? "x402" : "none",
         price: X402_PRICE,
         network: X402_NETWORK,
-        currency: "USDC",
+        currency: CURRENCY,
         description: "Lightweight diff endpoint — returns item hashes from briefings newer than since",
         params: {
           since: "(required) ISO 8601 timestamp",
@@ -63,8 +65,14 @@ export async function GET(request: NextRequest) {
       receiver: X402_RECEIVER || "not configured",
       network: X402_NETWORK,
       price: X402_PRICE,
-      currency: "USDC",
-      usdcContract: USDC_CONTRACT,
+      currency: CURRENCY,
+      // The settlement asset the 402 payment requirements will demand on this
+      // network. null when the network has no default asset in @x402/evm.
+      asset: DEFAULT_ASSET
+        ? { address: DEFAULT_ASSET.address, name: DEFAULT_ASSET.name, decimals: DEFAULT_ASSET.decimals }
+        : null,
+      // Deprecated alias of asset.address — the key predates non-USDC networks.
+      usdcContract: DEFAULT_ASSET?.address ?? "unknown",
     },
     scoring: {
       model: "aegis-vcl-v1",

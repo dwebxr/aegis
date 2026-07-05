@@ -60,10 +60,16 @@ describe("GET /api/d2a/info", () => {
     const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.payment.protocol).toBe("x402");
-    expect(data.payment.currency).toBe("USDC");
-    // Default network is eip155:84532 (Base Sepolia) → the advertised contract must
-    // be the Sepolia USDC the paywall actually demands, not Base-mainnet USDC.
+    // Default network is eip155:84532 (Base Sepolia) → the advertised asset must
+    // be the Sepolia USDC the paywall actually demands, not Base-mainnet USDC,
+    // and the currency label comes from the same registry entry.
     expect(data.payment.network).toBe("eip155:84532");
+    expect(data.payment.currency).toBe("USDC");
+    expect(data.payment.asset).toEqual({
+      address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      name: "USDC",
+      decimals: 6,
+    });
     expect(data.payment.usdcContract).toBe("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
   });
 
@@ -188,7 +194,7 @@ describe("GET /api/d2a/info with unsupported X402_NETWORK", () => {
     jest.resetModules();
   });
 
-  it("still serves 200 and reports usdcContract as unknown (no module-load throw)", async () => {
+  it("still serves 200 and reports the asset as unknown (no module-load throw)", async () => {
     // eip155:1 has no default asset in @x402/evm — the discovery route must keep
     // serving (it's free and auth-none) rather than crash at import time.
     process.env.X402_NETWORK = "eip155:1";
@@ -198,6 +204,8 @@ describe("GET /api/d2a/info with unsupported X402_NETWORK", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.payment.network).toBe("eip155:1");
+    expect(data.payment.currency).toBe("unknown");
+    expect(data.payment.asset).toBeNull();
     expect(data.payment.usdcContract).toBe("unknown");
   });
 });
