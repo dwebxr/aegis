@@ -1667,16 +1667,22 @@ components:
         topItems:
           type: array
           description: >
-            Ranked INDEX only (top 3). For full items — `content`,
-            `sourceUrl`, `reason`, full scores — request this contributor's
+            Ranked INDEX (top 3) with article URLs. For full items —
+            `content`, `reason`, full scores — request this contributor's
             briefing directly with `?principal=<contributor principal>`.
           items:
             type: object
-            required: [title, topics, briefingScore, verdict]
+            required: [title, sourceUrl, topics, briefingScore, verdict]
             properties:
               title:
                 type: string
                 description: First ~80 chars of the item text; `…` marks truncation.
+              sourceUrl:
+                type: string
+                description: >
+                  Article URL. Empty string when the item has no URL or
+                  under `preview=true` redaction (URLs are paid content,
+                  matching /changes semantics).
               topics:
                 type: array
                 items:

@@ -66,15 +66,27 @@ export async function buildBriefingResponse(request: NextRequest): Promise<NextR
 
     // When filters are active, fetch a larger batch and filter in-memory
     // because the canister can't filter by since/topics natively
-    const global = hasFilters
+    const rawGlobal = hasFilters
       ? await getGlobalBriefingSummaries(0, 100)
       : await getGlobalBriefingSummaries(offset, limit);
-    if (!global) {
+    if (!rawGlobal) {
       return withCors(
         NextResponse.json({ error: "No global briefings available" }, { status: 404 }),
         origin,
       );
     }
+
+    // Preview (free tier) redacts topItems URLs — same semantics as /changes:
+    // callers learn what ranks where, but which article it is stays paid.
+    const global = preview
+      ? {
+          ...rawGlobal,
+          contributors: rawGlobal.contributors.map(c => ({
+            ...c,
+            topItems: c.topItems.map(t => ({ ...t, sourceUrl: "" })),
+          })),
+        }
+      : rawGlobal;
 
     if (hasFilters) {
       let filtered = global.contributors;

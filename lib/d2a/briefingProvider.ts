@@ -117,6 +117,7 @@ export async function getGlobalBriefingSummaries(
 
       const topItems = parsed.items.slice(0, MAX_TOP_ITEMS).map((item) => ({
         title: item.title,
+        sourceUrl: typeof item.sourceUrl === "string" ? item.sourceUrl : "",
         topics: item.topics || [],
         briefingScore: item.briefingScore,
         verdict: item.verdict,

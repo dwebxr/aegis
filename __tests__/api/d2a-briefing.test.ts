@@ -63,7 +63,7 @@ const sampleGlobalBriefing = {
     generatedAt: "2025-01-01T00:00:00.000Z",
     summary: { totalEvaluated: 10, totalBurned: 2, qualityRate: 0.8 },
     topItems: [
-      { title: "Test Article", topics: ["tech"], briefingScore: 85, verdict: "quality" as const },
+      { title: "Test Article", sourceUrl: "https://example.com/x", topics: ["tech"], briefingScore: 85, verdict: "quality" as const },
     ],
   }],
   aggregatedTopics: ["tech"],
@@ -245,7 +245,7 @@ describe("GET /api/d2a/briefing — global path filtering", () => {
         generatedAt: "2026-03-20T10:00:00.000Z",
         summary: { totalEvaluated: 10, totalBurned: 2, qualityRate: 0.8 },
         topItems: [
-          { title: "AI News", topics: ["AI", "Tech"], briefingScore: 85, verdict: "quality" as const },
+          { title: "AI News", sourceUrl: "https://example.com/x", topics: ["AI", "Tech"], briefingScore: 85, verdict: "quality" as const },
         ],
       },
       {
@@ -253,7 +253,7 @@ describe("GET /api/d2a/briefing — global path filtering", () => {
         generatedAt: "2026-03-20T15:00:00.000Z",
         summary: { totalEvaluated: 5, totalBurned: 1, qualityRate: 0.8 },
         topItems: [
-          { title: "DeFi Update", topics: ["DeFi", "Crypto"], briefingScore: 75, verdict: "quality" as const },
+          { title: "DeFi Update", sourceUrl: "https://example.com/x", topics: ["DeFi", "Crypto"], briefingScore: 75, verdict: "quality" as const },
         ],
       },
       {
@@ -261,7 +261,7 @@ describe("GET /api/d2a/briefing — global path filtering", () => {
         generatedAt: "2026-03-19T08:00:00.000Z",
         summary: { totalEvaluated: 8, totalBurned: 3, qualityRate: 0.625 },
         topItems: [
-          { title: "Old AI Post", topics: ["AI"], briefingScore: 60, verdict: "quality" as const },
+          { title: "Old AI Post", sourceUrl: "https://example.com/x", topics: ["AI"], briefingScore: 60, verdict: "quality" as const },
         ],
       },
       {
@@ -269,7 +269,7 @@ describe("GET /api/d2a/briefing — global path filtering", () => {
         generatedAt: "2026-03-21T00:00:00.000Z",
         summary: { totalEvaluated: 12, totalBurned: 0, qualityRate: 1 },
         topItems: [
-          { title: "Mixed Topics", topics: ["AI", "DeFi"], briefingScore: 90, verdict: "quality" as const },
+          { title: "Mixed Topics", sourceUrl: "https://example.com/x", topics: ["AI", "DeFi"], briefingScore: 90, verdict: "quality" as const },
         ],
       },
     ],
