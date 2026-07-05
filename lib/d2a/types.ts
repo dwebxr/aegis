@@ -65,6 +65,9 @@ export interface GlobalBriefingContributor {
   };
   topItems: Array<{
     title: string;
+    // Article URL — empty string when the source item had none, or under
+    // preview=true redaction (URLs are paid content, same as /changes).
+    sourceUrl: string;
     topics: string[];
     briefingScore: number;
     verdict: Verdict;

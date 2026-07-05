@@ -121,4 +121,29 @@ describe("getGlobalBriefingSummaries — topItems normalization", () => {
     // Top 3 of 4 items, each relative to the contributor's own max.
     expect(result!.contributors[0].topItems.map(t => t.briefingScore)).toEqual([1, 0.5, 0.25]);
   });
+
+  it("includes each top item's sourceUrl in the index", async () => {
+    mockActor.getGlobalBriefingSummaries.mockResolvedValue({
+      total: 1n,
+      items: [[
+        { toText: () => "contrib-1" },
+        JSON.stringify(makeBriefing([2e-20, 1e-20])),
+        1_783_000_000_000_000_000n,
+      ]],
+    });
+    const result = await getGlobalBriefingSummaries(0, 5);
+    expect(result!.contributors[0].topItems.map(t => t.sourceUrl))
+      .toEqual(["https://example.com/a", "https://example.com/a"]);
+  });
+
+  it("serializes a missing/malformed sourceUrl as empty string", async () => {
+    const briefing = makeBriefing([2e-20]);
+    delete (briefing.items[0] as Record<string, unknown>).sourceUrl;
+    mockActor.getGlobalBriefingSummaries.mockResolvedValue({
+      total: 1n,
+      items: [[{ toText: () => "contrib-1" }, JSON.stringify(briefing), 1_783_000_000_000_000_000n]],
+    });
+    const result = await getGlobalBriefingSummaries(0, 5);
+    expect(result!.contributors[0].topItems[0].sourceUrl).toBe("");
+  });
 });

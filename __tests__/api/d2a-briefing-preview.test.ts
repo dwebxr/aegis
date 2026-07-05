@@ -68,6 +68,25 @@ describe("GET /api/d2a/briefing — preview mode with free tier enabled", () => 
     jest.resetModules();
   });
 
+  const sampleGlobal = {
+    version: "1.0" as const,
+    type: "global" as const,
+    generatedAt: "2026-03-20T12:00:00.000Z",
+    pagination: { offset: 0, limit: 5, total: 1, hasMore: false },
+    contributors: [{
+      principal: "contrib-1",
+      generatedAt: "2026-03-20T11:00:00.000Z",
+      summary: { totalEvaluated: 10, totalBurned: 2, qualityRate: 0.8 },
+      topItems: [
+        { title: "Long Article", sourceUrl: "https://example.com/1", topics: ["AI"], briefingScore: 1, verdict: "quality" as const },
+        { title: "Short Article", sourceUrl: "https://example.com/2", topics: ["DeFi"], briefingScore: 0.5, verdict: "quality" as const },
+      ],
+    }],
+    aggregatedTopics: ["AI", "DeFi"],
+    totalEvaluated: 10,
+    totalQualityRate: 0.8,
+  };
+
   function loadRouteWithFreeTier() {
     let GET: (req: NextRequest) => Promise<Response>;
 
@@ -76,7 +95,7 @@ describe("GET /api/d2a/briefing — preview mode with free tier enabled", () => 
     jest.isolateModules(() => {
       jest.mock("@/lib/d2a/briefingProvider", () => ({
         getLatestBriefing: jest.fn().mockResolvedValue(sampleBriefing),
-        getGlobalBriefingSummaries: jest.fn(),
+        getGlobalBriefingSummaries: jest.fn().mockResolvedValue(sampleGlobal),
       }));
       jest.mock("@/lib/d2a/x402Server", () => ({
         X402_RECEIVER: "",
@@ -126,6 +145,24 @@ describe("GET /api/d2a/briefing — preview mode with free tier enabled", () => 
     const res = await GET(makeRequest({ principal: "aaaaa-aa" }));
     const data = await res.json();
     expect(data.items[0].content.length).toBe(500);
+  });
+
+  it("redacts global topItems sourceUrl under preview (URLs are paid content)", async () => {
+    const GET = loadRouteWithFreeTier();
+    const res = await GET(makeRequest({ preview: "true" }));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.contributors[0].topItems.map((t: { sourceUrl: string }) => t.sourceUrl)).toEqual(["", ""]);
+    // Titles/scores stay visible — same semantics as /changes preview.
+    expect(data.contributors[0].topItems[0].title).toBe("Long Article");
+  });
+
+  it("keeps global topItems sourceUrl without preview", async () => {
+    const GET = loadRouteWithFreeTier();
+    const res = await GET(makeRequest({}));
+    const data = await res.json();
+    expect(data.contributors[0].topItems.map((t: { sourceUrl: string }) => t.sourceUrl))
+      .toEqual(["https://example.com/1", "https://example.com/2"]);
   });
 
   it("preview preserves all non-content fields", async () => {
