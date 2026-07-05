@@ -45,22 +45,31 @@ export function resolveBriefingShareRestore(
 // records the un-acknowledged opt-out so restore honors it and retries the
 // canister write; it is cleared once any write (off OR a fresh opt-in)
 // succeeds.
-const PENDING_SHARE_OFF_KEY = "aegis-briefing-share-pending-off";
+//
+// PRINCIPAL-SCOPED: an unscoped flag on a shared device would let account A's
+// failed opt-out force account B's sharing off and purge B's public briefing
+// on B's next login (fail-safe in direction, but it overrides B's choice and
+// deletes B's on-chain snapshot without B acting).
+const PENDING_SHARE_OFF_PREFIX = "aegis-briefing-share-pending-off";
 
-export function hasPendingShareOff(): boolean {
-  if (typeof globalThis.localStorage === "undefined") return false;
+function pendingShareOffKey(principalText: string): string {
+  return `${PENDING_SHARE_OFF_PREFIX}:${principalText}`;
+}
+
+export function hasPendingShareOff(principalText: string | null | undefined): boolean {
+  if (!principalText || typeof globalThis.localStorage === "undefined") return false;
   try {
-    return localStorage.getItem(PENDING_SHARE_OFF_KEY) === "1";
+    return localStorage.getItem(pendingShareOffKey(principalText)) === "1";
   } catch {
     return false;
   }
 }
 
-export function setPendingShareOff(pending: boolean): void {
-  if (typeof globalThis.localStorage === "undefined") return;
+export function setPendingShareOff(principalText: string | null | undefined, pending: boolean): void {
+  if (!principalText || typeof globalThis.localStorage === "undefined") return;
   try {
-    if (pending) localStorage.setItem(PENDING_SHARE_OFF_KEY, "1");
-    else localStorage.removeItem(PENDING_SHARE_OFF_KEY);
+    if (pending) localStorage.setItem(pendingShareOffKey(principalText), "1");
+    else localStorage.removeItem(pendingShareOffKey(principalText));
   } catch {
     // Private-mode storage failures degrade to the old behavior (restore
     // follows the on-chain flag) — publishing only resumes for opted-in data.

@@ -54,13 +54,33 @@ describe("resolveBriefingShareRestore", () => {
 });
 
 describe("pending share-off flag", () => {
-  afterEach(() => setPendingShareOff(false));
+  const A = "principal-aaa";
+  const B = "principal-bbb";
+
+  afterEach(() => {
+    setPendingShareOff(A, false);
+    setPendingShareOff(B, false);
+  });
 
   it("round-trips through localStorage", () => {
-    expect(hasPendingShareOff()).toBe(false);
-    setPendingShareOff(true);
-    expect(hasPendingShareOff()).toBe(true);
-    setPendingShareOff(false);
-    expect(hasPendingShareOff()).toBe(false);
+    expect(hasPendingShareOff(A)).toBe(false);
+    setPendingShareOff(A, true);
+    expect(hasPendingShareOff(A)).toBe(true);
+    setPendingShareOff(A, false);
+    expect(hasPendingShareOff(A)).toBe(false);
+  });
+
+  it("is principal-scoped — A's failed opt-out never bleeds into B (shared device)", () => {
+    // Without scoping, B's next login would force B's sharing off and purge
+    // B's public briefing because of A's unfinished opt-out.
+    setPendingShareOff(A, true);
+    expect(hasPendingShareOff(B)).toBe(false);
+    expect(hasPendingShareOff(A)).toBe(true);
+  });
+
+  it("treats a missing principal as no pending flag (logged out)", () => {
+    setPendingShareOff(null, true); // no-op
+    expect(hasPendingShareOff(null)).toBe(false);
+    expect(hasPendingShareOff(undefined)).toBe(false);
   });
 });

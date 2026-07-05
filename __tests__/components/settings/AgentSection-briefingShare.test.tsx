@@ -70,7 +70,7 @@ beforeEach(() => {
   mockSetBriefingShareEnabled.mockReset();
   mockSyncLinkedAccountToIC.mockReset();
   mockLoadSettingsFromIC.mockReset();
-  mockLoadSettingsFromIC.mockResolvedValue(null); // no on-chain settings yet
+  mockLoadSettingsFromIC.mockResolvedValue({ ok: true, settings: null }); // no on-chain settings yet
   mockLinkedAccount = null;
   mockBriefingShareEnabled = false;
   mockAuthValue = { isAuthenticated: true, identity: { fake: true }, principalText: "principal-abc" };
@@ -114,9 +114,9 @@ describe("AgentSection — public briefing sharing toggle", () => {
     // Immediate local stop — before the canister write resolves — with the
     // durable opt-out recorded in case the write never lands.
     expect(mockSetBriefingShareEnabled).toHaveBeenCalledWith(false);
-    expect(localStorage.getItem("aegis-briefing-share-pending-off")).toBe("1");
+    expect(localStorage.getItem("aegis-briefing-share-pending-off:principal-abc")).toBe("1");
     await waitFor(() => expect(mockSyncLinkedAccountToIC).toHaveBeenCalledWith({ fake: true }, null, false));
-    await waitFor(() => expect(localStorage.getItem("aegis-briefing-share-pending-off")).toBeNull());
+    await waitFor(() => expect(localStorage.getItem("aegis-briefing-share-pending-off:principal-abc")).toBeNull());
   });
 
   it("OFF failure: keeps local state off, keeps the pending opt-out flag, surfaces the retry warning", async () => {
@@ -128,7 +128,7 @@ describe("AgentSection — public briefing sharing toggle", () => {
     expect(await screen.findByText(/may not be purged yet/)).toBeInTheDocument();
     // The un-acknowledged opt-out survives so the next load doesn't silently
     // restore sharing-ON from the still-true on-chain flag.
-    expect(localStorage.getItem("aegis-briefing-share-pending-off")).toBe("1");
+    expect(localStorage.getItem("aegis-briefing-share-pending-off:principal-abc")).toBe("1");
   });
 
   it("uses the freshest ON-CHAIN linked account for the write, not stale local storage", async () => {
@@ -136,21 +136,44 @@ describe("AgentSection — public briefing sharing toggle", () => {
     // wholesale saveUserSettings put must carry the on-chain account or it
     // would wipe the user's linked Nostr account.
     const icAccount = { npub: "npub1abc", pubkeyHex: "ff".repeat(32), linkedAt: 1, followCount: 0 };
-    mockLoadSettingsFromIC.mockResolvedValue({ account: icAccount, d2aEnabled: false });
+    mockLoadSettingsFromIC.mockResolvedValue({ ok: true, settings: { account: icAccount, d2aEnabled: false } });
     mockSyncLinkedAccountToIC.mockResolvedValue(true);
     render(<AgentSection />);
     fireEvent.click(toggle());
     await waitFor(() => expect(mockSyncLinkedAccountToIC).toHaveBeenCalledWith({ fake: true }, icAccount, true));
   });
 
-  it("falls back to the local account when the on-chain settings read fails", async () => {
+  it("falls back to the local account when no settings exist on-chain yet", async () => {
     const localAccount = { npub: "npub1local", pubkeyHex: "aa".repeat(32), linkedAt: 1, followCount: 0 };
     mockLinkedAccount = localAccount;
-    mockLoadSettingsFromIC.mockResolvedValue(null);
+    mockLoadSettingsFromIC.mockResolvedValue({ ok: true, settings: null });
     mockSyncLinkedAccountToIC.mockResolvedValue(true);
     render(<AgentSection />);
     fireEvent.click(toggle());
     await waitFor(() => expect(mockSyncLinkedAccountToIC).toHaveBeenCalledWith({ fake: true }, localAccount, true));
+  });
+
+  it("aborts the write (no clobber) when the on-chain settings READ fails", async () => {
+    // ok:false ≠ "no settings": the canister may hold a linked account the
+    // client couldn't see — a wholesale put with a null account would wipe it.
+    mockLoadSettingsFromIC.mockResolvedValue({ ok: false });
+    render(<AgentSection />);
+    fireEvent.click(toggle());
+    expect(await screen.findByText(/Could not load current settings/)).toBeInTheDocument();
+    expect(mockSyncLinkedAccountToIC).not.toHaveBeenCalled();
+    expect(mockSetBriefingShareEnabled).not.toHaveBeenCalled();
+  });
+
+  it("OFF with a failed settings read: local off + pending flag stick, write aborted", async () => {
+    mockBriefingShareEnabled = true;
+    mockLoadSettingsFromIC.mockResolvedValue({ ok: false });
+    render(<AgentSection />);
+    fireEvent.click(toggle());
+    expect(mockSetBriefingShareEnabled).toHaveBeenCalledWith(false);
+    expect(await screen.findByText(/Could not load current settings/)).toBeInTheDocument();
+    expect(mockSyncLinkedAccountToIC).not.toHaveBeenCalled();
+    // Durable opt-out remains so restore retries the purge next load.
+    expect(localStorage.getItem("aegis-briefing-share-pending-off:principal-abc")).toBe("1");
   });
 
   it("is disabled when signed out", () => {

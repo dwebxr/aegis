@@ -74,17 +74,26 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
     // would publish against a canister that rejects it.
     if (!next) {
       setBriefingShareEnabled(false);
-      setPendingShareOff(true);
+      setPendingShareOff(principalText, true);
     }
     // saveUserSettings is a wholesale put: writing with a stale null local
-    // account would wipe the on-chain linked Nostr account. Prefer the
-    // freshest on-chain account; fall back to local storage if the read
-    // fails or no settings exist yet.
-    const icSettings = await loadSettingsFromIC(identity, principalText);
-    const account = icSettings ? icSettings.account : getLinkedAccount();
+    // account would wipe the on-chain linked Nostr account. Read the current
+    // on-chain settings first and ABORT on a failed read — a null local
+    // account can't tell us whether the canister holds one we couldn't see.
+    // (OFF stays durable: local state is already off + the pending flag is
+    // set, so restore retries the write on the next load.)
+    const read = await loadSettingsFromIC(identity, principalText);
+    if (!read.ok) {
+      setShareError("Could not load current settings from the canister — try again.");
+      setShareSyncing(false);
+      return;
+    }
+    // No settings on-chain yet (first-time opt-in): the local account, if any,
+    // is the only one that exists — safe to write.
+    const account = read.settings ? read.settings.account : getLinkedAccount();
     const ok = await syncLinkedAccountToIC(identity, account, next);
     if (ok) {
-      setPendingShareOff(false);
+      setPendingShareOff(principalText, false);
       if (next) setBriefingShareEnabled(true);
     } else {
       setShareError(next

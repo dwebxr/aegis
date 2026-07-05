@@ -320,13 +320,15 @@ function AegisAppInner() {
           const restore = resolveBriefingShareRestore(icD2A);
           const localAccount = getLinkedAccount();
 
-          if (restore.briefingShareEnabled && hasPendingShareOff()) {
-            // The user's last action was an opt-OUT whose canister write failed
-            // (d2aEnabled is still true on-chain). Honor the opt-out instead of
-            // silently resuming publishing, and retry the write + purge now.
+          if (restore.briefingShareEnabled && hasPendingShareOff(principalText)) {
+            // THIS principal's last action was an opt-OUT whose canister write
+            // failed (d2aEnabled is still true on-chain). Honor the opt-out
+            // instead of silently resuming publishing, and retry the write +
+            // purge now. (Principal-scoped: another account's failed opt-out on
+            // this device must not force this account's sharing off.)
             setBriefingShareEnabled(false);
             void syncLinkedAccountToIC(identity, icAccount ?? localAccount, false).then(ok => {
-              if (ok) setPendingShareOff(false);
+              if (ok) setPendingShareOff(principalText, false);
               else console.warn("[briefing] pending share-off retry failed; will retry next load");
             });
           } else {
@@ -353,7 +355,7 @@ function AegisAppInner() {
             // here (always false while dormant) would clobber it. (If a pending
             // share-off is being retried above, its write also carries this
             // account, so last-writer-wins is safe either way.)
-            void syncLinkedAccountToIC(identity, localAccount, restore.briefingShareEnabled && !hasPendingShareOff()).then(ok => {
+            void syncLinkedAccountToIC(identity, localAccount, restore.briefingShareEnabled && !hasPendingShareOff(principalText)).then(ok => {
               if (!ok) console.warn("[nostr] IC account sync failed");
             });
           }
