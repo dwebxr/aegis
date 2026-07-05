@@ -1515,8 +1515,13 @@ components:
       properties:
         title:
           type: string
+          description: >
+            First ~80 characters of the item text (items have no standalone
+            title); a trailing `…` marks truncation. The full text is in
+            `content`.
         content:
           type: string
+          description: Full item text (truncated only under `preview=true`).
         source:
           type: string
         sourceUrl:
@@ -1543,6 +1548,14 @@ components:
             type: string
         briefingScore:
           type: number
+          description: >
+            Briefing-relative rank score, normalized server-side at read time:
+            1 = top priority item, others proportional in (0, 1]. (The raw
+            on-chain value carries a publish-time recency-decay factor that
+            collapses toward 0 for old content — only its ORDER is meaningful,
+            hence the normalization.) `serendipityPick.briefingScore` is a
+            serendipity score on a different (0–10-ish) scale and is not
+            normalized.
 
     D2ABriefingResponse:
       type: object
@@ -1651,18 +1664,24 @@ components:
               type: number
         topItems:
           type: array
+          description: >
+            Ranked INDEX only (top 3). For full items — `content`,
+            `sourceUrl`, `reason`, full scores — request this contributor's
+            briefing directly with `?principal=<contributor principal>`.
           items:
             type: object
             required: [title, topics, briefingScore, verdict]
             properties:
               title:
                 type: string
+                description: First ~80 chars of the item text; `…` marks truncation.
               topics:
                 type: array
                 items:
                   type: string
               briefingScore:
                 type: number
+                description: Briefing-relative rank score (1 = contributor's top item).
               verdict:
                 $ref: '#/components/schemas/Verdict'
 

@@ -4,9 +4,14 @@ import type { D2ABriefingResponse, D2ABriefingItem } from "@/lib/d2a/types";
 import { errMsg } from "@/lib/utils/errors";
 import { APP_URL } from "@/lib/config";
 
+// Items have no standalone title — the "title" is the first characters of the
+// text. Mark the cut with an ellipsis so consumers can tell a truncated title
+// from a complete one (the full text is always in `content`).
+const TITLE_MAX = 80;
+
 function toBriefingItem({ item, briefingScore }: BriefingState["priority"][0]): D2ABriefingItem {
   return {
-    title: item.text.slice(0, 80),
+    title: item.text.length > TITLE_MAX ? item.text.slice(0, TITLE_MAX - 1) + "…" : item.text,
     content: item.text,
     source: item.source,
     sourceUrl: item.sourceUrl || "",

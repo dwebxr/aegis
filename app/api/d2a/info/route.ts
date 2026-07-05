@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         currency: CURRENCY,
         description: "Get curated briefing with scored content items",
         params: {
-          principal: "(optional) IC principal for user-specific briefing",
+          principal: "(optional) IC principal — returns that contributor's FULL briefing (content, sourceUrl, reason, full scores). Omitted → global ranked INDEX only (topItems have title/topics/score/verdict); take principals from contributors[].principal",
           since: "(optional) ISO 8601 — exclude briefings generated before this timestamp",
           limit: "(optional) max items to return (default 50, max 100; global path: default 5, max 10)",
           offset: "(optional) pagination offset (default 0)",
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
         description:
           "JPYC-paid curated briefing via OpenPay (OpenPay-flavored x402 v1 EIP-3009 authorization; vanilla x402 clients are not compatible). Same content and params as /api/d2a/briefing.",
         params: {
-          principal: "(optional) IC principal for user-specific briefing",
+          principal: "(optional) IC principal — returns that contributor's FULL briefing (content, sourceUrl, reason, full scores). Omitted → global ranked INDEX only (topItems have title/topics/score/verdict); take principals from contributors[].principal",
           since: "(optional) ISO 8601 — exclude briefings generated before this timestamp",
           limit: "(optional) max items to return (default 50, max 100; global path: default 5, max 10)",
           offset: "(optional) pagination offset (default 0)",
