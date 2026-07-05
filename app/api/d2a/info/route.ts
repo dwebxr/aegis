@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDefaultAsset } from "@x402/evm";
+import { DEFAULT_STABLECOINS } from "@x402/evm";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
 import { X402_NETWORK, X402_PRICE, X402_RECEIVER } from "@/lib/d2a/x402Server";
@@ -9,7 +9,10 @@ import { APP_URL } from "@/lib/config";
 // contract in lockstep with the `asset` actually demanded in the 402 payment
 // requirements (a hardcoded Base-mainnet address here once diverged from the
 // Base-Sepolia default network and sent agents to the wrong USDC contract).
-const USDC_CONTRACT = getDefaultAsset(X402_NETWORK).address;
+// Map lookup, not getDefaultAsset(): that throws for networks without a default
+// asset, and this free discovery route must keep serving (reporting the network
+// as configured) even when the operator picks a network the paywall can't settle.
+const USDC_CONTRACT = DEFAULT_STABLECOINS[X402_NETWORK]?.address ?? "unknown";
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);

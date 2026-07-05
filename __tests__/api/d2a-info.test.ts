@@ -179,6 +179,29 @@ describe("GET /api/d2a/info", () => {
   });
 });
 
+describe("GET /api/d2a/info with unsupported X402_NETWORK", () => {
+  const origNetwork = process.env.X402_NETWORK;
+
+  afterEach(() => {
+    if (origNetwork === undefined) delete process.env.X402_NETWORK;
+    else process.env.X402_NETWORK = origNetwork;
+    jest.resetModules();
+  });
+
+  it("still serves 200 and reports usdcContract as unknown (no module-load throw)", async () => {
+    // eip155:1 has no default asset in @x402/evm — the discovery route must keep
+    // serving (it's free and auth-none) rather than crash at import time.
+    process.env.X402_NETWORK = "eip155:1";
+    jest.resetModules();
+    const { GET: freshGET } = await import("@/app/api/d2a/info/route");
+    const res = await freshGET(makeRequest());
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.payment.network).toBe("eip155:1");
+    expect(data.payment.usdcContract).toBe("unknown");
+  });
+});
+
 describe("OPTIONS /api/d2a/info", () => {
   it("returns 204", async () => {
     const req = new NextRequest("http://localhost/api/d2a/info", { method: "OPTIONS" });

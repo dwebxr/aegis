@@ -183,7 +183,7 @@ paths:
           description: When `X402_FREE_TIER_ENABLED`, set `true` to bypass payment.
           schema:
             type: string
-            enum: [true]
+            enum: ["true"]
         - name: offset
           in: query
           required: false
@@ -281,7 +281,7 @@ paths:
             `title`/`sourceUrl` are redacted to empty strings.
           schema:
             type: string
-            enum: [true]
+            enum: ["true"]
       responses:
         '200':
           description: List of new items since `since`.
