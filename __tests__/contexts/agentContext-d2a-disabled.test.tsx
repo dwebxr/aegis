@@ -26,8 +26,13 @@ const mockCreateLedgerActor = jest.fn().mockResolvedValue({
   icrc2_approve: jest.fn().mockResolvedValue({ Ok: 1n }),
 });
 
-// Flag OFF — the whole point of this file.
-jest.mock("@/lib/agent/config", () => ({ __esModule: true, D2A_SUBSYSTEM_ENABLED: false }));
+// D2A flag OFF — the whole point of this file. Briefing publishing is ON
+// (production default) to prove it cannot wake any D2A machinery.
+jest.mock("@/lib/agent/config", () => ({
+  __esModule: true,
+  D2A_SUBSYSTEM_ENABLED: false,
+  BRIEFING_PUBLISH_ENABLED: true,
+}));
 jest.mock("@/lib/agent/manager", () => ({ __esModule: true, AgentManager: MockAgentManager }));
 jest.mock("@/lib/agent/handshake", () => ({ __esModule: true, sendComment: jest.fn() }));
 jest.mock("@/lib/d2a/comments", () => ({
@@ -98,11 +103,36 @@ describe("AgentProvider — D2A dormant (D2A_SUBSYSTEM_ENABLED=false)", () => {
 
     expect(managerInstances).toHaveLength(0);
     expect(result.current.agentState.isActive).toBe(false);
-    // The EFFECTIVE enabled flag stays false so downstream privacy gates (e.g.
-    // BriefingTab's on-chain briefing sync, which reads useAgent().isEnabled) never
-    // fire — the master switch must win over the internal toggle / restored setting.
+    // The EFFECTIVE enabled flag stays false so downstream D2A gates never fire —
+    // the master switch must win over the internal toggle / restored setting.
     expect(result.current.isEnabled).toBe(false);
     // And no ICP allowance pre-approval was attempted.
     expect(mockCreateLedgerActor).not.toHaveBeenCalled();
+  });
+
+  it("briefing sharing works while D2A is dormant and wakes NO D2A machinery", async () => {
+    const { result } = renderHook(() => useAgent(), { wrapper });
+    await waitFor(() => expect(result.current.nostrKeys).not.toBeNull());
+
+    expect(result.current.briefingShareEnabled).toBe(false);
+
+    await act(async () => {
+      result.current.setBriefingShareEnabled(true);
+    });
+    await act(async () => { await Promise.resolve(); });
+
+    // The decoupled gate flips…
+    expect(result.current.briefingShareEnabled).toBe(true);
+    // …while every D2A dormancy invariant holds: no manager, no agent state,
+    // effective D2A still disabled, no ICP allowance pre-approval.
+    expect(managerInstances).toHaveLength(0);
+    expect(result.current.agentState.isActive).toBe(false);
+    expect(result.current.isEnabled).toBe(false);
+    expect(mockCreateLedgerActor).not.toHaveBeenCalled();
+
+    await act(async () => {
+      result.current.setBriefingShareEnabled(false);
+    });
+    expect(result.current.briefingShareEnabled).toBe(false);
   });
 });

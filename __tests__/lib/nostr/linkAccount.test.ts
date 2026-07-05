@@ -519,9 +519,14 @@ describe("syncLinkedAccountToIC", () => {
     });
   });
 
-  it("swallows errors (logs warning, does not throw)", async () => {
+  it("swallows errors (logs warning, does not throw) and reports failure as false", async () => {
     mockSaveUserSettings.mockRejectedValue(new Error("IC unreachable"));
-    await expect(syncLinkedAccountToIC(fakeIdentity, account, true)).resolves.toBeUndefined();
+    await expect(syncLinkedAccountToIC(fakeIdentity, account, true)).resolves.toBe(false);
+  });
+
+  it("reports success as true (the briefing-share toggle gates client state on it)", async () => {
+    mockSaveUserSettings.mockResolvedValue(undefined);
+    await expect(syncLinkedAccountToIC(fakeIdentity, account, true)).resolves.toBe(true);
   });
 });
 

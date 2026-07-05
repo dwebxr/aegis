@@ -9,7 +9,7 @@ import { useNotify } from "./NotificationContext";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 import { AgentManager } from "@/lib/agent/manager";
 import { D2A_APPROVE_AMOUNT } from "@/lib/agent/protocol";
-import { D2A_SUBSYSTEM_ENABLED } from "@/lib/agent/config";
+import { BRIEFING_PUBLISH_ENABLED, D2A_SUBSYSTEM_ENABLED } from "@/lib/agent/config";
 import { createBackendActorAsync } from "@/lib/ic/actor";
 // createICPLedgerActorAsync / ICP_FEE are only needed on agent start (a
 // post-auth user action). Imported dynamically below to keep landing-page
@@ -24,7 +24,6 @@ import { saveComment, loadComments, clearOldComments } from "@/lib/d2a/comments"
 import type { StoredComment } from "@/lib/d2a/comments";
 import { getCachedAgentProfile, setCachedAgentProfile, fetchAgentProfile } from "@/lib/nostr/profile";
 import { errMsg } from "@/lib/utils/errors";
-import { syncLinkedAccountToIC, getLinkedAccount } from "@/lib/nostr/linkAccount";
 import { DEFAULT_RELAYS } from "@/lib/nostr/types";
 
 interface AgentContextValue {
@@ -32,6 +31,11 @@ interface AgentContextValue {
   isEnabled: boolean;
   toggleAgent: () => void;
   setD2AEnabled: (enabled: boolean) => void;
+  // Public briefing sharing — decoupled from the D2A dormancy above (see
+  // BRIEFING_PUBLISH_ENABLED in lib/agent/config.ts). Gates ONLY BriefingTab's
+  // on-chain saveLatestBriefing sync; never affects AgentManager startup.
+  briefingShareEnabled: boolean;
+  setBriefingShareEnabled: (enabled: boolean) => void;
   setWoTGraph: (graph: WoTGraph | null) => void;
   wotGraph: WoTGraph | null;
   agentProfile: NostrProfileMetadata | null;
@@ -59,6 +63,8 @@ const AgentContext = createContext<AgentContextValue>({
   isEnabled: false,
   toggleAgent: () => {},
   setD2AEnabled: () => {},
+  briefingShareEnabled: false,
+  setBriefingShareEnabled: () => {},
   setWoTGraph: () => {},
   wotGraph: null,
   agentProfile: null,
@@ -76,6 +82,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const { content, addContent } = useContent();
   const [agentState, setAgentState] = useState<AgentState>(defaultState);
   const [isEnabled, setD2AEnabled] = useState(false);
+  const [briefingShareEnabled, setBriefingShareState] = useState(false);
   const [d2aComments, setD2aComments] = useState<StoredComment[]>(() => {
     clearOldComments();
     return loadComments();
@@ -129,20 +136,25 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
 
   const toggleAgent = useCallback(() => {
     if (!D2A_SUBSYSTEM_ENABLED) return; // Dormant — the Start/Stop toggle is inert.
-    setD2AEnabled(prev => {
-      const next = !prev;
-      if (identity) {
-        void syncLinkedAccountToIC(identity, getLinkedAccount(), next).catch(e => console.warn("[agent] IC sync failed:", errMsg(e)));
-      }
-      return next;
-    });
-  }, [identity]);
+    // This toggle no longer writes the on-chain d2aEnabled field: that field
+    // now means "public briefing sharing" and is owned exclusively by the
+    // briefing-sharing toggle (setBriefingShareEnabled + syncLinkedAccountToIC).
+    // When the D2A redesign revives this switch it needs its own persistence.
+    setD2AEnabled(prev => !prev);
+  }, []);
 
   // Exposed setter is inert while the subsystem is dormant, so a restored IC
   // setting (d2aEnabled=true) or any external caller cannot silently re-activate
-  // D2A privacy behaviour (e.g. BriefingTab publishing briefings on-chain).
+  // D2A privacy behaviour (e.g. AgentManager startup).
   const setD2AEnabledGuarded = useCallback((enabled: boolean) => {
     if (D2A_SUBSYSTEM_ENABLED) setD2AEnabled(enabled);
+  }, []);
+
+  // Briefing sharing is gated ONLY by its own master switch — deliberately
+  // functional while D2A stays dormant. It feeds nothing but BriefingTab's
+  // on-chain sync gate (the AgentManager effect reads `isEnabled`, not this).
+  const setBriefingShareEnabled = useCallback((enabled: boolean) => {
+    if (BRIEFING_PUBLISH_ENABLED) setBriefingShareState(enabled);
   }, []);
 
   const setWoTGraph = useCallback((graph: WoTGraph | null) => {
@@ -324,11 +336,16 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   // consumer (BriefingTab's on-chain sync gate, the status UI) must see D2A as
   // disabled regardless of the internal toggle/restored setting.
   const effectiveEnabled = D2A_SUBSYSTEM_ENABLED && isEnabled;
+  const effectiveBriefingShare = BRIEFING_PUBLISH_ENABLED && briefingShareEnabled;
   const value = useMemo(() => ({
-    agentState, isEnabled: effectiveEnabled, toggleAgent, setD2AEnabled: setD2AEnabledGuarded, setWoTGraph, wotGraph,
+    agentState, isEnabled: effectiveEnabled, toggleAgent, setD2AEnabled: setD2AEnabledGuarded,
+    briefingShareEnabled: effectiveBriefingShare, setBriefingShareEnabled,
+    setWoTGraph, wotGraph,
     agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys,
     sendComment: handleSendComment, d2aComments,
-  }), [agentState, effectiveEnabled, toggleAgent, setD2AEnabledGuarded, setWoTGraph, wotGraph,
+  }), [agentState, effectiveEnabled, toggleAgent, setD2AEnabledGuarded,
+    effectiveBriefingShare, setBriefingShareEnabled,
+    setWoTGraph, wotGraph,
     agentProfile, agentProfileLoading, refreshAgentProfile, nostrKeys,
     handleSendComment, d2aComments]);
 
