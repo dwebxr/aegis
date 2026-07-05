@@ -183,6 +183,33 @@ describe("GET /api/d2a/info", () => {
     const data = await res.json();
     expect(data.endpoints.changes.params.preview).toContain("redacted");
   });
+
+  it("lists the JPYC briefing endpoint as OpenPay-flavored x402 v1", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    const jpyc = data.endpoints.briefingJpyc;
+    expect(jpyc.url).toBe("/api/d2a/briefing-jpyc");
+    expect(jpyc.method).toBe("GET");
+    // OPENPAY_MERCHANT_ADDRESS is unset in the test env → the route 503s, so the
+    // manifest must say "unavailable", not "none" (there is no free fallback).
+    expect(jpyc.auth).toBe("unavailable");
+    expect(jpyc.x402Version).toBe(1);
+    expect(jpyc.network).toBe("eip155:137");
+    expect(jpyc.currency).toBe("JPYC");
+    // Price is catalog-driven — the manifest must not hardcode a value that drifts.
+    expect(jpyc.price).toContain("OpenPay catalog");
+    expect(jpyc.facilitator).toBe("https://open-pay.jp");
+    expect(jpyc.description).toContain("vanilla x402 clients are not compatible");
+  });
+
+  it("marks x402 versions per endpoint and lists v1 endpoints in compatibility", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.briefing.x402Version).toBe(2);
+    expect(data.endpoints.changes.x402Version).toBe(2);
+    expect(data.compatibility.x402Version).toBe(2);
+    expect(data.compatibility.x402V1Endpoints).toEqual(["/api/d2a/briefing-jpyc"]);
+  });
 });
 
 describe("GET /api/d2a/info with unsupported X402_NETWORK", () => {
