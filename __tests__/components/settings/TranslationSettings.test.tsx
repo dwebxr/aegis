@@ -134,6 +134,52 @@ describe("TranslationSettings", () => {
     expect(screen.getByText(/On-chain Llama 3.1 — free, sign-in required/)).toBeTruthy();
   });
 
+  it("shows manual translation note under the language selector", () => {
+    mockPrefs = { targetLanguage: "ja", policy: "manual", backend: "auto", minScore: 6 };
+    render(<TranslationSettings />);
+    expect(screen.getByText("Manualでは、記事を開いて Translate ボタンを押したときだけ翻訳されます")).toBeTruthy();
+  });
+
+  it("shows manual auto-translate CTA for English and Japanese targets", () => {
+    mockPrefs = { targetLanguage: "en", policy: "manual", backend: "auto", minScore: 6 };
+    const { rerender } = render(<TranslationSettings />);
+    expect(screen.getByTestId("aegis-translation-auto-cta").textContent).toBe(
+      "Auto-translate all posts to English",
+    );
+
+    mockPrefs = { targetLanguage: "ja", policy: "manual", backend: "auto", minScore: 6 };
+    rerender(<TranslationSettings />);
+    expect(screen.getByTestId("aegis-translation-auto-cta").textContent).toBe(
+      "Auto-translate all posts to Japanese",
+    );
+  });
+
+  it("manual auto-translate CTA sets policy to all", () => {
+    mockPrefs = { targetLanguage: "en", policy: "manual", backend: "auto", minScore: 6 };
+    render(<TranslationSettings />);
+    fireEvent.click(screen.getByTestId("aegis-translation-auto-cta"));
+    expect(mockSetTranslationPrefs).toHaveBeenCalledWith(
+      expect.objectContaining({ policy: "all" }),
+    );
+  });
+
+  it("hides manual note and CTA for all, high_quality, and off policies", () => {
+    mockPrefs = { targetLanguage: "en", policy: "all", backend: "auto", minScore: 6 };
+    const { rerender } = render(<TranslationSettings />);
+    expect(screen.queryByTestId("aegis-translation-auto-cta")).toBeNull();
+    expect(screen.queryByText("Manualでは、記事を開いて Translate ボタンを押したときだけ翻訳されます")).toBeNull();
+
+    mockPrefs = { targetLanguage: "en", policy: "high_quality", backend: "auto", minScore: 6 };
+    rerender(<TranslationSettings />);
+    expect(screen.queryByTestId("aegis-translation-auto-cta")).toBeNull();
+    expect(screen.queryByText("Manualでは、記事を開いて Translate ボタンを押したときだけ翻訳されます")).toBeNull();
+
+    mockPrefs = { targetLanguage: "en", policy: "off", backend: "auto", minScore: 6 };
+    rerender(<TranslationSettings />);
+    expect(screen.queryByTestId("aegis-translation-auto-cta")).toBeNull();
+    expect(screen.queryByText("Manualでは、記事を開いて Translate ボタンを押したときだけ翻訳されます")).toBeNull();
+  });
+
   it("preserves other prefs when changing one field", () => {
     mockPrefs = { targetLanguage: "ja", policy: "high_quality", backend: "ic", minScore: 7 };
     render(<TranslationSettings />);

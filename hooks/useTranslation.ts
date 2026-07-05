@@ -3,7 +3,12 @@ import { usePreferences } from "@/contexts/PreferenceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotify } from "@/contexts/NotificationContext";
 import { translateContent, type TranslateOptions } from "@/lib/translation/engine";
-import { DEFAULT_TRANSLATION_PREFS } from "@/lib/translation/types";
+import {
+  DEFAULT_TRANSLATION_PREFS,
+  TranslationBackendUnavailableError,
+  type TranslationBackend,
+  type TranslationSkip,
+} from "@/lib/translation/types";
 import type { ContentItem } from "@/lib/types/content";
 import type { ContentSyncStatus } from "@/contexts/content/types";
 import type { _SERVICE } from "@/lib/ic/declarations";
@@ -20,6 +25,27 @@ const RETRY_INTERVAL_MS = 60_000;
 // translate without it in the cascade. Prevents stranding items if
 // actor creation hangs (bad network, II problems, etc.).
 const ACTOR_READY_TIMEOUT_MS = 5_000;
+
+const AUTO_NO_BACKEND_MESSAGE =
+  "自動翻訳のバックエンドがありません — Internet Identityでログインする、Settings→FeedsでローカルLLMを有効化、またはAPIキーを設定してください";
+const EXPLICIT_BACKEND_UNAVAILABLE_MESSAGE = (backendLabel: string) =>
+  `選択した翻訳バックエンド(${backendLabel})が利用できません — Settings→Translationで変更してください`;
+const AUTO_ALL_BACKENDS_FAILED_MESSAGE =
+  "一部の記事を翻訳できませんでした(IC LLMが不安定な場合があります)。未翻訳の記事は展開してTranslateで再試行できます";
+
+const BACKEND_LABELS: Record<TranslationBackend, string> = {
+  auto: "Auto",
+  browser: "Browser",
+  local: "Local",
+  cloud: "Cloud",
+  ic: "IC LLM",
+};
+
+type TranslationCallerKind = "auto" | "manual";
+
+function isTranslationSkip(outcome: Awaited<ReturnType<typeof translateContent>>): outcome is TranslationSkip {
+  return typeof outcome === "object" && outcome !== null && "status" in outcome && outcome.status === "skip";
+}
 
 interface UseTranslationReturn {
   translateItem: (itemId: string) => void;
@@ -58,6 +84,7 @@ export function useTranslation(
   }
 
   const activeRef = useRef(0);
+  const autoActiveRef = useRef(0);
 
   // Bumped to force the auto-translate effect to re-run after clearing the failed set.
   const [retryTick, setRetryTick] = useState(0);
@@ -81,10 +108,15 @@ export function useTranslation(
     return () => clearTimeout(timer);
   }, [isAuthenticated, syncStatus]);
 
-  // Debounce "all backends failed" notification — show once per language
+  // Debounce infrastructure error notifications per language; skip-based
+  // visibility notifications are once per hook session.
   const failNotifiedLangRef = useRef("");
+  const autoNoBackendNotifiedRef = useRef(false);
+  const explicitBackendUnavailableNotifiedRef = useRef(false);
+  const autoAllBackendsFailedNotifiedRef = useRef(false);
+  const pendingAllBackendsFailedRef = useRef(false);
 
-  const runTranslation = useCallback(async (item: ContentItem) => {
+  const runTranslation = useCallback(async (item: ContentItem, callerKind: TranslationCallerKind) => {
     const p = prefsRef.current;
     const opts: TranslateOptions = {
       text: item.text,
@@ -97,38 +129,75 @@ export function useTranslation(
 
     setTranslatingIds(prev => new Set(prev).add(item.id));
     activeRef.current++;
+    if (callerKind === "auto") autoActiveRef.current++;
 
-    // translateContent returns TranslationResult | "skip" on success,
-    // throws on transport failure. Failure notifications debounce per
-    // language so a broken infra path doesn't spam the user.
+    // translateContent throws on transport failure. THROWN failures notify on
+    // every caller kind — a manual Translate tap that dies silently is exactly
+    // the invisible-failure class this feature fix targets (and the pre-change
+    // behavior notified manual failures too). Only SKIP-based visibility
+    // notifications further down are auto-only, because a manual skip is
+    // directly observable at the button.
     let outcome: Awaited<ReturnType<typeof translateContent>> | null = null;
     try {
       outcome = await translateContent(opts);
     } catch (err) {
       attemptedRef.current.failed.add(item.id);
-      if (failNotifiedLangRef.current !== prefsRef.current.targetLanguage) {
+      if (err instanceof TranslationBackendUnavailableError) {
+        if (!explicitBackendUnavailableNotifiedRef.current) {
+          explicitBackendUnavailableNotifiedRef.current = true;
+          notifyRef.current(EXPLICIT_BACKEND_UNAVAILABLE_MESSAGE(BACKEND_LABELS[p.backend]), "error");
+        }
+      } else if (failNotifiedLangRef.current !== prefsRef.current.targetLanguage) {
         failNotifiedLangRef.current = prefsRef.current.targetLanguage;
         notifyRef.current(`Translation failed: ${errMsg(err)}`, "error");
       }
     }
 
     activeRef.current--;
+    if (callerKind === "auto") autoActiveRef.current--;
     setTranslatingIds(prev => {
       const next = new Set(prev);
       next.delete(item.id);
       return next;
     });
 
-    if (outcome && typeof outcome === "object") {
+    if (outcome && !isTranslationSkip(outcome)) {
       patchRef.current(item.id, { translation: outcome });
-    } else if (outcome === "skip") {
+    } else if (outcome && isTranslationSkip(outcome)) {
       attemptedRef.current.skip.add(item.id);
+      // no-backend notifies for BOTH caller kinds: a manual Translate tap with
+      // no usable backend produces no visible change at all, which is the same
+      // invisible failure as the auto path — and the message is the actionable
+      // fix (login / enable a local LLM / add a key). already-in-target stays
+      // silent (correct behavior); all-backends-failed aggregates auto-only
+      // (pre-existing manual semantics, and per-item spam is the alternative).
+      if (outcome.reason === "no-backend") {
+        if (p.backend === "auto") {
+          if (!autoNoBackendNotifiedRef.current) {
+            autoNoBackendNotifiedRef.current = true;
+            notifyRef.current(AUTO_NO_BACKEND_MESSAGE, "error");
+          }
+        } else if (!explicitBackendUnavailableNotifiedRef.current) {
+          explicitBackendUnavailableNotifiedRef.current = true;
+          notifyRef.current(EXPLICIT_BACKEND_UNAVAILABLE_MESSAGE(BACKEND_LABELS[p.backend]), "error");
+        }
+      } else if (callerKind === "auto" && outcome.reason === "all-backends-failed") {
+        pendingAllBackendsFailedRef.current = true;
+      }
+    }
+
+    if (callerKind === "auto" && autoActiveRef.current === 0 && pendingAllBackendsFailedRef.current) {
+      pendingAllBackendsFailedRef.current = false;
+      if (!autoAllBackendsFailedNotifiedRef.current) {
+        autoAllBackendsFailedNotifiedRef.current = true;
+        notifyRef.current(AUTO_ALL_BACKENDS_FAILED_MESSAGE, "info");
+      }
     }
   }, [actorRef]);
 
   const translateItem = useCallback((itemId: string) => {
     const item = items.find(it => it.id === itemId);
-    if (item && !item.translation) void runTranslation(item);
+    if (item && !item.translation) void runTranslation(item, "manual");
   }, [items, runTranslation]);
 
   const isItemTranslating = useCallback((itemId: string) => {
@@ -154,7 +223,7 @@ export function useTranslation(
 
     const slots = Math.max(0, MAX_CONCURRENT - activeRef.current);
     for (const item of pending.slice(0, slots)) {
-      void runTranslation(item);
+      void runTranslation(item, "auto");
     }
   }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, translatingIds, runTranslation, retryTick, isReady]);
 

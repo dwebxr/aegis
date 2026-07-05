@@ -1,6 +1,12 @@
 import * as Sentry from "@sentry/nextjs";
 import type { Span } from "@sentry/nextjs";
-import type { TranslationLanguage, TranslationBackend, TranslationResult } from "./types";
+import {
+  TranslationBackendUnavailableError,
+  type TranslationLanguage,
+  type TranslationBackend,
+  type TranslationResult,
+  type TranslationSkip,
+} from "./types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { buildTranslationPrompt, parseTranslationResponse } from "./prompt";
 import { validateTranslation } from "./validate";
@@ -205,7 +211,21 @@ function isDefinitiveUntranslatable(
   return false;
 }
 
-export async function translateContent(opts: TranslateOptions): Promise<TranslationResult | "skip"> {
+function makeSkip(reason: TranslationSkip["reason"], attempted: number): TranslationSkip {
+  return { status: "skip", reason, attempted };
+}
+
+function definitiveSkipReason(
+  attemptName: string,
+  reason: string,
+  targetLanguage: TranslationLanguage,
+): TranslationSkip["reason"] | null {
+  if (/identical to input/.test(reason)) return "already-in-target";
+  if (isDefinitiveUntranslatable(attemptName, reason, targetLanguage)) return "all-backends-failed";
+  return null;
+}
+
+export async function translateContent(opts: TranslateOptions): Promise<TranslationResult | TranslationSkip> {
   return Sentry.startSpan(
     {
       name: "translate.content",
@@ -227,7 +247,7 @@ export async function translateContent(opts: TranslateOptions): Promise<Translat
 async function translateContentInner(
   opts: TranslateOptions,
   span: Span,
-): Promise<TranslationResult | "skip"> {
+): Promise<TranslationResult | TranslationSkip> {
   const { text, reason, targetLanguage, backend, actorRef, isAuthenticated } = opts;
 
   const cached = await lookupTranslation(text, targetLanguage);
@@ -272,7 +292,7 @@ async function translateContentInner(
   // — Explicit backend selection —
   if (backend === "local") {
     const outcome = evaluateRaw(await translateWithOllama(prompt));
-    if (outcome.kind === "skip") return "skip";
+    if (outcome.kind === "skip") return makeSkip("already-in-target", 1);
     if (outcome.kind === "failed") throw new Error(explicitFail("Ollama", outcome.reason));
     return finalize(outcome.parsed, "ollama");
   }
@@ -282,7 +302,7 @@ async function translateContentInner(
     const label = useMediaPipe ? "MediaPipe" : "WebLLM";
     const engineName = useMediaPipe ? "mediapipe" : "webllm";
     const outcome = evaluateRaw(await call(prompt));
-    if (outcome.kind === "skip") return "skip";
+    if (outcome.kind === "skip") return makeSkip("already-in-target", 1);
     if (outcome.kind === "failed") throw new Error(explicitFail(label, outcome.reason));
     return finalize(outcome.parsed, engineName);
   }
@@ -292,22 +312,28 @@ async function translateContentInner(
     // the /api/translate boundary).
     const key = getUserApiKey();
     if (!key) {
-      throw new Error(
+      throw new TranslationBackendUnavailableError(
+        "cloud",
         "Claude (Cloud) requires an Anthropic API key. Add one in Settings → API Key (BYOK), or pick IC LLM / Browser / Local in Translation Engine.",
       );
     }
     const outcome = evaluateRaw(await translateWithClaude(prompt, key));
-    if (outcome.kind === "skip") return "skip";
+    if (outcome.kind === "skip") return makeSkip("already-in-target", 1);
     if (outcome.kind === "failed") throw new Error(explicitFail("Claude (BYOK)", outcome.reason));
     return finalize(outcome.parsed, "claude-byok");
   }
   if (backend === "ic") {
-    if (!actorRef || !isAuthenticated) throw new Error("IC requires authentication");
+    if (!actorRef || !isAuthenticated) {
+      throw new TranslationBackendUnavailableError("ic", "IC requires authentication");
+    }
+    if (!actorRef.current) {
+      throw new TranslationBackendUnavailableError("ic", "IC actor not available");
+    }
     // Explicit IC mode enables the 1-second retry on transient
     // canister failures — the user picked IC knowing there's no
     // fallback and wants it to try hard before surfacing an error.
     const outcome = evaluateRaw(await translateWithIC(prompt, actorRef, true));
-    if (outcome.kind === "skip") return "skip";
+    if (outcome.kind === "skip") return makeSkip("already-in-target", 1);
     if (outcome.kind === "failed") throw new Error(explicitFail("IC LLM", outcome.reason));
     return finalize(outcome.parsed, "ic-llm");
   }
@@ -356,14 +382,16 @@ async function translateContentInner(
       outcome: "skip", reason: "no configured translation backend",
       elapsedMs: 0,
     });
-    return "skip";
+    return makeSkip("no-backend", 0);
   }
 
   const failures: Array<{ name: string; reason: string }> = [];
+  let attempted = 0;
 
   for (const attempt of attempts) {
     const startedAt = Date.now();
     let raw: string;
+    attempted++;
     try {
       raw = await attempt.fn();
     } catch (err) {
@@ -392,14 +420,15 @@ async function translateContentInner(
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "skip", reason: "ALREADY_IN_TARGET", elapsedMs,
       });
-      return "skip";
+      return makeSkip("already-in-target", attempted);
     }
-    if (isDefinitiveUntranslatable(attempt.name, outcome.reason, targetLanguage)) {
+    const skipReason = definitiveSkipReason(attempt.name, outcome.reason, targetLanguage);
+    if (skipReason) {
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "skip", reason: `untranslatable: ${outcome.reason}`, elapsedMs,
       });
-      return "skip";
+      return makeSkip(skipReason, attempted);
     }
     // Soft validator failure — log, record, try the next backend.
     console.warn(`[translate] ${attempt.name} rejected:`, outcome.reason);
@@ -443,5 +472,5 @@ async function translateContentInner(
     reason: `cascade exhausted (validator): ${summary}`,
     elapsedMs: 0,
   });
-  return "skip";
+  return makeSkip("all-backends-failed", attempted);
 }

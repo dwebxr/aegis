@@ -20,6 +20,23 @@ export interface TranslationResult {
   generatedAt: number;
 }
 
+export interface TranslationSkip {
+  status: "skip";
+  reason: "no-backend" | "already-in-target" | "all-backends-failed";
+  attempted: number;
+}
+
+export class TranslationBackendUnavailableError extends Error {
+  readonly backend: TranslationBackend;
+
+  constructor(backend: TranslationBackend, message: string) {
+    super(message);
+    this.name = "TranslationBackendUnavailableError";
+    this.backend = backend;
+    Object.setPrototypeOf(this, TranslationBackendUnavailableError.prototype);
+  }
+}
+
 export const LANGUAGES: ReadonlyArray<{ code: TranslationLanguage; label: string; nativeLabel: string }> = [
   { code: "en", label: "English", nativeLabel: "English" },
   { code: "ja", label: "Japanese", nativeLabel: "日本語" },
