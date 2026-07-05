@@ -5,7 +5,8 @@ import { useAgent } from "@/contexts/AgentContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferences } from "@/contexts/PreferenceContext";
 import { BRIEFING_PUBLISH_ENABLED } from "@/lib/agent/config";
-import { syncLinkedAccountToIC, getLinkedAccount } from "@/lib/nostr/linkAccount";
+import { setPendingShareOff } from "@/lib/briefing/shareGate";
+import { syncLinkedAccountToIC, getLinkedAccount, loadSettingsFromIC } from "@/lib/nostr/linkAccount";
 import { AgentStatusBadge } from "@/components/ui/AgentStatusBadge";
 import {
   MIN_OFFER_SCORE,
@@ -48,7 +49,7 @@ const toggleKnob = (on: boolean): React.CSSProperties => ({
 
 export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
   const { isEnabled: agentEnabled, briefingShareEnabled, setBriefingShareEnabled } = useAgent();
-  const { isAuthenticated, identity } = useAuth();
+  const { isAuthenticated, identity, principalText } = useAuth();
   const {
     profile, setTopicAffinity, removeTopicAffinity,
     setQualityThreshold, addFilterRule, removeFilterRule,
@@ -61,17 +62,29 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
   const [shareError, setShareError] = useState<string | null>(null);
 
   const handleBriefingShareToggle = useCallback(async () => {
-    if (!identity || shareSyncing) return;
+    if (!identity || !principalText || shareSyncing) return;
     const next = !briefingShareEnabled;
     setShareSyncing(true);
     setShareError(null);
     // OFF: flip client state immediately so automatic publishing stops right
     // away even while the canister write (which purges the snapshot) is in
-    // flight. ON: flip only AFTER the canister accepted d2aEnabled=true —
-    // otherwise BriefingTab would publish against a canister that rejects it.
-    if (!next) setBriefingShareEnabled(false);
-    const ok = await syncLinkedAccountToIC(identity, getLinkedAccount(), next);
+    // flight, and record the pending opt-out so a failed/interrupted write
+    // can't silently revert to sharing-ON on the next load. ON: flip only
+    // AFTER the canister accepted d2aEnabled=true — otherwise BriefingTab
+    // would publish against a canister that rejects it.
+    if (!next) {
+      setBriefingShareEnabled(false);
+      setPendingShareOff(true);
+    }
+    // saveUserSettings is a wholesale put: writing with a stale null local
+    // account would wipe the on-chain linked Nostr account. Prefer the
+    // freshest on-chain account; fall back to local storage if the read
+    // fails or no settings exist yet.
+    const icSettings = await loadSettingsFromIC(identity, principalText);
+    const account = icSettings ? icSettings.account : getLinkedAccount();
+    const ok = await syncLinkedAccountToIC(identity, account, next);
     if (ok) {
+      setPendingShareOff(false);
       if (next) setBriefingShareEnabled(true);
     } else {
       setShareError(next
@@ -79,7 +92,7 @@ export const AgentSection: React.FC<AgentSectionProps> = ({ mobile }) => {
         : "Sharing is off locally, but the public snapshot may not be purged yet — toggle again to retry.");
     }
     setShareSyncing(false);
-  }, [identity, shareSyncing, briefingShareEnabled, setBriefingShareEnabled]);
+  }, [identity, principalText, shareSyncing, briefingShareEnabled, setBriefingShareEnabled]);
 
   const interests = Object.entries(profile.topicAffinities)
     .filter(([, v]) => v >= 0.2)

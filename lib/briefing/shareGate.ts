@@ -38,3 +38,31 @@ export function resolveBriefingShareRestore(
     writeDormancyOptOut: !flags.d2aSubsystemEnabled && !flags.briefingPublishEnabled && icD2A,
   };
 }
+
+// Durable opt-OUT intent. When the user turns sharing off but the canister
+// write fails (d2aEnabled stays true on-chain), a plain restore on the next
+// load would flip sharing back ON and silently resume publishing. This flag
+// records the un-acknowledged opt-out so restore honors it and retries the
+// canister write; it is cleared once any write (off OR a fresh opt-in)
+// succeeds.
+const PENDING_SHARE_OFF_KEY = "aegis-briefing-share-pending-off";
+
+export function hasPendingShareOff(): boolean {
+  if (typeof globalThis.localStorage === "undefined") return false;
+  try {
+    return localStorage.getItem(PENDING_SHARE_OFF_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setPendingShareOff(pending: boolean): void {
+  if (typeof globalThis.localStorage === "undefined") return;
+  try {
+    if (pending) localStorage.setItem(PENDING_SHARE_OFF_KEY, "1");
+    else localStorage.removeItem(PENDING_SHARE_OFF_KEY);
+  } catch {
+    // Private-mode storage failures degrade to the old behavior (restore
+    // follows the on-chain flag) — publishing only resumes for opted-in data.
+  }
+}

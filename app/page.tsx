@@ -38,7 +38,7 @@ import { WoTPromptBanner } from "@/components/ui/WoTPromptBanner";
 import { getLinkedAccount, saveLinkedAccount, syncLinkedAccountToIC, fetchNostrProfile, parseICSettings } from "@/lib/nostr/linkAccount";
 import type { LinkedNostrAccount } from "@/lib/nostr/linkAccount";
 import { D2A_SUBSYSTEM_ENABLED } from "@/lib/agent/config";
-import { resolveBriefingShareRestore } from "@/lib/briefing/shareGate";
+import { resolveBriefingShareRestore, hasPendingShareOff, setPendingShareOff } from "@/lib/briefing/shareGate";
 import { IngestionScheduler } from "@/lib/ingestion/scheduler";
 import { deriveNostrKeypairFromText } from "@/lib/nostr/identity";
 // Nostr publishing + NIP-98 auth + ICP ledger only execute on user actions
@@ -72,7 +72,7 @@ function AegisAppInner() {
   const translationOff = (profile.translationPrefs?.policy ?? "manual") === "off";
   const translateItem = translationOff ? undefined : rawTranslateItem;
   const { getSchedulerSources } = useSources();
-  const { agentState, isEnabled: agentIsEnabled, setD2AEnabled, briefingShareEnabled, setBriefingShareEnabled, setWoTGraph: pushWoTGraph } = useAgent();
+  const { agentState, setD2AEnabled, briefingShareEnabled, setBriefingShareEnabled, setWoTGraph: pushWoTGraph } = useAgent();
   const { isDemoMode, bannerDismissed, dismissBanner } = useDemo();
   const { filterMode } = useFilterMode();
 
@@ -150,8 +150,6 @@ function AegisAppInner() {
   const ledgerRef = useRef<ICPLedgerActor | null>(null);
   const profileRef = useRef(profile);
   profileRef.current = profile;
-  const agentEnabledRef = useRef(agentIsEnabled);
-  agentEnabledRef.current = agentIsEnabled;
   const briefingShareRef = useRef(briefingShareEnabled);
   briefingShareRef.current = briefingShareEnabled;
 
@@ -230,7 +228,9 @@ function AegisAppInner() {
       // Third arg is the on-chain d2aEnabled field = briefing-share opt-in.
       // Passing the D2A agent state here (always false while dormant) would
       // silently clobber the user's briefing-share opt-in on every link/unlink.
-      void syncLinkedAccountToIC(identity, account, briefingShareRef.current).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
+      void syncLinkedAccountToIC(identity, account, briefingShareRef.current).then(ok => {
+        if (!ok) console.warn("[nostr] IC account sync failed");
+      });
     }
   }, [identity]);
 
@@ -318,9 +318,20 @@ function AegisAppInner() {
           const effectiveD2A = D2A_SUBSYSTEM_ENABLED && icD2A;
           setD2AEnabled(effectiveD2A);
           const restore = resolveBriefingShareRestore(icD2A);
-          setBriefingShareEnabled(restore.briefingShareEnabled);
-
           const localAccount = getLinkedAccount();
+
+          if (restore.briefingShareEnabled && hasPendingShareOff()) {
+            // The user's last action was an opt-OUT whose canister write failed
+            // (d2aEnabled is still true on-chain). Honor the opt-out instead of
+            // silently resuming publishing, and retry the write + purge now.
+            setBriefingShareEnabled(false);
+            void syncLinkedAccountToIC(identity, icAccount ?? localAccount, false).then(ok => {
+              if (ok) setPendingShareOff(false);
+              else console.warn("[briefing] pending share-off retry failed; will retry next load");
+            });
+          } else {
+            setBriefingShareEnabled(restore.briefingShareEnabled);
+          }
 
           if (restore.writeDormancyOptOut) {
             // BOTH gates off but previously opted in on-chain: an old briefing
@@ -328,7 +339,9 @@ function AegisAppInner() {
             // canister purges the snapshot. Idempotent: the next load sees
             // icD2A=false and skips this. Must NOT fire while briefing publishing
             // is enabled, or it would re-purge every opt-in on each load.
-            void syncLinkedAccountToIC(identity, icAccount ?? localAccount, false).catch(err => console.warn("[nostr] D2A dormancy opt-out failed:", errMsg(err)));
+            void syncLinkedAccountToIC(identity, icAccount ?? localAccount, false).then(ok => {
+              if (!ok) console.warn("[nostr] D2A dormancy opt-out write failed");
+            });
           }
 
           if (!localAccount && icAccount) {
@@ -337,8 +350,12 @@ function AegisAppInner() {
             setLinkedAccount(icAccount);
           } else if (localAccount && !icAccount) {
             // Preserve the restored briefing-share opt-in — writing effectiveD2A
-            // here (always false while dormant) would clobber it.
-            void syncLinkedAccountToIC(identity, localAccount, restore.briefingShareEnabled).catch(err => console.warn("[nostr] IC account sync failed:", errMsg(err)));
+            // here (always false while dormant) would clobber it. (If a pending
+            // share-off is being retried above, its write also carries this
+            // account, so last-writer-wins is safe either way.)
+            void syncLinkedAccountToIC(identity, localAccount, restore.briefingShareEnabled && !hasPendingShareOff()).then(ok => {
+              if (!ok) console.warn("[nostr] IC account sync failed");
+            });
           }
 
           // Hydrate displayName + followCount from relays if the stored count is 0

@@ -1,9 +1,12 @@
 /**
+ * @jest-environment jsdom
+ *
  * Gate matrix for briefing-share restore — this logic is the exact site of the
  * original incident (the dormancy restore block purged every briefing opt-in),
- * so all four flag combinations are pinned here.
+ * so all four flag combinations are pinned here. jsdom env for the
+ * localStorage-backed pending-off flag.
  */
-import { resolveBriefingShareRestore } from "@/lib/briefing/shareGate";
+import { resolveBriefingShareRestore, hasPendingShareOff, setPendingShareOff } from "@/lib/briefing/shareGate";
 
 const DORMANT_PUBLISH_ON = { d2aSubsystemEnabled: false, briefingPublishEnabled: true };
 const DORMANT_PUBLISH_OFF = { d2aSubsystemEnabled: false, briefingPublishEnabled: false };
@@ -47,5 +50,17 @@ describe("resolveBriefingShareRestore", () => {
       briefingShareEnabled: true,
       writeDormancyOptOut: false,
     });
+  });
+});
+
+describe("pending share-off flag", () => {
+  afterEach(() => setPendingShareOff(false));
+
+  it("round-trips through localStorage", () => {
+    expect(hasPendingShareOff()).toBe(false);
+    setPendingShareOff(true);
+    expect(hasPendingShareOff()).toBe(true);
+    setPendingShareOff(false);
+    expect(hasPendingShareOff()).toBe(false);
   });
 });

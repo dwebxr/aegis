@@ -190,6 +190,19 @@ describe("BriefingTab — public briefing sharing gate", () => {
     expect(syncBriefingMock).toHaveBeenCalledTimes(1);
   });
 
+  it("gate is independent of the D2A agent state (isEnabled)", () => {
+    // D2A agent "on" must NOT publish when sharing is off…
+    useAgentMock.mockReturnValue({ briefingShareEnabled: false, isEnabled: true });
+    const view = renderWith({ content: [makeItem("p1", 9), makeItem("p2", 8), makeItem("p3", 7)] });
+    expect(syncBriefingMock).not.toHaveBeenCalled();
+    view.unmount();
+
+    // …and sharing "on" publishes even with the D2A agent dormant.
+    useAgentMock.mockReturnValue({ briefingShareEnabled: true, isEnabled: false });
+    renderWith({ content: [makeItem("p1", 9), makeItem("p2", 8), makeItem("p3", 7)] });
+    expect(syncBriefingMock).toHaveBeenCalledTimes(1);
+  });
+
   it("toggling sharing from off → on starts syncing on next content change", () => {
     useAgentMock.mockReturnValue({ briefingShareEnabled: false });
     const items = [makeItem("p1", 9), makeItem("p2", 8), makeItem("p3", 7)];
