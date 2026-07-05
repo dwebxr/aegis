@@ -26,9 +26,15 @@ function normalizeBriefingScores(parsed: D2ABriefingResponse): D2ABriefingRespon
     .filter(s => typeof s === "number" && Number.isFinite(s) && s > 0);
   if (positive.length === 0) return parsed;
   const max = Math.max(...positive);
+  // Floor keeps every RANKED item strictly positive: a fresh top item next to a
+  // weeks-older one can push the ratio below the 4-decimal resolution, and a
+  // consumer thresholding on `briefingScore > 0` must not lose an item that IS
+  // in the ranking. Ties at the floor are fine — ordering below this scale was
+  // already destroyed by the decay factor.
+  const SCORE_FLOOR = 0.0001;
   const norm = (s: number) =>
     typeof s === "number" && Number.isFinite(s) && s > 0
-      ? Math.round((s / max) * 10_000) / 10_000
+      ? Math.max(SCORE_FLOOR, Math.round((s / max) * 10_000) / 10_000)
       : 0;
   return {
     ...parsed,

@@ -87,6 +87,16 @@ describe("getLatestBriefing — briefingScore normalization", () => {
     expect(result!.items.map(i => i.briefingScore)).toEqual([0, 0]);
   });
 
+  it("floors tiny-but-positive ratios to 0.0001 — ranked items never serialize as 0", async () => {
+    // A fresh top item next to a weeks-older one: ratio 1e-20 rounds to 0 at
+    // 4 decimals, but a consumer thresholding on `> 0` must keep the item.
+    mockActor.getLatestBriefing.mockResolvedValue([
+      JSON.stringify(makeBriefing([5, 1e-20])),
+    ]);
+    const result = await getLatestBriefing("aaaaa-aa");
+    expect(result!.items.map(i => i.briefingScore)).toEqual([1, 0.0001]);
+  });
+
   it("maps non-finite/negative scores to 0 instead of NaN", async () => {
     const briefing = makeBriefing([2e-20]);
     briefing.items.push({ ...makeItem(0, "bad"), briefingScore: -5 });
