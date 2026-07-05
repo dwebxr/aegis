@@ -32,7 +32,9 @@ const SETTLE_TIMEOUT_MS = 15_000;
 
 const ACCEPTS_CACHE_TTL_MS = 5 * 60_000;
 
-export const OPENPAY_URL = process.env.OPENPAY_URL?.trim() || "https://open-pay.jp";
+// Trailing slashes are stripped so path concatenation can't produce
+// "https://host//api/..." (routers/CDNs often treat // as a distinct path).
+export const OPENPAY_URL = (process.env.OPENPAY_URL?.trim() || "https://open-pay.jp").replace(/\/+$/, "");
 export const OPENPAY_RESOURCE_URL =
   process.env.OPENPAY_RESOURCE_URL?.trim() || "https://aegis-ai.xyz/api/d2a/briefing-jpyc";
 export const OPENPAY_MERCHANT = (process.env.OPENPAY_MERCHANT_ADDRESS?.trim() || "").toLowerCase();
@@ -99,7 +101,14 @@ function isValidAccept(a: unknown, wantedResource: string): a is OpenPayAccept {
     typeof x.asset === "string" &&
     x.asset.toLowerCase() === OPENPAY_JPYC_ASSET &&
     typeof merchant === "string" &&
-    merchant.toLowerCase() === OPENPAY_MERCHANT
+    merchant.toLowerCase() === OPENPAY_MERCHANT &&
+    // x402 v1 requirements a wallet can actually pay against — an accept
+    // missing these would serve an unusable 402 and reach the facilitator
+    // malformed; fail closed instead.
+    typeof x.payTo === "string" &&
+    x.payTo.length > 0 &&
+    typeof x.maxAmountRequired === "string" &&
+    /^[0-9]+$/.test(x.maxAmountRequired)
   );
 }
 

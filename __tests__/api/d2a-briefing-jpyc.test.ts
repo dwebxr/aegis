@@ -203,6 +203,9 @@ describe("GET /api/d2a/briefing-jpyc — gate preconditions", () => {
         // though the enclosing catalog item matched.
         makeAccept({ resource: "https://open-pay.jp/api/paid/demo" }),
         makeAccept({ resource: undefined }),
+        // Structurally incomplete requirements a wallet couldn't pay against
+        makeAccept({ payTo: undefined }),
+        makeAccept({ maxAmountRequired: "not-a-number" }),
       ])),
     });
     const { GET } = await loadRoute();
@@ -232,6 +235,17 @@ describe("GET /api/d2a/briefing-jpyc — gate preconditions", () => {
     const body = await res.json();
     expect(body.accepts).toHaveLength(1);
     expect(body.accepts[0].maxAmountRequired).toBe("1000000000000000000");
+  });
+
+  it("tolerates a trailing slash in OPENPAY_URL (no // in facilitator paths)", async () => {
+    process.env.OPENPAY_URL = "https://open-pay.jp/";
+    const fetchMock = installFetchMock({});
+    const { GET } = await loadRoute();
+    const res = await GET(makeRequest({ principal: PRINCIPAL }, { "x-payment": paymentHeader() }));
+    expect(res.status).toBe(200);
+    for (const call of fetchMock.mock.calls) {
+      expect(String(call[0])).not.toContain("jp//");
+    }
   });
 
   it("caches discovery within the TTL (second request does not re-fetch)", async () => {
