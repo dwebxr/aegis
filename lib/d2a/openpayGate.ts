@@ -82,7 +82,7 @@ function normalizeResource(raw: unknown): string | null {
   return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, "")}`;
 }
 
-function isValidAccept(a: unknown): a is OpenPayAccept {
+function isValidAccept(a: unknown, wantedResource: string): a is OpenPayAccept {
   if (!a || typeof a !== "object") return false;
   const x = a as Record<string, unknown>;
   const openpay = (x.extra as Record<string, unknown> | undefined)?.openpay as
@@ -92,6 +92,10 @@ function isValidAccept(a: unknown): a is OpenPayAccept {
   return (
     x.scheme === "exact" &&
     x.network === JPYC_NETWORK &&
+    // The requirement itself is what the client's wallet authorizes — its
+    // `resource` must be THIS endpoint, not just the enclosing catalog item's,
+    // or malformed catalog data could have us settle a payment bound elsewhere.
+    normalizeResource(x.resource) === wantedResource &&
     typeof x.asset === "string" &&
     x.asset.toLowerCase() === OPENPAY_JPYC_ASSET &&
     typeof merchant === "string" &&
@@ -141,8 +145,11 @@ export async function fetchAccepts(): Promise<OpenPayAccept[] | null> {
 
   const mine = items.find(
     i => normalizeResource((i as { resource?: unknown })?.resource) === wanted,
-  ) as { accepts?: unknown[] } | undefined;
-  const valid = (mine?.accepts ?? []).filter(isValidAccept);
+  ) as { accepts?: unknown } | undefined;
+  // accepts may be malformed (non-array) in a bad catalog response — that must
+  // fail closed (null → 503), not throw out of the gate as a 500.
+  const rawAccepts = Array.isArray(mine?.accepts) ? mine.accepts : [];
+  const valid = rawAccepts.filter((a): a is OpenPayAccept => isValidAccept(a, wanted));
   if (valid.length === 0) return null;
 
   const accepts = [valid[0]];

@@ -192,17 +192,35 @@ describe("GET /api/d2a/briefing-jpyc — gate preconditions", () => {
     expect(res.status).toBe(503);
   });
 
-  it("filters out wrong-network / wrong-asset / wrong-merchant accepts (all invalid → 503)", async () => {
+  it("filters out wrong-network / wrong-asset / wrong-merchant / wrong-resource accepts (all invalid → 503)", async () => {
     installFetchMock({
       discovery: () => jsonResponse(makeDiscovery([
         makeAccept({ network: "eip155:8453" }),
         makeAccept({ asset: "0x0000000000000000000000000000000000000001" }),
         makeAccept({ extra: { openpay: { merchant: "0x0000000000000000000000000000000000000002" } } }),
+        // The requirement the wallet authorizes must be bound to THIS resource —
+        // an accept pointing elsewhere (or missing resource) is rejected even
+        // though the enclosing catalog item matched.
+        makeAccept({ resource: "https://open-pay.jp/api/paid/demo" }),
+        makeAccept({ resource: undefined }),
       ])),
     });
     const { GET } = await loadRoute();
     const res = await GET(makeRequest({ principal: PRINCIPAL }));
     expect(res.status).toBe(503);
+  });
+
+  it("503s (not 500) when the catalog item's accepts is malformed (non-array)", async () => {
+    installFetchMock({
+      discovery: () => jsonResponse({
+        x402Version: 1,
+        items: [{ resource: RESOURCE, accepts: { not: "an array" } }],
+      }),
+    });
+    const { GET } = await loadRoute();
+    const res = await GET(makeRequest({ principal: PRINCIPAL }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("OpenPay resource not available");
   });
 
   it("serves exactly ONE validated accept in the 402 even when several pass", async () => {
