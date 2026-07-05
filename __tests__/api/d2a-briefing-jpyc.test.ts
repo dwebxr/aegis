@@ -206,6 +206,9 @@ describe("GET /api/d2a/briefing-jpyc — gate preconditions", () => {
         // Structurally incomplete requirements a wallet couldn't pay against
         makeAccept({ payTo: undefined }),
         makeAccept({ maxAmountRequired: "not-a-number" }),
+        makeAccept({ maxTimeoutSeconds: undefined }),
+        makeAccept({ description: undefined }),
+        makeAccept({ mimeType: undefined }),
       ])),
     });
     const { GET } = await loadRoute();

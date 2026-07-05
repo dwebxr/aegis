@@ -67,6 +67,9 @@ export interface OpenPayAccept {
   payTo: string;
   maxAmountRequired: string;
   resource: string;
+  description: string;
+  mimeType: string;
+  maxTimeoutSeconds: number;
   extra?: { openpay?: { merchant?: string } } & Record<string, unknown>;
   [key: string]: unknown;
 }
@@ -103,12 +106,18 @@ function isValidAccept(a: unknown, wantedResource: string): a is OpenPayAccept {
     typeof merchant === "string" &&
     merchant.toLowerCase() === OPENPAY_MERCHANT &&
     // x402 v1 requirements a wallet can actually pay against — an accept
-    // missing these would serve an unusable 402 and reach the facilitator
-    // malformed; fail closed instead.
+    // missing any required v1 field (payTo, maxAmountRequired, description,
+    // mimeType, maxTimeoutSeconds) would serve an unusable 402 and reach the
+    // facilitator malformed; fail closed instead.
     typeof x.payTo === "string" &&
     x.payTo.length > 0 &&
     typeof x.maxAmountRequired === "string" &&
-    /^[0-9]+$/.test(x.maxAmountRequired)
+    /^[0-9]+$/.test(x.maxAmountRequired) &&
+    typeof x.description === "string" &&
+    typeof x.mimeType === "string" &&
+    typeof x.maxTimeoutSeconds === "number" &&
+    Number.isInteger(x.maxTimeoutSeconds) &&
+    x.maxTimeoutSeconds > 0
   );
 }
 
