@@ -9,7 +9,7 @@ import {
 } from "./types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { buildTranslationPrompt, parseTranslationResponse } from "./prompt";
-import { validateTranslation } from "./validate";
+import { validateTranslation, containsKana } from "./validate";
 import { lookupTranslation, storeTranslation } from "./cache";
 import { recordTranslationAttempt } from "./debugLog";
 import { withIcLlmSlot } from "@/lib/ic/icLlmConcurrency";
@@ -215,12 +215,27 @@ function makeSkip(reason: TranslationSkip["reason"], attempted: number): Transla
   return { status: "skip", reason, attempted };
 }
 
+/** Whether an identical echo can plausibly mean "the input was already in the
+ *  target language". Only ja has a cheap reliable signal (kana); for every
+ *  other target an echo is a failed sample, not an answer about the input. */
+function echoLooksAlreadyInTarget(originalText: string, targetLanguage: TranslationLanguage): boolean {
+  return targetLanguage === "ja" && containsKana(originalText);
+}
+
 function definitiveSkipReason(
   attemptName: string,
   reason: string,
   targetLanguage: TranslationLanguage,
+  originalText: string,
 ): TranslationSkip["reason"] | null {
-  if (/identical to input/.test(reason)) return "already-in-target";
+  if (/identical to input/.test(reason)) {
+    // An echo is definitive either way (re-sampling a paraphrase of it helps
+    // nobody), but it only means "already in target" when the INPUT looks like
+    // the target language — an English echo on an en→fr request is a failure.
+    return echoLooksAlreadyInTarget(originalText, targetLanguage)
+      ? "already-in-target"
+      : "all-backends-failed";
+  }
   if (isDefinitiveUntranslatable(attemptName, reason, targetLanguage)) return "all-backends-failed";
   return null;
 }
@@ -338,7 +353,7 @@ async function translateContentInner(
       // Definitive classifications are ANSWERS, not noise (same guard as the
       // auto cascade): an echo of already-target input must skip, not be
       // re-sampled into a cached paraphrase.
-      const definitive = definitiveSkipReason("ic-llm", outcome.reason, targetLanguage);
+      const definitive = definitiveSkipReason("ic-llm", outcome.reason, targetLanguage, text);
       if (definitive === "already-in-target") return makeSkip("already-in-target", 1);
       if (definitive) throw new Error(explicitFail("IC LLM", outcome.reason));
       // Non-definitive validator rejections are stochastic Llama noise; one
@@ -346,7 +361,7 @@ async function translateContentInner(
       const retryOutcome = evaluateRaw(await translateWithIC(prompt, actorRef, true));
       if (retryOutcome.kind === "skip") return makeSkip("already-in-target", 2);
       if (retryOutcome.kind === "failed") {
-        if (definitiveSkipReason("ic-llm", retryOutcome.reason, targetLanguage) === "already-in-target") {
+        if (definitiveSkipReason("ic-llm", retryOutcome.reason, targetLanguage, text) === "already-in-target") {
           return makeSkip("already-in-target", 2);
         }
         throw new Error(explicitFail("IC LLM", `${retryOutcome.reason} (retried once)`));
@@ -441,7 +456,7 @@ async function translateContentInner(
       // Definitive classifications (echo of already-target input, untranslatable)
       // are ANSWERS, not noise — re-sampling them could replace a correct
       // already-in-target skip with a cached paraphrase of the original.
-      definitiveSkipReason(attempt.name, outcome.reason, targetLanguage) === null
+      definitiveSkipReason(attempt.name, outcome.reason, targetLanguage, text) === null
     ) {
       console.warn("[translate] ic-llm rejected, re-sampling once:", outcome.reason);
       // Record the validator failure in `failures` BEFORE re-sampling: if the
@@ -484,7 +499,7 @@ async function translateContentInner(
       });
       return makeSkip("already-in-target", attempted);
     }
-    const skipReason = definitiveSkipReason(attempt.name, outcome.reason, targetLanguage);
+    const skipReason = definitiveSkipReason(attempt.name, outcome.reason, targetLanguage, text);
     if (skipReason) {
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,

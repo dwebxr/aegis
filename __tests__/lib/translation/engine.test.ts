@@ -970,7 +970,7 @@ describe("translateContent", () => {
       expectSkip(result, "all-backends-failed", 1);
     });
 
-    it("auto cascade promotes 'identical to input' to skip for non-ja targets too (fr, via claude-byok)", async () => {
+    it("auto cascade: non-ja echo is a FAILURE skip, not already-in-target (fr, via claude-byok)", async () => {
       mockOllamaEnabled = false;
       mockApiKey = "sk-ant-test-key";
       globalThis.fetch = jest.fn().mockImplementation(async () => {
@@ -983,10 +983,12 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expectSkip(result, "already-in-target", 1);
+      // An English echo on an en→fr request is a failed sample — labeling it
+      // already-in-target would hide the failure from the aggregate notice.
+      expectSkip(result, "all-backends-failed", 1);
     });
 
-    it("auto cascade promotes 'identical to input' to skip even from a local backend", async () => {
+    it("auto cascade: echo of non-target-looking input is a FAILURE skip even from a local backend", async () => {
       mockOllamaEnabled = true;
       mockApiKey = null;
       const claudeCalls = jest.fn();
@@ -1004,7 +1006,9 @@ describe("translateContent", () => {
         backend: "auto",
       });
 
-      expectSkip(result, "already-in-target", 1);
+      // English input echoed on an en→ja request (no kana in the input):
+      // not already-in-target — a definitive failure label.
+      expectSkip(result, "all-backends-failed", 1);
       // Skip is definitive — later backends are not tried
       expect(claudeCalls).not.toHaveBeenCalled();
     });
