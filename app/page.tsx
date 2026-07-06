@@ -742,7 +742,7 @@ function AegisAppInner() {
       )}
       {tab === "d2a" && (
         <TabErrorBoundary tabName="D2A">
-          <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={handleTabChange} onTranslate={translateItem} isItemTranslating={isItemTranslating} />
+          <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={handleTabChange} onTranslate={translateItem} onAutoTranslate={requestAutoTranslate} isItemTranslating={isItemTranslating} />
         </TabErrorBoundary>
       )}
       {tab === "settings" && (

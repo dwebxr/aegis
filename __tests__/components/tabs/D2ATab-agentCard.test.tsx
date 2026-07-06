@@ -8,6 +8,11 @@ if (typeof globalThis.TextEncoder === "undefined") {
 }
 
 // Mock @dfinity/agent to avoid BigInt incompatibility in Jest
+jest.mock("@/contexts/PreferenceContext", () => ({
+  __esModule: true,
+  usePreferences: () => ({ profile: {} }),
+}));
+
 jest.mock("@dfinity/agent", () => ({}));
 jest.mock("@dfinity/principal", () => ({
   Principal: { fromText: jest.fn().mockReturnValue({ toText: () => "mock-principal" }) },
