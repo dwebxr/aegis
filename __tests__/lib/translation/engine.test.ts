@@ -1236,6 +1236,27 @@ describe("translateContent", () => {
       expect(actorRef.current!.translateOnChain).toHaveBeenCalledTimes(2);
     });
 
+    it("explicit IC: already-target echo skips WITHOUT a re-sample (Codex P2 r3)", async () => {
+      const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
+      const jaText = "これはすでに日本語で書かれた記事の本文です。翻訳は不要のはずです。";
+      const icMock = jest.fn().mockResolvedValue({ ok: jaText });
+      const actorRef = {
+        current: { translateOnChain: icMock },
+      } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      const result = await translateContent({
+        text: jaText,
+        targetLanguage: "ja",
+        backend: "ic",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expectSkip(result, "already-in-target", 1);
+      expect(icMock).toHaveBeenCalledTimes(1);
+    });
+
     it("already-target echo skips as already-in-target WITHOUT a re-sample (Codex P2)", async () => {
       const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
       _resetIcLlmCircuit();

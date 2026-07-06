@@ -335,10 +335,20 @@ async function translateContentInner(
     const outcome = evaluateRaw(await translateWithIC(prompt, actorRef, true));
     if (outcome.kind === "skip") return makeSkip("already-in-target", 1);
     if (outcome.kind === "failed") {
-      // Validator rejections are stochastic Llama noise; one re-sample converts most.
+      // Definitive classifications are ANSWERS, not noise (same guard as the
+      // auto cascade): an echo of already-target input must skip, not be
+      // re-sampled into a cached paraphrase.
+      const definitive = definitiveSkipReason("ic-llm", outcome.reason, targetLanguage);
+      if (definitive === "already-in-target") return makeSkip("already-in-target", 1);
+      if (definitive) throw new Error(explicitFail("IC LLM", outcome.reason));
+      // Non-definitive validator rejections are stochastic Llama noise; one
+      // re-sample converts most.
       const retryOutcome = evaluateRaw(await translateWithIC(prompt, actorRef, true));
       if (retryOutcome.kind === "skip") return makeSkip("already-in-target", 2);
       if (retryOutcome.kind === "failed") {
+        if (definitiveSkipReason("ic-llm", retryOutcome.reason, targetLanguage) === "already-in-target") {
+          return makeSkip("already-in-target", 2);
+        }
         throw new Error(explicitFail("IC LLM", `${retryOutcome.reason} (retried once)`));
       }
       return finalize(retryOutcome.parsed, "ic-llm");
