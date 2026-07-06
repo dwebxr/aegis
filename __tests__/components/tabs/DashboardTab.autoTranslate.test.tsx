@@ -24,18 +24,23 @@ jest.mock("@/contexts/FilterModeContext", () => ({
   useFilterMode: () => ({ filterMode: "lite", setFilterMode: jest.fn() }),
 }));
 
+// STABLE object identity, matching the real PreferenceContext (memoized):
+// a fresh profile literal per render would recompute the section memos on
+// EVERY render and make the translatedCount display test tautological.
+const STABLE_PROFILE = {
+  topicAffinities: {},
+  authorTrust: {},
+  recentTopics: [],
+  totalValidated: 0,
+  totalFlagged: 0,
+  calibration: { qualityThreshold: 5.5 },
+  bookmarkedIds: [],
+  translationPrefs: { targetLanguage: "ja", policy: "all", backend: "auto", minScore: 6 },
+};
+
 jest.mock("@/contexts/PreferenceContext", () => ({
   usePreferences: () => ({
-    profile: {
-      topicAffinities: {},
-      authorTrust: {},
-      recentTopics: [],
-      totalValidated: 0,
-      totalFlagged: 0,
-      calibration: { qualityThreshold: 5.5 },
-      bookmarkedIds: [],
-      translationPrefs: { targetLanguage: "ja", policy: "all", backend: "auto", minScore: 6 },
-    },
+    profile: STABLE_PROFILE,
     addFilterRule: jest.fn(),
     bookmarkItem: jest.fn(),
     unbookmarkItem: jest.fn(),
