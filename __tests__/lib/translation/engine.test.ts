@@ -514,6 +514,42 @@ describe("translateContent", () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
+    it("auto-cascade ic-llm survives slow responses + slot-queue wait (no outer 8s budget)", async () => {
+      // Regression: an outer 8s timeout used to INCLUDE the concurrency-slot
+      // queue wait (2 slots vs 4 concurrent auto translations), so queued
+      // items timed out systematically at ~8s (field-observed 8013ms
+      // transport-errors). Only callIC's inner 30s — started after slot
+      // acquisition — bounds the call now: a 9s response must succeed.
+      jest.useFakeTimers();
+      try {
+        const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
+        const { _resetIcLlmConcurrency } = await import("@/lib/ic/icLlmConcurrency");
+        _resetIcLlmCircuit();
+        _resetIcLlmConcurrency();
+        mockOllamaEnabled = false;
+        mockWebLLMEnabled = false;
+        mockApiKey = null;
+        const icMock = jest.fn().mockImplementation(
+          () => new Promise(resolve => setTimeout(() => resolve({ ok: "遅いが成功した翻訳" }), 9_000)),
+        );
+        const actorRef = { current: { translateOnChain: icMock } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+        const pending = translateContent({
+          text: "Slow IC response must not be killed by an outer budget",
+          targetLanguage: "ja",
+          backend: "auto",
+          actorRef,
+          isAuthenticated: true,
+        });
+        await jest.advanceTimersByTimeAsync(9_100);
+        const result = await pending;
+        expect(expectResult(result).backend).toBe("ic-llm");
+        expect(expectResult(result).translatedText).toBe("遅いが成功した翻訳");
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it("does NOT include ic-llm in auto cascade for anonymous users", async () => {
       mockOllamaEnabled = false;
       mockWebLLMEnabled = false;
