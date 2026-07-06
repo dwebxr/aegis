@@ -1,3 +1,5 @@
+import type { ContentItem } from "@/lib/types/content";
+
 export type TranslationLanguage = "en" | "ja" | "zh" | "ko" | "es" | "fr" | "de" | "pt" | "it" | "ru";
 
 export type TranslationPolicy = "off" | "manual" | "high_quality" | "all";
@@ -56,3 +58,9 @@ export const DEFAULT_TRANSLATION_PREFS: TranslationPrefs = {
   backend: "auto",
   minScore: 6,
 };
+
+export function shouldAutoTranslate(item: ContentItem, prefs: TranslationPrefs): boolean {
+  if (prefs.policy === "all") return true;
+  if (prefs.policy === "high_quality") return item.scores.composite >= prefs.minScore;
+  return false;
+}

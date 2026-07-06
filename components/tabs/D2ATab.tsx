@@ -2,6 +2,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { ContentCard } from "@/components/ui/ContentCard";
+import { usePreferences } from "@/contexts/PreferenceContext";
+import { DEFAULT_TRANSLATION_PREFS, shouldAutoTranslate } from "@/lib/translation/types";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { AgentProfileEditModal } from "@/components/ui/AgentProfileEditModal";
 import { PencilIcon } from "@/components/icons";
@@ -46,6 +48,7 @@ interface D2ATabProps {
   onFlag: (id: string) => void;
   onTabChange?: (tab: string) => void;
   onTranslate?: (id: string) => void;
+  onAutoTranslate?: (id: string) => void;
   isItemTranslating?: (id: string) => boolean;
 }
 
@@ -92,8 +95,10 @@ const LOG_ICONS: Record<string, { icon: string; colorClass: string }> = {
 
 export const D2ATab: React.FC<D2ATabProps> = ({
   content, agentState, mobile, identity, principalText,
-  onValidate, onFlag, onTabChange, onTranslate, isItemTranslating,
+  onValidate, onFlag, onTabChange, onTranslate, onAutoTranslate, isItemTranslating,
 }) => {
+  const { profile } = usePreferences();
+  const translationPrefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
   const { agentProfile, agentProfileLoading, nostrKeys, refreshAgentProfile, wotGraph, sendComment, d2aComments } = useAgent();
   const [subTab, setSubTab] = useState<SubTab>("exchanges");
   const [peerSortKey, setPeerSortKey] = useState<PeerSortKey>("effectiveTrust");
@@ -447,6 +452,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                     onValidate={onValidate}
                     onFlag={onFlag}
                     onTranslate={onTranslate}
+                    onAutoTranslate={onAutoTranslate && shouldAutoTranslate(item, translationPrefs) ? onAutoTranslate : undefined}
                     isTranslating={isItemTranslating?.(item.id)}
                     mobile={mobile}
                   />
@@ -816,6 +822,7 @@ export const D2ATab: React.FC<D2ATabProps> = ({
                         }).catch(err => console.warn("[d2a] publishCurationList failed:", err));
                       } : undefined}
                       onTranslate={onTranslate}
+                      onAutoTranslate={onAutoTranslate}
                       isItemTranslating={isItemTranslating}
                       mobile={mobile}
                     />

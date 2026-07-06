@@ -2,6 +2,8 @@
 import React, { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { ContentCard } from "./ContentCard";
+import { usePreferences } from "@/contexts/PreferenceContext";
+import { DEFAULT_TRANSLATION_PREFS, shouldAutoTranslate } from "@/lib/translation/types";
 import type { ContentItem } from "@/lib/types/content";
 import type { CurationGroup } from "@/lib/d2a/curationGroup";
 
@@ -16,14 +18,17 @@ interface GroupFeedViewProps {
   onRemoveMember?: (pubkey: string) => void;
   onSync?: () => void;
   onTranslate?: (id: string) => void;
+  onAutoTranslate?: (id: string) => void;
   isItemTranslating?: (id: string) => boolean;
   mobile?: boolean;
 }
 
 export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
   group, feed, isOwner, currentUserPk, onValidate, onFlag,
-  onAddMember, onRemoveMember, onSync, onTranslate, isItemTranslating, mobile,
+  onAddMember, onRemoveMember, onSync, onTranslate, onAutoTranslate, isItemTranslating, mobile,
 }) => {
+  const { profile } = usePreferences();
+  const translationPrefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
   const [expanded, setExpanded] = useState<string | null>(null);
   const handleToggle = useCallback((id: string) => {
     setExpanded(prev => prev === id ? null : id);
@@ -102,6 +107,7 @@ export const GroupFeedView: React.FC<GroupFeedViewProps> = ({
               onValidate={onValidate}
               onFlag={onFlag}
               onTranslate={onTranslate}
+              onAutoTranslate={onAutoTranslate && shouldAutoTranslate(item, translationPrefs) ? onAutoTranslate : undefined}
               isTranslating={isItemTranslating?.(item.id)}
               mobile={mobile}
             />

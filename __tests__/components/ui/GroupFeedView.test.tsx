@@ -12,6 +12,11 @@ afterEach(() => cleanup());
 
 // Stub ContentCard so this suite focuses on GroupFeedView. Each callback is
 // re-exposed as a test button so we can verify the wiring.
+jest.mock("@/contexts/PreferenceContext", () => ({
+  __esModule: true,
+  usePreferences: () => ({ profile: {} }),
+}));
+
 jest.mock("@/components/ui/ContentCard", () => ({
   __esModule: true,
   ContentCard: ({

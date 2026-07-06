@@ -44,6 +44,7 @@ import { BurnedItemsDrawer } from "@/components/ui/BurnedItemsDrawer";
 import { useAutoReveal } from "@/hooks/useAutoReveal";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { deduplicateItems } from "@/contexts/content/dedup";
+import { DEFAULT_TRANSLATION_PREFS, shouldAutoTranslate } from "@/lib/translation/types";
 
 function ScorePill({ gr, signalType }: { gr: ReturnType<typeof scoreGrade>; signalType: string | null }) {
   return (
@@ -282,11 +283,12 @@ interface DashboardTabProps {
   pendingCount?: number;
   onFlushPending?: () => void;
   onTranslate?: (id: string) => void;
+  onAutoTranslate?: (id: string) => void;
   isItemTranslating?: (id: string) => boolean;
   pipelineStats?: import("@/lib/filtering/types").FilterPipelineStats | null;
 }
 
-export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [], pendingCount = 0, onFlushPending, onTranslate, isItemTranslating, pipelineStats }) => {
+export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [], pendingCount = 0, onFlushPending, onTranslate, onAutoTranslate, isItemTranslating, pipelineStats }) => {
   const { filterMode } = useFilterMode();
   const { sources } = useSources();
   const { isDemoMode } = useDemo();
@@ -314,6 +316,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     catch { return "feed"; }
   });
   const { profile, addFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
+  const translationPrefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [burnedDrawerOpen, setBurnedDrawerOpen] = useState(false);
 
@@ -503,17 +506,27 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
   const contentRef = useRef(content);
   contentRef.current = content;
 
+  // Translation-progress signal for the dashboard-mode section memos below.
+  // They deliberately key on content.length (not identity) to avoid recompute
+  // churn on every patch — but a completed translation changes identity, NOT
+  // length, so without this dep the sections keep rendering stale items and
+  // the translations the dashboard wiring just paid for never appear.
+  const translatedCount = useMemo(
+    () => content.reduce((n, c) => (c.translation ? n + 1 : n), 0),
+    [content],
+  );
+
   const dashboardTop3 = useMemo(() => {
     if (homeMode !== "dashboard") return [];
     return computeDashboardTop3(contentRef.current, profile, Date.now());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, homeMode, content.length]);
+  }, [profile, homeMode, content.length, translatedCount]);
 
   const dashboardTopicSpotlight = useMemo(() => {
     if (homeMode !== "dashboard") return [];
     return computeTopicSpotlight(contentRef.current, profile, dashboardTop3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, dashboardTop3, homeMode, content.length]);
+  }, [profile, dashboardTop3, homeMode, content.length, translatedCount]);
 
   const { filteredDiscoveries, unreviewedQueue, dashboardSaved } = useMemo(() => {
     if (homeMode !== "dashboard") return EMPTY_SECTIONS;
@@ -528,7 +541,30 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     const saved = computeDashboardSaved(contentRef.current, profile.bookmarkedIds ?? [], topIds).slice(0, 3);
     return { filteredDiscoveries: filtDisc, unreviewedQueue: queue, dashboardSaved: saved };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboardTop3, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds, homeMode, content.length]);
+  }, [dashboardTop3, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds, homeMode, content.length, translatedCount]);
+
+  // Dashboard-mode sections render DashboardCard (no per-card auto-translate
+  // effect like ContentCard), so request translation for their items here.
+  // Every source list is bounded (top3=3, spotlight groups ≤5 items each,
+  // discoveries/queue/saved ≤3) — no unbounded fan-out to the IC LLM.
+  const dashboardAutoIds = useMemo(() => {
+    if (homeMode !== "dashboard" || !onAutoTranslate) return [];
+    const items = [
+      ...dashboardTop3.map(bi => bi.item),
+      ...dashboardTopicSpotlight.flatMap(g => g.items),
+      ...filteredDiscoveries.map(d => d.item),
+      ...unreviewedQueue,
+      ...dashboardSaved,
+    ];
+    return items
+      .filter(item => !item.translation && shouldAutoTranslate(item, translationPrefs))
+      .map(item => item.id);
+  }, [homeMode, onAutoTranslate, dashboardTop3, dashboardTopicSpotlight, filteredDiscoveries, unreviewedQueue, dashboardSaved, translationPrefs]);
+
+  useEffect(() => {
+    if (!onAutoTranslate) return;
+    for (const id of dashboardAutoIds) onAutoTranslate(id);
+  }, [dashboardAutoIds, onAutoTranslate]);
 
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; key: number } | null>(null);
   const [agentKnowsHighlight, setAgentKnowsHighlight] = useState(false);
@@ -964,6 +1000,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         isBookmarked={bookmarkSet.has(item.id)}
                         onAddFilterRule={addFilterRule}
                         onTranslate={onTranslate}
+                        onAutoTranslate={onAutoTranslate && shouldAutoTranslate(item, translationPrefs) ? onAutoTranslate : undefined}
                         isTranslating={isItemTranslating?.(item.id)}
                         mobile={mobile}
                         focused={focusedId === item.id}

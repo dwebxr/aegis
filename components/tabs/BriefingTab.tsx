@@ -20,6 +20,7 @@ import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
 import { errMsg } from "@/lib/utils/errors";
 import { getUserApiKey } from "@/lib/apiKey/storage";
+import { DEFAULT_TRANSLATION_PREFS, shouldAutoTranslate } from "@/lib/translation/types";
 
 interface BriefingTabProps {
   content: ContentItem[];
@@ -32,10 +33,11 @@ interface BriefingTabProps {
   discoveries?: SerendipityItem[];
   onTabChange?: (tab: string) => void;
   onTranslate?: (id: string) => void;
+  onAutoTranslate?: (id: string) => void;
   isItemTranslating?: (id: string) => boolean;
 }
 
-export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys, isLoading, discoveries = [], onTabChange, onTranslate, isItemTranslating }) => {
+export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys, isLoading, discoveries = [], onTabChange, onTranslate, onAutoTranslate, isItemTranslating }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const handleToggle = useCallback((id: string) => {
     setExpanded(prev => prev === id ? null : id);
@@ -50,6 +52,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const [digestError, setDigestError] = useState<string | null>(null);
   const { syncBriefing } = useContent();
   const { briefingShareEnabled } = useAgent();
+  const translationPrefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
 
@@ -101,6 +104,30 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
     if (briefing.serendipity) briefingIds.add(briefing.serendipity.item.id);
     return discoveries.filter(d => !briefingIds.has(d.item.id));
   }, [discoveries, briefing.priority, briefing.serendipity]);
+
+  // Visible surfaces beyond the priority/serendipity ContentCards (which
+  // request their own translation on mount): search results, the expanded
+  // Filtered Out list, and discoveries render without a per-card auto
+  // effect. Request translation for them here, CAPPED — search and
+  // filtered-out are unbounded lists and must not mass-fire against the
+  // shared IC LLM. Deeper entries translate on manual tap.
+  const SURFACE_CAP = 20;
+  const surfaceAutoIds = useMemo(() => {
+    if (!onAutoTranslate) return [];
+    const surface = [
+      ...(searchResults ?? []).slice(0, SURFACE_CAP),
+      ...(showFiltered ? briefing.filteredOut.slice(0, SURFACE_CAP) : []),
+      ...dedupedDiscoveries.map(d => d.item),
+    ];
+    return surface
+      .filter(item => !item.translation && shouldAutoTranslate(item, translationPrefs))
+      .map(item => item.id);
+  }, [onAutoTranslate, searchResults, showFiltered, briefing.filteredOut, dedupedDiscoveries, translationPrefs]);
+
+  useEffect(() => {
+    if (!onAutoTranslate) return;
+    for (const id of surfaceAutoIds) onAutoTranslate(id);
+  }, [surfaceAutoIds, onAutoTranslate]);
 
   const briefingSyncKey = useMemo(
     () => briefing.priority.map(b => b.item.id).join(",") + "|" + (briefing.serendipity?.item.id ?? ""),
@@ -326,6 +353,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 onValidate={onValidate}
                 onFlag={onFlag}
                 onTranslate={onTranslate}
+                onAutoTranslate={onAutoTranslate && shouldAutoTranslate(b.item, translationPrefs) ? onAutoTranslate : undefined}
                 isTranslating={isItemTranslating?.(b.item.id)}
                 mobile={mobile}
               />
@@ -396,6 +424,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
             onValidate={onValidate}
             onFlag={onFlag}
             onTranslate={onTranslate}
+            onAutoTranslate={onAutoTranslate && shouldAutoTranslate(briefing.serendipity.item, translationPrefs) ? onAutoTranslate : undefined}
             isTranslating={isItemTranslating?.(briefing.serendipity.item.id)}
             mobile={mobile}
           />

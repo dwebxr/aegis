@@ -66,11 +66,13 @@ function AegisAppInner() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
   const { content, isAnalyzing, syncStatus, cacheChecked, analyze, scoreText, validateItem, flagItem, addContent, addContentBuffered, flushPendingItems, pendingCount, clearDemoContent, patchItem, actorRef } = useContent();
-  const { translateItem: rawTranslateItem, isItemTranslating } = useTranslation(content, patchItem, actorRef, syncStatus);
+  const { translateItem: rawTranslateItem, requestAutoTranslate: rawRequestAutoTranslate, isItemTranslating } = useTranslation(content, patchItem, actorRef, syncStatus);
   const { isAuthenticated, identity, principalText, login } = useAuth();
   const { userContext, profile } = usePreferences();
   const translationOff = (profile.translationPrefs?.policy ?? "manual") === "off";
+  const autoTranslationEnabled = ["all", "high_quality"].includes(profile.translationPrefs?.policy ?? "manual");
   const translateItem = translationOff ? undefined : rawTranslateItem;
+  const requestAutoTranslate = autoTranslationEnabled ? rawRequestAutoTranslate : undefined;
   const { getSchedulerSources } = useSources();
   const { agentState, setD2AEnabled, briefingShareEnabled, setBriefingShareEnabled, setWoTGraph: pushWoTGraph } = useAgent();
   const { isDemoMode, bannerDismissed, dismissBanner } = useDemo();
@@ -705,12 +707,12 @@ function AegisAppInner() {
       )}
       {tab === "dashboard" && (
         <TabErrorBoundary tabName="Home">
-          <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} onTranslate={translateItem} isItemTranslating={isItemTranslating} pipelineStats={pipelineResult?.stats ?? null} />
+          <DashboardTab content={content} mobile={mobile} onValidate={handleValidate} onFlag={handleFlag} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} wotLoading={wotLoading} onTabChange={handleTabChange} discoveries={discoveries} pendingCount={pendingCount} onFlushPending={flushPendingItems} onTranslate={translateItem} onAutoTranslate={requestAutoTranslate} isItemTranslating={isItemTranslating} pipelineStats={pipelineResult?.stats ?? null} />
         </TabErrorBoundary>
       )}
       {tab === "briefing" && (
         <TabErrorBoundary tabName="Briefing">
-          <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} discoveries={discoveries} onTabChange={handleTabChange} onTranslate={translateItem} isItemTranslating={isItemTranslating} />
+          <BriefingTab content={wotAdjustedContent} profile={profile} onValidate={handleValidate} onFlag={handleFlag} mobile={mobile} nostrKeys={nostrKeys} isLoading={isAuthenticated && content.length === 0 && cacheChecked && syncStatus !== "synced"} discoveries={discoveries} onTabChange={handleTabChange} onTranslate={translateItem} onAutoTranslate={requestAutoTranslate} isItemTranslating={isItemTranslating} />
         </TabErrorBoundary>
       )}
       {tab === "incinerator" && (
@@ -740,7 +742,7 @@ function AegisAppInner() {
       )}
       {tab === "d2a" && (
         <TabErrorBoundary tabName="D2A">
-          <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={handleTabChange} onTranslate={translateItem} isItemTranslating={isItemTranslating} />
+          <D2ATab content={content} agentState={agentState} mobile={mobile} identity={identity} principalText={principalText} onValidate={handleValidate} onFlag={handleFlag} onTabChange={handleTabChange} onTranslate={translateItem} onAutoTranslate={requestAutoTranslate} isItemTranslating={isItemTranslating} />
         </TabErrorBoundary>
       )}
       {tab === "settings" && (
