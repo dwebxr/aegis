@@ -60,12 +60,16 @@ function makeActorRef(translateOnChain: jest.Mock): ActorRef {
  *  that leaves the mock's timer unscheduled forever and the test hangs into
  *  jest's real-time limit. Advance in small steps until the mock has actually
  *  been invoked, then advance the remaining window. */
-async function advanceUntilCalled(mock: jest.Mock, thenAdvanceMs: number): Promise<void> {
-  for (let i = 0; i < 200 && mock.mock.calls.length === 0; i++) {
+async function advanceUntilCallCount(mock: jest.Mock, count: number, thenAdvanceMs: number): Promise<void> {
+  for (let i = 0; i < 200 && mock.mock.calls.length < count; i++) {
     await jest.advanceTimersByTimeAsync(10);
   }
-  expect(mock).toHaveBeenCalled();
+  expect(mock.mock.calls.length).toBeGreaterThanOrEqual(count);
   await jest.advanceTimersByTimeAsync(thenAdvanceMs);
+}
+
+async function advanceUntilCalled(mock: jest.Mock, thenAdvanceMs: number): Promise<void> {
+  await advanceUntilCallCount(mock, 1, thenAdvanceMs);
 }
 
 beforeEach(() => {
@@ -117,9 +121,10 @@ describe("auto-cascade ic-llm with the real timeout helper", () => {
       e => ({ kind: "rejected" as const, e }),
     );
     await advanceUntilCalled(icMock, 30_100);
+    await advanceUntilCallCount(icMock, 2, 30_100);
     const outcome = await settled;
     if (outcome.kind === "resolved") {
-      expect(outcome.r).toMatchObject({ status: "skip", reason: "all-backends-failed" });
+      expect(outcome.r).toMatchObject({ status: "skip", reason: "all-backends-failed", attempted: 2 });
     } else {
       expect(String(outcome.e)).toMatch(/timeout/i);
     }

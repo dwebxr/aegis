@@ -334,7 +334,15 @@ async function translateContentInner(
     // fallback and wants it to try hard before surfacing an error.
     const outcome = evaluateRaw(await translateWithIC(prompt, actorRef, true));
     if (outcome.kind === "skip") return makeSkip("already-in-target", 1);
-    if (outcome.kind === "failed") throw new Error(explicitFail("IC LLM", outcome.reason));
+    if (outcome.kind === "failed") {
+      // Validator rejections are stochastic Llama noise; one re-sample converts most.
+      const retryOutcome = evaluateRaw(await translateWithIC(prompt, actorRef, true));
+      if (retryOutcome.kind === "skip") return makeSkip("already-in-target", 2);
+      if (retryOutcome.kind === "failed") {
+        throw new Error(explicitFail("IC LLM", `${retryOutcome.reason} (retried once)`));
+      }
+      return finalize(retryOutcome.parsed, "ic-llm");
+    }
     return finalize(outcome.parsed, "ic-llm");
   }
 
@@ -368,8 +376,11 @@ async function translateContentInner(
     // items burned most of their budget waiting and timed out systematically
     // (field-observed 8013ms transport-errors; ~half the feed failing).
     // Queue wait is bounded: slots release in `finally` and each occupant is
-    // capped by the inner 30s. No retry — the cascade itself is the retry.
+    // capped by the inner 30s.
     attempts.push({ name: "ic-llm", fn: () => translateWithIC(prompt, actorRef, false) });
+    // Stochastic validator rejections usually recover on a re-sample; transport
+    // double-cost is bounded by the circuit breaker opening after 3 failures.
+    attempts.push({ name: "ic-llm-retry", fn: () => translateWithIC(prompt, actorRef, false) });
   }
 
   const itemHint = text.slice(0, 60);
@@ -415,7 +426,7 @@ async function translateContentInner(
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "ok", reason: "", elapsedMs,
       });
-      return finalize(outcome.parsed, attempt.name);
+      return finalize(outcome.parsed, attempt.name === "ic-llm-retry" ? "ic-llm" : attempt.name);
     }
     if (outcome.kind === "skip") {
       // ALREADY_IN_TARGET is a definitive answer — no later backend

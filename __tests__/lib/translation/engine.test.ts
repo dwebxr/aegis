@@ -514,6 +514,50 @@ describe("translateContent", () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
+    it("auto cascade re-samples ic-llm once after validator rejection and succeeds", async () => {
+      const input = "Apple announced a new product today at their annual keynote.";
+      const invalid = "x".repeat(input.length * 6);
+      const icMock = jest.fn()
+        .mockResolvedValueOnce({ ok: invalid })
+        .mockResolvedValueOnce({ ok: "アップルが新製品を発表しました。" });
+      const actorRef = { current: { translateOnChain: icMock } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      const result = await translateContent({
+        text: input,
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      const r = expectResult(result);
+      expect(r.backend).toBe("ic-llm");
+      expect(r.translatedText).toBe("アップルが新製品を発表しました。");
+      expect(icMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("auto cascade skips after both ic-llm samples are validator-rejected", async () => {
+      const { _icLlmCircuitFailures } = await import("@/lib/ic/icLlmCircuitBreaker");
+      const input = "Apple announced a new product today at their annual keynote.";
+      const invalid = "x".repeat(input.length * 6);
+      const icMock = jest.fn()
+        .mockResolvedValueOnce({ ok: invalid })
+        .mockResolvedValueOnce({ ok: invalid });
+      const actorRef = { current: { translateOnChain: icMock } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      const result = await translateContent({
+        text: input,
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expectSkip(result, "all-backends-failed", 2);
+      expect(icMock).toHaveBeenCalledTimes(2);
+      expect(_icLlmCircuitFailures()).toBe(0);
+    });
+
     it("does NOT include ic-llm in auto cascade for anonymous users", async () => {
       mockOllamaEnabled = false;
       mockWebLLMEnabled = false;
@@ -754,19 +798,42 @@ describe("translateContent", () => {
       expectSkip(result, "all-backends-failed", 1);
     });
 
-    it("explicit IC backend throws with named reason on validator rejection", async () => {
-      const mockTranslate = jest.fn().mockResolvedValue({
-        ok: "English without any kana for ja target",
-      });
+    it("explicit IC backend re-samples once after validator rejection and succeeds", async () => {
+      const input = "Apple announced a new product today at their annual keynote.";
+      const invalid = "x".repeat(input.length * 6);
+      const mockTranslate = jest.fn()
+        .mockResolvedValueOnce({ ok: invalid })
+        .mockResolvedValueOnce({ ok: "アップルが新製品を発表しました。" });
       const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
 
-      await expect(translateContent({
-        text: "Apple announced a new product today.",
+      const result = await translateContent({
+        text: input,
         targetLanguage: "ja",
         backend: "ic",
         actorRef,
         isAuthenticated: true,
-      })).rejects.toThrow(/IC LLM returned an unusable response.*no kana.*switch.*Auto/i);
+      });
+
+      const r = expectResult(result);
+      expect(r.backend).toBe("ic-llm");
+      expect(r.translatedText).toBe("アップルが新製品を発表しました。");
+      expect(mockTranslate).toHaveBeenCalledTimes(2);
+    });
+
+    it("explicit IC backend throws with the retry reason when both samples are validator-rejected", async () => {
+      const input = "Apple announced a new product today at their annual keynote.";
+      const invalid = "x".repeat(input.length * 6);
+      const mockTranslate = jest.fn().mockResolvedValue({ ok: invalid });
+      const actorRef = { current: { translateOnChain: mockTranslate } } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      await expect(translateContent({
+        text: input,
+        targetLanguage: "ja",
+        backend: "ic",
+        actorRef,
+        isAuthenticated: true,
+      })).rejects.toThrow(/IC LLM returned an unusable response.*no kana.*retried once.*switch.*Auto/i);
+      expect(mockTranslate).toHaveBeenCalledTimes(2);
     });
 
     it("translateWithIC retries once on transient 'IC LLM translation failed' error", async () => {
@@ -1163,7 +1230,7 @@ describe("translateContent", () => {
         isAuthenticated: true,
       });
 
-      expectSkip(result, "all-backends-failed", 1);
+      expectSkip(result, "all-backends-failed", 2);
     });
 
     it("empty raw response from a cascade backend is NOT promoted to skip, falls through", async () => {
@@ -1227,7 +1294,7 @@ describe("translateContent", () => {
       } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
       globalThis.fetch = jest.fn();
 
-      await translateContent({
+      const result = await translateContent({
         text: "Apple announced.",
         targetLanguage: "ja",
         backend: "auto",
@@ -1235,8 +1302,9 @@ describe("translateContent", () => {
         isAuthenticated: true,
       });
 
-      // Single ic-llm transport failure increments the breaker counter
-      expect(_icLlmCircuitFailures()).toBe(1);
+      expectSkip(result, "all-backends-failed", 2);
+      // The auto retry makes a second transport attempt; both increment the breaker counter.
+      expect(_icLlmCircuitFailures()).toBe(2);
     });
 
     it("silently skips when cascade has ONE transport failure AND ONE validator failure", async () => {
@@ -1602,9 +1670,9 @@ describe("translateContent", () => {
       } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
       globalThis.fetch = jest.fn();
 
-      // Three sequential calls (use await to keep them sequential so
-      // the breaker counter increments deterministically)
-      for (let i = 0; i < 3; i++) {
+      // Sequential calls keep the breaker counter deterministic. The auto
+      // ic-llm retry means each exhausted call contributes two failures.
+      for (let i = 0; i < 2; i++) {
         const r = await translateContent({
           text: `Failing item ${i}`,
           targetLanguage: "ja",
@@ -1612,7 +1680,7 @@ describe("translateContent", () => {
           actorRef,
           isAuthenticated: true,
         });
-        expectSkip(r, "all-backends-failed", 1); // app-level ic-llm failure → silent skip
+        expectSkip(r, "all-backends-failed", 2); // app-level ic-llm failure → silent skip
       }
 
       expect(_icLlmCircuitState()).toBe("open");
