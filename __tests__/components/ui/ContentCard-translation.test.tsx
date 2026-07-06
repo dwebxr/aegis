@@ -27,6 +27,7 @@ function makeItem(overrides: Partial<ContentItem> = {}): ContentItem {
 
 const noop = () => {};
 const mockTranslate = jest.fn();
+const mockAutoTranslate = jest.fn();
 
 function renderCard(overrides: Partial<ContentItem> = {}, onTranslate?: (id: string) => void) {
   return render(
@@ -43,6 +44,7 @@ function renderCard(overrides: Partial<ContentItem> = {}, onTranslate?: (id: str
 
 beforeEach(() => {
   mockTranslate.mockClear();
+  mockAutoTranslate.mockClear();
 });
 
 describe("ContentCard translation display", () => {
@@ -168,5 +170,56 @@ describe("ContentCard translation display", () => {
       },
     });
     expect(screen.getByText("Original reason here")).toBeTruthy();
+  });
+});
+
+describe("ContentCard auto-translation request", () => {
+  it("fires onAutoTranslate on mount when untranslated", () => {
+    render(
+      <ContentCard
+        item={makeItem({ id: "auto-id" })}
+        expanded={false}
+        onToggle={noop}
+        onValidate={noop}
+        onFlag={noop}
+        onAutoTranslate={mockAutoTranslate}
+      />
+    );
+    expect(mockAutoTranslate).toHaveBeenCalledWith("auto-id");
+  });
+
+  it("does not fire onAutoTranslate when translation exists", () => {
+    render(
+      <ContentCard
+        item={makeItem({
+          id: "translated-id",
+          translation: {
+            translatedText: "翻訳済み",
+            targetLanguage: "ja",
+            backend: "ic-llm",
+            generatedAt: Date.now(),
+          },
+        })}
+        expanded={false}
+        onToggle={noop}
+        onValidate={noop}
+        onFlag={noop}
+        onAutoTranslate={mockAutoTranslate}
+      />
+    );
+    expect(mockAutoTranslate).not.toHaveBeenCalled();
+  });
+
+  it("does not fire when onAutoTranslate is undefined", () => {
+    render(
+      <ContentCard
+        item={makeItem({ id: "no-prop-id" })}
+        expanded={false}
+        onToggle={noop}
+        onValidate={noop}
+        onFlag={noop}
+      />
+    );
+    expect(mockAutoTranslate).not.toHaveBeenCalled();
   });
 });

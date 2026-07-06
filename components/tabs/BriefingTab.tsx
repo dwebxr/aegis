@@ -20,6 +20,7 @@ import type { UserPreferenceProfile } from "@/lib/preferences/types";
 import type { SerendipityItem } from "@/lib/filtering/serendipity";
 import { errMsg } from "@/lib/utils/errors";
 import { getUserApiKey } from "@/lib/apiKey/storage";
+import { DEFAULT_TRANSLATION_PREFS, shouldAutoTranslate } from "@/lib/translation/types";
 
 interface BriefingTabProps {
   content: ContentItem[];
@@ -32,10 +33,11 @@ interface BriefingTabProps {
   discoveries?: SerendipityItem[];
   onTabChange?: (tab: string) => void;
   onTranslate?: (id: string) => void;
+  onAutoTranslate?: (id: string) => void;
   isItemTranslating?: (id: string) => boolean;
 }
 
-export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys, isLoading, discoveries = [], onTabChange, onTranslate, isItemTranslating }) => {
+export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onValidate, onFlag, mobile, nostrKeys, isLoading, discoveries = [], onTabChange, onTranslate, onAutoTranslate, isItemTranslating }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const handleToggle = useCallback((id: string) => {
     setExpanded(prev => prev === id ? null : id);
@@ -50,6 +52,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
   const [digestError, setDigestError] = useState<string | null>(null);
   const { syncBriefing } = useContent();
   const { briefingShareEnabled } = useAgent();
+  const translationPrefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
 
   const briefing = useMemo(() => generateBriefing(content, profile), [content, profile]);
 
@@ -326,6 +329,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
                 onValidate={onValidate}
                 onFlag={onFlag}
                 onTranslate={onTranslate}
+                onAutoTranslate={onAutoTranslate && shouldAutoTranslate(b.item, translationPrefs) ? onAutoTranslate : undefined}
                 isTranslating={isItemTranslating?.(b.item.id)}
                 mobile={mobile}
               />
@@ -396,6 +400,7 @@ export const BriefingTab: React.FC<BriefingTabProps> = ({ content, profile, onVa
             onValidate={onValidate}
             onFlag={onFlag}
             onTranslate={onTranslate}
+            onAutoTranslate={onAutoTranslate && shouldAutoTranslate(briefing.serendipity.item, translationPrefs) ? onAutoTranslate : undefined}
             isTranslating={isItemTranslating?.(briefing.serendipity.item.id)}
             mobile={mobile}
           />

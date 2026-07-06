@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { colors, scoreGrade } from "@/styles/theme";
 import { ScoreBar } from "./ScoreBar";
@@ -30,6 +30,7 @@ interface ContentCardProps {
   onAddFilterRule?: (rule: Omit<CustomFilterRule, "id" | "createdAt">) => void;
   onBookmark?: (id: string) => void;
   onTranslate?: (id: string) => void;
+  onAutoTranslate?: (itemId: string) => void;
   isBookmarked?: boolean;
   isTranslating?: boolean;
   mobile?: boolean;
@@ -259,12 +260,16 @@ function ActionLink({
   );
 }
 
-const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, onTranslate, isBookmarked, isTranslating, mobile, variant = "default", rank, focused, clusterCount }) => {
+const ContentCardInner: React.FC<ContentCardProps> = ({ item, expanded, onToggle, onValidate, onFlag, onAddFilterRule, onBookmark, onTranslate, onAutoTranslate, isBookmarked, isTranslating, mobile, variant = "default", rank, focused, clusterCount }) => {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const isSlop = item.verdict === "slop";
   const gr = scoreGrade(item.scores.composite);
+
+  useEffect(() => {
+    if (onAutoTranslate && !item.translation) onAutoTranslate(item.id);
+  }, [onAutoTranslate, item.id, item.translation]);
 
   const isLarge = variant === "priority" || variant === "serendipity";
   const compactBtns = mobile && !!(onBookmark || onAddFilterRule);

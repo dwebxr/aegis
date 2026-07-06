@@ -120,10 +120,11 @@ afterEach(() => {
 });
 
 describe("useTranslation — public surface", () => {
-  it("returns translateItem and isItemTranslating functions", () => {
+  it("returns translateItem, requestAutoTranslate, and isItemTranslating functions", () => {
     const { wrapper } = harness([makeItem("a")]);
     const { result } = renderHook(wrapper);
     expect(typeof result.current.translateItem).toBe("function");
+    expect(typeof result.current.requestAutoTranslate).toBe("function");
     expect(typeof result.current.isItemTranslating).toBe("function");
     expect(result.current.isItemTranslating("a")).toBe(false);
   });
@@ -206,11 +207,17 @@ describe("useTranslation — outcome handling", () => {
     mockTranslateContent.mockResolvedValueOnce(makeSkip("already-in-target", 1));
 
     const { wrapper, patchItem } = harness([item]);
-    const { rerender } = renderHook(wrapper);
+    const { result, rerender } = renderHook(wrapper);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+    });
     await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
 
-    // Re-render — should NOT re-attempt because id is in skip set
+    // Re-render and duplicate request — should NOT re-attempt because id is in skip set
     rerender();
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+    });
     await new Promise(r => setTimeout(r, 20));
     expect(mockTranslateContent).toHaveBeenCalledTimes(1);
     expect(patchItem).not.toHaveBeenCalled();
@@ -224,7 +231,11 @@ describe("useTranslation — outcome handling", () => {
 
     const items = [makeItem("a"), makeItem("b")];
     const { wrapper } = harness(items);
-    renderHook(wrapper);
+    const { result } = renderHook(wrapper);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+      result.current.requestAutoTranslate("b");
+    });
 
     await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBeGreaterThanOrEqual(1));
     await new Promise(r => setTimeout(r, 20));
@@ -302,7 +313,11 @@ describe("useTranslation — outcome handling", () => {
     setPolicy("all", { backend: "auto" });
     mockTranslateContent.mockResolvedValue(makeSkip("no-backend", 0));
     const { wrapper } = harness([makeItem("a"), makeItem("b")]);
-    renderHook(wrapper);
+    const { result } = renderHook(wrapper);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+      result.current.requestAutoTranslate("b");
+    });
 
     await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(2));
     await waitFor(() => {
@@ -321,7 +336,11 @@ describe("useTranslation — outcome handling", () => {
       new TranslationBackendUnavailableError("cloud", "Claude requires an API key"),
     );
     const { wrapper } = harness([makeItem("a"), makeItem("b")]);
-    renderHook(wrapper);
+    const { result } = renderHook(wrapper);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+      result.current.requestAutoTranslate("b");
+    });
 
     await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBeGreaterThanOrEqual(1));
     await waitFor(() => {
@@ -338,7 +357,11 @@ describe("useTranslation — outcome handling", () => {
     setPolicy("all");
     mockTranslateContent.mockResolvedValue(makeSkip("all-backends-failed", 1));
     const { wrapper } = harness([makeItem("a"), makeItem("b")]);
-    renderHook(wrapper);
+    const { result } = renderHook(wrapper);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+      result.current.requestAutoTranslate("b");
+    });
 
     await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(2));
     await waitFor(() => {
@@ -355,7 +378,10 @@ describe("useTranslation — outcome handling", () => {
     setPolicy("all");
     mockTranslateContent.mockResolvedValueOnce(makeSkip("already-in-target", 1));
     const { wrapper } = harness([makeItem("a")]);
-    renderHook(wrapper);
+    const { result } = renderHook(wrapper);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+    });
 
     await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
     await new Promise(r => setTimeout(r, 20));
@@ -368,7 +394,11 @@ describe("useTranslation — auto policies", () => {
     setPolicy("off");
     const items = [makeItem("a"), makeItem("b")];
     const { wrapper } = harness(items);
-    renderHook(wrapper);
+    const { result } = renderHook(wrapper);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+      result.current.requestAutoTranslate("b");
+    });
     await new Promise(r => setTimeout(r, 30));
     expect(mockTranslateContent).not.toHaveBeenCalled();
   });
@@ -377,29 +407,146 @@ describe("useTranslation — auto policies", () => {
     setPolicy("manual");
     const items = [makeItem("a"), makeItem("b")];
     const { wrapper } = harness(items);
-    renderHook(wrapper);
+    const { result } = renderHook(wrapper);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+      result.current.requestAutoTranslate("b");
+    });
     await new Promise(r => setTimeout(r, 30));
     expect(mockTranslateContent).not.toHaveBeenCalled();
   });
 
-  it("policy=all auto-translates pending items respecting concurrency limit (4)", async () => {
-    // Concurrency cap is 4. Pre-hotfix-14 it was 2 to respect the
-    // DFINITY LLM canister's per-caller limit; hotfix 13 removed
-    // ic-llm from the auto cascade, so that constraint is gone and 4
-    // in-flight claude-server calls fit comfortably under the 60/min
-    // rate limit on /api/translate.
+  it("policy=all auto queue runs 4 immediately and pumps the rest after completions", async () => {
     setPolicy("all");
-    mockTranslateContent.mockImplementation(() => new Promise(() => {})); // never resolves
+    const deferred = Array.from({ length: 6 }, () => {
+      let resolve!: (value: TranslationResult) => void;
+      const promise = new Promise<TranslationResult>(r => { resolve = r; });
+      return { promise, resolve };
+    });
+    let callIndex = 0;
+    mockTranslateContent.mockImplementation(() => deferred[callIndex++].promise);
     const items = [
-      makeItem("a"), makeItem("b"), makeItem("c"), makeItem("d"),
-      makeItem("e"), makeItem("f"), makeItem("g"),
+      makeItem("a"), makeItem("b"), makeItem("c"), makeItem("d"), makeItem("e"), makeItem("f"),
     ];
     const { wrapper } = harness(items);
-    renderHook(wrapper);
+    const { result } = renderHook(wrapper);
+    await act(async () => {
+      for (const item of items) result.current.requestAutoTranslate(item.id);
+    });
     await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBe(4));
-    // Wait a tick — should still be 4, not more
-    await new Promise(r => setTimeout(r, 20));
+
+    await act(async () => {
+      deferred[0].resolve(makeResult());
+    });
+    await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBe(5));
+
+    await act(async () => {
+      deferred[1].resolve(makeResult());
+    });
+    await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBe(6));
+  });
+
+  it("deduplicates duplicate requestAutoTranslate calls while an id is queued", async () => {
+    setPolicy("all");
+    const deferred = Array.from({ length: 5 }, () => {
+      let resolve!: (value: TranslationResult) => void;
+      const promise = new Promise<TranslationResult>(r => { resolve = r; });
+      return { promise, resolve };
+    });
+    let callIndex = 0;
+    mockTranslateContent.mockImplementation(() => deferred[callIndex++].promise);
+    const items = [makeItem("a"), makeItem("b"), makeItem("c"), makeItem("d"), makeItem("e")];
+    const { wrapper } = harness(items);
+    const { result } = renderHook(wrapper);
+
+    await act(async () => {
+      for (const item of items) result.current.requestAutoTranslate(item.id);
+      result.current.requestAutoTranslate("e");
+      result.current.requestAutoTranslate("e");
+    });
     expect(mockTranslateContent.mock.calls.length).toBe(4);
+
+    await act(async () => {
+      deferred[0].resolve(makeResult());
+    });
+    await waitFor(() => expect(mockTranslateContent.mock.calls.length).toBe(5));
+    const translatedTexts = mockTranslateContent.mock.calls.map(c => c[0].text);
+    expect(translatedTexts.filter(text => text === "text-e")).toHaveLength(1);
+  });
+
+  it("drops queued auto work after policy switches to manual", async () => {
+    setPolicy("all");
+    const deferred = Array.from({ length: 4 }, () => {
+      let resolve!: (value: TranslationResult) => void;
+      const promise = new Promise<TranslationResult>(r => { resolve = r; });
+      return { promise, resolve };
+    });
+    let callIndex = 0;
+    mockTranslateContent.mockImplementation(() => deferred[callIndex++]?.promise ?? Promise.resolve(makeResult()));
+    const items = [makeItem("a"), makeItem("b"), makeItem("c"), makeItem("d"), makeItem("e"), makeItem("f")];
+    const { wrapper } = harness(items);
+    const { result, rerender } = renderHook(wrapper);
+
+    await act(async () => {
+      for (const item of items) result.current.requestAutoTranslate(item.id);
+    });
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(4));
+
+    setPolicy("manual");
+    rerender();
+    await act(async () => {
+      for (const d of deferred) d.resolve(makeResult());
+    });
+    await new Promise(r => setTimeout(r, 20));
+    expect(mockTranslateContent).toHaveBeenCalledTimes(4);
+  });
+
+  it("manual translateItem runs immediately even when the auto queue is full", async () => {
+    setPolicy("all");
+    mockTranslateContent.mockImplementation(() => new Promise(() => {}));
+    const items = [makeItem("a"), makeItem("b"), makeItem("c"), makeItem("d"), makeItem("e"), makeItem("manual")];
+    const { wrapper } = harness(items);
+    const { result } = renderHook(wrapper);
+
+    await act(async () => {
+      for (const id of ["a", "b", "c", "d", "e"]) result.current.requestAutoTranslate(id);
+      result.current.translateItem("manual");
+    });
+    expect(mockTranslateContent).toHaveBeenCalledTimes(5);
+    expect(mockTranslateContent.mock.calls[4][0].text).toBe("text-manual");
+  });
+
+  it("re-enqueues failed auto-requested items after the 60s clear, but not manual-only failures", async () => {
+    jest.useFakeTimers();
+    setPolicy("all");
+    mockTranslateContent
+      .mockRejectedValueOnce(new Error("auto failed"))
+      .mockRejectedValueOnce(new Error("manual failed"))
+      .mockResolvedValueOnce(makeResult());
+
+    const { wrapper } = harness([makeItem("auto"), makeItem("manual")]);
+    const { result } = renderHook(wrapper);
+
+    await act(async () => {
+      result.current.requestAutoTranslate("auto");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      result.current.translateItem("manual");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mockTranslateContent).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockTranslateContent).toHaveBeenCalledTimes(3);
+    expect(mockTranslateContent.mock.calls[2][0].text).toBe("text-auto");
   });
 
   it("policy=high_quality only translates items meeting minScore", async () => {
@@ -407,7 +554,10 @@ describe("useTranslation — auto policies", () => {
     mockTranslateContent.mockResolvedValue(makeResult());
     const items = [makeItem("low", 5), makeItem("mid", 6), makeItem("high", 8)];
     const { wrapper } = harness(items);
-    renderHook(wrapper);
+    const { result } = renderHook(wrapper);
+    await act(async () => {
+      for (const item of items) result.current.requestAutoTranslate(item.id);
+    });
     await waitFor(() => expect(mockTranslateContent).toHaveBeenCalled());
     await new Promise(r => setTimeout(r, 30));
 
@@ -424,13 +574,19 @@ describe("useTranslation — language change resets attempted set", () => {
     mockTranslateContent.mockRejectedValueOnce(new Error("ic-llm: timeout"));
     const items = [makeItem("a")];
     const { wrapper } = harness(items);
-    const { rerender } = renderHook(wrapper);
+    const { result, rerender } = renderHook(wrapper);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+    });
     await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
     await new Promise(r => setTimeout(r, 10));
 
     setPolicy("all", { targetLanguage: "fr" });
     mockTranslateContent.mockResolvedValueOnce(makeResult({ targetLanguage: "fr" }));
     rerender();
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+    });
     await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(2));
   });
 });
@@ -450,7 +606,11 @@ describe("useTranslation — isReady gate (cold-start race protection)", () => {
         actorRef as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>,
         "offline",
       );
-    renderHook(wrapperFn);
+    const { result } = renderHook(wrapperFn);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+      result.current.requestAutoTranslate("b");
+    });
     await new Promise(r => setTimeout(r, 30));
     expect(mockTranslateContent).not.toHaveBeenCalled();
   });
@@ -471,7 +631,10 @@ describe("useTranslation — isReady gate (cold-start race protection)", () => {
         actorRef as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>,
         currentSyncStatus,
       );
-    const { rerender } = renderHook(wrapperFn);
+    const { rerender, result } = renderHook(wrapperFn);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+    });
 
     // Initially nothing fires
     await new Promise(r => setTimeout(r, 20));
@@ -498,11 +661,15 @@ describe("useTranslation — isReady gate (cold-start race protection)", () => {
         actorRef as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>,
         "offline",
       );
-    renderHook(wrapperFn);
+    const { result } = renderHook(wrapperFn);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+    });
     await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
   });
 
   it("falls back to ready=true after the actor-ready timeout if syncStatus stays offline", async () => {
+    jest.useFakeTimers();
     setPolicy("all", { targetLanguage: "ja" });
     mockIsAuthenticated = true;
     mockTranslateContent.mockResolvedValue(makeResult({ targetLanguage: "ja" }));
@@ -517,18 +684,19 @@ describe("useTranslation — isReady gate (cold-start race protection)", () => {
         actorRef as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>,
         "offline",
       );
-    renderHook(wrapperFn);
+    const { result } = renderHook(wrapperFn);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+    });
 
     // Before the timeout, no translation
     expect(mockTranslateContent).not.toHaveBeenCalled();
 
-    // Wait past the 5-second fallback timer (real timer, no fake-timer
-    // interaction with waitFor which is fragile under jsdom).
-    await waitFor(
-      () => expect(mockTranslateContent).toHaveBeenCalled(),
-      { timeout: 7_000 },
-    );
-  }, 10_000);
+    await act(async () => {
+      jest.advanceTimersByTime(5_000);
+    });
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalled());
+  });
 
   it("clears BOTH failed and skip sets when transitioning out of offline", async () => {
     setPolicy("all", { targetLanguage: "ja" });
@@ -549,6 +717,10 @@ describe("useTranslation — isReady gate (cold-start race protection)", () => {
         currentSyncStatus,
       );
     const { rerender, result } = renderHook(wrapperFn);
+
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+    });
 
     // Manual translate while offline — pollutes the skip set
     await act(async () => {

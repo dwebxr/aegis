@@ -6,6 +6,7 @@ import { translateContent, type TranslateOptions } from "@/lib/translation/engin
 import {
   DEFAULT_TRANSLATION_PREFS,
   TranslationBackendUnavailableError,
+  shouldAutoTranslate,
   type TranslationBackend,
   type TranslationSkip,
 } from "@/lib/translation/types";
@@ -14,10 +15,10 @@ import type { ContentSyncStatus } from "@/contexts/content/types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
 
-// Parallel in-flight translations. Bounded by the /api/translate rate
-// limit (60/min) — at ~5s per call, 4 in-flight produces ~0.8 req/sec,
-// well under the cap. Scoring has its own IC-LLM concurrency gate in
-// `contexts/content/scoring.ts` and is unaffected by this constant.
+// Auto-translation queue concurrency. Rendered cards enqueue their own
+// item IDs; the queue pumps at most four in-flight translations and
+// revalidates each ID against current content/preferences before work
+// reaches any backend. Manual Translate bypasses this queue.
 const MAX_CONCURRENT = 4;
 const RETRY_INTERVAL_MS = 60_000;
 
@@ -49,6 +50,7 @@ function isTranslationSkip(outcome: Awaited<ReturnType<typeof translateContent>>
 
 interface UseTranslationReturn {
   translateItem: (itemId: string) => void;
+  requestAutoTranslate: (itemId: string) => void;
   isItemTranslating: (itemId: string) => boolean;
 }
 
@@ -74,6 +76,8 @@ export function useTranslation(
   patchRef.current = patchItem;
   const notifyRef = useRef(addNotification);
   notifyRef.current = addNotification;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   // Attempted-item sets, keyed by target language so a language switch resets them.
   const attemptedRef = useRef<{ lang: string; skip: Set<string>; failed: Set<string> }>({
@@ -83,11 +87,12 @@ export function useTranslation(
     attemptedRef.current = { lang: prefs.targetLanguage, skip: new Set(), failed: new Set() };
   }
 
-  const activeRef = useRef(0);
+  const autoQueueRef = useRef<string[]>([]);
+  const queuedIdsRef = useRef<Set<string>>(new Set());
+  const activeIdsRef = useRef<Set<string>>(new Set());
+  const autoRequestedIdsRef = useRef<Set<string>>(new Set());
   const autoActiveRef = useRef(0);
-
-  // Bumped to force the auto-translate effect to re-run after clearing the failed set.
-  const [retryTick, setRetryTick] = useState(0);
+  const pumpRef = useRef<() => void>(() => {});
 
   // Gates auto-translate until the IC actor is ready (authenticated
   // users) or immediately (anonymous users). Without the gate, the
@@ -97,6 +102,8 @@ export function useTranslation(
   // the downstream backends. ACTOR_READY_TIMEOUT_MS is the fallback so
   // a hung actor creation doesn't strand items forever.
   const [isReady, setIsReady] = useState<boolean>(() => !isAuthenticated);
+  const isReadyRef = useRef(isReady);
+  isReadyRef.current = isReady;
 
   useEffect(() => {
     if (!isAuthenticated || syncStatus !== "offline") {
@@ -116,6 +123,28 @@ export function useTranslation(
   const autoAllBackendsFailedNotifiedRef = useRef(false);
   const pendingAllBackendsFailedRef = useRef(false);
 
+  const enqueueAutoRequest = useCallback((itemId: string, recordRequest = true) => {
+    const item = itemsRef.current.find(it => it.id === itemId);
+    if (!item) return;
+    if (item.translation) return;
+    if (!shouldAutoTranslate(item, prefsRef.current)) return;
+    if (queuedIdsRef.current.has(itemId)) return;
+    if (activeIdsRef.current.has(itemId)) return;
+    if (attemptedRef.current.skip.has(itemId)) return;
+    if (attemptedRef.current.failed.has(itemId)) return;
+
+    if (recordRequest) autoRequestedIdsRef.current.add(itemId);
+    queuedIdsRef.current.add(itemId);
+    autoQueueRef.current.push(itemId);
+    pumpRef.current();
+  }, []);
+
+  const reenqueueRequestedIds = useCallback((itemIds: Set<string>) => {
+    for (const itemId of itemIds) {
+      if (autoRequestedIdsRef.current.has(itemId)) enqueueAutoRequest(itemId, false);
+    }
+  }, [enqueueAutoRequest]);
+
   const runTranslation = useCallback(async (item: ContentItem, callerKind: TranslationCallerKind) => {
     const p = prefsRef.current;
     const opts: TranslateOptions = {
@@ -128,7 +157,6 @@ export function useTranslation(
     };
 
     setTranslatingIds(prev => new Set(prev).add(item.id));
-    activeRef.current++;
     if (callerKind === "auto") autoActiveRef.current++;
 
     // translateContent throws on transport failure. THROWN failures notify on
@@ -153,7 +181,7 @@ export function useTranslation(
       }
     }
 
-    activeRef.current--;
+    activeIdsRef.current.delete(item.id);
     if (callerKind === "auto") autoActiveRef.current--;
     setTranslatingIds(prev => {
       const next = new Set(prev);
@@ -193,45 +221,66 @@ export function useTranslation(
         notifyRef.current(AUTO_ALL_BACKENDS_FAILED_MESSAGE, "info");
       }
     }
+
+    if (callerKind === "auto") pumpRef.current();
   }, [actorRef]);
 
+  const pumpAutoQueue = useCallback(() => {
+    if (!isReadyRef.current) return;
+
+    while (activeIdsRef.current.size < MAX_CONCURRENT && autoQueueRef.current.length > 0) {
+      const itemId = autoQueueRef.current.shift();
+      if (!itemId) continue;
+      queuedIdsRef.current.delete(itemId);
+
+      const item = itemsRef.current.find(it => it.id === itemId);
+      if (!item) continue;
+      if (item.translation) continue;
+      if (activeIdsRef.current.has(itemId)) continue;
+      if (attemptedRef.current.skip.has(itemId)) continue;
+      if (attemptedRef.current.failed.has(itemId)) continue;
+      if (!shouldAutoTranslate(item, prefsRef.current)) continue;
+
+      activeIdsRef.current.add(itemId);
+      void runTranslation(item, "auto");
+    }
+  }, [runTranslation]);
+  pumpRef.current = pumpAutoQueue;
+
   const translateItem = useCallback((itemId: string) => {
-    const item = items.find(it => it.id === itemId);
-    if (item && !item.translation) void runTranslation(item, "manual");
-  }, [items, runTranslation]);
+    const item = itemsRef.current.find(it => it.id === itemId);
+    if (!item || item.translation) return;
+    if (activeIdsRef.current.has(itemId)) return;
+
+    if (queuedIdsRef.current.delete(itemId)) {
+      autoQueueRef.current = autoQueueRef.current.filter(id => id !== itemId);
+    }
+
+    activeIdsRef.current.add(itemId);
+    void runTranslation(item, "manual");
+  }, [runTranslation]);
+
+  const requestAutoTranslate = useCallback((itemId: string) => {
+    enqueueAutoRequest(itemId);
+  }, [enqueueAutoRequest]);
 
   const isItemTranslating = useCallback((itemId: string) => {
     return translatingIds.has(itemId);
   }, [translatingIds]);
 
-  // Auto-translate effect: runs when content or prefs change AND the
-  // cascade is ready (cold-start race protection — see isReady above).
   useEffect(() => {
-    if (prefs.policy === "manual" || prefs.policy === "off") return;
-    if (!isReady) return;
-
-    const pending = items.filter(item => {
-      if (item.translation) return false;
-      if (translatingIds.has(item.id)) return false;
-      if (attemptedRef.current.skip.has(item.id)) return false;
-      if (attemptedRef.current.failed.has(item.id)) return false;
-      if (prefs.policy === "high_quality" && item.scores.composite < prefs.minScore) return false;
-      return true;
-    });
-
-    if (pending.length === 0) return;
-
-    const slots = Math.max(0, MAX_CONCURRENT - activeRef.current);
-    for (const item of pending.slice(0, slots)) {
-      void runTranslation(item, "auto");
+    if (prefs.policy === "manual" || prefs.policy === "off") {
+      autoQueueRef.current = [];
+      queuedIdsRef.current.clear();
+      return;
     }
-  }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, translatingIds, runTranslation, retryTick, isReady]);
+    pumpRef.current();
+  }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, isReady]);
 
   // Clear failed AND skip sets when the IC actor becomes ready. The
   // isReady gate above normally prevents cold-start misfires, but a
-  // manual translateItem call (e.g. user clicked the Translate button)
-  // can still bypass the gate and get stranded on a degraded cascade.
-  // Clearing both sets gives those items a second chance.
+  // visible card request or manual Translate tap can still hit a degraded
+  // cascade while offline. Auto-requested visible items get a second chance.
   const prevSyncStatusRef = useRef<typeof syncStatus>("offline");
   useEffect(() => {
     const prev = prevSyncStatusRef.current;
@@ -241,26 +290,29 @@ export function useTranslation(
       syncStatus !== "offline" &&
       (attemptedRef.current.failed.size > 0 || attemptedRef.current.skip.size > 0)
     ) {
+      const retryIds = new Set([...attemptedRef.current.failed, ...attemptedRef.current.skip]);
       attemptedRef.current.failed.clear();
       attemptedRef.current.skip.clear();
       failNotifiedLangRef.current = "";
-      setRetryTick(t => t + 1);
+      reenqueueRequestedIds(retryIds);
+      pumpRef.current();
     }
-  }, [syncStatus]);
+  }, [syncStatus, reenqueueRequestedIds]);
 
   // Periodic retry: clear the failed set every RETRY_INTERVAL_MS so
-  // transient infra problems get a second chance. retryTick forces
-  // the auto-translate effect to re-evaluate.
+  // transient infra problems get a second chance. Only items that a
+  // rendered card previously requested are re-enqueued.
   useEffect(() => {
     const interval = setInterval(() => {
       if (attemptedRef.current.failed.size > 0) {
+        const retryIds = new Set(attemptedRef.current.failed);
         attemptedRef.current.failed.clear();
         failNotifiedLangRef.current = "";
-        setRetryTick(t => t + 1);
+        reenqueueRequestedIds(retryIds);
       }
     }, RETRY_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, []);
+  }, [reenqueueRequestedIds]);
 
-  return { translateItem, isItemTranslating };
+  return { translateItem, requestAutoTranslate, isItemTranslating };
 }

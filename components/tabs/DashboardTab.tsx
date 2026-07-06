@@ -44,6 +44,7 @@ import { BurnedItemsDrawer } from "@/components/ui/BurnedItemsDrawer";
 import { useAutoReveal } from "@/hooks/useAutoReveal";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { deduplicateItems } from "@/contexts/content/dedup";
+import { DEFAULT_TRANSLATION_PREFS, shouldAutoTranslate } from "@/lib/translation/types";
 
 function ScorePill({ gr, signalType }: { gr: ReturnType<typeof scoreGrade>; signalType: string | null }) {
   return (
@@ -282,11 +283,12 @@ interface DashboardTabProps {
   pendingCount?: number;
   onFlushPending?: () => void;
   onTranslate?: (id: string) => void;
+  onAutoTranslate?: (id: string) => void;
   isItemTranslating?: (id: string) => boolean;
   pipelineStats?: import("@/lib/filtering/types").FilterPipelineStats | null;
 }
 
-export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [], pendingCount = 0, onFlushPending, onTranslate, isItemTranslating, pipelineStats }) => {
+export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onValidate, onFlag, isLoading, wotLoading, onTabChange, discoveries = [], pendingCount = 0, onFlushPending, onTranslate, onAutoTranslate, isItemTranslating, pipelineStats }) => {
   const { filterMode } = useFilterMode();
   const { sources } = useSources();
   const { isDemoMode } = useDemo();
@@ -314,6 +316,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     catch { return "feed"; }
   });
   const { profile, addFilterRule, bookmarkItem, unbookmarkItem } = usePreferences();
+  const translationPrefs = profile.translationPrefs ?? DEFAULT_TRANSLATION_PREFS;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [burnedDrawerOpen, setBurnedDrawerOpen] = useState(false);
 
@@ -964,6 +967,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                         isBookmarked={bookmarkSet.has(item.id)}
                         onAddFilterRule={addFilterRule}
                         onTranslate={onTranslate}
+                        onAutoTranslate={onAutoTranslate && shouldAutoTranslate(item, translationPrefs) ? onAutoTranslate : undefined}
                         isTranslating={isItemTranslating?.(item.id)}
                         mobile={mobile}
                         focused={focusedId === item.id}
