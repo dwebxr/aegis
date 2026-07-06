@@ -444,6 +444,12 @@ async function translateContentInner(
       definitiveSkipReason(attempt.name, outcome.reason, targetLanguage) === null
     ) {
       console.warn("[translate] ic-llm rejected, re-sampling once:", outcome.reason);
+      // Record the validator failure in `failures` BEFORE re-sampling: if the
+      // re-sample then dies on transport, the cascade must classify as MIXED
+      // validator+transport (silent skip, matching pre-re-sample semantics) —
+      // not as infra-only, which would throw/notify/60s-retry an item whose
+      // first sample was already rejected on content grounds.
+      failures.push({ name: attempt.name, reason: outcome.reason });
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "failed", reason: `${outcome.reason} (re-sampling)`, elapsedMs: Date.now() - startedAt,
@@ -452,8 +458,6 @@ async function translateContentInner(
       try {
         outcome = evaluateRaw(await attempt.fn());
       } catch (err) {
-        // Transport failure on the re-sample — classify as transport so an
-        // infra-only cascade keeps its throw/60s-retry semantics.
         const reason = errMsg(err);
         failures.push({ name: attempt.name, reason });
         recordTranslationAttempt({

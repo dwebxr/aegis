@@ -1236,6 +1236,32 @@ describe("translateContent", () => {
       expect(actorRef.current!.translateOnChain).toHaveBeenCalledTimes(2);
     });
 
+    it("validator rejection + transport-failed re-sample classifies MIXED → silent skip, not infra throw (Codex P2 r4)", async () => {
+      const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
+      const input = "Apple announced a new product line today at the keynote event.";
+      const garbage = "x".repeat(input.length * 6); // ratio > 5 → validator reject, non-definitive
+      const icMock = jest.fn()
+        .mockResolvedValueOnce({ ok: garbage })
+        .mockRejectedValueOnce(new Error("IC LLM translation timeout"));
+      const actorRef = {
+        current: { translateOnChain: icMock },
+      } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      // Must SKIP (mixed validator+transport), not throw the infra-only error
+      // that would trigger user notification + 60s retry for an item whose
+      // first sample was rejected on content grounds.
+      const result = await translateContent({
+        text: input,
+        targetLanguage: "fr",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+      expectSkip(result, "all-backends-failed", 2);
+      expect(icMock).toHaveBeenCalledTimes(2);
+    });
+
     it("explicit IC: already-target echo skips WITHOUT a re-sample (Codex P2 r3)", async () => {
       const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
       _resetIcLlmCircuit();
