@@ -361,11 +361,15 @@ async function translateContentInner(
     attempts.push({ name: "claude-byok", fn: () => translateWithClaude(prompt, byokKey) });
   }
   if (actorRef?.current && isAuthenticated && !isIcLlmCircuitOpen()) {
-    // 8s budget: normal Llama 3.1 8B responses return in 2-5s. No
-    // retry — on exhaustion the cascade silent-skips.
-    attempts.push({ name: "ic-llm", fn: () => withTimeout(
-      translateWithIC(prompt, actorRef, false), 8_000, "IC LLM auto-cascade timeout",
-    ) });
+    // No outer timeout here — callIC already bounds the actual canister call
+    // (30s, started AFTER the concurrency slot is acquired). An outer budget
+    // used to be 8s and INCLUDED the slot-queue wait: with the auto path
+    // running up to 4 items against MAX_CONCURRENT_IC_LLM=2 slots, queued
+    // items burned most of their budget waiting and timed out systematically
+    // (field-observed 8013ms transport-errors; ~half the feed failing).
+    // Queue wait is bounded: slots release in `finally` and each occupant is
+    // capped by the inner 30s. No retry — the cascade itself is the retry.
+    attempts.push({ name: "ic-llm", fn: () => translateWithIC(prompt, actorRef, false) });
   }
 
   const itemHint = text.slice(0, 60);
