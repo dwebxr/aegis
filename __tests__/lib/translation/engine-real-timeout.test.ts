@@ -55,6 +55,19 @@ function makeActorRef(translateOnChain: jest.Mock): ActorRef {
   return { current: { translateOnChain } } as unknown as ActorRef;
 }
 
+/** The engine awaits real async boundaries (cache sha256 via crypto.subtle)
+ *  BEFORE the IC call registers its timer — advancing fake timers earlier than
+ *  that leaves the mock's timer unscheduled forever and the test hangs into
+ *  jest's real-time limit. Advance in small steps until the mock has actually
+ *  been invoked, then advance the remaining window. */
+async function advanceUntilCalled(mock: jest.Mock, thenAdvanceMs: number): Promise<void> {
+  for (let i = 0; i < 200 && mock.mock.calls.length === 0; i++) {
+    await jest.advanceTimersByTimeAsync(10);
+  }
+  expect(mock).toHaveBeenCalled();
+  await jest.advanceTimersByTimeAsync(thenAdvanceMs);
+}
+
 beforeEach(() => {
   localStorage.clear();
   mockApiKey = null;
@@ -79,11 +92,11 @@ describe("auto-cascade ic-llm with the real timeout helper", () => {
       actorRef: makeActorRef(icMock),
       isAuthenticated: true,
     });
-    await jest.advanceTimersByTimeAsync(9_100);
+    await advanceUntilCalled(icMock, 9_100);
     const result = await pending;
     expect((result as TranslationResult).backend).toBe("ic-llm");
     expect((result as TranslationResult).translatedText).toBe("遅いが成功した翻訳");
-  });
+  }, 15_000);
 
   it("the inner 30s callIC bound is still live — a 31s response fails, not hangs", async () => {
     const icMock = jest.fn().mockImplementation(
@@ -103,12 +116,12 @@ describe("auto-cascade ic-llm with the real timeout helper", () => {
       r => ({ kind: "resolved" as const, r }),
       e => ({ kind: "rejected" as const, e }),
     );
-    await jest.advanceTimersByTimeAsync(30_100);
+    await advanceUntilCalled(icMock, 30_100);
     const outcome = await settled;
     if (outcome.kind === "resolved") {
       expect(outcome.r).toMatchObject({ status: "skip", reason: "all-backends-failed" });
     } else {
       expect(String(outcome.e)).toMatch(/timeout/i);
     }
-  });
+  }, 15_000);
 });
