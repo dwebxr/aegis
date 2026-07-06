@@ -5,7 +5,7 @@
 import type { TranslationLanguage } from "./types";
 
 // langDetect requires >=4 chars; this validator must work on titles and single sentences.
-function containsKana(text: string): boolean {
+export function containsKana(text: string): boolean {
   for (let i = 0; i < text.length; i++) {
     const code = text.charCodeAt(i);
     if (

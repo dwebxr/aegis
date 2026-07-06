@@ -9,7 +9,7 @@ import {
 } from "./types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { buildTranslationPrompt, parseTranslationResponse } from "./prompt";
-import { validateTranslation } from "./validate";
+import { validateTranslation, containsKana } from "./validate";
 import { lookupTranslation, storeTranslation } from "./cache";
 import { recordTranslationAttempt } from "./debugLog";
 import { withIcLlmSlot } from "@/lib/ic/icLlmConcurrency";
@@ -215,12 +215,27 @@ function makeSkip(reason: TranslationSkip["reason"], attempted: number): Transla
   return { status: "skip", reason, attempted };
 }
 
+/** Whether an identical echo can plausibly mean "the input was already in the
+ *  target language". Only ja has a cheap reliable signal (kana); for every
+ *  other target an echo is a failed sample, not an answer about the input. */
+function echoLooksAlreadyInTarget(originalText: string, targetLanguage: TranslationLanguage): boolean {
+  return targetLanguage === "ja" && containsKana(originalText);
+}
+
 function definitiveSkipReason(
   attemptName: string,
   reason: string,
   targetLanguage: TranslationLanguage,
+  originalText: string,
 ): TranslationSkip["reason"] | null {
-  if (/identical to input/.test(reason)) return "already-in-target";
+  if (/identical to input/.test(reason)) {
+    // An echo is definitive either way (re-sampling a paraphrase of it helps
+    // nobody), but it only means "already in target" when the INPUT looks like
+    // the target language — an English echo on an en→fr request is a failure.
+    return echoLooksAlreadyInTarget(originalText, targetLanguage)
+      ? "already-in-target"
+      : "all-backends-failed";
+  }
   if (isDefinitiveUntranslatable(attemptName, reason, targetLanguage)) return "all-backends-failed";
   return null;
 }
@@ -334,7 +349,25 @@ async function translateContentInner(
     // fallback and wants it to try hard before surfacing an error.
     const outcome = evaluateRaw(await translateWithIC(prompt, actorRef, true));
     if (outcome.kind === "skip") return makeSkip("already-in-target", 1);
-    if (outcome.kind === "failed") throw new Error(explicitFail("IC LLM", outcome.reason));
+    if (outcome.kind === "failed") {
+      // Definitive classifications are ANSWERS, not noise (same guard as the
+      // auto cascade): an echo of already-target input must skip, not be
+      // re-sampled into a cached paraphrase.
+      const definitive = definitiveSkipReason("ic-llm", outcome.reason, targetLanguage, text);
+      if (definitive === "already-in-target") return makeSkip("already-in-target", 1);
+      if (definitive) throw new Error(explicitFail("IC LLM", outcome.reason));
+      // Non-definitive validator rejections are stochastic Llama noise; one
+      // re-sample converts most.
+      const retryOutcome = evaluateRaw(await translateWithIC(prompt, actorRef, true));
+      if (retryOutcome.kind === "skip") return makeSkip("already-in-target", 2);
+      if (retryOutcome.kind === "failed") {
+        if (definitiveSkipReason("ic-llm", retryOutcome.reason, targetLanguage, text) === "already-in-target") {
+          return makeSkip("already-in-target", 2);
+        }
+        throw new Error(explicitFail("IC LLM", `${retryOutcome.reason} (retried once)`));
+      }
+      return finalize(retryOutcome.parsed, "ic-llm");
+    }
     return finalize(outcome.parsed, "ic-llm");
   }
 
@@ -368,7 +401,7 @@ async function translateContentInner(
     // items burned most of their budget waiting and timed out systematically
     // (field-observed 8013ms transport-errors; ~half the feed failing).
     // Queue wait is bounded: slots release in `finally` and each occupant is
-    // capped by the inner 30s. No retry — the cascade itself is the retry.
+    // capped by the inner 30s.
     attempts.push({ name: "ic-llm", fn: () => translateWithIC(prompt, actorRef, false) });
   }
 
@@ -408,7 +441,47 @@ async function translateContentInner(
       });
       continue;
     }
-    const outcome = evaluateRaw(raw);
+    let outcome = evaluateRaw(raw);
+    // Stochastic validator rejections (Llama runaway/noise, ~12.5% of ic-llm
+    // samples) usually recover on ONE re-sample. Fires ONLY on app-level
+    // rejections — a transport failure throws above and stays with the circuit
+    // breaker + 60s-retry machinery (re-sampling during an outage would double
+    // breaker hits, and an out-of-band retry succeeding could close a breaker
+    // that just opened). Breaker re-checked here: a concurrent item may have
+    // opened it since this cascade was built.
+    if (
+      outcome.kind === "failed" &&
+      attempt.name === "ic-llm" &&
+      !isIcLlmCircuitOpen() &&
+      // Definitive classifications (echo of already-target input, untranslatable)
+      // are ANSWERS, not noise — re-sampling them could replace a correct
+      // already-in-target skip with a cached paraphrase of the original.
+      definitiveSkipReason(attempt.name, outcome.reason, targetLanguage, text) === null
+    ) {
+      console.warn("[translate] ic-llm rejected, re-sampling once:", outcome.reason);
+      // Record the validator failure in `failures` BEFORE re-sampling: if the
+      // re-sample then dies on transport, the cascade must classify as MIXED
+      // validator+transport (silent skip, matching pre-re-sample semantics) —
+      // not as infra-only, which would throw/notify/60s-retry an item whose
+      // first sample was already rejected on content grounds.
+      failures.push({ name: attempt.name, reason: outcome.reason });
+      recordTranslationAttempt({
+        itemHint, targetLanguage, backend: attempt.name,
+        outcome: "failed", reason: `${outcome.reason} (re-sampling)`, elapsedMs: Date.now() - startedAt,
+      });
+      attempted++;
+      try {
+        outcome = evaluateRaw(await attempt.fn());
+      } catch (err) {
+        const reason = errMsg(err);
+        failures.push({ name: attempt.name, reason });
+        recordTranslationAttempt({
+          itemHint, targetLanguage, backend: attempt.name,
+          outcome: "transport-error", reason, elapsedMs: Date.now() - startedAt,
+        });
+        continue;
+      }
+    }
     const elapsedMs = Date.now() - startedAt;
     if (outcome.kind === "ok") {
       recordTranslationAttempt({
@@ -426,7 +499,7 @@ async function translateContentInner(
       });
       return makeSkip("already-in-target", attempted);
     }
-    const skipReason = definitiveSkipReason(attempt.name, outcome.reason, targetLanguage);
+    const skipReason = definitiveSkipReason(attempt.name, outcome.reason, targetLanguage, text);
     if (skipReason) {
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
