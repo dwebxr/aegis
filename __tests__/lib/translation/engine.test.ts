@@ -1302,9 +1302,10 @@ describe("translateContent", () => {
         isAuthenticated: true,
       });
 
-      expectSkip(result, "all-backends-failed", 2);
-      // The auto retry makes a second transport attempt; both increment the breaker counter.
-      expect(_icLlmCircuitFailures()).toBe(2);
+      // Canister {err} responses throw from callIC (transport-class): NO
+      // validator re-sample — a single attempt, a single breaker increment.
+      expectSkip(result, "all-backends-failed", 1);
+      expect(_icLlmCircuitFailures()).toBe(1);
     });
 
     it("silently skips when cascade has ONE transport failure AND ONE validator failure", async () => {
@@ -1670,9 +1671,10 @@ describe("translateContent", () => {
       } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
       globalThis.fetch = jest.fn();
 
-      // Sequential calls keep the breaker counter deterministic. The auto
-      // ic-llm retry means each exhausted call contributes two failures.
-      for (let i = 0; i < 2; i++) {
+      // Sequential calls keep the breaker counter deterministic. Canister
+      // {err} responses are transport-class (thrown from callIC): no
+      // validator re-sample, one breaker increment per call → 3 calls open it.
+      for (let i = 0; i < 3; i++) {
         const r = await translateContent({
           text: `Failing item ${i}`,
           targetLanguage: "ja",
@@ -1680,7 +1682,7 @@ describe("translateContent", () => {
           actorRef,
           isAuthenticated: true,
         });
-        expectSkip(r, "all-backends-failed", 2); // app-level ic-llm failure → silent skip
+        expectSkip(r, "all-backends-failed", 1); // app-level ic-llm failure → silent skip
       }
 
       expect(_icLlmCircuitState()).toBe("open");

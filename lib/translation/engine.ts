@@ -378,9 +378,6 @@ async function translateContentInner(
     // Queue wait is bounded: slots release in `finally` and each occupant is
     // capped by the inner 30s.
     attempts.push({ name: "ic-llm", fn: () => translateWithIC(prompt, actorRef, false) });
-    // Stochastic validator rejections usually recover on a re-sample; transport
-    // double-cost is bounded by the circuit breaker opening after 3 failures.
-    attempts.push({ name: "ic-llm-retry", fn: () => translateWithIC(prompt, actorRef, false) });
   }
 
   const itemHint = text.slice(0, 60);
@@ -419,14 +416,42 @@ async function translateContentInner(
       });
       continue;
     }
-    const outcome = evaluateRaw(raw);
+    let outcome = evaluateRaw(raw);
+    // Stochastic validator rejections (Llama runaway/noise, ~12.5% of ic-llm
+    // samples) usually recover on ONE re-sample. Fires ONLY on app-level
+    // rejections — a transport failure throws above and stays with the circuit
+    // breaker + 60s-retry machinery (re-sampling during an outage would double
+    // breaker hits, and an out-of-band retry succeeding could close a breaker
+    // that just opened). Breaker re-checked here: a concurrent item may have
+    // opened it since this cascade was built.
+    if (outcome.kind === "failed" && attempt.name === "ic-llm" && !isIcLlmCircuitOpen()) {
+      console.warn("[translate] ic-llm rejected, re-sampling once:", outcome.reason);
+      recordTranslationAttempt({
+        itemHint, targetLanguage, backend: attempt.name,
+        outcome: "failed", reason: `${outcome.reason} (re-sampling)`, elapsedMs: Date.now() - startedAt,
+      });
+      attempted++;
+      try {
+        outcome = evaluateRaw(await attempt.fn());
+      } catch (err) {
+        // Transport failure on the re-sample — classify as transport so an
+        // infra-only cascade keeps its throw/60s-retry semantics.
+        const reason = errMsg(err);
+        failures.push({ name: attempt.name, reason });
+        recordTranslationAttempt({
+          itemHint, targetLanguage, backend: attempt.name,
+          outcome: "transport-error", reason, elapsedMs: Date.now() - startedAt,
+        });
+        continue;
+      }
+    }
     const elapsedMs = Date.now() - startedAt;
     if (outcome.kind === "ok") {
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "ok", reason: "", elapsedMs,
       });
-      return finalize(outcome.parsed, attempt.name === "ic-llm-retry" ? "ic-llm" : attempt.name);
+      return finalize(outcome.parsed, attempt.name);
     }
     if (outcome.kind === "skip") {
       // ALREADY_IN_TARGET is a definitive answer — no later backend

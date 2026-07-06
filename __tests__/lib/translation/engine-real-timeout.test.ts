@@ -113,18 +113,19 @@ describe("auto-cascade ic-llm with the real timeout helper", () => {
       actorRef: makeActorRef(icMock),
       isAuthenticated: true,
     });
-    // Cascade-exhausted app-level classification → skip, not a hang. The
-    // inner timeout message is transport-shaped, so the cascade records a
-    // failure and returns all-backends-failed.
     const settled = pending.then(
       r => ({ kind: "resolved" as const, r }),
       e => ({ kind: "rejected" as const, e }),
     );
     await advanceUntilCalled(icMock, 30_100);
-    await advanceUntilCallCount(icMock, 2, 30_100);
     const outcome = await settled;
+    // A timeout is a TRANSPORT failure: it must NOT trigger the validator
+    // re-sample (that would double breaker hits during an outage), so the
+    // canister is called exactly once, and the failure surfaces via the
+    // infra classification (throw) or a skip — never a hang.
+    expect(icMock).toHaveBeenCalledTimes(1);
     if (outcome.kind === "resolved") {
-      expect(outcome.r).toMatchObject({ status: "skip", reason: "all-backends-failed", attempted: 2 });
+      expect(outcome.r).toMatchObject({ status: "skip", reason: "all-backends-failed", attempted: 1 });
     } else {
       expect(String(outcome.e)).toMatch(/timeout/i);
     }
