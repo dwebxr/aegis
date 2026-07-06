@@ -147,6 +147,40 @@ describe("DashboardTab auto-translation visibility", () => {
     expect(new Set(requestedIds).size).toBeLessThanOrEqual(qualityItems.length);
   });
 
+  it("dashboard mode DISPLAYS a translation that lands without a content-length change (Opus P2 r4)", async () => {
+    // Section memos key on content.length; a completed translation changes
+    // identity only — the translatedCount dep must force a recompute or the
+    // paid-for translation never appears while sitting in dashboard mode.
+    localStorage.setItem("aegis-home-mode", "dashboard");
+    const items = Array.from({ length: 6 }, (_, i) =>
+      makeItem({ id: `t-${i}`, text: `english text ${i}`, createdAt: now - i }),
+    );
+    const { rerender, container } = render(
+      <DashboardTab
+        content={items}
+        onValidate={jest.fn()}
+        onFlag={jest.fn()}
+        onAutoTranslate={jest.fn()}
+      />,
+    );
+    expect(container.textContent).not.toContain("日本語訳テキスト");
+
+    // Same length, same ids — one item now carries a translation.
+    const patched = items.map((item, i) => i === 0
+      ? { ...item, translation: { translatedText: "日本語訳テキスト", targetLanguage: "ja" as const, backend: "ic-llm" as const, generatedAt: now } }
+      : item,
+    );
+    rerender(
+      <DashboardTab
+        content={patched}
+        onValidate={jest.fn()}
+        onFlag={jest.fn()}
+        onAutoTranslate={jest.fn()}
+      />,
+    );
+    await waitFor(() => expect(container.textContent).toContain("日本語訳テキスト"));
+  });
+
   it("dashboard mode with translated items does not re-request them", async () => {
     localStorage.setItem("aegis-home-mode", "dashboard");
     const translated = Array.from({ length: 5 }, (_, i) =>
