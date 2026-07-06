@@ -597,6 +597,28 @@ describe("useTranslation — auto policies", () => {
 });
 
 describe("useTranslation — language change resets attempted set", () => {
+  it("changing targetLanguage AUTO-re-enqueues previously requested visible items — no card re-fire needed (Codex P2 r2)", async () => {
+    setPolicy("all", { targetLanguage: "ja" });
+    mockTranslateContent.mockRejectedValueOnce(new Error("ic-llm: timeout"));
+    const items = [makeItem("a")];
+    const { wrapper } = harness(items);
+    const { result, rerender } = renderHook(wrapper);
+    await act(async () => {
+      result.current.requestAutoTranslate("a");
+    });
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(1));
+    await new Promise(r => setTimeout(r, 10));
+
+    // Language switch WITHOUT another requestAutoTranslate call: the mounted
+    // card's prop identity doesn't change, so it won't re-fire — the hook
+    // itself must re-enqueue everything cards previously requested.
+    setPolicy("all", { targetLanguage: "fr" });
+    mockTranslateContent.mockResolvedValueOnce(makeResult({ targetLanguage: "fr" }));
+    rerender();
+    await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(2));
+    expect(mockTranslateContent.mock.calls[1][0].targetLanguage).toBe("fr");
+  });
+
   it("changing targetLanguage clears the failed/skip set so previously failed items can retry", async () => {
     setPolicy("all", { targetLanguage: "ja" });
     mockTranslateContent.mockRejectedValueOnce(new Error("ic-llm: timeout"));

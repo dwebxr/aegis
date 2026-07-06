@@ -272,14 +272,25 @@ export function useTranslation(
     return translatingIds.has(itemId);
   }, [translatingIds]);
 
+  // Tracks the language the queue last worked toward, so a target-language
+  // switch re-enqueues everything mounted cards ever requested: their
+  // skip/failed verdicts were reset by the attemptedRef lang key above, but
+  // the cards themselves won't re-fire (prop identity is stable), so without
+  // this the visible items would stay untranslated until a remount.
+  const queueLangRef = useRef(prefs.targetLanguage);
+
   useEffect(() => {
     if (prefs.policy === "manual" || prefs.policy === "off") {
       autoQueueRef.current = [];
       queuedIdsRef.current.clear();
       return;
     }
+    if (queueLangRef.current !== prefs.targetLanguage) {
+      queueLangRef.current = prefs.targetLanguage;
+      reenqueueRequestedIds(autoRequestedIdsRef.current);
+    }
     pumpRef.current();
-  }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, isReady]);
+  }, [items, prefs.policy, prefs.minScore, prefs.targetLanguage, isReady, reenqueueRequestedIds]);
 
   // Clear failed AND skip sets when the IC actor becomes ready. The
   // isReady gate above normally prevents cold-start misfires, but a
