@@ -222,7 +222,11 @@ export function useTranslation(
       }
     }
 
-    if (callerKind === "auto") pumpRef.current();
+    // Pump after EVERY completion, manual included: manual translations
+    // occupy activeIds slots too, so a manual-only burst that fills all
+    // slots would otherwise strand queued auto items until an unrelated
+    // content/prefs change.
+    pumpRef.current();
   }, [actorRef]);
 
   const pumpAutoQueue = useCallback(() => {

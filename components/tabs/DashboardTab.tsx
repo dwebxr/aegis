@@ -533,6 +533,29 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardTop3, dashboardTopicSpotlight, discoveries, profile.bookmarkedIds, homeMode, content.length]);
 
+  // Dashboard-mode sections render DashboardCard (no per-card auto-translate
+  // effect like ContentCard), so request translation for their items here.
+  // Every source list is bounded (top3=3, spotlight groups ≤5 items each,
+  // discoveries/queue/saved ≤3) — no unbounded fan-out to the IC LLM.
+  const dashboardAutoIds = useMemo(() => {
+    if (homeMode !== "dashboard" || !onAutoTranslate) return [];
+    const items = [
+      ...dashboardTop3.map(bi => bi.item),
+      ...dashboardTopicSpotlight.flatMap(g => g.items),
+      ...filteredDiscoveries.map(d => d.item),
+      ...unreviewedQueue,
+      ...dashboardSaved,
+    ];
+    return items
+      .filter(item => !item.translation && shouldAutoTranslate(item, translationPrefs))
+      .map(item => item.id);
+  }, [homeMode, onAutoTranslate, dashboardTop3, dashboardTopicSpotlight, filteredDiscoveries, unreviewedQueue, dashboardSaved, translationPrefs]);
+
+  useEffect(() => {
+    if (!onAutoTranslate) return;
+    for (const id of dashboardAutoIds) onAutoTranslate(id);
+  }, [dashboardAutoIds, onAutoTranslate]);
+
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; key: number } | null>(null);
   const [agentKnowsHighlight, setAgentKnowsHighlight] = useState(false);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout>>();

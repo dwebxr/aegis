@@ -115,4 +115,65 @@ describe("DashboardTab auto-translation visibility", () => {
     for (const item of arrayHeadSlop) expect(requestedIds).not.toContain(item.id);
     for (const item of qualityItems.slice(40)) expect(requestedIds).not.toContain(item.id);
   });
+
+  it("dashboard mode requests translation for its visible section items (Codex P2)", async () => {
+    // Dashboard-mode sections render DashboardCard (no per-card effect) —
+    // the tab-level effect must cover them or dashboard-mode users get no
+    // auto-translation at all after the whole-array scan removal.
+    localStorage.setItem("aegis-home-mode", "dashboard");
+    const qualityItems = Array.from({ length: 10 }, (_, i) =>
+      makeItem({
+        id: `dash-${i}`,
+        text: `dashboard quality ${i}`,
+        createdAt: now - i,
+      }),
+    );
+    const onAutoTranslate = jest.fn();
+
+    render(
+      <DashboardTab
+        content={qualityItems}
+        onValidate={jest.fn()}
+        onFlag={jest.fn()}
+        onAutoTranslate={onAutoTranslate}
+      />,
+    );
+
+    // Top-3 is always computed in dashboard mode — its ids must be requested.
+    await waitFor(() => expect(onAutoTranslate).toHaveBeenCalled());
+    const requestedIds = onAutoTranslate.mock.calls.map(call => call[0]);
+    expect(requestedIds.length).toBeGreaterThanOrEqual(3);
+    // Bounded: never the whole content array in one burst beyond section caps.
+    expect(new Set(requestedIds).size).toBeLessThanOrEqual(qualityItems.length);
+  });
+
+  it("dashboard mode with translated items does not re-request them", async () => {
+    localStorage.setItem("aegis-home-mode", "dashboard");
+    const translated = Array.from({ length: 5 }, (_, i) =>
+      makeItem({
+        id: `done-${i}`,
+        text: `already translated ${i}`,
+        createdAt: now - i,
+        translation: {
+          translatedText: "翻訳済み",
+          targetLanguage: "ja",
+          backend: "ic-llm",
+          generatedAt: now,
+        },
+      }),
+    );
+    const onAutoTranslate = jest.fn();
+
+    render(
+      <DashboardTab
+        content={translated}
+        onValidate={jest.fn()}
+        onFlag={jest.fn()}
+        onAutoTranslate={onAutoTranslate}
+      />,
+    );
+
+    await new Promise(r => setTimeout(r, 50));
+    expect(onAutoTranslate).not.toHaveBeenCalled();
+  });
 });

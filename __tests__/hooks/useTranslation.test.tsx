@@ -516,6 +516,34 @@ describe("useTranslation — auto policies", () => {
     expect(mockTranslateContent.mock.calls[4][0].text).toBe("text-manual");
   });
 
+  it("manual completions pump the auto queue (manual-only burst can't strand queued items — Codex P2)", async () => {
+    setPolicy("all");
+    const resolvers: Array<(v: unknown) => void> = [];
+    mockTranslateContent.mockImplementation(
+      () => new Promise(resolve => { resolvers.push(resolve); }),
+    );
+    const items = ["m1", "m2", "m3", "m4", "auto1"].map(id => makeItem(id));
+    const { wrapper } = harness(items);
+    const { result } = renderHook(wrapper);
+
+    await act(async () => {
+      // Four manual taps fill every activeIds slot…
+      for (const id of ["m1", "m2", "m3", "m4"]) result.current.translateItem(id);
+      // …then a rendered card requests auto translation: must queue, not run.
+      result.current.requestAutoTranslate("auto1");
+    });
+    expect(mockTranslateContent).toHaveBeenCalledTimes(4);
+
+    // A MANUAL completion frees a slot — the queue must pump without any
+    // content/prefs change.
+    await act(async () => {
+      resolvers[0]({ translatedText: "翻訳", targetLanguage: "ja", backend: "ic-llm", generatedAt: 1 });
+      await Promise.resolve();
+    });
+    expect(mockTranslateContent).toHaveBeenCalledTimes(5);
+    expect(mockTranslateContent.mock.calls[4][0].text).toBe("text-auto1");
+  });
+
   it("re-enqueues failed auto-requested items after the 60s clear, but not manual-only failures", async () => {
     jest.useFakeTimers();
     setPolicy("all");
