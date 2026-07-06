@@ -1230,7 +1230,34 @@ describe("translateContent", () => {
         isAuthenticated: true,
       });
 
+      // URL echo fails the validator with a NON-definitive reason (no kana),
+      // so it gets one re-sample before exhausting — attempted 2.
       expectSkip(result, "all-backends-failed", 2);
+      expect(actorRef.current!.translateOnChain).toHaveBeenCalledTimes(2);
+    });
+
+    it("already-target echo skips as already-in-target WITHOUT a re-sample (Codex P2)", async () => {
+      const { _resetIcLlmCircuit } = await import("@/lib/ic/icLlmCircuitBreaker");
+      _resetIcLlmCircuit();
+      // Input already in the target language; the IC echoes it back verbatim.
+      // The validator flags "identical to input" — a definitive ANSWER that a
+      // re-sample must not override with a cached paraphrase.
+      const jaText = "これはすでに日本語で書かれた記事の本文です。翻訳は不要のはずです。";
+      const icMock = jest.fn().mockResolvedValue({ ok: jaText });
+      const actorRef = {
+        current: { translateOnChain: icMock },
+      } as unknown as React.MutableRefObject<import("@/lib/ic/declarations")._SERVICE | null>;
+
+      const result = await translateContent({
+        text: jaText,
+        targetLanguage: "ja",
+        backend: "auto",
+        actorRef,
+        isAuthenticated: true,
+      });
+
+      expectSkip(result, "already-in-target", 1);
+      expect(icMock).toHaveBeenCalledTimes(1);
     });
 
     it("empty raw response from a cascade backend is NOT promoted to skip, falls through", async () => {

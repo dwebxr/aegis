@@ -424,7 +424,15 @@ async function translateContentInner(
     // breaker hits, and an out-of-band retry succeeding could close a breaker
     // that just opened). Breaker re-checked here: a concurrent item may have
     // opened it since this cascade was built.
-    if (outcome.kind === "failed" && attempt.name === "ic-llm" && !isIcLlmCircuitOpen()) {
+    if (
+      outcome.kind === "failed" &&
+      attempt.name === "ic-llm" &&
+      !isIcLlmCircuitOpen() &&
+      // Definitive classifications (echo of already-target input, untranslatable)
+      // are ANSWERS, not noise — re-sampling them could replace a correct
+      // already-in-target skip with a cached paraphrase of the original.
+      definitiveSkipReason(attempt.name, outcome.reason, targetLanguage) === null
+    ) {
       console.warn("[translate] ic-llm rejected, re-sampling once:", outcome.reason);
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
