@@ -62,6 +62,41 @@ const PUSH_THROTTLE: Record<string, number> = {
   "3x_day": 8 * MS_PER_HOUR,
 };
 
+// Captures Web Share Target / deep-link params (?share_url, ?share_text,
+// ?share_title, ?tab=sources&url=...) once after login, then clears them
+// from the address bar. Isolated so useSearchParams()'s CSR bailout stops
+// at this component's Suspense boundary instead of the whole page.
+function ShareTargetBridge({ isAuthenticated, onShareTarget }: {
+  isAuthenticated: boolean;
+  onShareTarget: (url: string | null) => void;
+}) {
+  const searchParams = useSearchParams();
+  const consumedRef = useRef(false);
+
+  useEffect(() => {
+    if (consumedRef.current) return;
+    if (!isAuthenticated) return;
+
+    // Web Share Target: ?share_url=xxx or ?share_text=xxx
+    const sharedUrl = extractUrl(searchParams.get("share_url"))
+      || extractUrl(searchParams.get("share_text"))
+      || extractUrl(searchParams.get("share_title"));
+
+    // Deep Link: ?tab=sources&url=xxx  or  ?tab=sources
+    const isDeepLink = searchParams.get("tab") === "sources";
+    const deepLinkUrl = isDeepLink ? extractUrl(searchParams.get("url")) : null;
+
+    const url = sharedUrl || deepLinkUrl;
+    if (!sharedUrl && !isDeepLink) return;
+
+    consumedRef.current = true;
+    onShareTarget(url);
+    window.history.replaceState({}, "", "/");
+  }, [searchParams, isAuthenticated, onShareTarget]);
+
+  return null;
+}
+
 function AegisAppInner() {
   const { mobile } = useWindowSize();
   const { addNotification } = useNotify();
@@ -117,34 +152,16 @@ function AegisAppInner() {
     return () => window.removeEventListener("aegis:notification", handler);
   }, [addNotification]);
 
-  // Web Share Target + Deep Link → Sources tab with auto-Extract
-  // Both paths capture the URL in state before replaceState clears searchParams,
-  // then pass it to SourcesTab as initialUrl for auto-fill + Extract.
-  const searchParams = useSearchParams();
-  const shareConsumedRef = useRef(false);
+  // Web Share Target + Deep Link → Sources tab with auto-Extract.
+  // The searchParams consumer lives in ShareTargetBridge (own Suspense
+  // boundary) so useSearchParams() doesn't bail the whole page out of
+  // static prerendering — the landing page must be in the initial HTML.
   const [capturedDeepLinkUrl, setCapturedDeepLinkUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (shareConsumedRef.current) return;
-    if (!isAuthenticated) return;
-
-    // Web Share Target: ?share_url=xxx or ?share_text=xxx
-    const sharedUrl = extractUrl(searchParams.get("share_url"))
-      || extractUrl(searchParams.get("share_text"))
-      || extractUrl(searchParams.get("share_title"));
-
-    // Deep Link: ?tab=sources&url=xxx  or  ?tab=sources
-    const isDeepLink = searchParams.get("tab") === "sources";
-    const deepLinkUrl = isDeepLink ? extractUrl(searchParams.get("url")) : null;
-
-    const url = sharedUrl || deepLinkUrl;
-    if (!sharedUrl && !isDeepLink) return;
-
-    shareConsumedRef.current = true;
+  const handleShareTarget = useCallback((url: string | null) => {
     if (url) setCapturedDeepLinkUrl(url);
     setTab("sources");
-    window.history.replaceState({}, "", "/");
-  }, [searchParams, isAuthenticated]);
+  }, []);
 
   const schedulerRef = useRef<IngestionScheduler | null>(null);
   const userContextRef = useRef(userContext);
@@ -689,18 +706,27 @@ function AegisAppInner() {
     }
   }, [nostrKeys]);
 
-  const showLanding = isDemoMode && !bannerDismissed;
+  // No isLoading gate: during SSR and the auth check the landing page is
+  // rendered (crawlers get real content in the initial HTML). Returning
+  // authenticated users have it CSS-hidden pre-paint via data-auth-hint,
+  // and React swaps to the app once Internet Identity resolves.
+  const showLanding = !isAuthenticated && !bannerDismissed;
 
   if (showLanding) {
     return (
       <AppShell activeTab={tab} onTabChange={handleTabChange}>
-        <LandingHero onTryDemo={dismissBanner} onLogin={login} mobile={mobile} />
+        <div data-landing-gate>
+          <LandingHero onTryDemo={dismissBanner} onLogin={login} mobile={mobile} />
+        </div>
       </AppShell>
     );
   }
 
   return (
     <AppShell activeTab={tab} onTabChange={handleTabChange}>
+      <Suspense fallback={null}>
+        <ShareTargetBridge isAuthenticated={isAuthenticated} onShareTarget={handleShareTarget} />
+      </Suspense>
       <DemoBanner mobile={mobile} />
       {isAuthenticated && !linkedAccount && !wotPromptDismissed && (
         <WoTPromptBanner onGoToSettings={() => handleTabChange("settings")} onDismiss={dismissWotPrompt} />
@@ -755,9 +781,5 @@ function AegisAppInner() {
 }
 
 export default function AegisApp() {
-  return (
-    <Suspense fallback={null}>
-      <AegisAppInner />
-    </Suspense>
-  );
+  return <AegisAppInner />;
 }

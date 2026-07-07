@@ -1,4 +1,4 @@
-export const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://aegis.dwebxr.xyz").replace(/\/$/, "");
+export const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://aegis-ai.xyz").replace(/\/$/, "");
 
 export const SOCIAL_LINKS = [
   { key: "discord", href: "https://discord.gg/85JVzJaatT", title: "Discord" },

@@ -46,7 +46,7 @@ describe("briefingToD2AResponse", () => {
     const result = briefingToD2AResponse(makeBriefingState());
     expect(result.version).toBe("1.0");
     expect(result.source).toBe("aegis");
-    expect(result.sourceUrl).toBe("https://aegis.dwebxr.xyz");
+    expect(result.sourceUrl).toBe("https://aegis-ai.xyz");
   });
 
   it("converts generatedAt timestamp to ISO string", () => {

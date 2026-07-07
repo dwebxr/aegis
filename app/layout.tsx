@@ -11,16 +11,21 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+const TITLE = "Aegis — AI Content Quality Filter & Zero-Noise Briefing";
+const DESC =
+  "Open-source AI feed reader that scores every RSS and social post, filters out the slop, and delivers a clean, ranked briefing. Built on the Internet Computer and Nostr.";
+
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
 
   title: {
-    default: "Aegis — AI Content Quality Filter",
+    default: TITLE,
     template: "%s | Aegis",
   },
 
-  description:
-    "Zero-noise briefing powered by AI + Nostr + Internet Computer. Filter slop, curate quality, exchange signals with other agents.",
+  description: DESC,
+
+  alternates: { canonical: "/" },
 
   manifest: "/manifest.json",
 
@@ -43,9 +48,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Aegis",
-    title: "Aegis — AI Content Quality Filter",
-    description:
-      "Your personal AI that burns the slop and delivers only what matters. Powered by on-chain AI scoring, Nostr signal publishing, and device-to-agent content exchange.",
+    title: TITLE,
+    description: DESC,
     url: APP_URL,
     images: [
       {
@@ -61,23 +65,28 @@ export const metadata: Metadata = {
 
   twitter: {
     card: "summary_large_image",
-    title: "Aegis — AI Content Quality Filter",
-    description:
-      "Zero-noise briefing. AI scores content, burns the slop, delivers quality. Built on Nostr + Internet Computer.",
+    title: TITLE,
+    description: DESC,
+    site: "@Coo_aiagent",
+    creator: "@Coo_aiagent",
     images: ["/og-image.png"],
   },
 
   keywords: [
-    "AI",
+    "AI feed reader",
+    "RSS reader",
+    "AI news aggregator",
     "content curation",
+    "daily briefing",
+    "slop detection",
+    "content quality",
+    "AI curation",
     "Nostr",
     "Internet Computer",
     "ICP",
-    "briefing",
-    "slop detection",
-    "content quality",
     "D2A",
     "decentralized",
+    "open source",
   ],
 
   authors: [{ name: "DWEBXR LAB", url: "https://dwebxr.xyz" }],
@@ -90,19 +99,49 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebApplication",
-  name: "Aegis",
-  description:
-    "AI Content Quality Filter — Zero-noise briefing powered by AI + Nostr + Internet Computer",
-  url: APP_URL,
-  applicationCategory: "UtilitiesApplication",
-  operatingSystem: "Web",
-  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-  author: {
-    "@type": "Organization",
-    name: "DWEBXR LAB",
-    url: "https://dwebxr.xyz",
-  },
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${APP_URL}/#org`,
+      name: "DWEBXR LAB",
+      url: "https://dwebxr.xyz",
+      sameAs: [
+        "https://github.com/dwebxr/aegis",
+        "https://x.com/Coo_aiagent",
+        "https://medium.com/aegis-ai",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${APP_URL}/#website`,
+      name: "Aegis",
+      url: APP_URL,
+      publisher: { "@id": `${APP_URL}/#org` },
+    },
+    {
+      "@type": "WebApplication",
+      "@id": `${APP_URL}/#app`,
+      name: "Aegis",
+      description: DESC,
+      url: APP_URL,
+      applicationCategory: "NewsApplication",
+      operatingSystem: "Web",
+      softwareVersion: "3.0",
+      isAccessibleForFree: true,
+      screenshot: `${APP_URL}/images/home-dashboard.png`,
+      featureList: [
+        "AI quality scoring (Value / Context / Legitimacy) for every post",
+        "RSS, Nostr, and web page ingestion",
+        "Ranked zero-noise daily briefing",
+        "Local-first AI cascade: Ollama, in-browser WebLLM, Claude API, Internet Computer LLM",
+        "Automatic translation of feed content",
+        "Encrypted agent-to-agent content exchange (D2A) over Nostr",
+        "Paid machine-readable briefing API via x402 (USDC and JPYC)",
+      ],
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      author: { "@id": `${APP_URL}/#org` },
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -113,9 +152,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="apple-touch-icon" href="/icon-192.png" />
         <script
-          dangerouslySetInnerHTML={{ __html: `try{document.documentElement.setAttribute('data-theme',localStorage.getItem('aegis-theme')==='light'?'light':'dark')}catch(e){console.debug('[theme]',e)}` }}
+          dangerouslySetInnerHTML={{ __html: `try{document.documentElement.setAttribute('data-theme',localStorage.getItem('aegis-theme')==='light'?'light':'dark');if(localStorage.getItem('aegis-auth-hint')==='1')document.documentElement.setAttribute('data-auth-hint','1')}catch(e){console.debug('[theme]',e)}` }}
         />
         <script
           type="application/ld+json"

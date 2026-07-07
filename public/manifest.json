@@ -1,7 +1,7 @@
 {
   "name": "Aegis",
   "short_name": "Aegis",
-  "description": "D2A Social Agent Platform — AI-powered content quality scoring",
+  "description": "AI content quality filter — a clean, ranked briefing from your RSS and social feeds.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0f1e",

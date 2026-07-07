@@ -391,3 +391,10 @@ a {
 @media (hover: none) {
   .touch-label { display: inline !important; }
 }
+
+/* Landing page is server-rendered for crawlers; returning authenticated
+   users get it hidden before first paint via the data-auth-hint attribute
+   set by the inline <head> script (see lib/authHint.ts). */
+html[data-auth-hint="1"] [data-landing-gate] {
+  display: none;
+}

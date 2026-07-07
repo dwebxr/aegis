@@ -13,21 +13,21 @@ test.describe("Landing Page", () => {
   });
 
   test("How It Works section shows 3 steps", async ({ landingPage }) => {
-    await expect(landingPage.page.getByText("Add Your Feeds")).toBeVisible();
-    await expect(landingPage.page.getByText("AI Filters the Noise")).toBeVisible();
-    await expect(landingPage.page.getByText("Read What Matters")).toBeVisible();
+    await expect(landingPage.page.getByText("Add your feeds")).toBeVisible();
+    await expect(landingPage.page.getByText("AI filters out the slop")).toBeVisible();
+    await expect(landingPage.page.getByText("Read only what matters")).toBeVisible();
   });
 
-  test("Features section shows 4 feature cards", async ({ landingPage }) => {
-    await expect(landingPage.page.getByText("Quality Filter").first()).toBeVisible();
-    await expect(landingPage.page.getByText("Nostr Publishing").first()).toBeVisible();
-    await expect(landingPage.page.getByText("Web of Trust").first()).toBeVisible();
-    await expect(landingPage.page.getByText("D2A Agents").first()).toBeVisible();
+  test("Feature sections show current headings", async ({ landingPage }) => {
+    await expect(landingPage.page.getByText("Add RSS and social sources in one place")).toBeVisible();
+    await expect(landingPage.page.getByText("AI that knows what's real — and what's slop")).toBeVisible();
+    await expect(landingPage.page.getByText("A new layer of signal, beyond big social")).toBeVisible();
+    await expect(landingPage.page.getByText("Read anywhere, like a native app")).toBeVisible();
   });
 
   test("Who It's For section shows personas", async ({ landingPage }) => {
-    await expect(landingPage.page.getByText("Crypto Trader")).toBeVisible();
-    await expect(landingPage.page.getByText("Newsletter Writer")).toBeVisible();
+    await expect(landingPage.page.getByText("Crypto traders")).toBeVisible();
+    await expect(landingPage.page.getByText("Newsletter writers")).toBeVisible();
   });
 
   test("Try Demo button enters demo mode and shows dashboard", async ({ landingPage }) => {
