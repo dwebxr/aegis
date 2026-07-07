@@ -52,5 +52,26 @@ describe("OGP / Meta tags (structural)", () => {
       expect(layoutContent).toContain("WebApplication");
       expect(layoutContent).toContain("schema.org");
     });
+
+    it("has canonical alternates", () => {
+      expect(layoutContent).toContain("alternates");
+    });
+
+    it("uses a JSON-LD @graph", () => {
+      expect(layoutContent).toContain('"@graph"');
+    });
+  });
+
+  describe("llms.txt", () => {
+    const llmsPath = path.resolve(__dirname, "../../public/llms.txt");
+
+    it("exists at public/llms.txt", () => {
+      expect(fs.existsSync(llmsPath)).toBe(true);
+    });
+
+    it("starts with the Aegis heading", () => {
+      const content = fs.readFileSync(llmsPath, "utf-8");
+      expect(content.startsWith("# Aegis")).toBe(true);
+    });
   });
 });

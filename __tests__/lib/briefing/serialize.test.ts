@@ -99,7 +99,7 @@ describe("serializeBriefing", () => {
     expect(publishedTag).toBeDefined();
 
     const clientTag = result.tags.find((t) => t[0] === "client");
-    expect(clientTag).toEqual(["client", "aegis", "https://aegis.dwebxr.xyz"]);
+    expect(clientTag).toEqual(["client", "aegis", "https://aegis-ai.xyz"]);
 
     // Topic tags
     const tTags = result.tags.filter((t) => t[0] === "t");

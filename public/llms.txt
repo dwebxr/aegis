@@ -1,0 +1,24 @@
+# Aegis
+
+> Aegis is an open-source AI content quality filter: it ingests RSS, Nostr, and web content, scores each item for quality (Value / Context / Legitimacy) with an AI cascade (local Ollama, in-browser WebLLM, Claude API, or the Internet Computer's on-chain LLM), filters out slop, and delivers a clean, ranked briefing. It runs as a Next.js PWA backed by an Internet Computer canister, publishes quality signals to Nostr, and sells machine-readable briefings to other agents via x402 micropayments (USDC on Base Sepolia; JPYC on Polygon via OpenPay).
+
+Live app: https://aegis-ai.xyz
+License: MIT. Built by DWEBXR LAB.
+
+## Docs
+
+- [README](https://github.com/dwebxr/aegis/blob/main/README.md): overview, architecture, self-hosting
+- [OpenAPI spec](https://aegis-ai.xyz/openapi.yaml): machine-readable REST API reference
+- [API docs](https://aegis-ai.xyz/api-docs): human-readable API documentation
+- [D2A protocol](https://github.com/dwebxr/aegis/blob/main/docs/D2A_PROTOCOL.md): end-to-end-encrypted agent-to-agent content exchange over Nostr
+
+## API
+
+- [Agent discovery](https://aegis-ai.xyz/api/d2a/info): capabilities and endpoints, free, no auth
+- [Global briefing (x402, USDC)](https://aegis-ai.xyz/api/d2a/briefing): paid ranked briefing for AI agents, x402 v2 on Base Sepolia
+- [Global briefing (x402, JPYC)](https://aegis-ai.xyz/api/d2a/briefing-jpyc): paid briefing via OpenPay, JPYC on Polygon
+- [Health](https://aegis-ai.xyz/api/health): deployment status and version
+
+## Source
+
+- [GitHub repository](https://github.com/dwebxr/aegis): full source code (MIT)

@@ -19,14 +19,16 @@ const DemoContext = createContext<DemoState>({
 export function DemoProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
-  const [bannerDismissed, setBannerDismissed] = useState(() => {
-    if (typeof window === "undefined") return false;
+  // Initialized false (not from sessionStorage) so the first client render
+  // matches the server-rendered landing page; the stored dismissal is
+  // restored in an effect right after hydration.
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  useEffect(() => {
     try {
-      return sessionStorage.getItem(DEMO_BANNER_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
+      if (sessionStorage.getItem(DEMO_BANNER_KEY) === "true") setBannerDismissed(true);
+    } catch { console.debug("[demo] sessionStorage unavailable"); }
+  }, []);
 
   const isDemoMode = !isAuthenticated && !isLoading;
 

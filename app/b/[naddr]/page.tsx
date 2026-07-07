@@ -76,6 +76,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!briefing) {
     return {
       title: "Briefing Not Found | Aegis",
+      alternates: { canonical: `/b/${naddr}` },
     };
   }
 
@@ -83,6 +84,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: briefing.title,
     description: desc,
+    alternates: { canonical: `/b/${naddr}` },
     openGraph: {
       type: "article",
       title: briefing.title,

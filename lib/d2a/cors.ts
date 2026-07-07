@@ -15,12 +15,12 @@ function csvEnv(key: string): string[] {
   return val ? val.split(",").map(o => o.trim()).filter(Boolean) : [];
 }
 
-const ALLOWED_ORIGINS: string[] = [
+const ALLOWED_ORIGINS: string[] = Array.from(new Set([
   ...(process.env.D2A_CORS_ORIGINS
     ? csvEnv("D2A_CORS_ORIGINS")
-    : ["https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io", APP_URL]),
+    : ["https://4wfup-gqaaa-aaaas-qdqca-cai.icp0.io", APP_URL, "https://aegis.dwebxr.xyz"]),
   ...csvEnv("AEGIS_A2A_ALLOWED_ORIGINS"),
-].filter(isValidOrigin);
+])).filter(isValidOrigin);
 
 const STATIC_CORS: Record<string, string> = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",

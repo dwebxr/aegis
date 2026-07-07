@@ -8,6 +8,7 @@ import * as Sentry from "@sentry/nextjs";
 import { useNotify } from "./NotificationContext";
 import { errMsg } from "@/lib/utils/errors";
 import { nowNs } from "@/lib/utils/icTime";
+import { syncAuthHint } from "@/lib/authHint";
 
 interface DelegationChain {
   delegations: Array<{ delegation: { expiration: bigint } }>;
@@ -114,6 +115,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     });
   }, [addNotification]);
+
+  // Keep the paint-time landing-page hint in sync with resolved auth state.
+  // Runs after every resolution path (init, login, logout, session-expired,
+  // expired delegation, anonymous principal, init failure, mock auth) since
+  // they all funnel through these two state values.
+  useEffect(() => {
+    if (isLoading) return;
+    syncAuthHint(isAuthenticated);
+  }, [isAuthenticated, isLoading]);
 
   const login = useCallback(async () => {
     if (!authClient) return;

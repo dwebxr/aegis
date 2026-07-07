@@ -1,12 +1,18 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { breakpoints } from "@/styles/theme";
 
-export function useWindowSize() {
-  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
+// Server render can't know the viewport, so the first client render must use
+// the same fixed width (1024) to hydrate cleanly against the prerendered
+// landing page. The layout effect swaps in the real width before first paint.
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-  useEffect(() => {
+export function useWindowSize() {
+  const [width, setWidth] = useState(1024);
+
+  useIsomorphicLayoutEffect(() => {
     const handler = () => setWidth(window.innerWidth);
+    handler();
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, []);

@@ -30,7 +30,7 @@ describe("GET /api/d2a/info", () => {
   it("contains sourceUrl", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
-    expect(data.sourceUrl).toBe("https://aegis.dwebxr.xyz");
+    expect(data.sourceUrl).toBe("https://aegis-ai.xyz");
   });
 
   it("lists briefing endpoint with receiver-derived auth (none when x402 unset)", async () => {

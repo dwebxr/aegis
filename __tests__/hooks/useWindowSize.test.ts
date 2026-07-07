@@ -5,7 +5,16 @@
  * useWindowSize — unit tests.
  * Tests resize events, mobile/tablet breakpoint detection, and initial value.
  */
+import React from "react";
+import { TextEncoder } from "util";
 import { renderHook, act } from "@testing-library/react";
+
+// jsdom lacks TextEncoder, which react-dom/server needs at module load.
+if (typeof globalThis.TextEncoder === "undefined") {
+  globalThis.TextEncoder = TextEncoder as typeof globalThis.TextEncoder;
+}
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- must load after the polyfill above
+const { renderToString } = require("react-dom/server") as typeof import("react-dom/server");
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { breakpoints } from "@/styles/theme";
 
@@ -110,5 +119,18 @@ describe("useWindowSize", () => {
     fireResize(breakpoints.tablet - 1);
     const { result } = renderHook(() => useWindowSize());
     expect(result.current.tablet).toBe(true);
+  });
+
+  it("render output ignores window.innerWidth until the layout effect (hydration safety)", () => {
+    // The server prerenders the landing page with width=1024; the first
+    // client render must produce identical markup even on a phone, so the
+    // hook must not read window.innerWidth during render itself.
+    Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 400 });
+    function Probe() {
+      const { width } = useWindowSize();
+      return React.createElement("span", null, String(width));
+    }
+    const html = renderToString(React.createElement(Probe));
+    expect(html).toContain("1024");
   });
 });
