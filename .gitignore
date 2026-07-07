@@ -65,3 +65,7 @@ next-env.d.ts
 # claude code harness ephemeral state
 .claude/worktrees/
 .claude/evaluations/
+
+# claude code session artifacts (review logs, one-off plans/notes) — never publish
+.claude/*.log
+.claude/*.md
