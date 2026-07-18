@@ -9,24 +9,53 @@
  * before — resets on cold start, each instance gets its own budget).
  */
 
-import { getKV, _resetKVCache } from "./kvStore";
+import * as Sentry from "@sentry/nextjs";
+import { dailyBudgetKV, scoreBudgetKV } from "./kv/namespace";
 
 const _parsed = parseInt((process.env.ANTHROPIC_DAILY_BUDGET || "500").trim(), 10);
 const DAILY_BUDGET = Number.isNaN(_parsed) ? 500 : _parsed;
+const _parsedScore = parseInt((process.env.SCORE_DAILY_BUDGET || "300").trim(), 10);
+const SCORE_DAILY_BUDGET = Number.isNaN(_parsedScore) ? 300 : _parsedScore;
 
 // In-memory fallback (per-instance)
 let memCalls = 0;
 let memResetAt = Date.now() + 86_400_000;
+let memScoreCalls = 0;
+let memScoreDate = new Date().toISOString().slice(0, 10);
 
 function dailyKey(): string {
-  return `aegis:api-calls:${new Date().toISOString().slice(0, 10)}`;
+  return new Date().toISOString().slice(0, 10);
+}
+
+function reserveScoreInMemory(): boolean {
+  const today = dailyKey();
+  if (today !== memScoreDate) {
+    memScoreCalls = 0;
+    memScoreDate = today;
+  }
+  if (memScoreCalls >= SCORE_DAILY_BUDGET) return false;
+  memScoreCalls++;
+  return true;
+}
+
+function canUseMemoryScoreBudget(): boolean {
+  return process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+}
+
+function secondsUntilNextUtcDay(): number {
+  const now = new Date();
+  const nextUtcDay = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+  );
+  return Math.max(1, Math.ceil((nextUtcDay - now.getTime()) / 1000));
 }
 
 export async function withinDailyBudget(): Promise<boolean> {
-  const store = await getKV();
-  if (store) {
-    const count = (await store.get<number>(dailyKey())) ?? 0;
-    return count < DAILY_BUDGET;
+  const storedCount = await dailyBudgetKV.get<number>(dailyKey());
+  if (storedCount !== undefined) {
+    return (storedCount ?? 0) < DAILY_BUDGET;
   }
   const now = Date.now();
   if (now >= memResetAt) {
@@ -37,11 +66,8 @@ export async function withinDailyBudget(): Promise<boolean> {
 }
 
 export async function recordApiCall(): Promise<void> {
-  const store = await getKV();
-  if (store) {
-    const key = dailyKey();
-    const count = await store.incr(key);
-    if (count === 1) await store.expire(key, 86_400);
+  const count = await dailyBudgetKV.incr(dailyKey(), { ex: 86_400 });
+  if (count !== undefined) {
     const threshold = Math.floor(DAILY_BUDGET * 0.1);
     if (threshold > 0 && count === DAILY_BUDGET - threshold) {
       console.warn(`[dailyBudget] 90% consumed: ${count}/${DAILY_BUDGET} calls used`);
@@ -56,9 +82,39 @@ export async function recordApiCall(): Promise<void> {
 }
 
 export async function _resetDailyBudget(): Promise<void> {
-  const store = await getKV();
-  if (store) await store.del(dailyKey());
+  await dailyBudgetKV.set(dailyKey(), undefined);
   memCalls = 0;
   memResetAt = Date.now() + 86_400_000;
-  _resetKVCache(); // Reset lazy cache for test isolation
+  memScoreCalls = 0;
+  memScoreDate = dailyKey();
+}
+
+export async function tryReserveScoreBudget(): Promise<boolean> {
+  const key = dailyKey();
+  const initialized = await scoreBudgetKV.set(key, 0, { nx: true, ex: 86_400 });
+  if (initialized === undefined) {
+    if (canUseMemoryScoreBudget()) return reserveScoreInMemory();
+    throw new Error("Score budget requires KV in production");
+  }
+
+  const count = await scoreBudgetKV.incr(key);
+  if (count === undefined) throw new Error("Score budget KV became unavailable");
+  if (count <= SCORE_DAILY_BUDGET) return true;
+
+  try {
+    const restored = await scoreBudgetKV.decr(key);
+    if (restored === undefined) throw new Error("Score budget KV became unavailable");
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: { module: "dailyBudget", failure: "score-budget-decr" },
+    });
+  }
+  return false;
+}
+
+export async function getScoreBudgetRetryAfter(): Promise<number> {
+  const untilNextUtcDay = secondsUntilNextUtcDay();
+  const ttl = await scoreBudgetKV.ttl(dailyKey());
+  if (ttl === undefined || ttl <= 0) return untilNextUtcDay;
+  return Math.min(ttl, untilNextUtcDay);
 }

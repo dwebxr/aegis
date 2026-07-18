@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getKV, _resetKVCache } from "./kvStore";
+import { rateLimitKV } from "./kv/namespace";
 import { errMsg } from "@/lib/utils/errors";
 
-// Re-export _resetKVCache for tests that already import it from rateLimit.
-export { _resetKVCache };
+// The facade checks configuration on every operation, so no client cache remains
+// to clear. Keep the test helper as a compatibility no-op.
+export function _resetKVCache(): void {}
 
 // Sliding window via Vercel KV INCR+EXPIRE; falls back to in-memory rateLimit() when KV is absent.
 export async function distributedRateLimit(
@@ -11,17 +12,12 @@ export async function distributedRateLimit(
   limit = 20,
   windowSec = 60,
 ): Promise<NextResponse | null> {
-  const store = await getKV();
-  if (!store) return rateLimit(request, limit, windowSec * 1000);
-
   try {
     const ip = getClientIP(request);
-    const windowKey = `aegis:rl:${ip}:${Math.floor(Date.now() / (windowSec * 1000))}`;
+    const windowKey = `${ip}:${Math.floor(Date.now() / (windowSec * 1000))}`;
 
-    const count = await store.incr(windowKey);
-    if (count === 1) {
-      await store.expire(windowKey, windowSec);
-    }
+    const count = await rateLimitKV.incr(windowKey, { ex: windowSec });
+    if (count === undefined) return rateLimit(request, limit, windowSec * 1000);
 
     if (count > limit) {
       // The distributed count already says DENY — never fall back to the weaker
@@ -29,8 +25,8 @@ export async function distributedRateLimit(
       // failing ttl() only degrades the Retry-After hint, not the decision.
       let retryAfter = windowSec;
       try {
-        const ttl = await store.ttl(windowKey);
-        if (ttl > 0) retryAfter = ttl;
+        const ttl = await rateLimitKV.ttl(windowKey);
+        if (ttl !== undefined && ttl > 0) retryAfter = ttl;
       } catch { /* ttl unavailable — use the full window */ }
       return NextResponse.json(
         { error: "Rate limit exceeded. Try again later." },
@@ -54,20 +50,19 @@ export async function distributedRateLimitByKey(
   windowSec: number,
   errorMessage = "Rate limit exceeded for this resource. Try again later.",
 ): Promise<NextResponse | null> {
-  const store = await getKV();
-  if (!store) return inMemoryRateLimitByKey(key, limit, windowSec * 1000, errorMessage);
-
   try {
-    const windowKey = `aegis:rl:key:${key}:${Math.floor(Date.now() / (windowSec * 1000))}`;
-    const count = await store.incr(windowKey);
-    if (count === 1) await store.expire(windowKey, windowSec);
+    const windowKey = `key:${key}:${Math.floor(Date.now() / (windowSec * 1000))}`;
+    const count = await rateLimitKV.incr(windowKey, { ex: windowSec });
+    if (count === undefined) {
+      return inMemoryRateLimitByKey(key, limit, windowSec * 1000, errorMessage);
+    }
 
     if (count > limit) {
       // Already over the distributed limit → deny; don't fall back to in-memory.
       let retryAfter = windowSec;
       try {
-        const ttl = await store.ttl(windowKey);
-        if (ttl > 0) retryAfter = ttl;
+        const ttl = await rateLimitKV.ttl(windowKey);
+        if (ttl !== undefined && ttl > 0) retryAfter = ttl;
       } catch { /* ttl unavailable — use the full window */ }
       return NextResponse.json(
         { error: errorMessage },
