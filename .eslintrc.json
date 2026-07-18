@@ -1,3 +1,109 @@
 {
-  "extends": ["next/core-web-vitals", "next/typescript"]
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "ignorePatterns": [
+    ".claude/worktrees/**",
+    "__tests__/**",
+    "e2e/**",
+    "next-env.d.ts",
+    "public/sw.js"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["@vercel/kv"], "message": "@vercel/kv is restricted to lib/api/kv/internal/raw.ts." },
+            { "group": ["@/lib/api/kv/internal/raw", "**/lib/api/kv/internal/raw", "./raw", "./internal/raw", "../internal/raw"], "message": "Raw KV access is restricted to lib/api/kv/internal/factory.ts." },
+            { "group": ["@/lib/api/kv/internal/factory", "**/lib/api/kv/internal/factory", "./internal/factory", "../internal/factory", "./factory"], "message": "KV namespaces must be declared in the approved facade modules." },
+            { "group": ["@/lib/api/kv/journalNamespace", "**/lib/api/kv/journalNamespace", "./journalNamespace", "../kv/journalNamespace"], "message": "The journal namespace is restricted to settlementJournal.ts." },
+            { "group": ["@/lib/api/kv/reconcileJournal", "**/lib/api/kv/reconcileJournal", "./reconcileJournal", "../kv/reconcileJournal"], "message": "Reconciliation capabilities are restricted to scripts/." },
+            { "group": ["@/scripts/*", "@/scripts/**", "**/scripts/*", "**/scripts/**"], "message": "Application code must not import operational scripts." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["lib/api/kv/internal/raw.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["@/lib/api/kv/internal/raw", "**/lib/api/kv/internal/raw", "./raw"], "message": "Raw KV access is restricted to lib/api/kv/internal/factory.ts." },
+            { "group": ["@/lib/api/kv/internal/factory", "**/lib/api/kv/internal/factory", "./factory"], "message": "KV namespaces must be declared in the approved facade modules." },
+            { "group": ["@/lib/api/kv/journalNamespace", "**/lib/api/kv/journalNamespace", "./journalNamespace"], "message": "The journal namespace is restricted to settlementJournal.ts." },
+            { "group": ["@/lib/api/kv/reconcileJournal", "**/lib/api/kv/reconcileJournal", "./reconcileJournal"], "message": "Reconciliation capabilities are restricted to scripts/." },
+            { "group": ["@/scripts/*", "@/scripts/**", "**/scripts/*", "**/scripts/**"], "message": "Application code must not import operational scripts." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["lib/api/kv/internal/factory.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["@vercel/kv"], "message": "@vercel/kv is restricted to lib/api/kv/internal/raw.ts." },
+            { "group": ["@/lib/api/kv/internal/factory", "**/lib/api/kv/internal/factory", "./factory"], "message": "KV namespaces must be declared in the approved facade modules." },
+            { "group": ["@/lib/api/kv/journalNamespace", "**/lib/api/kv/journalNamespace", "./journalNamespace"], "message": "The journal namespace is restricted to settlementJournal.ts." },
+            { "group": ["@/lib/api/kv/reconcileJournal", "**/lib/api/kv/reconcileJournal", "./reconcileJournal"], "message": "Reconciliation capabilities are restricted to scripts/." },
+            { "group": ["@/scripts/*", "@/scripts/**", "**/scripts/*", "**/scripts/**"], "message": "Application code must not import operational scripts." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["lib/api/kv/namespace.ts", "lib/api/kv/journalNamespace.ts", "lib/api/kv/reconcileJournal.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["@vercel/kv"], "message": "@vercel/kv is restricted to lib/api/kv/internal/raw.ts." },
+            { "group": ["@/lib/api/kv/internal/raw", "**/lib/api/kv/internal/raw", "./raw", "./internal/raw", "../internal/raw"], "message": "Raw KV access is restricted to lib/api/kv/internal/factory.ts." },
+            { "group": ["@/lib/api/kv/journalNamespace", "**/lib/api/kv/journalNamespace", "./journalNamespace"], "message": "The journal namespace is restricted to settlementJournal.ts." },
+            { "group": ["@/lib/api/kv/reconcileJournal", "**/lib/api/kv/reconcileJournal", "./reconcileJournal"], "message": "Reconciliation capabilities are restricted to scripts/." },
+            { "group": ["@/scripts/*", "@/scripts/**", "**/scripts/*", "**/scripts/**"], "message": "Application code must not import operational scripts." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["lib/d2a/settlementJournal.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["@vercel/kv"], "message": "@vercel/kv is restricted to lib/api/kv/internal/raw.ts." },
+            { "group": ["@/lib/api/kv/internal/raw", "**/lib/api/kv/internal/raw", "./raw", "./internal/raw", "../internal/raw"], "message": "Raw KV access is restricted to lib/api/kv/internal/factory.ts." },
+            { "group": ["@/lib/api/kv/internal/factory", "**/lib/api/kv/internal/factory", "./internal/factory", "../internal/factory", "./factory"], "message": "KV namespaces must be declared in the approved facade modules." },
+            { "group": ["@/lib/api/kv/reconcileJournal", "**/lib/api/kv/reconcileJournal", "./reconcileJournal", "../kv/reconcileJournal"], "message": "Reconciliation capabilities are restricted to scripts/." },
+            { "group": ["@/scripts/*", "@/scripts/**", "**/scripts/*", "**/scripts/**"], "message": "Application code must not import operational scripts." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["scripts/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["@vercel/kv"], "message": "@vercel/kv is restricted to lib/api/kv/internal/raw.ts." },
+            { "group": ["@/lib/api/kv/internal/raw", "**/lib/api/kv/internal/raw", "./raw", "./internal/raw", "../internal/raw"], "message": "Raw KV access is restricted to lib/api/kv/internal/factory.ts." },
+            { "group": ["@/lib/api/kv/internal/factory", "**/lib/api/kv/internal/factory", "./internal/factory", "../internal/factory", "./factory"], "message": "KV namespaces must be declared in the approved facade modules." },
+            { "group": ["@/lib/api/kv/journalNamespace", "**/lib/api/kv/journalNamespace", "./journalNamespace", "../kv/journalNamespace"], "message": "The journal namespace is restricted to settlementJournal.ts." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["app/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
+      "excludedFiles": ["lib/api/kv/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-syntax": ["error", {
+          "selector": "ExportNamedDeclaration[source.value=/kv\\/internal/]",
+          "message": "KV internals must not be re-exported outside lib/api/kv."
+        }, {
+          "selector": "ExportAllDeclaration[source.value=/kv\\/internal/]",
+          "message": "KV internals must not be re-exported outside lib/api/kv."
+        }]
+      }
+    }
+  ]
 }

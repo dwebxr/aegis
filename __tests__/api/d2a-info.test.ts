@@ -56,6 +56,23 @@ describe("GET /api/d2a/info", () => {
     expect(data.endpoints.health.auth).toBe("none");
   });
 
+  it("lists the disabled-by-default score endpoint with its own price", async () => {
+    const res = await GET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.score).toEqual(expect.objectContaining({
+      url: "/api/d2a/score",
+      method: "GET",
+      auth: "disabled",
+      x402Version: 2,
+      price: "$0.02",
+      network: "eip155:84532",
+      currency: "USDC",
+    }));
+    expect(data.endpoints.score.params.url).toContain("required");
+    expect(data.endpoints.score.params.url).toContain("access logs");
+    expect(data.payment.priceNote).toContain("endpoints[].price");
+  });
+
   it("includes payment section with x402 protocol", async () => {
     const res = await GET(makeRequest());
     const data = await res.json();
@@ -234,6 +251,80 @@ describe("GET /api/d2a/info with unsupported X402_NETWORK", () => {
     expect(data.payment.currency).toBe("unknown");
     expect(data.payment.asset).toBeNull();
     expect(data.payment.usdcContract).toBe("unknown");
+  });
+});
+
+describe("GET /api/d2a/info with Base mainnet", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("advertises eip155:8453 USD Coin from the x402 asset registry", async () => {
+    process.env.X402_NETWORK = "eip155:8453";
+    process.env.CDP_API_KEY_ID = "test-key-id";
+    process.env.CDP_API_KEY_SECRET = "test-key-secret";
+    jest.doMock("@/lib/d2a/cdpFacilitator", () => ({
+      createCdpFacilitatorConfig: () => ({ url: "https://cdp.test/x402" }),
+    }));
+    jest.resetModules();
+    const { GET: mainnetGET } = await import("@/app/api/d2a/info/route");
+    const res = await mainnetGET(makeRequest());
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.endpoints.score.network).toBe("eip155:8453");
+    expect(data.endpoints.score.currency).toBe("USD Coin");
+    expect(data.payment.asset).toEqual({
+      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      name: "USD Coin",
+      decimals: 6,
+    });
+  });
+});
+
+describe("GET /api/d2a/info with shared payments disabled", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("advertises all three shared payment endpoints as disabled", async () => {
+    process.env.D2A_PAYMENTS_DISABLED = "true";
+    process.env.D2A_SCORE_ENABLED = "true";
+    jest.resetModules();
+    const { GET: disabledGET } = await import("@/app/api/d2a/info/route");
+    const res = await disabledGET(makeRequest());
+    const data = await res.json();
+
+    expect(data.endpoints.briefing.auth).toBe("disabled");
+    expect(data.endpoints.changes.auth).toBe("disabled");
+    expect(data.endpoints.score.auth).toBe("disabled");
+  });
+});
+
+describe("D2A score free-mode production fail-fast", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("throws while loading the info descriptor when production free mode is enabled", async () => {
+    Object.defineProperty(process.env, "NODE_ENV", {
+      value: "production",
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+    process.env.D2A_SCORE_FREE_ENABLED = "true";
+    jest.resetModules();
+    await expect(import("@/app/api/d2a/info/route"))
+      .rejects.toThrow("must not be enabled in production");
   });
 });
 

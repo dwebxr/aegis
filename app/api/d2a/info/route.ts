@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_STABLECOINS } from "@x402/evm";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
-import { X402_NETWORK, X402_PRICE, X402_RECEIVER } from "@/lib/d2a/x402Server";
+import {
+  X402_NETWORK,
+  X402_PRICE,
+  X402_RECEIVER,
+  X402_SCORE_PRICE,
+} from "@/lib/d2a/x402Server";
 import { OPENPAY_MERCHANT, OPENPAY_URL } from "@/lib/d2a/openpayGate";
 import { APP_URL } from "@/lib/config";
 
@@ -16,6 +21,14 @@ import { APP_URL } from "@/lib/config";
 // as configured) even when the operator picks a network the paywall can't settle.
 const DEFAULT_ASSET = DEFAULT_STABLECOINS[X402_NETWORK] ?? null;
 const CURRENCY = DEFAULT_ASSET?.name ?? "unknown";
+const SCORE_FREE_ENABLED = process.env.D2A_SCORE_FREE_ENABLED === "true";
+const PAYMENTS_DISABLED = process.env.D2A_PAYMENTS_DISABLED === "true";
+const IS_PRODUCTION =
+  process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+
+if (SCORE_FREE_ENABLED && IS_PRODUCTION) {
+  throw new Error("D2A_SCORE_FREE_ENABLED must not be enabled in production");
+}
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);
@@ -31,7 +44,7 @@ export async function GET(request: NextRequest) {
       briefing: {
         url: "/api/d2a/briefing",
         method: "GET",
-        auth: X402_RECEIVER ? "x402" : "none",
+        auth: PAYMENTS_DISABLED ? "disabled" : X402_RECEIVER ? "x402" : "none",
         x402Version: 2,
         price: X402_PRICE,
         network: X402_NETWORK,
@@ -49,7 +62,7 @@ export async function GET(request: NextRequest) {
       changes: {
         url: "/api/d2a/briefing/changes",
         method: "GET",
-        auth: X402_RECEIVER ? "x402" : "none",
+        auth: PAYMENTS_DISABLED ? "disabled" : X402_RECEIVER ? "x402" : "none",
         x402Version: 2,
         price: X402_PRICE,
         network: X402_NETWORK,
@@ -58,6 +71,25 @@ export async function GET(request: NextRequest) {
         params: {
           since: "(required) ISO 8601 timestamp",
           preview: "(optional) 'true' to get hash-only diff (title/sourceUrl redacted) without x402 payment (requires X402_FREE_TIER_ENABLED)",
+        },
+      },
+      score: {
+        url: "/api/d2a/score",
+        method: "GET",
+        auth: process.env.D2A_SCORE_ENABLED !== "true" || PAYMENTS_DISABLED
+          ? "disabled"
+          : SCORE_FREE_ENABLED
+            ? "none"
+            : X402_RECEIVER
+              ? "x402"
+              : "unavailable",
+        x402Version: 2,
+        price: X402_SCORE_PRICE,
+        network: X402_NETWORK,
+        currency: CURRENCY,
+        description: "Score a URL's content quality (V/C/L) with AI",
+        params: {
+          url: "(required) http(s) URL of the article to score (max 2048 chars; sent as query string — appears in access logs)",
         },
       },
       briefingJpyc: {
@@ -90,6 +122,7 @@ export async function GET(request: NextRequest) {
       receiver: X402_RECEIVER || "not configured",
       network: X402_NETWORK,
       price: X402_PRICE,
+      priceNote: "This is the default briefing price. Each endpoints[].price value is authoritative for that endpoint.",
       currency: CURRENCY,
       // The settlement asset the 402 payment requirements will demand on this
       // network. null when the network has no default asset in @x402/evm.

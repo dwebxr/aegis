@@ -5,10 +5,7 @@ import { heuristicScores } from "@/lib/ingestion/quickFilter";
 import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { withinDailyBudget, recordApiCall } from "@/lib/api/dailyBudget";
 import { errMsg } from "@/lib/utils/errors";
-import { buildScoringPrompt } from "@/lib/scoring/prompt";
-import { parseScoreResponse } from "@/lib/scoring/parseResponse";
-import type { ScoreParseResult } from "@/lib/scoring/types";
-import { callAnthropic, ANTHROPIC_DEFAULT_MODEL } from "@/lib/api/anthropic";
+import { scoreOneText } from "@/lib/scoring/scoreWithClaude.server";
 import { resolveAnthropicKey } from "@/lib/api/byok";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 
@@ -27,37 +24,6 @@ function sanitizeUserContext(rawCtx?: UserContext): UserContext | undefined {
     lowAffinityTopics: sanitizeTopics(rawCtx.lowAffinityTopics),
     trustedAuthors: sanitizeTopics(rawCtx.trustedAuthors),
   };
-}
-
-async function scoreOneText(
-  text: string,
-  userContext: UserContext | undefined,
-  apiKey: string,
-): Promise<ScoreParseResult & { tier: "claude" }> {
-  const allTopics = userContext
-    ? [...userContext.recentTopics, ...userContext.highAffinityTopics].filter(Boolean)
-    : [];
-  const prompt = buildScoringPrompt(text, allTopics.length > 0 ? allTopics : undefined, 5000);
-
-  const res = await callAnthropic({
-    apiKey,
-    model: ANTHROPIC_DEFAULT_MODEL,
-    maxTokens: 1000,
-    messages: [{ role: "user", content: prompt }],
-    timeoutMs: 15_000,
-  });
-
-  if (!res.ok) {
-    throw new Error(`Anthropic API returned ${res.status}`);
-  }
-
-  const parsed = parseScoreResponse(res.text);
-
-  if (!parsed) {
-    throw new Error("Failed to parse AI response");
-  }
-
-  return { ...parsed, tier: "claude" as const };
 }
 
 export async function POST(request: NextRequest) {

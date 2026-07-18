@@ -1,3 +1,7 @@
+jest.mock("@/lib/d2a/cdpFacilitator", () => ({
+  createCdpFacilitatorConfig: jest.fn(() => ({ url: "https://cdp.test/x402" })),
+}));
+
 describe("x402Server exports", () => {
   const origEnv = process.env;
 
@@ -28,7 +32,12 @@ describe("x402Server exports", () => {
   });
 
   it("trims whitespace from X402_NETWORK", () => {
-    process.env = { ...origEnv, X402_NETWORK: "  eip155:8453  " };
+    process.env = {
+      ...origEnv,
+      X402_NETWORK: "  eip155:8453  ",
+      CDP_API_KEY_ID: "key-id",
+      CDP_API_KEY_SECRET: "key-secret",
+    };
     jest.isolateModules(() => {
       const { X402_NETWORK } = require("@/lib/d2a/x402Server");
       expect(X402_NETWORK).toBe("eip155:8453");
@@ -80,5 +89,58 @@ describe("x402Server exports", () => {
       const { X402_NETWORK } = require("@/lib/d2a/x402Server");
       expect(X402_NETWORK).toMatch(/^[a-z0-9]+:\d+$/);
     });
+  });
+});
+
+describe("x402Server CDP fail-fast configuration", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("throws during dynamic import when only CDP_API_KEY_ID exists", async () => {
+    process.env = { ...originalEnv, CDP_API_KEY_ID: "key-id" };
+    delete process.env.CDP_API_KEY_SECRET;
+    jest.resetModules();
+
+    await expect(import("@/lib/d2a/x402Server"))
+      .rejects.toThrow("must be configured together");
+  });
+
+  it("throws during dynamic import when only CDP_API_KEY_SECRET exists", async () => {
+    process.env = { ...originalEnv, CDP_API_KEY_SECRET: "key-secret" };
+    delete process.env.CDP_API_KEY_ID;
+    jest.resetModules();
+
+    await expect(import("@/lib/d2a/x402Server"))
+      .rejects.toThrow("must be configured together");
+  });
+
+  it("throws during dynamic import for Base mainnet without CDP keys", async () => {
+    process.env = { ...originalEnv, X402_NETWORK: "eip155:8453" };
+    delete process.env.CDP_API_KEY_ID;
+    delete process.env.CDP_API_KEY_SECRET;
+    jest.resetModules();
+
+    await expect(import("@/lib/d2a/x402Server"))
+      .rejects.toThrow("Base mainnet requires");
+  });
+
+  it("uses CDP credentials and ignores X402_FACILITATOR_URL", async () => {
+    const createCdpFacilitatorConfig = jest.fn(() => ({ url: "https://cdp.test/x402" }));
+    jest.doMock("@/lib/d2a/cdpFacilitator", () => ({ createCdpFacilitatorConfig }));
+    process.env = {
+      ...originalEnv,
+      CDP_API_KEY_ID: " key-id ",
+      CDP_API_KEY_SECRET: " key-secret ",
+      X402_FACILITATOR_URL: "https://must-be-ignored.example",
+    };
+    jest.resetModules();
+
+    await import("@/lib/d2a/x402Server");
+
+    expect(createCdpFacilitatorConfig).toHaveBeenCalledWith("key-id", "key-secret");
   });
 });
