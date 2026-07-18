@@ -17,10 +17,11 @@ jest.mock("@/lib/api/kv/namespace", () => ({ metricsKV: mockMetrics }));
 jest.mock("@sentry/nextjs", () => ({ captureException: mockCaptureException }));
 
 import type { SettleContext, SettleResultContext } from "@x402/core/server";
+import { decodePaymentSignatureHeader } from "@x402/core/http";
 import {
   acquirePaymentWork,
+  canonicalPaymentIdentity,
   createAttempt,
-  hashPaymentPayload,
   onAfterSettle,
   onAfterVerify,
   onBeforeSettle,
@@ -28,7 +29,14 @@ import {
   readFinalAndAttempt,
 } from "@/lib/d2a/settlementJournal";
 
-const RAW_PAYMENT = "eyJ4NDAyVmVyc2lvbiI6Mn0=";
+const AUTHORIZATION = {
+  from: "0x0000000000000000000000000000000000000002",
+  to: "0x0000000000000000000000000000000000000001",
+  value: "20000",
+  validAfter: "0",
+  validBefore: "1750000000",
+  nonce: `0x${"ab".repeat(32)}`,
+};
 
 function context(): SettleContext {
   return {
@@ -43,7 +51,7 @@ function context(): SettleContext {
         maxTimeoutSeconds: 300,
         extra: {},
       },
-      payload: { authorization: { from: "0xpayer" } },
+      payload: { authorization: AUTHORIZATION, signature: "0xfake" },
       resource: { url: "https://example.com/article?x=1" },
     },
     requirements: {
@@ -56,7 +64,7 @@ function context(): SettleContext {
       extra: {},
     },
     declaredExtensions: {},
-    transportContext: { request: { paymentHeader: RAW_PAYMENT } },
+    transportContext: {},
   } as unknown as SettleContext;
 }
 
@@ -73,9 +81,33 @@ describe("settlementJournal", () => {
     mockMetrics.incr.mockResolvedValue(1);
   });
 
-  it("hashes the received base64 payload verbatim", () => {
-    expect(hashPaymentPayload("YQ==")).not.toBe(hashPaymentPayload("YQ"));
-    expect(hashPaymentPayload("YQ==")).toMatch(/^[0-9a-f]{64}$/);
+  it("maps equivalent JSON order, whitespace, and base64 padding to one identity", () => {
+    const payment = context().paymentPayload;
+    const reordered = {
+      payload: {
+        signature: "0xfake",
+        authorization: {
+          nonce: AUTHORIZATION.nonce.toUpperCase().replace("0X", "0x"),
+          validBefore: AUTHORIZATION.validBefore,
+          validAfter: AUTHORIZATION.validAfter,
+          value: AUTHORIZATION.value,
+          to: AUTHORIZATION.to,
+          from: AUTHORIZATION.from.toUpperCase().replace("0X", "0x"),
+        },
+      },
+      accepted: payment.accepted,
+      x402Version: 2,
+      resource: payment.resource,
+    };
+    const compact = Buffer.from(JSON.stringify(payment), "utf8").toString("base64");
+    const spacedUnpadded = Buffer.from(JSON.stringify(reordered, null, 2), "utf8")
+      .toString("base64")
+      .replace(/=+$/, "");
+
+    const first = canonicalPaymentIdentity(decodePaymentSignatureHeader(compact));
+    const second = canonicalPaymentIdentity(decodePaymentSignatureHeader(spacedUnpadded));
+    expect(first).toBe(second);
+    expect(first).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("acquires paid work with a 150-second SET NX marker that has no release API", async () => {
@@ -125,6 +157,11 @@ describe("settlementJournal", () => {
       payer: "payer",
       url: "https://example.com",
       price: "1",
+      authorization: {
+        ...AUTHORIZATION,
+        network: "eip155:84532",
+        asset: "asset",
+      },
       createdAt: 1,
       updatedAt: 1,
     }));
@@ -203,6 +240,13 @@ describe("settlementJournal", () => {
       "pending",
       expect.objectContaining({ score: expect.any(Number), member: expect.stringContaining(":a:") }),
     );
+    const pendingRecord = mockJournal.set.mock.calls.find((call) =>
+      String(call[0]).includes(":a:"))?.[1];
+    expect(pendingRecord.authorization).toEqual({
+      ...AUTHORIZATION,
+      network: "eip155:84532",
+      asset: "0xasset",
+    });
   });
 
   it("fails closed when ZADD fails and marks the attempt rejected before ZREM", async () => {
@@ -236,7 +280,7 @@ describe("settlementJournal", () => {
   });
 
   it("writes final, then settled attempt, then removes the pending index", async () => {
-    const hash = hashPaymentPayload(RAW_PAYMENT);
+    const hash = canonicalPaymentIdentity(context().paymentPayload);
     mockJournal.get
       .mockResolvedValueOnce({ attemptToken: "attempt", createdAt: 1 })
       .mockResolvedValueOnce({

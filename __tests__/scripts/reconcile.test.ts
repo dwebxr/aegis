@@ -7,6 +7,7 @@ const mockPruneMissingPending = jest.fn();
 const mockReadReconcileCandidate = jest.fn();
 const mockReadRunbookEpoch = jest.fn();
 const mockReadRunbookLock = jest.fn();
+const mockVerifySettlement = jest.fn();
 
 jest.mock("@/lib/api/kv/reconcileJournal", () => ({
   acquireRunbookLock: mockAcquireRunbookLock,
@@ -22,9 +23,53 @@ jest.mock("@/lib/api/kv/reconcileJournal", () => ({
   writeResolution: jest.fn(),
 }));
 
-import { resolutionWarnings, runReconcileReport } from "@/scripts/reconcile";
+jest.mock("@/scripts/verify-settlement", () => ({
+  ...jest.requireActual("@/scripts/verify-settlement"),
+  verifySettlement: (...args: unknown[]) => mockVerifySettlement(...args),
+}));
+
+import {
+  buildJournalVerificationPlan,
+  resolutionWarnings,
+  runReconcileReport,
+  verifyJournalSettlement,
+} from "@/scripts/reconcile";
+import type { SettlementAttempt } from "@/lib/d2a/settlementJournal";
+import {
+  BASE_USDC_IMPLEMENTATION,
+  BASE_USDC_PROXY,
+} from "@/scripts/verify-settlement";
 
 const HASH = "a".repeat(64);
+const NONCE = `0x${"ab".repeat(32)}`;
+const AUTHORIZATION = {
+  from: "0x0000000000000000000000000000000000000002",
+  to: "0x0000000000000000000000000000000000000001",
+  value: "20000",
+  nonce: NONCE,
+  validAfter: "0",
+  validBefore: "1750000000",
+  network: "eip155:84532",
+  asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+};
+
+function journalAttempt(
+  authorization: SettlementAttempt["authorization"] = AUTHORIZATION,
+): SettlementAttempt {
+  return {
+    status: "unknown",
+    network: authorization.network,
+    asset: authorization.asset,
+    amount: "999",
+    payTo: "0xlegacy-payee-must-not-be-used",
+    payer: "0xlegacy-payer-must-not-be-used",
+    url: "https://example.com/article",
+    price: "20000",
+    authorization,
+    createdAt: 1_000_000,
+    updatedAt: 1_000_000,
+  };
+}
 
 describe("reconcile report", () => {
   beforeEach(() => {
@@ -53,6 +98,10 @@ describe("reconcile report", () => {
       },
     ]);
     mockReadRunbookEpoch.mockResolvedValue(7);
+    mockVerifySettlement.mockResolvedValue({
+      status: "closed-unpaid",
+      evidence: { compensationAllowed: true, reason: "test" },
+    });
   });
 
   afterEach(() => {
@@ -130,5 +179,90 @@ describe("reconcile report", () => {
         ],
       }),
     ]);
+  });
+
+  it("builds chain and verifier input only from the journal authorization", () => {
+    const plan = buildJournalVerificationPlan(journalAttempt(), {
+      tx: `0x${"cd".repeat(32)}`,
+      payer: AUTHORIZATION.from.toUpperCase().replace("0X", "0x"),
+      nonce: AUTHORIZATION.nonce.toUpperCase().replace("0X", "0x"),
+    });
+
+    expect(plan.status).toBe("ready");
+    if (plan.status !== "ready") throw new Error(plan.reason);
+    expect(plan.chain.id).toBe(84532);
+    expect(plan.rpcUrl).toBe("https://sepolia.base.org");
+    expect(plan.input).toEqual({
+      txHash: `0x${"cd".repeat(32)}`,
+      payer: AUTHORIZATION.from,
+      payTo: AUTHORIZATION.to,
+      amount: 20_000n,
+      nonce: AUTHORIZATION.nonce,
+      validBefore: 1_750_000_000n,
+      network: "eip155:84532",
+      usdc: AUTHORIZATION.asset,
+      expectedImplementation: "0xd74cc5d436923b8ba2c179b4bCA2841D8A52C5B5",
+    });
+  });
+
+  it("passes the journal-derived authorization and network to verifySettlement", async () => {
+    const result = await verifyJournalSettlement(journalAttempt(), {
+      tx: `0x${"cd".repeat(32)}`,
+      payer: AUTHORIZATION.from,
+      nonce: AUTHORIZATION.nonce,
+    });
+
+    expect(result.status).toBe("closed-unpaid");
+    expect(mockVerifySettlement).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        payer: AUTHORIZATION.from,
+        payTo: AUTHORIZATION.to,
+        amount: 20_000n,
+        nonce: AUTHORIZATION.nonce,
+        validBefore: 1_750_000_000n,
+        network: "eip155:84532",
+        usdc: AUTHORIZATION.asset,
+      }),
+    );
+  });
+
+  it("selects Base mainnet RPC, USDC, and implementation pin from attempt.network", () => {
+    const authorization = {
+      ...AUTHORIZATION,
+      network: "eip155:8453",
+      asset: BASE_USDC_PROXY,
+    };
+    const plan = buildJournalVerificationPlan(journalAttempt(authorization));
+
+    expect(plan.status).toBe("ready");
+    if (plan.status !== "ready") throw new Error(plan.reason);
+    expect(plan.chain.id).toBe(8453);
+    expect(plan.rpcUrl).toBe("https://mainnet.base.org");
+    expect(plan.input).toEqual(expect.objectContaining({
+      network: "eip155:8453",
+      usdc: BASE_USDC_PROXY,
+      expectedImplementation: BASE_USDC_IMPLEMENTATION,
+    }));
+  });
+
+  it("rejects CLI authorization values that disagree with the journal", () => {
+    expect(() => buildJournalVerificationPlan(journalAttempt(), {
+      nonce: `0x${"ef".repeat(32)}`,
+    })).toThrow("--nonce does not match the journal authorization");
+    expect(() => buildJournalVerificationPlan(journalAttempt(), {
+      "valid-before": "1750000001",
+    })).toThrow("--valid-before does not match the journal authorization");
+  });
+
+  it("classifies an unknown journal network as needs-review", () => {
+    const plan = buildJournalVerificationPlan(journalAttempt({
+      ...AUTHORIZATION,
+      network: "eip155:999999",
+    }));
+    expect(plan).toEqual({
+      status: "needs-review",
+      reason: "journal-network-unsupported:eip155:999999",
+    });
   });
 });

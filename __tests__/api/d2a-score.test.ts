@@ -10,7 +10,7 @@ const mockCaptureException = jest.fn();
 const mockAddBreadcrumb = jest.fn();
 const mockCaptureMessage = jest.fn();
 const mockAcquirePaymentWork = jest.fn();
-const mockHashPaymentPayload = jest.fn((value: string) => `hash:${value}`);
+const mockCanonicalPaymentIdentity = jest.fn((_paymentPayload: unknown) => "payment-identity");
 let mockReceiver = "";
 
 jest.mock("@/lib/api/kv/namespace", () => ({ scoreCacheKV: mockScoreCache }));
@@ -35,7 +35,8 @@ jest.mock("@/lib/d2a/x402Server", () => ({
 }));
 jest.mock("@/lib/d2a/settlementJournal", () => ({
   acquirePaymentWork: (...args: unknown[]) => mockAcquirePaymentWork(...args),
-  hashPaymentPayload: (...args: [string]) => mockHashPaymentPayload(...args),
+  canonicalPaymentIdentity: (paymentPayload: unknown) =>
+    mockCanonicalPaymentIdentity(paymentPayload),
 }));
 jest.mock("@x402/next", () => ({
   withX402: (handler: (request: NextRequest) => Promise<NextResponse>) => handler,
@@ -71,6 +72,32 @@ function request(url?: string, origin?: string, paymentSignature?: string): Next
       ...(paymentSignature ? { "PAYMENT-SIGNATURE": paymentSignature } : {}),
     },
   });
+}
+
+function paymentSignature(): string {
+  return Buffer.from(JSON.stringify({
+    x402Version: 2,
+    accepted: {
+      scheme: "exact",
+      network: "eip155:84532",
+      asset: "0xasset",
+      amount: "20000",
+      payTo: "0xreceiver",
+      maxTimeoutSeconds: 300,
+      extra: {},
+    },
+    payload: {
+      authorization: {
+        from: "0xpayer",
+        to: "0xreceiver",
+        value: "20000",
+        validAfter: "0",
+        validBefore: "1750000000",
+        nonce: `0x${"ab".repeat(32)}`,
+      },
+      signature: "0xfake",
+    },
+  }), "utf8").toString("base64");
 }
 
 const article = {
@@ -292,15 +319,22 @@ describe("GET /api/d2a/score (free test path)", () => {
 
   it("rejects duplicate paid work before cache and does not report expected contention", async () => {
     mockAcquirePaymentWork.mockResolvedValueOnce(false);
+    const payment = paymentSignature();
     const response = await route.GET(request(
       "https://example.com/paid",
       undefined,
-      "same-payment",
+      payment,
     ));
     expect(response.status).toBe(503);
     expect(response.headers.get("Retry-After")).toBe("10");
     expect((await response.json()).reason).toBe("payment_in_progress");
-    expect(mockHashPaymentPayload).toHaveBeenCalledWith("same-payment");
+    expect(mockCanonicalPaymentIdentity).toHaveBeenCalledWith(expect.objectContaining({
+      accepted: expect.objectContaining({ network: "eip155:84532" }),
+      payload: expect.objectContaining({ authorization: expect.objectContaining({
+        from: "0xpayer",
+      }) }),
+    }));
+    expect(mockAcquirePaymentWork).toHaveBeenCalledWith("payment-identity");
     expect(mockScoreCache.get).not.toHaveBeenCalled();
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
@@ -310,7 +344,7 @@ describe("GET /api/d2a/score (free test path)", () => {
     const response = await route.GET(request(
       "https://example.com/paid-error",
       undefined,
-      "same-payment",
+      paymentSignature(),
     ));
     expect(response.status).toBe(503);
     expect((await response.json()).reason).toBe("payment_in_progress");
@@ -318,6 +352,18 @@ describe("GET /api/d2a/score (free test path)", () => {
       expect.any(Error),
       expect.objectContaining({ tags: expect.objectContaining({ reason: "payment_in_progress" }) }),
     );
+  });
+
+  it("returns 400 when PAYMENT-SIGNATURE cannot be decoded", async () => {
+    const response = await route.GET(request(
+      "https://example.com/invalid-payment",
+      undefined,
+      "not-base64!",
+    ));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Invalid PAYMENT-SIGNATURE header");
+    expect(mockAcquirePaymentWork).not.toHaveBeenCalled();
+    expect(mockScoreCache.get).not.toHaveBeenCalled();
   });
 
   it("enforces outer and inner rate-limit axes", async () => {

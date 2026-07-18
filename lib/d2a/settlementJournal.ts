@@ -16,6 +16,17 @@ const MAX_ATTEMPT_TOKEN_TRIES = 3;
 
 export type SettlementAttemptStatus = "pending" | "settled" | "rejected" | "unknown";
 
+export interface SettlementAuthorization {
+  from: string;
+  to: string;
+  value: string;
+  nonce: string;
+  validAfter: string;
+  validBefore: string;
+  network: string;
+  asset: string;
+}
+
 export interface SettlementAttempt {
   status: SettlementAttemptStatus;
   network: string;
@@ -25,6 +36,7 @@ export interface SettlementAttempt {
   payer: string;
   url: string;
   price: string;
+  authorization: SettlementAuthorization;
   txHash?: string;
   createdAt: number;
   updatedAt: number;
@@ -63,8 +75,66 @@ function compensationKey(hash: string): string {
   return `${hash}:compensation`;
 }
 
-export function hashPaymentPayload(rawPaymentPayload: string): string {
-  return createHash("sha256").update(rawPaymentPayload).digest("hex");
+function objectField(value: unknown, path: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`Invalid payment payload: ${path} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function stringField(record: Record<string, unknown>, field: string, path: string): string {
+  const value = record[field];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Invalid payment payload: ${path}.${field} must be a non-empty string`);
+  }
+  return value;
+}
+
+function paymentAuthorizationRecords(paymentPayload: unknown): {
+  accepted: Record<string, unknown>;
+  authorization: Record<string, unknown>;
+} {
+  const payment = objectField(paymentPayload, "paymentPayload");
+  const accepted = objectField(payment.accepted, "paymentPayload.accepted");
+  const payload = objectField(payment.payload, "paymentPayload.payload");
+  const authorization = objectField(
+    payload.authorization,
+    "paymentPayload.payload.authorization",
+  );
+  return { accepted, authorization };
+}
+
+function paymentAuthorization(paymentPayload: unknown): SettlementAuthorization {
+  const { accepted, authorization } = paymentAuthorizationRecords(paymentPayload);
+  return {
+    from: stringField(authorization, "from", "paymentPayload.payload.authorization"),
+    to: stringField(authorization, "to", "paymentPayload.payload.authorization"),
+    value: stringField(authorization, "value", "paymentPayload.payload.authorization"),
+    nonce: stringField(authorization, "nonce", "paymentPayload.payload.authorization"),
+    validAfter: stringField(
+      authorization,
+      "validAfter",
+      "paymentPayload.payload.authorization",
+    ),
+    validBefore: stringField(
+      authorization,
+      "validBefore",
+      "paymentPayload.payload.authorization",
+    ),
+    network: stringField(accepted, "network", "paymentPayload.accepted"),
+    asset: stringField(accepted, "asset", "paymentPayload.accepted"),
+  };
+}
+
+/** EIP-3009's on-chain idempotency identity: network + authorizer + nonce. */
+export function canonicalPaymentIdentity(paymentPayload: unknown): string {
+  const { accepted, authorization } = paymentAuthorizationRecords(paymentPayload);
+  const network = stringField(accepted, "network", "paymentPayload.accepted");
+  const from = stringField(authorization, "from", "paymentPayload.payload.authorization");
+  const nonce = stringField(authorization, "nonce", "paymentPayload.payload.authorization");
+  return createHash("sha256")
+    .update(`${network}:${from.toLowerCase()}:${nonce.toLowerCase()}`)
+    .digest("hex");
 }
 
 /**
@@ -72,8 +142,8 @@ export function hashPaymentPayload(rawPaymentPayload: string): string {
  * score marker, this lock is intentionally never deleted: only its TTL may
  * release it, so a failed request also provides bounded retry backoff.
  */
-export async function acquirePaymentWork(hash: string): Promise<boolean | undefined> {
-  const result = await journalKV.set(`${hash}:work`, "reserved", {
+export async function acquirePaymentWork(identity: string): Promise<boolean | undefined> {
+  const result = await journalKV.set(`${identity}:work`, "reserved", {
     nx: true,
     ex: PAYMENT_WORK_TTL_SECONDS,
   });
@@ -238,20 +308,6 @@ async function recordMetric(network: string, outcome: string, attemptToken: stri
   }
 }
 
-function rawPaymentHeader(transportContext: unknown): string | null {
-  if (!transportContext || typeof transportContext !== "object") return null;
-  const request = (transportContext as { request?: unknown }).request;
-  if (!request || typeof request !== "object") return null;
-  const paymentHeader = (request as { paymentHeader?: unknown }).paymentHeader;
-  if (typeof paymentHeader === "string" && paymentHeader.length > 0) return paymentHeader;
-  const adapter = (request as { adapter?: unknown }).adapter;
-  if (!adapter || typeof adapter !== "object") return null;
-  const getHeader = (adapter as { getHeader?: unknown }).getHeader;
-  if (typeof getHeader !== "function") return null;
-  const value = getHeader.call(adapter, "payment-signature");
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
 function requestUrl(context: SettleContext): string {
   if (typeof context.paymentPayload.resource?.url === "string") {
     return context.paymentPayload.resource.url;
@@ -268,33 +324,25 @@ function requestUrl(context: SettleContext): string {
   return typeof value === "string" ? value : "";
 }
 
-function payer(context: SettleContext): string {
-  const authorization = context.paymentPayload.payload.authorization;
-  if (authorization && typeof authorization === "object") {
-    const from = (authorization as { from?: unknown }).from;
-    if (typeof from === "string") return from;
-  }
-  const direct = context.paymentPayload.payload.payer;
-  return typeof direct === "string" ? direct : "";
-}
-
 function attemptRecord(
   context: SettleContext,
   status: SettlementAttemptStatus,
   timestamp: number,
   reason?: string,
 ): SettlementAttempt {
+  const authorization = paymentAuthorization(context.paymentPayload);
   return {
     status,
     network: context.requirements.network,
     asset: context.requirements.asset,
     amount: context.requirements.amount,
     payTo: context.requirements.payTo,
-    payer: payer(context),
+    payer: authorization.from,
     url: requestUrl(context),
     // The accepted amount is the original authorized price; requirements.amount
     // may be a settlement override for schemes that support partial charging.
     price: context.paymentPayload.accepted.amount,
+    authorization,
     createdAt: timestamp,
     updatedAt: timestamp,
     ...(reason ? { reason } : {}),
@@ -363,13 +411,16 @@ export async function onAfterVerify(context: VerifyResultContext): Promise<void>
 export async function onBeforeSettle(
   context: SettleContext,
 ): Promise<void | { abort: true; reason: string }> {
-  const rawPayload = rawPaymentHeader(context.transportContext);
-  if (!rawPayload) {
+  let hash: string;
+  try {
+    hash = canonicalPaymentIdentity(context.paymentPayload);
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { module: "settlementJournal", failure: "invalid-payment-identity" },
+    });
     await recordMetric(context.requirements.network, "journal-unavailable", randomUUID());
     return { abort: true, reason: "journal-unavailable" };
   }
-
-  const hash = hashPaymentPayload(rawPayload);
   try {
     const existingClaim = await readClaim(hash);
     const initial = await readFinalAndAttempt(hash, existingClaim?.attemptToken);
@@ -456,14 +507,15 @@ export async function onBeforeSettle(
 }
 
 export async function onAfterSettle(context: SettleResultContext): Promise<void> {
-  const rawPayload = rawPaymentHeader(context.transportContext);
-  if (!rawPayload) {
-    Sentry.captureException(new Error("Missing raw payment payload after settlement"), {
-      tags: { module: "settlementJournal", failure: "missing-payment-header" },
+  let hash: string;
+  try {
+    hash = canonicalPaymentIdentity(context.paymentPayload);
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { module: "settlementJournal", failure: "invalid-payment-identity-after-settle" },
     });
     return;
   }
-  const hash = hashPaymentPayload(rawPayload);
   let claim: SettlementClaim | null | undefined;
   try {
     claim = await readClaim(hash);
@@ -545,10 +597,17 @@ export async function onAfterSettle(context: SettleResultContext): Promise<void>
 }
 
 export async function onSettleFailure(context: SettleFailureContext): Promise<void> {
-  const rawPayload = rawPaymentHeader(context.transportContext);
-  const hash = rawPayload ? hashPaymentPayload(rawPayload) : "unavailable";
+  let hash = "unavailable";
   let attemptToken = "unavailable";
-  if (rawPayload) {
+  try {
+    hash = canonicalPaymentIdentity(context.paymentPayload);
+  } catch (error) {
+    Sentry.captureException(error, {
+      level: "error",
+      tags: { module: "settlementJournal", failure: "invalid-payment-identity-on-failure" },
+    });
+  }
+  if (hash !== "unavailable") {
     try {
       const claim = await readClaim(hash);
       if (claim) {

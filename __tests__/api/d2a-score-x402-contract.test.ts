@@ -7,6 +7,7 @@ import type {
 } from "@x402/core/types";
 import type { FacilitatorClient } from "@x402/core/server";
 import {
+  decodePaymentSignatureHeader,
   decodePaymentRequiredHeader,
   encodePaymentSignatureHeader,
 } from "@x402/core/http";
@@ -15,6 +16,9 @@ import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { withX402 } from "@x402/next";
 import { NextRequest, NextResponse } from "next/server";
 import { withCors } from "@/lib/d2a/cors";
+import {
+  canonicalPaymentIdentity as realCanonicalPaymentIdentity,
+} from "@/lib/d2a/settlementJournal";
 import { strictFacilitatorClient } from "@/lib/d2a/strictFacilitatorClient";
 
 const NETWORK = "eip155:84532" as const;
@@ -113,11 +117,45 @@ async function paymentFor(endpoint: (req: NextRequest) => Promise<NextResponse>)
         from: "0x0000000000000000000000000000000000000002",
         to: RECEIVER,
         value: required.accepts[0].amount,
+        validAfter: "0",
+        validBefore: "1750000000",
+        nonce: `0x${"ab".repeat(32)}`,
       },
       signature: "0xfake",
     },
   };
   return encodePaymentSignatureHeader(payload);
+}
+
+function equivalentPaymentEncodings(payment: string): [string, string] {
+  const decoded = decodePaymentSignatureHeader(payment);
+  const authorization = decoded.payload.authorization as Record<string, unknown>;
+  const reordered = {
+    payload: {
+      signature: decoded.payload.signature,
+      authorization: {
+        nonce: authorization.nonce,
+        validBefore: authorization.validBefore,
+        validAfter: authorization.validAfter,
+        value: authorization.value,
+        to: authorization.to,
+        from: authorization.from,
+      },
+    },
+    accepted: decoded.accepted,
+    resource: decoded.resource,
+    x402Version: decoded.x402Version,
+  };
+
+  let paddedJson = JSON.stringify(decoded);
+  while (!Buffer.from(paddedJson, "utf8").toString("base64").endsWith("=")) paddedJson += " ";
+  let unpaddedJson = JSON.stringify(reordered, null, 2);
+  while (Buffer.byteLength(unpaddedJson, "utf8") % 3 !== 0) unpaddedJson += " ";
+  const padded = Buffer.from(paddedJson, "utf8").toString("base64");
+  const unpadded = Buffer.from(unpaddedJson, "utf8").toString("base64");
+  expect(padded).toMatch(/=$/);
+  expect(unpadded).not.toMatch(/=$/);
+  return [padded, unpadded];
 }
 
 describe("/api/d2a/score x402 v2 contract", () => {
@@ -318,16 +356,18 @@ describe("/api/d2a/score x402 v2 contract", () => {
       async () => NextResponse.json({ ok: true }),
     );
     const payment = await paymentFor(requirementHarness.endpoint);
+    const [firstEncoding, secondEncoding] = equivalentPaymentEncodings(payment);
 
     const routeFake = new FakeFacilitator();
     const routeServer = new x402ResourceServer(strictFacilitatorClient(routeFake))
       .register(NETWORK, new ExactEvmScheme());
-    let workReserved = false;
-    const acquirePaymentWork = jest.fn(async () => {
-      if (workReserved) return false;
-      workReserved = true;
+    const reservedIdentities = new Set<string>();
+    const acquirePaymentWork = jest.fn(async (identity: string) => {
+      if (reservedIdentities.has(identity)) return false;
+      reservedIdentities.add(identity);
       return true;
     });
+    const canonicalPaymentIdentity = jest.fn(realCanonicalPaymentIdentity);
     const scoreOneText = jest.fn().mockResolvedValue({
       originality: 7,
       insight: 8,
@@ -355,7 +395,7 @@ describe("/api/d2a/score x402 v2 contract", () => {
     }));
     jest.doMock("@/lib/d2a/settlementJournal", () => ({
       acquirePaymentWork,
-      hashPaymentPayload: jest.fn(() => "same-payload-hash"),
+      canonicalPaymentIdentity,
     }));
     jest.doMock("@/lib/api/rateLimit", () => ({
       distributedRateLimitByKey: jest.fn().mockResolvedValue(null),
@@ -390,8 +430,8 @@ describe("/api/d2a/score x402 v2 contract", () => {
       const actualRoute = require("@/app/api/d2a/score/route") as
         typeof import("@/app/api/d2a/score/route");
       const responses = await Promise.all([
-        actualRoute.GET(request(payment, "https://example.com/one")),
-        actualRoute.GET(request(payment, "https://example.net/two")),
+        actualRoute.GET(request(firstEncoding, "https://example.com/one")),
+        actualRoute.GET(request(secondEncoding, "https://example.net/two")),
       ]);
 
       expect(responses.map((response) => response.status).sort()).toEqual([200, 503]);
@@ -401,6 +441,8 @@ describe("/api/d2a/score x402 v2 contract", () => {
       }));
       expect(inProgress?.headers.get("Retry-After")).toBe("10");
       expect(acquirePaymentWork).toHaveBeenCalledTimes(2);
+      expect(canonicalPaymentIdentity).toHaveBeenCalledTimes(2);
+      expect(reservedIdentities.size).toBe(1);
       expect(scoreOneText).toHaveBeenCalledTimes(1);
       expect(routeFake.verify).toHaveBeenCalledTimes(2);
       expect(routeFake.settle).toHaveBeenCalledTimes(1);

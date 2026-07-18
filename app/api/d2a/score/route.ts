@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import * as Sentry from "@sentry/nextjs";
+import { decodePaymentSignatureHeader } from "@x402/core/http";
 import { getFacilitatorResponseError } from "@x402/core/server";
 import { withX402 } from "@x402/next";
 import { NextRequest, NextResponse } from "next/server";
@@ -10,7 +11,7 @@ import { distributedRateLimitByKey } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
 import {
   acquirePaymentWork,
-  hashPaymentPayload,
+  canonicalPaymentIdentity,
 } from "@/lib/d2a/settlementJournal";
 import {
   resourceServer,
@@ -158,8 +159,18 @@ async function handleScore(request: NextRequest): Promise<NextResponse> {
 
   const paymentSignature = request.headers.get("payment-signature");
   if (paymentSignature !== null) {
+    let paymentIdentity: string;
     try {
-      const acquired = await acquirePaymentWork(hashPaymentPayload(paymentSignature));
+      const paymentPayload = decodePaymentSignatureHeader(paymentSignature);
+      paymentIdentity = canonicalPaymentIdentity(paymentPayload);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid PAYMENT-SIGNATURE header" },
+        { status: 400 },
+      );
+    }
+    try {
+      const acquired = await acquirePaymentWork(paymentIdentity);
       if (acquired !== true) {
         return errorResponse(
           503,

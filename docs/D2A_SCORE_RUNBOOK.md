@@ -89,11 +89,13 @@ The script obtains `runbook-lock` with `SET NX EX 900`, increments `runbook-epoc
 
 Every resolution is a new `{hash}:resolution:{resolutionToken}` record written with `SET NX`; attempts are never updated in place. Reports list resolutions in epoch order and label any hash with multiple resolutions, or a resolution whose epoch is older than the current counter, as requiring manual adjudication. No winner is selected by code.
 
+When a caller claims that a payment already settled, ask them to present the payer address and authorization nonce. Do not ask for or match the raw `PAYMENT-SIGNATURE`. Locate the journal identity `sha256(network + ":" + payer.toLowerCase() + ":" + nonce.toLowerCase())` using the endpoint's payment network, then confirm the attempt's stored authorization and on-chain evidence.
+
 To append a human decision after reviewing the report:
 
 ```bash
 npx tsx scripts/reconcile.ts \
-  --resolve <payload-sha256> \
+  --resolve <payment-identity> \
   --attempt-token <uuid> \
   --outcome needs-manual-review \
   --operator <name> \
@@ -106,25 +108,22 @@ Perform these steps in order for exactly one attempt:
 
 1. Run report-only reconciliation and confirm the attempt is eligible. Resolve all multiple/stale resolution warnings manually.
 2. Immediately re-read the journal using the compensation command. If a final record now exists, stop.
-3. Run the on-chain verifier with the exact transaction, payer, payee, amount, nonce, and `validBefore`. Continue only for `closed-unpaid` with `compensationAllowed: true`.
+3. Run the on-chain verifier against the authorization stored in the journal attempt. The journal supplies payer, payee, amount, nonce, validity window, network, and asset; the network selects the chain, RPC default, USDC proxy, and implementation pin. Continue only for `closed-unpaid` with `compensationAllowed: true`; an unknown network or mismatched asset is `needs-review`.
 4. Commit the compensation entry to the external accounting ledger and obtain its immutable reference.
 5. Run the command below. It repeats the journal read and verification, then writes `{hash}:compensation` with `SET NX` and no TTL. If this fails, do not send.
 6. Only after the command prints `authorizedToSendOneTransfer: true`, send one transfer matching the ledger entry. Record its transaction hash in the ledger; do not run another item in the same wallet action.
 
 ```bash
 npx tsx scripts/reconcile.ts \
-  --compensate <payload-sha256> \
+  --compensate <payment-identity> \
   --attempt-token <uuid> \
   --tx 0x... \
   --payer 0x... \
-  --pay-to 0x... \
-  --amount 20000 \
   --nonce 0x... \
-  --valid-before 1750000000 \
   --ledger-ref LEDGER-123
 ```
 
-The script never transfers funds. It asserts on every run that sampled compensation tombstones have Redis TTL `-1`. A compensation tombstone with any other TTL is an incident.
+`--payer` and `--nonce` are operator-presented assertions for matching the paid claim; they never override the journal. Optional `--pay-to`, `--amount`, `--valid-after`, `--valid-before`, `--network`, and `--asset` values are also assertions and are rejected if they differ from the journal authorization. The script never transfers funds. It asserts on every run that sampled compensation tombstones have Redis TTL `-1`. A compensation tombstone with any other TTL is an incident.
 
 After Redis restoration, failover, or journal recovery, stop all compensation. Treat the external accounting ledger as authoritative and reconcile every restored final, resolution, and tombstone against it. Do not resume compensation until that comparison is complete and signed off.
 
@@ -148,7 +147,7 @@ On threshold breach or a confirmed facilitator regression:
 
 ## Backpressure and budget behavior
 
-Paid score requests hash the received `PAYMENT-SIGNATURE` bytes verbatim and reserve `{hash}:work` with `SET NX EX 150` after URL validation. The work marker is shared across URLs, so one authorization can run at most one paid handler during its lifetime. A loser receives `payment_in_progress` `503` with `Retry-After: 10`. Free requests without the header skip this marker. It is never explicitly deleted.
+Paid score requests decode `PAYMENT-SIGNATURE` and derive the canonical EIP-3009 identity `sha256(network + ":" + payer.toLowerCase() + ":" + nonce.toLowerCase())`. They reserve `{identity}:work` with `SET NX EX 150` after URL validation. Equivalent JSON whitespace, key ordering, base64 padding, or address/nonce casing therefore cannot create another work key. The marker is shared across URLs, so one authorization can run at most one paid handler during its lifetime. A loser receives `payment_in_progress` `503` with `Retry-After: 10`. Free requests without the header skip this marker. It is never explicitly deleted.
 
 The in-progress marker is owner-token based, written with `SET NX EX 150`, and is never explicitly deleted. A concurrent request double-checks cache and otherwise receives `503` with `Retry-After: 10`. The marker intentionally survives a failed attempt until TTL expiry, providing natural per-URL backoff; operators must not delete it to accelerate retries.
 

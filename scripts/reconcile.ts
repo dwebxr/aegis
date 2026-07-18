@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Address, Hex } from "viem";
 import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+import { base, baseSepolia } from "viem/chains";
 import {
   acquireRunbookLock,
   assertCompensationTombstonesPermanent,
@@ -18,12 +18,46 @@ import {
   type ReconcileResolution,
 } from "@/lib/api/kv/reconcileJournal";
 import type { SettlementAttempt, SettlementFinal } from "@/lib/d2a/settlementJournal";
-import { verifySettlement } from "@/scripts/verify-settlement";
+import {
+  BASE_SEPOLIA_USDC_IMPLEMENTATION,
+  BASE_SEPOLIA_USDC_PROXY,
+  BASE_USDC_IMPLEMENTATION,
+  BASE_USDC_PROXY,
+  verifySettlement,
+  type SettlementNetwork,
+  type VerifySettlementInput,
+  type VerifySettlementResult,
+} from "@/scripts/verify-settlement";
 
 const STALE_AFTER_MS = 60 * 60 * 1_000;
 const MIN_REMAINING_TTL_SECONDS = 7 * 24 * 60 * 60;
 const LEASE_MS = 600 * 1_000;
 const JOURNAL_RETENTION_MS = 90 * 24 * 60 * 60 * 1_000;
+
+const RECONCILE_NETWORK_CONFIG = {
+  "eip155:8453": {
+    chain: base,
+    rpcUrl: "https://mainnet.base.org",
+    usdc: BASE_USDC_PROXY,
+    expectedImplementation: BASE_USDC_IMPLEMENTATION,
+  },
+  "eip155:84532": {
+    chain: baseSepolia,
+    rpcUrl: "https://sepolia.base.org",
+    usdc: BASE_SEPOLIA_USDC_PROXY,
+    expectedImplementation: BASE_SEPOLIA_USDC_IMPLEMENTATION,
+  },
+} as const;
+
+export type JournalVerificationPlan = {
+  status: "ready";
+  chain: typeof base | typeof baseSepolia;
+  rpcUrl: string;
+  input: VerifySettlementInput;
+} | {
+  status: "needs-review";
+  reason: string;
+};
 
 export interface ReconcileCandidateReport {
   hash: string;
@@ -204,6 +238,121 @@ function selectEligible(
   return candidate;
 }
 
+function assertTextOption(
+  options: Record<string, string>,
+  option: string,
+  journalValue: string,
+): void {
+  const supplied = options[option];
+  if (supplied !== undefined && supplied.toLowerCase() !== journalValue.toLowerCase()) {
+    throw new Error(`--${option} does not match the journal authorization`);
+  }
+}
+
+function assertIntegerOption(
+  options: Record<string, string>,
+  option: string,
+  journalValue: string,
+): void {
+  const supplied = options[option];
+  if (supplied === undefined) return;
+  try {
+    if (BigInt(supplied) === BigInt(journalValue)) return;
+  } catch {
+    // The mismatch error below deliberately covers malformed operator input.
+  }
+  throw new Error(`--${option} does not match the journal authorization`);
+}
+
+/**
+ * Bind compensation verification to the exact authorization captured before
+ * settlement. CLI authorization fields are assertions only, never overrides.
+ */
+export function buildJournalVerificationPlan(
+  attempt: SettlementAttempt,
+  options: Record<string, string> = {},
+): JournalVerificationPlan {
+  const authorization = attempt.authorization;
+  if (!authorization) {
+    return { status: "needs-review", reason: "journal-authorization-missing" };
+  }
+
+  assertTextOption(options, "payer", authorization.from);
+  assertTextOption(options, "pay-to", authorization.to);
+  assertTextOption(options, "nonce", authorization.nonce);
+  assertTextOption(options, "network", authorization.network);
+  assertTextOption(options, "asset", authorization.asset);
+  assertIntegerOption(options, "amount", authorization.value);
+  assertIntegerOption(options, "valid-after", authorization.validAfter);
+  assertIntegerOption(options, "valid-before", authorization.validBefore);
+
+  if (authorization.network.toLowerCase() !== attempt.network.toLowerCase()) {
+    return { status: "needs-review", reason: "journal-network-fields-mismatch" };
+  }
+  if (authorization.asset.toLowerCase() !== attempt.asset.toLowerCase()) {
+    return { status: "needs-review", reason: "journal-asset-fields-mismatch" };
+  }
+  const networkConfig = RECONCILE_NETWORK_CONFIG[
+    attempt.network as SettlementNetwork
+  ];
+  if (!networkConfig) {
+    return {
+      status: "needs-review",
+      reason: `journal-network-unsupported:${attempt.network}`,
+    };
+  }
+  if (authorization.asset.toLowerCase() !== networkConfig.usdc.toLowerCase()) {
+    return {
+      status: "needs-review",
+      reason: `journal-asset-does-not-match-network-usdc:${authorization.asset}`,
+    };
+  }
+
+  try {
+    return {
+      status: "ready",
+      chain: networkConfig.chain,
+      rpcUrl: options["rpc-url"]
+        || process.env.BASE_RPC_URL
+        || networkConfig.rpcUrl,
+      input: {
+        txHash: (options.tx || attempt.txHash) as Hex | undefined,
+        payer: authorization.from as Address,
+        payTo: authorization.to as Address,
+        amount: BigInt(authorization.value),
+        nonce: authorization.nonce as Hex,
+        validBefore: BigInt(authorization.validBefore),
+        network: attempt.network as SettlementNetwork,
+        usdc: networkConfig.usdc,
+        expectedImplementation: networkConfig.expectedImplementation,
+      },
+    };
+  } catch (error) {
+    return {
+      status: "needs-review",
+      reason: `journal-authorization-invalid:${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+export async function verifyJournalSettlement(
+  attempt: SettlementAttempt,
+  options: Record<string, string> = {},
+): Promise<VerifySettlementResult> {
+  const plan = buildJournalVerificationPlan(attempt, options);
+  if (plan.status === "needs-review") {
+    return {
+      status: "needs-review",
+      evidence: { compensationAllowed: false, reason: plan.reason },
+    };
+  }
+  const client = createPublicClient({
+    chain: plan.chain,
+    transport: http(plan.rpcUrl),
+  });
+  return verifySettlement(client, plan.input);
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   if (options.resolve && options.compensate) {
@@ -246,18 +395,7 @@ async function main(): Promise<void> {
     if (snapshot.final) throw new Error("Settlement final appeared; compensation stopped");
     if (!snapshot.attempt) throw new Error("Settlement attempt disappeared; compensation stopped");
 
-    const client = createPublicClient({
-      chain: base,
-      transport: http(options["rpc-url"] || process.env.BASE_RPC_URL || "https://mainnet.base.org"),
-    });
-    const verified = await verifySettlement(client, {
-      txHash: (options.tx || snapshot.attempt.txHash) as Hex | undefined,
-      payer: (options.payer || snapshot.attempt.payer) as Address,
-      payTo: (options["pay-to"] || snapshot.attempt.payTo) as Address,
-      amount: BigInt(options.amount || snapshot.attempt.amount),
-      nonce: requireOption(options, "nonce") as Hex,
-      validBefore: BigInt(requireOption(options, "valid-before")),
-    });
+    const verified = await verifyJournalSettlement(snapshot.attempt, options);
     if (verified.status !== "closed-unpaid" || !verified.evidence.compensationAllowed) {
       throw new Error(`Compensation is not authorized: ${verified.evidence.reason}`);
     }
