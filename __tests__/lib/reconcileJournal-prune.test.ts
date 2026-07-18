@@ -5,6 +5,7 @@ const mockReconcileKV = {
   zrange: jest.fn(),
   mget: jest.fn(),
   zrem: jest.fn(),
+  ttl: jest.fn(),
 };
 
 jest.mock("@/lib/api/kv/internal/factory", () => ({
@@ -26,6 +27,7 @@ describe("reconcileJournal pending-index pruning", () => {
     mockReconcileKV.get.mockResolvedValue(null);
     mockReconcileKV.set.mockResolvedValue("OK");
     mockReconcileKV.del.mockResolvedValue(1);
+    mockReconcileKV.ttl.mockResolvedValue(900);
   });
 
   it("MGETs records older than retention and removes only missing members", async () => {
@@ -87,6 +89,14 @@ describe("reconcileJournal pending-index pruning", () => {
     mockReconcileKV.get.mockResolvedValue("current-owner");
 
     await expect(releaseRunbookLock("stale-owner")).resolves.toBe(false);
+    expect(mockReconcileKV.del).not.toHaveBeenCalled();
+  });
+
+  it("leaves a low-TTL runbook lock to expire naturally", async () => {
+    mockReconcileKV.ttl.mockResolvedValue(60);
+    mockReconcileKV.get.mockResolvedValue("current-owner");
+
+    await expect(releaseRunbookLock("current-owner")).resolves.toBe(false);
     expect(mockReconcileKV.del).not.toHaveBeenCalled();
   });
 });

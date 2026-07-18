@@ -65,7 +65,13 @@ function context(): SettleContext {
       extra: {},
     },
     declaredExtensions: {},
-    transportContext: {},
+    transportContext: {
+      request: {
+        adapter: {
+          getUrl: () => "https://example.com/article?token=transport-secret#private",
+        },
+      },
+    },
   } as unknown as SettleContext;
 }
 
@@ -276,6 +282,30 @@ describe("settlementJournal", () => {
       network: "eip155:84532",
       asset: "0xasset",
     });
+    expect(pendingRecord.url).toBe("https://example.com/article");
+  });
+
+  it("records the real request URL when payment resource.url is tampered", async () => {
+    mockJournal.get
+      .mockResolvedValueOnce(null) // initial claim
+      .mockResolvedValueOnce(null) // compensation
+      .mockResolvedValueOnce(null); // token collision check
+    mockJournal.mget
+      .mockResolvedValueOnce([null])
+      .mockResolvedValueOnce([null, null]);
+    const original = context();
+    const tampered = {
+      ...original,
+      paymentPayload: {
+        ...original.paymentPayload,
+        resource: { url: "https://attacker.example/forged?leak=client#controlled" },
+      },
+    } as unknown as SettleContext;
+
+    await expect(onBeforeSettle(tampered)).resolves.toBeUndefined();
+
+    const pendingRecord = mockJournal.set.mock.calls.find((call) =>
+      String(call[0]).includes(":a:"))?.[1];
     expect(pendingRecord.url).toBe("https://example.com/article");
   });
 

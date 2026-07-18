@@ -89,6 +89,12 @@ export function readRunbookLock(): Promise<string | null | undefined> {
 
 export async function releaseRunbookLock(ownerToken: string): Promise<boolean | undefined> {
   try {
+    const ttl = await reconcileKV.ttl("runbook-lock");
+    if (ttl === undefined) return undefined;
+    // Check TTL before ownership: with more than 60 seconds remaining, natural
+    // expiry cannot replace this lock during the following millisecond-scale
+    // GET/DEL. Near-expiry locks are left untouched to expire naturally.
+    if (ttl <= 60) return false;
     const owner = await reconcileKV.get<string>("runbook-lock");
     if (owner === undefined) return undefined;
     if (owner !== ownerToken) return false;

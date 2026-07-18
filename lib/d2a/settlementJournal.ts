@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import * as Sentry from "@sentry/nextjs";
 import type {
+  HTTPTransportContext,
   SettleContext,
   SettleFailureContext,
   SettleResultContext,
@@ -347,16 +348,9 @@ function recordVerifyMetric(
 }
 
 function requestUrl(context: SettleContext): string {
-  if (typeof context.paymentPayload.resource?.url === "string") {
-    return context.paymentPayload.resource.url;
-  }
-  const transport = context.transportContext;
-  if (!transport || typeof transport !== "object") return "";
-  const request = (transport as { request?: unknown }).request;
-  if (!request || typeof request !== "object") return "";
-  const adapter = (request as { adapter?: unknown }).adapter;
-  if (!adapter || typeof adapter !== "object") return "";
-  const getUrl = (adapter as { getUrl?: unknown }).getUrl;
+  const transport = context.transportContext as HTTPTransportContext | undefined;
+  const adapter = transport?.request?.adapter;
+  const getUrl = adapter?.getUrl;
   if (typeof getUrl !== "function") return "";
   const value = getUrl.call(adapter);
   return typeof value === "string" ? value : "";
