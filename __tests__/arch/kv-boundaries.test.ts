@@ -172,6 +172,7 @@ describe("KV architecture boundaries", () => {
         "incrementRunbookEpoch",
         "listResolutions",
         "listStalePending",
+        "pruneMissingPending",
         "readJournalReport",
         "readReconcileCandidate",
         "readResolution",

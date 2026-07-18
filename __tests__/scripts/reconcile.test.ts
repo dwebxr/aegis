@@ -3,6 +3,7 @@ const mockAssertCompensationTombstonesPermanent = jest.fn();
 const mockIncrementRunbookEpoch = jest.fn();
 const mockListResolutions = jest.fn();
 const mockListStalePending = jest.fn();
+const mockPruneMissingPending = jest.fn();
 const mockReadReconcileCandidate = jest.fn();
 const mockReadRunbookEpoch = jest.fn();
 const mockReadRunbookLock = jest.fn();
@@ -13,6 +14,7 @@ jest.mock("@/lib/api/kv/reconcileJournal", () => ({
   incrementRunbookEpoch: mockIncrementRunbookEpoch,
   listResolutions: mockListResolutions,
   listStalePending: mockListStalePending,
+  pruneMissingPending: mockPruneMissingPending,
   readReconcileCandidate: mockReadReconcileCandidate,
   readRunbookEpoch: mockReadRunbookEpoch,
   readRunbookLock: mockReadRunbookLock,
@@ -33,6 +35,7 @@ describe("reconcile report", () => {
     mockIncrementRunbookEpoch.mockResolvedValue(7);
     mockAssertCompensationTombstonesPermanent.mockResolvedValue(2);
     mockListStalePending.mockResolvedValue([`${HASH}:a:attempt`]);
+    mockPruneMissingPending.mockResolvedValue({ checked: 1, pruned: 1 });
     mockReadReconcileCandidate.mockResolvedValue({
       final: null,
       attempt: { status: "unknown", createdAt: 1_000_000 },
@@ -68,9 +71,32 @@ describe("reconcile report", () => {
       status: "unknown",
       attemptTtl: 604_800,
     }));
+    expect(report.prunedPendingCount).toBe(1);
+    expect(mockPruneMissingPending).toHaveBeenCalledWith(
+      10_000_000 - 90 * 24 * 60 * 60 * 1_000 - 1,
+      expect.any(Function),
+    );
     expect(report.resolutions).toHaveLength(1);
     expect(report.resolutionWarnings[0]).toEqual(expect.objectContaining({ stale: true }));
   });
+
+  it.each(["settled", "rejected"])(
+    "keeps dangling terminal status %s report-only with a cleanup warning",
+    async (status) => {
+      mockReadReconcileCandidate.mockResolvedValue({
+        final: null,
+        attempt: { status, createdAt: 1_000_000 },
+        attemptTtl: 7 * 24 * 60 * 60,
+      });
+
+      const report = await runReconcileReport("owner");
+
+      expect(report.candidates[0]).toEqual(expect.objectContaining({
+        eligible: false,
+        note: "terminal-status-dangling-index-cleanup-required",
+      }));
+    },
+  );
 
   it("keeps near-expiry attempts report-only", async () => {
     mockReadReconcileCandidate.mockResolvedValue({

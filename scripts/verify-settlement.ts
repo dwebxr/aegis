@@ -12,14 +12,20 @@ import {
   type Transport,
   type TransactionReceipt,
 } from "viem";
-import { base } from "viem/chains";
+import { base, baseSepolia } from "viem/chains";
 
 export const BASE_USDC_PROXY = getAddress("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
+export const BASE_SEPOLIA_USDC_PROXY = getAddress("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
+export const BASE_USDC_IMPLEMENTATION = getAddress(
+  "0x2Ce6311ddAE708829bc0784C967b7d77D19FD779",
+);
+export const BASE_SEPOLIA_USDC_IMPLEMENTATION = getAddress(
+  "0xd74Cc5d436923b8bA2c179b4bcA2841D8A52C5B5",
+);
 export const ZOS_IMPLEMENTATION_SLOT = keccak256(
   stringToHex("org.zeppelinos.proxy.implementation"),
 );
 
-const proxyAbi = parseAbi(["function implementation() view returns (address)"]);
 const authorizationAbi = parseAbi([
   "event AuthorizationUsed(address indexed authorizer, bytes32 indexed nonce)",
   "event AuthorizationCanceled(address indexed authorizer, bytes32 indexed nonce)",
@@ -29,6 +35,25 @@ const authorizationAbi = parseAbi([
 const upgradedEvent = parseAbi(["event Upgraded(address indexed implementation)"])[0];
 
 export type SettlementStatus = "settled" | "closed-unpaid" | "needs-review";
+export type SettlementNetwork = "eip155:8453" | "eip155:84532";
+
+const NETWORK_CONFIG = {
+  "eip155:8453": {
+    chain: base,
+    rpcUrl: "https://mainnet.base.org",
+    usdc: BASE_USDC_PROXY,
+    expectedImplementation: BASE_USDC_IMPLEMENTATION,
+  },
+  "eip155:84532": {
+    chain: baseSepolia,
+    rpcUrl: "https://sepolia.base.org",
+    usdc: BASE_SEPOLIA_USDC_PROXY,
+    expectedImplementation: BASE_SEPOLIA_USDC_IMPLEMENTATION,
+  },
+} as const;
+
+type SupportedBaseChain = typeof base | typeof baseSepolia;
+type SupportedPublicClient = PublicClient<Transport, SupportedBaseChain>;
 
 export interface VerifySettlementInput {
   txHash?: Hex;
@@ -38,6 +63,8 @@ export interface VerifySettlementInput {
   nonce: Hex;
   validBefore: bigint;
   usdc?: Address;
+  network?: SettlementNetwork;
+  expectedImplementation?: Address;
 }
 
 export interface SettlementEvidence {
@@ -119,31 +146,25 @@ function decodeReceiptEvents(receipt: TransactionReceipt, usdc: Address): Decode
 }
 
 async function pinnedImplementation(
-  client: PublicClient<Transport, typeof base>,
+  client: SupportedPublicClient,
   usdc: Address,
   blockNumber: bigint,
 ): Promise<{ implementation: Address; parentBlock: bigint } | null> {
   if (blockNumber === 0n) return null;
   const parentBlock = blockNumber - 1n;
-  const [receiptSlot, parentSlot, receiptView, parentView, upgrades] = await Promise.all([
+  const [receiptSlot, parentSlot, upgrades] = await Promise.all([
     client.getStorageAt({ address: usdc, slot: ZOS_IMPLEMENTATION_SLOT, blockNumber }),
     client.getStorageAt({ address: usdc, slot: ZOS_IMPLEMENTATION_SLOT, blockNumber: parentBlock }),
-    client.readContract({ address: usdc, abi: proxyAbi, functionName: "implementation", blockNumber }),
-    client.readContract({
-      address: usdc,
-      abi: proxyAbi,
-      functionName: "implementation",
-      blockNumber: parentBlock,
-    }),
     client.getLogs({ address: usdc, event: upgradedEvent, fromBlock: blockNumber, toBlock: blockNumber }),
   ]);
   if (upgrades.length > 0) return null;
 
+  // FiatTokenProxy.implementation() is protected by ifAdmin; a non-admin RPC
+  // caller falls through to the implementation and reverts. The ZOS storage
+  // slot is therefore the sole read-only source for this implementation pin.
   const implementations = [
     addressFromStorage(receiptSlot),
     addressFromStorage(parentSlot),
-    getAddress(receiptView),
-    getAddress(parentView),
   ];
   if (implementations.some((value) => value === null)) return null;
   const [implementation] = implementations as Address[];
@@ -152,13 +173,18 @@ async function pinnedImplementation(
 }
 
 export async function verifySettlement(
-  client: PublicClient<Transport, typeof base>,
+  client: SupportedPublicClient,
   input: VerifySettlementInput,
 ): Promise<VerifySettlementResult> {
   if (!input.txHash) return needsReview("tx-hash-unknown");
 
   try {
-    const usdc = getAddress(input.usdc ?? BASE_USDC_PROXY);
+    const network = input.network ?? "eip155:8453";
+    const networkConfig = NETWORK_CONFIG[network];
+    const usdc = getAddress(input.usdc ?? networkConfig.usdc);
+    const expectedImplementation = getAddress(
+      input.expectedImplementation ?? networkConfig.expectedImplementation,
+    );
     const payer = getAddress(input.payer);
     const payTo = getAddress(input.payTo);
     const [receipt, finalizedBlock] = await Promise.all([
@@ -186,6 +212,9 @@ export async function verifySettlement(
       implementation: pin.implementation,
       implementationParentBlock: pin.parentBlock.toString(),
     };
+    if (!sameAddress(pin.implementation, expectedImplementation)) {
+      return needsReview("usdc-implementation-pin-mismatch", evidence);
+    }
 
     const events = decodeReceiptEvents(receipt, usdc);
     const targetTransfers = events.transfers.filter((event) =>
@@ -272,9 +301,14 @@ async function main(): Promise<void> {
   for (const required of ["payer", "pay-to", "amount", "nonce", "valid-before"] as const) {
     if (!options[required]) throw new Error(`--${required} is required`);
   }
+  const network = options.network ?? "eip155:8453";
+  if (!(network in NETWORK_CONFIG)) {
+    throw new Error("--network must be eip155:8453 or eip155:84532");
+  }
+  const networkConfig = NETWORK_CONFIG[network as SettlementNetwork];
   const client = createPublicClient({
-    chain: base,
-    transport: http(options["rpc-url"] || process.env.BASE_RPC_URL || "https://mainnet.base.org"),
+    chain: networkConfig.chain,
+    transport: http(options["rpc-url"] || process.env.BASE_RPC_URL || networkConfig.rpcUrl),
   });
   const result = await verifySettlement(client, {
     txHash: options.tx as Hex | undefined,
@@ -283,6 +317,10 @@ async function main(): Promise<void> {
     amount: BigInt(options.amount),
     nonce: options.nonce as Hex,
     validBefore: BigInt(options["valid-before"]),
+    network: network as SettlementNetwork,
+    expectedImplementation: options["expected-impl"]
+      ? getAddress(options["expected-impl"])
+      : networkConfig.expectedImplementation,
   });
   console.log(JSON.stringify(result, null, 2));
   if (result.status === "needs-review") process.exitCode = 2;

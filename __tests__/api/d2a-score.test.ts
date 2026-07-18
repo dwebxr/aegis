@@ -9,6 +9,8 @@ const mockDistributedRateLimitByKey = jest.fn();
 const mockCaptureException = jest.fn();
 const mockAddBreadcrumb = jest.fn();
 const mockCaptureMessage = jest.fn();
+const mockAcquirePaymentWork = jest.fn();
+const mockHashPaymentPayload = jest.fn((value: string) => `hash:${value}`);
 let mockReceiver = "";
 
 jest.mock("@/lib/api/kv/namespace", () => ({ scoreCacheKV: mockScoreCache }));
@@ -30,6 +32,10 @@ jest.mock("@/lib/d2a/x402Server", () => ({
   X402_NETWORK: "eip155:84532",
   X402_SCORE_PRICE: "$0.02",
   resourceServer: {},
+}));
+jest.mock("@/lib/d2a/settlementJournal", () => ({
+  acquirePaymentWork: (...args: unknown[]) => mockAcquirePaymentWork(...args),
+  hashPaymentPayload: (...args: [string]) => mockHashPaymentPayload(...args),
 }));
 jest.mock("@x402/next", () => ({
   withX402: (handler: (request: NextRequest) => Promise<NextResponse>) => handler,
@@ -54,7 +60,7 @@ function setNodeEnv(value: string): void {
   });
 }
 
-function request(url?: string, origin?: string): NextRequest {
+function request(url?: string, origin?: string, paymentSignature?: string): NextRequest {
   const target = new URL("http://localhost/api/d2a/score");
   if (url !== undefined) target.searchParams.set("url", url);
   return new NextRequest(target, {
@@ -62,6 +68,7 @@ function request(url?: string, origin?: string): NextRequest {
     headers: {
       "x-forwarded-for": "203.0.113.10",
       ...(origin ? { origin } : {}),
+      ...(paymentSignature ? { "PAYMENT-SIGNATURE": paymentSignature } : {}),
     },
   });
 }
@@ -96,6 +103,7 @@ describe("GET /api/d2a/score (free test path)", () => {
   beforeAll(() => {
     setNodeEnv("test");
     process.env.D2A_SCORE_ENABLED = "true";
+    delete process.env.D2A_PAYMENTS_DISABLED;
     process.env.D2A_SCORE_FREE_ENABLED = "true";
     process.env.ANTHROPIC_API_KEY = "test-key";
     mockReceiver = "";
@@ -106,6 +114,7 @@ describe("GET /api/d2a/score (free test path)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.D2A_SCORE_ENABLED = "true";
+    delete process.env.D2A_PAYMENTS_DISABLED;
     process.env.ANTHROPIC_API_KEY = "test-key";
     mockScoreCache.get.mockResolvedValue(null);
     mockScoreCache.set.mockResolvedValue("OK");
@@ -114,6 +123,7 @@ describe("GET /api/d2a/score (free test path)", () => {
     mockTryReserveScoreBudget.mockResolvedValue(true);
     mockGetScoreBudgetRetryAfter.mockResolvedValue(60);
     mockDistributedRateLimitByKey.mockResolvedValue(null);
+    mockAcquirePaymentWork.mockResolvedValue(true);
   });
 
   afterAll(() => {
@@ -139,6 +149,16 @@ describe("GET /api/d2a/score (free test path)", () => {
     expect(response.status).toBe(503);
     expect((await response.json()).reason).toBe("disabled");
     expect(mockDistributedRateLimitByKey).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("returns payments_disabled before running either rate limit or payment wrapper", async () => {
+    process.env.D2A_PAYMENTS_DISABLED = "true";
+    const response = await route.GET(request("https://example.com/article"));
+    expect(response.status).toBe(503);
+    expect((await response.json()).reason).toBe("payments_disabled");
+    expect(mockDistributedRateLimitByKey).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it("returns 503 when the Anthropic key is absent", async () => {
@@ -147,6 +167,7 @@ describe("GET /api/d2a/score (free test path)", () => {
     expect(response.status).toBe(503);
     expect((await response.json()).reason).toBe("scoring_unavailable");
     expect(mockExtractArticle).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it("returns budget_exhausted with Retry-After", async () => {
@@ -157,6 +178,18 @@ describe("GET /api/d2a/score (free test path)", () => {
     expect(response.headers.get("Retry-After")).toBe("123");
     expect((await response.json()).reason).toBe("budget_exhausted");
     expect(mockScoreOneText).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("reports a budget KV exception while preserving the expected refusal response", async () => {
+    mockTryReserveScoreBudget.mockRejectedValueOnce(new Error("budget KV down"));
+    const response = await route.GET(request("https://example.com/budget-kv"));
+    expect(response.status).toBe(503);
+    expect((await response.json()).reason).toBe("budget_exhausted");
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ tags: expect.objectContaining({ reason: "budget_exhausted" }) }),
+    );
   });
 
   it.each([422, 502])("preserves extraction status %s", async (status) => {
@@ -171,6 +204,7 @@ describe("GET /api/d2a/score (free test path)", () => {
     const response = await route.GET(request("https://example.com/article"));
     expect(response.status).toBe(502);
     expect((await response.json()).reason).toBe("scoring_unavailable");
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
 
   it("returns the score shape and overwrites model composite/verdict invariants", async () => {
@@ -225,6 +259,14 @@ describe("GET /api/d2a/score (free test path)", () => {
     expect(mockScoreOneText).not.toHaveBeenCalled();
   });
 
+  it("does not report a missing KV capability as an exception", async () => {
+    mockScoreCache.set.mockResolvedValueOnce(undefined);
+    const response = await route.GET(request("https://example.com/no-kv"));
+    expect(response.status).toBe(503);
+    expect((await response.json()).reason).toBe("cache_unavailable");
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
   it("continues with 200 when only the final cache write fails", async () => {
     mockScoreCache.set.mockImplementation(async (key: string) => {
       if (key.startsWith("in-progress:")) return "OK";
@@ -245,6 +287,37 @@ describe("GET /api/d2a/score (free test path)", () => {
     expect(response.status).toBe(503);
     expect(response.headers.get("Retry-After")).toBe("10");
     expect(mockScoreCache.get).toHaveBeenCalledTimes(2);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate paid work before cache and does not report expected contention", async () => {
+    mockAcquirePaymentWork.mockResolvedValueOnce(false);
+    const response = await route.GET(request(
+      "https://example.com/paid",
+      undefined,
+      "same-payment",
+    ));
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("10");
+    expect((await response.json()).reason).toBe("payment_in_progress");
+    expect(mockHashPaymentPayload).toHaveBeenCalledWith("same-payment");
+    expect(mockScoreCache.get).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("reports KV exceptions during paid-work acquisition", async () => {
+    mockAcquirePaymentWork.mockRejectedValueOnce(new Error("journal down"));
+    const response = await route.GET(request(
+      "https://example.com/paid-error",
+      undefined,
+      "same-payment",
+    ));
+    expect(response.status).toBe(503);
+    expect((await response.json()).reason).toBe("payment_in_progress");
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ tags: expect.objectContaining({ reason: "payment_in_progress" }) }),
+    );
   });
 
   it("enforces outer and inner rate-limit axes", async () => {
@@ -271,6 +344,19 @@ describe("GET /api/d2a/score (free test path)", () => {
 });
 
 describe("score route deployment guards", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env.D2A_PAYMENTS_DISABLED;
+    mockScoreCache.get.mockResolvedValue(null);
+    mockScoreCache.set.mockResolvedValue("OK");
+    mockExtractArticle.mockResolvedValue(article);
+    mockScoreOneText.mockResolvedValue(rawScore);
+    mockTryReserveScoreBudget.mockResolvedValue(true);
+    mockGetScoreBudgetRetryAfter.mockResolvedValue(60);
+    mockDistributedRateLimitByKey.mockResolvedValue(null);
+    mockAcquirePaymentWork.mockResolvedValue(true);
+  });
+
   afterEach(() => {
     process.env = { ...originalEnv };
     mockReceiver = "";
@@ -287,6 +373,7 @@ describe("score route deployment guards", () => {
     const response = await isolated.GET(request("https://example.com/article"));
     expect(response.status).toBe(503);
     expect((await response.json()).reason).toBe("payments_unconfigured");
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it("fails closed when production KV is unconfigured", async () => {
@@ -304,6 +391,7 @@ describe("score route deployment guards", () => {
     const response = await isolated.GET(request("https://example.com/article"));
     expect(response.status).toBe(503);
     expect((await response.json()).reason).toBe("kv_unconfigured");
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it("throws at module load when production free mode is enabled", () => {

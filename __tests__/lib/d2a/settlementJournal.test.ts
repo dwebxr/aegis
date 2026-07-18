@@ -18,6 +18,7 @@ jest.mock("@sentry/nextjs", () => ({ captureException: mockCaptureException }));
 
 import type { SettleContext, SettleResultContext } from "@x402/core/server";
 import {
+  acquirePaymentWork,
   createAttempt,
   hashPaymentPayload,
   onAfterSettle,
@@ -75,6 +76,18 @@ describe("settlementJournal", () => {
   it("hashes the received base64 payload verbatim", () => {
     expect(hashPaymentPayload("YQ==")).not.toBe(hashPaymentPayload("YQ"));
     expect(hashPaymentPayload("YQ==")).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("acquires paid work with a 150-second SET NX marker that has no release API", async () => {
+    await expect(acquirePaymentWork("payment-hash")).resolves.toBe(true);
+    expect(mockJournal.set).toHaveBeenCalledWith(
+      "payment-hash:work",
+      "reserved",
+      { nx: true, ex: 150 },
+    );
+
+    mockJournal.set.mockResolvedValueOnce(null);
+    await expect(acquirePaymentWork("payment-hash")).resolves.toBe(false);
   });
 
   it("counts every verify shape except literal boolean true as verify-failure", async () => {

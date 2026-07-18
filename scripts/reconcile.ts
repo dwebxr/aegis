@@ -8,6 +8,7 @@ import {
   incrementRunbookEpoch,
   listResolutions,
   listStalePending,
+  pruneMissingPending,
   readReconcileCandidate,
   readRunbookEpoch,
   readRunbookLock,
@@ -22,6 +23,7 @@ import { verifySettlement } from "@/scripts/verify-settlement";
 const STALE_AFTER_MS = 60 * 60 * 1_000;
 const MIN_REMAINING_TTL_SECONDS = 7 * 24 * 60 * 60;
 const LEASE_MS = 600 * 1_000;
+const JOURNAL_RETENTION_MS = 90 * 24 * 60 * 60 * 1_000;
 
 export interface ReconcileCandidateReport {
   hash: string;
@@ -46,6 +48,7 @@ export interface ReconcileReport {
   epoch: number;
   leaseDeadline: number;
   compensationTtlSamples: number;
+  prunedPendingCount: number;
   candidates: ReconcileCandidateReport[];
   resolutions: IndexedResolution[];
   resolutionWarnings: ResolutionWarning[];
@@ -92,6 +95,12 @@ export async function runReconcileReport(ownerToken: string = randomUUID()): Pro
   if (epoch === undefined) throw new Error("Journal KV is unavailable");
   const compensationTtlSamples = await assertCompensationTombstonesPermanent();
 
+  const pruning = await pruneMissingPending(
+    acquiredAt - JOURNAL_RETENTION_MS - 1,
+    () => assertLease(ownerToken, leaseDeadline),
+  );
+  if (pruning === undefined) throw new Error("Journal KV is unavailable");
+
   const cutoff = acquiredAt - STALE_AFTER_MS;
   const pending = await listStalePending(cutoff);
   if (pending === undefined) throw new Error("Journal KV is unavailable");
@@ -119,7 +128,15 @@ export async function runReconcileReport(ownerToken: string = randomUUID()): Pro
     const oldEnough = ageMs !== null && ageMs > STALE_AFTER_MS;
     const ttlSafe = snapshot.attemptTtl !== undefined
       && snapshot.attemptTtl >= MIN_REMAINING_TTL_SECONDS;
-    const eligible = Boolean(snapshot.attempt && !snapshot.final && oldEnough && ttlSafe);
+    const durableStatusEligible = snapshot.attempt?.status === "pending"
+      || snapshot.attempt?.status === "unknown";
+    const eligible = Boolean(
+      snapshot.attempt
+      && !snapshot.final
+      && durableStatusEligible
+      && oldEnough
+      && ttlSafe,
+    );
     candidates.push({
       ...identity,
       status: snapshot.attempt?.status ?? "missing",
@@ -131,6 +148,8 @@ export async function runReconcileReport(ownerToken: string = randomUUID()): Pro
         ? "final-exists-stop"
         : !snapshot.attempt
           ? "attempt-missing-report-only"
+          : !durableStatusEligible
+            ? "terminal-status-dangling-index-cleanup-required"
           : !oldEnough
             ? "younger-than-one-hour-report-only"
             : !ttlSafe
@@ -149,6 +168,7 @@ export async function runReconcileReport(ownerToken: string = randomUUID()): Pro
     epoch,
     leaseDeadline,
     compensationTtlSamples,
+    prunedPendingCount: pruning.pruned,
     candidates,
     resolutions,
     resolutionWarnings: resolutionWarnings(resolutions, currentEpoch),

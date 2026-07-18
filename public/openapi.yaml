@@ -249,6 +249,12 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          description: Shared D2A payments are disabled by the operator kill switch.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     options:
       tags: [D2A]
       summary: CORS preflight
@@ -443,6 +449,12 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          description: Shared D2A payments are disabled by the operator kill switch.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     options:
       tags: [D2A]
       summary: CORS preflight
@@ -518,9 +530,10 @@ paths:
         '503':
           description: >
             Endpoint disabled/unconfigured, KV unavailable, daily budget
-            exhausted, or another score for this URL is still in progress.
-            In-progress responses use `Retry-After: 10`; the marker expires
-            naturally and is never explicitly deleted.
+            exhausted, the same payment is already doing work, or another
+            score for this URL is still in progress. In-progress responses
+            use `Retry-After: 10`; markers expire naturally and are never
+            explicitly deleted.
           content:
             application/json:
               schema:

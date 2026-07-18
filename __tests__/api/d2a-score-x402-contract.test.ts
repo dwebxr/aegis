@@ -41,8 +41,13 @@ class FakeFacilitator implements FacilitatorClient {
   }
 }
 
-function request(payment?: string): NextRequest {
-  return new NextRequest("http://localhost/api/d2a/score?url=https%3A%2F%2Fexample.com", {
+function request(
+  payment?: string,
+  articleUrl = "https://example.com",
+): NextRequest {
+  const url = new URL("http://localhost/api/d2a/score");
+  url.searchParams.set("url", articleUrl);
+  return new NextRequest(url, {
     method: "GET",
     headers: {
       origin: "https://aegis.dwebxr.xyz",
@@ -243,6 +248,174 @@ describe("/api/d2a/score x402 v2 contract", () => {
       if (previousFree === undefined) delete process.env.D2A_SCORE_FREE_ENABLED;
       else process.env.D2A_SCORE_FREE_ENABLED = previousFree;
       jest.dontMock("@/lib/d2a/x402Server");
+      jest.resetModules();
+    }
+  });
+
+  it("returns payments_disabled before verify/settle on all shared payment routes", async () => {
+    const requirementFake = new FakeFacilitator();
+    const requirementHarness = harness(
+      requirementFake,
+      async () => NextResponse.json({ ok: true }),
+    );
+    const payment = await paymentFor(requirementHarness.endpoint);
+
+    const routeFake = new FakeFacilitator();
+    const routeServer = new x402ResourceServer(strictFacilitatorClient(routeFake))
+      .register(NETWORK, new ExactEvmScheme());
+    const previousDisabled = process.env.D2A_PAYMENTS_DISABLED;
+    const previousEnabled = process.env.D2A_SCORE_ENABLED;
+    process.env.D2A_PAYMENTS_DISABLED = "true";
+    process.env.D2A_SCORE_ENABLED = "true";
+    jest.resetModules();
+    jest.doMock("@/lib/d2a/x402Server", () => ({
+      X402_NETWORK: NETWORK,
+      X402_PRICE: "$0.01",
+      X402_RECEIVER: RECEIVER,
+      X402_SCORE_PRICE: "$0.02",
+      resourceServer: routeServer,
+    }));
+    try {
+      const scoreRoute = require("@/app/api/d2a/score/route") as
+        typeof import("@/app/api/d2a/score/route");
+      const briefingRoute = require("@/app/api/d2a/briefing/route") as
+        typeof import("@/app/api/d2a/briefing/route");
+      const changesRoute = require("@/app/api/d2a/briefing/changes/route") as
+        typeof import("@/app/api/d2a/briefing/changes/route");
+      const paidHeaders = { "PAYMENT-SIGNATURE": payment };
+      const responses = await Promise.all([
+        scoreRoute.GET(request(payment)),
+        briefingRoute.GET(new NextRequest("http://localhost/api/d2a/briefing", {
+          headers: paidHeaders,
+        })),
+        changesRoute.GET(new NextRequest(
+          "http://localhost/api/d2a/briefing/changes?since=2026-01-01T00:00:00Z",
+          { headers: paidHeaders },
+        )),
+      ]);
+
+      expect(responses.map((response) => response.status)).toEqual([503, 503, 503]);
+      await Promise.all(responses.map(async (response) => {
+        expect((await response.json()).reason).toBe("payments_disabled");
+      }));
+      expect(routeFake.getSupported).not.toHaveBeenCalled();
+      expect(routeFake.verify).not.toHaveBeenCalled();
+      expect(routeFake.settle).not.toHaveBeenCalled();
+    } finally {
+      if (previousDisabled === undefined) delete process.env.D2A_PAYMENTS_DISABLED;
+      else process.env.D2A_PAYMENTS_DISABLED = previousDisabled;
+      if (previousEnabled === undefined) delete process.env.D2A_SCORE_ENABLED;
+      else process.env.D2A_SCORE_ENABLED = previousEnabled;
+      jest.dontMock("@/lib/d2a/x402Server");
+      jest.resetModules();
+    }
+  });
+
+  it("allows only one concurrent handler for the same payment across different URLs", async () => {
+    const requirementFake = new FakeFacilitator();
+    const requirementHarness = harness(
+      requirementFake,
+      async () => NextResponse.json({ ok: true }),
+    );
+    const payment = await paymentFor(requirementHarness.endpoint);
+
+    const routeFake = new FakeFacilitator();
+    const routeServer = new x402ResourceServer(strictFacilitatorClient(routeFake))
+      .register(NETWORK, new ExactEvmScheme());
+    let workReserved = false;
+    const acquirePaymentWork = jest.fn(async () => {
+      if (workReserved) return false;
+      workReserved = true;
+      return true;
+    });
+    const scoreOneText = jest.fn().mockResolvedValue({
+      originality: 7,
+      insight: 8,
+      credibility: 9,
+      composite: 7,
+      verdict: "quality",
+      reason: "Useful",
+      topics: ["technology"],
+      vSignal: 8,
+      cContext: 5,
+      lSlop: 1.5,
+      tier: "claude",
+    });
+    const previousEnv = { ...process.env };
+    process.env.D2A_SCORE_ENABLED = "true";
+    delete process.env.D2A_SCORE_FREE_ENABLED;
+    delete process.env.D2A_PAYMENTS_DISABLED;
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    jest.resetModules();
+    jest.doMock("@/lib/d2a/x402Server", () => ({
+      X402_NETWORK: NETWORK,
+      X402_RECEIVER: RECEIVER,
+      X402_SCORE_PRICE: "$0.02",
+      resourceServer: routeServer,
+    }));
+    jest.doMock("@/lib/d2a/settlementJournal", () => ({
+      acquirePaymentWork,
+      hashPaymentPayload: jest.fn(() => "same-payload-hash"),
+    }));
+    jest.doMock("@/lib/api/rateLimit", () => ({
+      distributedRateLimitByKey: jest.fn().mockResolvedValue(null),
+    }));
+    jest.doMock("@/lib/api/kv/namespace", () => ({
+      scoreCacheKV: {
+        get: jest.fn().mockResolvedValue(null),
+        set: jest.fn().mockResolvedValue("OK"),
+      },
+    }));
+    jest.doMock("@/lib/extraction/extractArticle.server", () => ({
+      extractArticle: jest.fn().mockResolvedValue({
+        status: 200,
+        data: {
+          title: "Example",
+          content: "A sufficiently long article body for scoring.",
+          source: "example.com",
+        },
+      }),
+    }));
+    jest.doMock("@/lib/api/dailyBudget", () => ({
+      tryReserveScoreBudget: jest.fn().mockResolvedValue(true),
+      getScoreBudgetRetryAfter: jest.fn().mockResolvedValue(60),
+    }));
+    jest.doMock("@/lib/scoring/scoreWithClaude.server", () => ({ scoreOneText }));
+    jest.doMock("@sentry/nextjs", () => ({
+      addBreadcrumb: jest.fn(),
+      captureException: jest.fn(),
+      captureMessage: jest.fn(),
+    }));
+    try {
+      const actualRoute = require("@/app/api/d2a/score/route") as
+        typeof import("@/app/api/d2a/score/route");
+      const responses = await Promise.all([
+        actualRoute.GET(request(payment, "https://example.com/one")),
+        actualRoute.GET(request(payment, "https://example.net/two")),
+      ]);
+
+      expect(responses.map((response) => response.status).sort()).toEqual([200, 503]);
+      const inProgress = responses.find((response) => response.status === 503);
+      expect(await inProgress?.json()).toEqual(expect.objectContaining({
+        reason: "payment_in_progress",
+      }));
+      expect(inProgress?.headers.get("Retry-After")).toBe("10");
+      expect(acquirePaymentWork).toHaveBeenCalledTimes(2);
+      expect(scoreOneText).toHaveBeenCalledTimes(1);
+      expect(routeFake.verify).toHaveBeenCalledTimes(2);
+      expect(routeFake.settle).toHaveBeenCalledTimes(1);
+    } finally {
+      process.env = { ...previousEnv };
+      for (const moduleName of [
+        "@/lib/d2a/x402Server",
+        "@/lib/d2a/settlementJournal",
+        "@/lib/api/rateLimit",
+        "@/lib/api/kv/namespace",
+        "@/lib/extraction/extractArticle.server",
+        "@/lib/api/dailyBudget",
+        "@/lib/scoring/scoreWithClaude.server",
+        "@sentry/nextjs",
+      ]) jest.dontMock(moduleName);
       jest.resetModules();
     }
   });

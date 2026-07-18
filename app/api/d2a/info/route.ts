@@ -22,6 +22,7 @@ import { APP_URL } from "@/lib/config";
 const DEFAULT_ASSET = DEFAULT_STABLECOINS[X402_NETWORK] ?? null;
 const CURRENCY = DEFAULT_ASSET?.name ?? "unknown";
 const SCORE_FREE_ENABLED = process.env.D2A_SCORE_FREE_ENABLED === "true";
+const PAYMENTS_DISABLED = process.env.D2A_PAYMENTS_DISABLED === "true";
 const IS_PRODUCTION =
   process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
       briefing: {
         url: "/api/d2a/briefing",
         method: "GET",
-        auth: X402_RECEIVER ? "x402" : "none",
+        auth: PAYMENTS_DISABLED ? "disabled" : X402_RECEIVER ? "x402" : "none",
         x402Version: 2,
         price: X402_PRICE,
         network: X402_NETWORK,
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
       changes: {
         url: "/api/d2a/briefing/changes",
         method: "GET",
-        auth: X402_RECEIVER ? "x402" : "none",
+        auth: PAYMENTS_DISABLED ? "disabled" : X402_RECEIVER ? "x402" : "none",
         x402Version: 2,
         price: X402_PRICE,
         network: X402_NETWORK,
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
       score: {
         url: "/api/d2a/score",
         method: "GET",
-        auth: process.env.D2A_SCORE_ENABLED !== "true"
+        auth: process.env.D2A_SCORE_ENABLED !== "true" || PAYMENTS_DISABLED
           ? "disabled"
           : SCORE_FREE_ENABLED
             ? "none"

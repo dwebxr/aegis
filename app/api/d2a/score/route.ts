@@ -9,6 +9,10 @@ import { scoreCacheKV } from "@/lib/api/kv/namespace";
 import { distributedRateLimitByKey } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
 import {
+  acquirePaymentWork,
+  hashPaymentPayload,
+} from "@/lib/d2a/settlementJournal";
+import {
   resourceServer,
   X402_NETWORK,
   X402_RECEIVER,
@@ -85,7 +89,7 @@ function errorResponse(
   error?: unknown,
   retryAfter?: number,
 ): NextResponse {
-  reportOperationalError(error ?? new Error(message), reason, url);
+  if (error !== undefined) reportOperationalError(error, reason, url);
   return NextResponse.json(
     { error: message, reason },
     {
@@ -151,6 +155,33 @@ async function handleScore(request: NextRequest): Promise<NextResponse> {
 
   parsedUrl.hash = "";
   const normalizedUrl = parsedUrl.toString();
+
+  const paymentSignature = request.headers.get("payment-signature");
+  if (paymentSignature !== null) {
+    try {
+      const acquired = await acquirePaymentWork(hashPaymentPayload(paymentSignature));
+      if (acquired !== true) {
+        return errorResponse(
+          503,
+          "payment_in_progress",
+          "This payment is already processing another scoring request",
+          parsedUrl,
+          undefined,
+          10,
+        );
+      }
+    } catch (error) {
+      return errorResponse(
+        503,
+        "payment_in_progress",
+        "This payment is already processing another scoring request",
+        parsedUrl,
+        error,
+        10,
+      );
+    }
+  }
+
   const key = cacheKey(normalizedUrl);
   const cached = await readCachedScore(key, parsedUrl);
   if (cached) return cached;
@@ -334,6 +365,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (process.env.D2A_SCORE_ENABLED !== "true") {
       return finalize(
         errorResponse(503, "disabled", "URL scoring is disabled"),
+        request,
+      );
+    }
+    if (process.env.D2A_PAYMENTS_DISABLED === "true") {
+      return finalize(
+        errorResponse(503, "payments_disabled", "D2A payments are disabled"),
         request,
       );
     }

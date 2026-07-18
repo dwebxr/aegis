@@ -10,6 +10,7 @@ import { journalKV } from "@/lib/api/kv/journalNamespace";
 import { metricsKV } from "@/lib/api/kv/namespace";
 
 const JOURNAL_TTL_SECONDS = 90 * 24 * 60 * 60;
+const PAYMENT_WORK_TTL_SECONDS = 150;
 const METRICS_TTL_SECONDS = 14 * 24 * 60 * 60;
 const MAX_ATTEMPT_TOKEN_TRIES = 3;
 
@@ -64,6 +65,19 @@ function compensationKey(hash: string): string {
 
 export function hashPaymentPayload(rawPaymentPayload: string): string {
   return createHash("sha256").update(rawPaymentPayload).digest("hex");
+}
+
+/**
+ * Reserve paid handler work for a verified payment payload. Like the per-URL
+ * score marker, this lock is intentionally never deleted: only its TTL may
+ * release it, so a failed request also provides bounded retry backoff.
+ */
+export async function acquirePaymentWork(hash: string): Promise<boolean | undefined> {
+  const result = await journalKV.set(`${hash}:work`, "reserved", {
+    nx: true,
+    ex: PAYMENT_WORK_TTL_SECONDS,
+  });
+  return result === undefined ? undefined : result === "OK";
 }
 
 export async function readClaim(hash: string): Promise<SettlementClaim | null | undefined> {

@@ -284,6 +284,28 @@ describe("GET /api/d2a/info with Base mainnet", () => {
   });
 });
 
+describe("GET /api/d2a/info with shared payments disabled", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("advertises all three shared payment endpoints as disabled", async () => {
+    process.env.D2A_PAYMENTS_DISABLED = "true";
+    process.env.D2A_SCORE_ENABLED = "true";
+    jest.resetModules();
+    const { GET: disabledGET } = await import("@/app/api/d2a/info/route");
+    const res = await disabledGET(makeRequest());
+    const data = await res.json();
+
+    expect(data.endpoints.briefing.auth).toBe("disabled");
+    expect(data.endpoints.changes.auth).toBe("disabled");
+    expect(data.endpoints.score.auth).toBe("disabled");
+  });
+});
+
 describe("D2A score free-mode production fail-fast", () => {
   const originalEnv = { ...process.env };
 

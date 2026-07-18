@@ -4,6 +4,7 @@ const reconcileKV = kvNamespace("aegis:journal:");
 const reconcileMetricsKV = kvNamespace("aegis:metrics:");
 
 const RUNBOOK_LOCK_SECONDS = 900;
+const PENDING_PRUNE_BATCH_SIZE = 500;
 
 export interface ReconcileResolution {
   epoch: number;
@@ -82,6 +83,34 @@ export function readRunbookEpoch(): Promise<number | null | undefined> {
 
 export function listStalePending(beforeTimestamp: number): Promise<string[] | undefined> {
   return reconcileKV.zrange<string[]>("pending", "-inf", beforeTimestamp, { byScore: true });
+}
+
+/** Remove only expired-index members whose journal records are already gone. */
+export async function pruneMissingPending(
+  beforeTimestamp: number,
+  beforeWrite: () => Promise<void>,
+): Promise<{ checked: number; pruned: number } | undefined> {
+  const members = await reconcileKV.zrange<string[]>(
+    "pending",
+    "-inf",
+    beforeTimestamp,
+    { byScore: true },
+  );
+  if (members === undefined) return undefined;
+
+  let pruned = 0;
+  for (let index = 0; index < members.length; index += PENDING_PRUNE_BATCH_SIZE) {
+    const batch = members.slice(index, index + PENDING_PRUNE_BATCH_SIZE);
+    const records = await reconcileKV.mget<Array<unknown | null>>(...batch);
+    if (records === undefined) return undefined;
+    const missing = batch.filter((_member, recordIndex) => records[recordIndex] == null);
+    if (missing.length === 0) continue;
+    await beforeWrite();
+    const removed = await reconcileKV.zrem("pending", ...missing);
+    if (removed === undefined) return undefined;
+    pruned += removed;
+  }
+  return { checked: members.length, pruned };
 }
 
 export async function readReconcileCandidate<TAttempt, TFinal>(

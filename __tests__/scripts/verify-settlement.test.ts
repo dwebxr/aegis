@@ -71,10 +71,7 @@ function clientFor(logs: TransactionReceipt["logs"], options: {
       expect(slot).toBe(ZOS_IMPLEMENTATION_SLOT);
       return Promise.resolve(pad(IMPLEMENTATION, { size: 32 }));
     }),
-    readContract: jest.fn().mockImplementation(({ functionName }: { functionName: string }) =>
-      functionName === "implementation"
-        ? Promise.resolve(IMPLEMENTATION)
-        : Promise.resolve(options.authorizationState ?? true)),
+    readContract: jest.fn().mockResolvedValue(options.authorizationState ?? true),
     getLogs: jest.fn().mockResolvedValue(options.upgrades ?? []),
   };
 }
@@ -86,6 +83,7 @@ const input = {
   amount: AMOUNT,
   nonce: NONCE,
   validBefore: 400n,
+  expectedImplementation: IMPLEMENTATION,
 };
 
 describe("verifySettlement", () => {
@@ -111,6 +109,7 @@ describe("verifySettlement", () => {
       fromBlock: 100n,
       toBlock: 100n,
     }));
+    expect(client.readContract).not.toHaveBeenCalled();
   });
 
   it("requires the matching transfer to be immediately adjacent", async () => {
@@ -169,6 +168,23 @@ describe("verifySettlement", () => {
     await expect(verifySettlement(client as never, input)).resolves.toEqual({
       status: "needs-review",
       evidence: expect.objectContaining({ compensationAllowed: false }),
+    });
+  });
+
+  it("returns needs-review when the ZOS slot does not match the expected pin", async () => {
+    const client = clientFor([]);
+
+    const result = await verifySettlement(client as never, {
+      ...input,
+      expectedImplementation: "0x7777777777777777777777777777777777777777",
+    });
+
+    expect(result).toEqual({
+      status: "needs-review",
+      evidence: expect.objectContaining({
+        implementation: IMPLEMENTATION,
+        reason: "usdc-implementation-pin-mismatch",
+      }),
     });
   });
 
