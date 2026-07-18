@@ -12,6 +12,7 @@ import {
   readReconcileCandidate,
   readRunbookEpoch,
   readRunbookLock,
+  releaseRunbookLock,
   writeCompensationTombstone,
   writeResolution,
   type IndexedResolution,
@@ -421,6 +422,11 @@ async function main(): Promise<void> {
   }
 
   console.log(JSON.stringify({ ...report, compensation }, null, 2));
+
+  // R12-R13: releasing a completed run is only a convenience optimization.
+  // Correctness comes from append-only resolutions plus the monotonic epoch;
+  // abnormal exits deliberately retain the lease until its TTL expires.
+  await releaseRunbookLock(report.ownerToken);
 }
 
 if (require.main === module) {

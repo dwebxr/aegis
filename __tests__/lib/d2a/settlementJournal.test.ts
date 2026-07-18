@@ -52,7 +52,7 @@ function context(): SettleContext {
         extra: {},
       },
       payload: { authorization: AUTHORIZATION, signature: "0xfake" },
-      resource: { url: "https://example.com/article?x=1" },
+      resource: { url: "https://example.com/article?token=secret#private" },
     },
     requirements: {
       scheme: "exact",
@@ -122,7 +122,7 @@ describe("settlementJournal", () => {
     await expect(acquirePaymentWork("payment-hash")).resolves.toBe(false);
   });
 
-  it("counts every verify shape except literal boolean true as verify-failure", async () => {
+  it("keeps verify results separate from settlement SLO metrics", async () => {
     for (const result of [
       { isValid: false },
       {},
@@ -133,13 +133,24 @@ describe("settlementJournal", () => {
     }
     expect(mockMetrics.zadd).toHaveBeenCalledTimes(4);
     expect(mockMetrics.zadd).toHaveBeenCalledWith(
+      "verify:eip155:84532",
+      expect.objectContaining({ member: expect.stringContaining(":failure:") }),
+    );
+    expect(mockMetrics.zadd).not.toHaveBeenCalledWith(
       "settle:eip155:84532",
-      expect.objectContaining({ member: expect.stringContaining(":verify-failure:") }),
+      expect.anything(),
+    );
+    expect(mockMetrics.incr).toHaveBeenCalledWith(
+      expect.stringMatching(/^verify:eip155:84532:\d{4}-\d{2}-\d{2}:failure$/),
+      { ex: 1_209_600 },
     );
 
     mockMetrics.zadd.mockClear();
     await onAfterVerify({ ...context(), result: { isValid: true } } as never);
-    expect(mockMetrics.zadd).not.toHaveBeenCalled();
+    expect(mockMetrics.zadd).toHaveBeenCalledWith(
+      "verify:eip155:84532",
+      expect.objectContaining({ member: expect.stringContaining(":success:") }),
+    );
   });
 
   it("retries SET NX attempt-token collisions up to three times", async () => {
@@ -216,6 +227,10 @@ describe("settlementJournal", () => {
     expect(mockJournal.get).toHaveBeenCalledTimes(1);
     expect(mockJournal.set.mock.calls.some((call) => String(call[0]).endsWith(":claim")))
       .toBe(false);
+    expect(mockMetrics.zadd).not.toHaveBeenCalledWith(
+      "settle:eip155:84532",
+      expect.anything(),
+    );
   });
 
   it("acquires the claim, double-checks state, then writes and indexes pending", async () => {
@@ -247,6 +262,7 @@ describe("settlementJournal", () => {
       network: "eip155:84532",
       asset: "0xasset",
     });
+    expect(pendingRecord.url).toBe("https://example.com/article");
   });
 
   it("fails closed when ZADD fails and marks the attempt rejected before ZREM", async () => {

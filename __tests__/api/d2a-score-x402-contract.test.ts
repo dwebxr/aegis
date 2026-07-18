@@ -48,6 +48,7 @@ class FakeFacilitator implements FacilitatorClient {
 function request(
   payment?: string,
   articleUrl = "https://example.com",
+  paymentHeader = "PAYMENT-SIGNATURE",
 ): NextRequest {
   const url = new URL("http://localhost/api/d2a/score");
   url.searchParams.set("url", articleUrl);
@@ -55,7 +56,7 @@ function request(
     method: "GET",
     headers: {
       origin: "https://aegis.dwebxr.xyz",
-      ...(payment ? { "PAYMENT-SIGNATURE": payment } : {}),
+      ...(payment ? { [paymentHeader]: payment } : {}),
     },
   });
 }
@@ -349,7 +350,9 @@ describe("/api/d2a/score x402 v2 contract", () => {
     }
   });
 
-  it("allows only one concurrent handler for the same payment across different URLs", async () => {
+  it.each(["PAYMENT-SIGNATURE", "X-PAYMENT"])(
+    "allows only one concurrent handler for the same payment via %s",
+    async (paymentHeader) => {
     const requirementFake = new FakeFacilitator();
     const requirementHarness = harness(
       requirementFake,
@@ -430,8 +433,8 @@ describe("/api/d2a/score x402 v2 contract", () => {
       const actualRoute = require("@/app/api/d2a/score/route") as
         typeof import("@/app/api/d2a/score/route");
       const responses = await Promise.all([
-        actualRoute.GET(request(firstEncoding, "https://example.com/one")),
-        actualRoute.GET(request(secondEncoding, "https://example.net/two")),
+        actualRoute.GET(request(firstEncoding, "https://example.com/one", paymentHeader)),
+        actualRoute.GET(request(secondEncoding, "https://example.net/two", paymentHeader)),
       ]);
 
       expect(responses.map((response) => response.status).sort()).toEqual([200, 503]);
@@ -460,7 +463,8 @@ describe("/api/d2a/score x402 v2 contract", () => {
       ]) jest.dontMock(moduleName);
       jest.resetModules();
     }
-  });
+    },
+  );
 
   it("(h) decorates wrapper-generated 402 responses with CORS and no-store", async () => {
     const fake = new FakeFacilitator();

@@ -179,6 +179,8 @@ describe("KV architecture boundaries", () => {
         "readRunbookEpoch",
         "readRunbookLock",
         "readSettlementMetrics",
+        "readVerificationMetrics",
+        "releaseRunbookLock",
         "writeCompensationTombstone",
         "writeResolution",
       ],

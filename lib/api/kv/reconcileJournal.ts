@@ -1,6 +1,6 @@
 import { kvNamespace } from "./internal/factory";
 
-const reconcileKV = kvNamespace("aegis:journal:");
+const reconcileKV = kvNamespace("aegis:journal:", { allowDelete: true });
 const reconcileMetricsKV = kvNamespace("aegis:metrics:");
 
 const RUNBOOK_LOCK_SECONDS = 900;
@@ -71,6 +71,18 @@ export async function acquireRunbookLock(ownerToken: string): Promise<boolean | 
 
 export function readRunbookLock(): Promise<string | null | undefined> {
   return reconcileKV.get<string>("runbook-lock");
+}
+
+export async function releaseRunbookLock(ownerToken: string): Promise<boolean | undefined> {
+  try {
+    const owner = await reconcileKV.get<string>("runbook-lock");
+    if (owner === undefined) return undefined;
+    if (owner !== ownerToken) return false;
+    const deleted = await reconcileKV.del("runbook-lock");
+    return deleted === undefined ? undefined : deleted > 0;
+  } catch {
+    return undefined;
+  }
 }
 
 export function incrementRunbookEpoch(): Promise<number | undefined> {
@@ -179,4 +191,11 @@ export function readSettlementMetrics(
   count: number,
 ): Promise<string[] | undefined> {
   return reconcileMetricsKV.zrange<string[]>(`settle:${network}`, -count, -1);
+}
+
+export function readVerificationMetrics(
+  network: string,
+  count: number,
+): Promise<string[] | undefined> {
+  return reconcileMetricsKV.zrange<string[]>(`verify:${network}`, -count, -1);
 }

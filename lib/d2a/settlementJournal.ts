@@ -288,24 +288,45 @@ function utcDate(timestamp: number): string {
   return new Date(timestamp).toISOString().slice(0, 10);
 }
 
-async function recordMetric(network: string, outcome: string, attemptToken: string): Promise<void> {
+async function recordMetric(
+  phase: "settle" | "verify",
+  network: string,
+  outcome: string,
+  attemptToken: string,
+): Promise<void> {
   const timestamp = Date.now();
-  const zsetKey = `settle:${network}`;
+  const zsetKey = `${phase}:${network}`;
   try {
     await metricsKV.zadd(zsetKey, {
       score: timestamp,
       member: `${timestamp}:${outcome}:${attemptToken}`,
     });
     await metricsKV.zremrangebyrank(zsetKey, 0, -101);
-    await metricsKV.incr(`settle:${network}:${utcDate(timestamp)}:${outcome}`, {
+    await metricsKV.incr(`${phase}:${network}:${utcDate(timestamp)}:${outcome}`, {
       ex: METRICS_TTL_SECONDS,
     });
   } catch (error) {
     Sentry.captureException(error, {
-      tags: { module: "settlementJournal", failure: "metrics", outcome },
+      tags: { module: "settlementJournal", failure: "metrics", phase, outcome },
       extra: { network, attemptToken },
     });
   }
+}
+
+function recordSettleMetric(
+  network: string,
+  outcome: string,
+  attemptToken: string,
+): Promise<void> {
+  return recordMetric("settle", network, outcome, attemptToken);
+}
+
+function recordVerifyMetric(
+  network: string,
+  outcome: "success" | "failure",
+  attemptToken: string,
+): Promise<void> {
+  return recordMetric("verify", network, outcome, attemptToken);
 }
 
 function requestUrl(context: SettleContext): string {
@@ -324,6 +345,19 @@ function requestUrl(context: SettleContext): string {
   return typeof value === "string" ? value : "";
 }
 
+function journalUrl(context: SettleContext): string {
+  const value = requestUrl(context);
+  if (!value) return "";
+  try {
+    const parsed = new URL(value);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    // Malformed/relative transport URLs still must not retain secrets in a
+    // query or fragment.
+    return value.split(/[?#]/, 1)[0] ?? "";
+  }
+}
+
 function attemptRecord(
   context: SettleContext,
   status: SettlementAttemptStatus,
@@ -338,7 +372,7 @@ function attemptRecord(
     amount: context.requirements.amount,
     payTo: context.requirements.payTo,
     payer: authorization.from,
-    url: requestUrl(context),
+    url: journalUrl(context),
     // The accepted amount is the original authorized price; requirements.amount
     // may be a settlement override for schemes that support partial charging.
     price: context.paymentPayload.accepted.amount,
@@ -398,27 +432,32 @@ async function rejectAndAbort(
       extra: { hash, reason },
     });
   }
-  await recordMetric(context.requirements.network, reason, metricToken ?? randomUUID());
+  // A settle SLO sample begins only after this request owns the claim.
+  if (attemptToken) {
+    await recordSettleMetric(context.requirements.network, reason, metricToken ?? attemptToken);
+  }
   return { abort: true, reason };
 }
 
 export async function onAfterVerify(context: VerifyResultContext): Promise<void> {
-  if (context.result?.isValid !== true) {
-    await recordMetric(context.requirements.network, "verify-failure", randomUUID());
-  }
+  await recordVerifyMetric(
+    context.requirements.network,
+    context.result?.isValid === true ? "success" : "failure",
+    randomUUID(),
+  );
 }
 
 export async function onBeforeSettle(
   context: SettleContext,
 ): Promise<void | { abort: true; reason: string }> {
   let hash: string;
+  let claimedAttemptToken: string | undefined;
   try {
     hash = canonicalPaymentIdentity(context.paymentPayload);
   } catch (error) {
     Sentry.captureException(error, {
       tags: { module: "settlementJournal", failure: "invalid-payment-identity" },
     });
-    await recordMetric(context.requirements.network, "journal-unavailable", randomUUID());
     return { abort: true, reason: "journal-unavailable" };
   }
   try {
@@ -453,6 +492,7 @@ export async function onBeforeSettle(
         claimed === false ? "aborted-concurrent" : "journal-unavailable",
       );
     }
+    claimedAttemptToken = attemptToken;
 
     const checked = await readFinalAndAttempt(hash, attemptToken);
     if (checked.final) {
@@ -492,7 +532,7 @@ export async function onBeforeSettle(
         tags: { module: "settlementJournal", failure: "pending-zadd" },
         extra: { hash, attemptToken, recordKey: attemptKey(hash, attemptToken) },
       });
-      await recordMetric(context.requirements.network, "zadd-failed", attemptToken);
+      await recordSettleMetric(context.requirements.network, "zadd-failed", attemptToken);
       return { abort: true, reason: "zadd-failed" };
     }
 
@@ -501,7 +541,13 @@ export async function onBeforeSettle(
       tags: { module: "settlementJournal", failure: "before-settle" },
       extra: { hash },
     });
-    await recordMetric(context.requirements.network, "journal-unavailable", randomUUID());
+    if (claimedAttemptToken) {
+      await recordSettleMetric(
+        context.requirements.network,
+        "journal-unavailable",
+        claimedAttemptToken,
+      );
+    }
     return { abort: true, reason: "journal-unavailable" };
   }
 }
@@ -549,7 +595,7 @@ export async function onAfterSettle(context: SettleResultContext): Promise<void>
         tags: { module: "settlementJournal", failure: "final-write" },
         extra: { hash, attemptToken },
       });
-      await recordMetric(context.requirements.network, "success", attemptToken);
+      await recordSettleMetric(context.requirements.network, "success", attemptToken);
       return;
     }
     if (finalWritten === undefined) {
@@ -557,7 +603,7 @@ export async function onAfterSettle(context: SettleResultContext): Promise<void>
         tags: { module: "settlementJournal", failure: "final-write" },
         extra: { hash, attemptToken },
       });
-      await recordMetric(context.requirements.network, "success", attemptToken);
+      await recordSettleMetric(context.requirements.network, "success", attemptToken);
       return;
     }
 
@@ -575,7 +621,7 @@ export async function onAfterSettle(context: SettleResultContext): Promise<void>
         extra: { hash, attemptToken },
       });
     }
-    await recordMetric(context.requirements.network, "success", attemptToken);
+    await recordSettleMetric(context.requirements.network, "success", attemptToken);
     return;
   }
 
@@ -593,12 +639,13 @@ export async function onAfterSettle(context: SettleResultContext): Promise<void>
       extra: { hash, attemptToken },
     });
   }
-  await recordMetric(context.requirements.network, "failure", attemptToken);
+  await recordSettleMetric(context.requirements.network, "failure", attemptToken);
 }
 
 export async function onSettleFailure(context: SettleFailureContext): Promise<void> {
   let hash = "unavailable";
   let attemptToken = "unavailable";
+  let claimAcquired = false;
   try {
     hash = canonicalPaymentIdentity(context.paymentPayload);
   } catch (error) {
@@ -612,6 +659,7 @@ export async function onSettleFailure(context: SettleFailureContext): Promise<vo
       const claim = await readClaim(hash);
       if (claim) {
         attemptToken = claim.attemptToken;
+        claimAcquired = true;
         const updated = await updateAttempt(hash, attemptToken, {
           status: "unknown",
           updatedAt: Date.now(),
@@ -633,5 +681,7 @@ export async function onSettleFailure(context: SettleFailureContext): Promise<vo
     tags: { module: "settlementJournal", failure: "settlement-unknown" },
     extra: { hash, attemptToken },
   });
-  await recordMetric(context.requirements.network, "unknown", attemptToken);
+  if (claimAcquired) {
+    await recordSettleMetric(context.requirements.network, "unknown", attemptToken);
+  }
 }

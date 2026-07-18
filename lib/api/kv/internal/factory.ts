@@ -16,7 +16,7 @@ interface SortedSetMember<T> {
 
 type SortedSetRangeOptions = Record<string, unknown>;
 
-export function kvNamespace(prefix: string) {
+function createNamespace(prefix: string) {
   const fullKey = (key: string) => `${prefix}${key}`;
 
   return {
@@ -113,6 +113,34 @@ export function kvNamespace(prefix: string) {
       const store = await getRawKV();
       if (!store) return undefined;
       return store.ttl(fullKey(key));
+    },
+  };
+}
+
+type Namespace = ReturnType<typeof createNamespace>;
+
+interface DeleteCapability {
+  del(key: string): Promise<number | undefined>;
+}
+
+export function kvNamespace(prefix: string): Namespace;
+export function kvNamespace(
+  prefix: string,
+  options: { allowDelete: true },
+): Namespace & DeleteCapability;
+export function kvNamespace(
+  prefix: string,
+  options?: { allowDelete?: boolean },
+): Namespace | (Namespace & DeleteCapability) {
+  const namespace = createNamespace(prefix);
+  if (!options?.allowDelete) return namespace;
+
+  return {
+    ...namespace,
+    async del(key: string): Promise<number | undefined> {
+      const store = await getRawKV();
+      if (!store) return undefined;
+      return store.del(`${prefix}${key}`);
     },
   };
 }

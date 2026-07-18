@@ -1,4 +1,7 @@
-import { readSettlementMetrics } from "@/lib/api/kv/reconcileJournal";
+import {
+  readSettlementMetrics,
+  readVerificationMetrics,
+} from "@/lib/api/kv/reconcileJournal";
 
 const WINDOW_SIZE = 20;
 const ROLLBACK_MIN_SUCCESSES = 16;
@@ -10,11 +13,23 @@ export interface SettleStats {
   successRate: number;
   windowComplete: boolean;
   rollback: boolean;
+  verification: {
+    attempts: number;
+    failures: number;
+    failureRate: number;
+  };
 }
 
-export function calculateSettleStats(network: string, members: string[]): SettleStats {
+export function calculateSettleStats(
+  network: string,
+  members: string[],
+  verifyMembers: string[] = [],
+): SettleStats {
   const window = members.slice(-WINDOW_SIZE);
   const successes = window.filter((member) => member.split(":", 3)[1] === "success").length;
+  const verifyWindow = verifyMembers.slice(-WINDOW_SIZE);
+  const verifyFailures = verifyWindow
+    .filter((member) => member.split(":", 3)[1] === "failure").length;
   return {
     network,
     attempts: window.length,
@@ -22,13 +37,23 @@ export function calculateSettleStats(network: string, members: string[]): Settle
     successRate: window.length === 0 ? 0 : successes / window.length,
     windowComplete: window.length === WINDOW_SIZE,
     rollback: window.length === WINDOW_SIZE && successes < ROLLBACK_MIN_SUCCESSES,
+    verification: {
+      attempts: verifyWindow.length,
+      failures: verifyFailures,
+      failureRate: verifyWindow.length === 0 ? 0 : verifyFailures / verifyWindow.length,
+    },
   };
 }
 
 export async function settlementStats(network: string): Promise<SettleStats> {
-  const members = await readSettlementMetrics(network, WINDOW_SIZE);
-  if (members === undefined) throw new Error("Settlement metrics KV is unavailable");
-  return calculateSettleStats(network, members);
+  const [members, verifyMembers] = await Promise.all([
+    readSettlementMetrics(network, WINDOW_SIZE),
+    readVerificationMetrics(network, WINDOW_SIZE),
+  ]);
+  if (members === undefined || verifyMembers === undefined) {
+    throw new Error("Settlement metrics KV is unavailable");
+  }
+  return calculateSettleStats(network, members, verifyMembers);
 }
 
 async function main(): Promise<void> {

@@ -17,4 +17,18 @@ describe("calculateSettleStats", () => {
       expect.objectContaining({ successes: 15, rollback: true, windowComplete: true }),
     );
   });
+
+  it("shows verify failures without letting them poison the rollback window", () => {
+    const verifyFailures = Array.from({ length: 20 }, (_, index) =>
+      `${index}:failure:verify-${index}`);
+
+    expect(calculateSettleStats("eip155:8453", [], verifyFailures)).toEqual(
+      expect.objectContaining({
+        attempts: 0,
+        rollback: false,
+        windowComplete: false,
+        verification: { attempts: 20, failures: 20, failureRate: 1 },
+      }),
+    );
+  });
 });

@@ -7,6 +7,7 @@ const mockPruneMissingPending = jest.fn();
 const mockReadReconcileCandidate = jest.fn();
 const mockReadRunbookEpoch = jest.fn();
 const mockReadRunbookLock = jest.fn();
+const mockReleaseRunbookLock = jest.fn();
 const mockVerifySettlement = jest.fn();
 
 jest.mock("@/lib/api/kv/reconcileJournal", () => ({
@@ -19,6 +20,7 @@ jest.mock("@/lib/api/kv/reconcileJournal", () => ({
   readReconcileCandidate: mockReadReconcileCandidate,
   readRunbookEpoch: mockReadRunbookEpoch,
   readRunbookLock: mockReadRunbookLock,
+  releaseRunbookLock: mockReleaseRunbookLock,
   writeCompensationTombstone: jest.fn(),
   writeResolution: jest.fn(),
 }));

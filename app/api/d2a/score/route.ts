@@ -67,6 +67,19 @@ function clientIp(request: NextRequest): string {
     || "unknown";
 }
 
+function paymentHeader(request: NextRequest): string | null {
+  // Keep this in the same order as @x402/next's compiled createRequestContext.
+  return request.headers.get("payment-signature") || request.headers.get("x-payment");
+}
+
+function requestWithPrimaryPaymentHeader(request: NextRequest): NextRequest {
+  const selected = paymentHeader(request);
+  if (!selected || request.headers.get("payment-signature")) return request;
+  const headers = new Headers(request.headers);
+  headers.set("payment-signature", selected);
+  return new NextRequest(request, { headers });
+}
+
 function safeUrl(url?: URL): string | undefined {
   return url ? `${url.origin}${url.pathname}` : undefined;
 }
@@ -157,7 +170,7 @@ async function handleScore(request: NextRequest): Promise<NextResponse> {
   parsedUrl.hash = "";
   const normalizedUrl = parsedUrl.toString();
 
-  const paymentSignature = request.headers.get("payment-signature");
+  const paymentSignature = paymentHeader(request);
   if (paymentSignature !== null) {
     let paymentIdentity: string;
     try {
@@ -399,7 +412,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         "Payment receiver is not configured",
       );
     } else {
-      response = await getPaidHandler()(request);
+      response = await getPaidHandler()(requestWithPrimaryPaymentHeader(request));
     }
     return finalize(response, request);
   } catch (error) {
