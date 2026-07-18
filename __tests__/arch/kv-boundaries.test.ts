@@ -164,7 +164,23 @@ describe("KV architecture boundaries", () => {
       "lib/api/kv/internal/factory.ts": ["kvNamespace"],
       "lib/api/kv/namespace.ts": ["dailyBudgetKV", "metricsKV", "rateLimitKV", "scoreBudgetKV", "scoreCacheKV"],
       "lib/api/kv/journalNamespace.ts": ["journalKV"],
-      "lib/api/kv/reconcileJournal.ts": ["readJournalReport", "readResolution", "writeResolution"],
+      "lib/api/kv/reconcileJournal.ts": [
+        "IndexedResolution",
+        "ReconcileResolution",
+        "acquireRunbookLock",
+        "assertCompensationTombstonesPermanent",
+        "incrementRunbookEpoch",
+        "listResolutions",
+        "listStalePending",
+        "readJournalReport",
+        "readReconcileCandidate",
+        "readResolution",
+        "readRunbookEpoch",
+        "readRunbookLock",
+        "readSettlementMetrics",
+        "writeCompensationTombstone",
+        "writeResolution",
+      ],
     };
     for (const [file, names] of Object.entries(expected)) {
       expect(exportedNames(path.join(ROOT, file))).toEqual([...names].sort());

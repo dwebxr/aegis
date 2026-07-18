@@ -264,6 +264,11 @@ describe("GET /api/d2a/info with Base mainnet", () => {
 
   it("advertises eip155:8453 USD Coin from the x402 asset registry", async () => {
     process.env.X402_NETWORK = "eip155:8453";
+    process.env.CDP_API_KEY_ID = "test-key-id";
+    process.env.CDP_API_KEY_SECRET = "test-key-secret";
+    jest.doMock("@/lib/d2a/cdpFacilitator", () => ({
+      createCdpFacilitatorConfig: () => ({ url: "https://cdp.test/x402" }),
+    }));
     jest.resetModules();
     const { GET: mainnetGET } = await import("@/app/api/d2a/info/route");
     const res = await mainnetGET(makeRequest());

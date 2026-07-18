@@ -27,6 +27,7 @@
     "canister:rollback": "scripts/canister-rollback.sh"
   },
   "dependencies": {
+    "@coinbase/cdp-sdk": "1.50.0",
     "@dfinity/agent": "3.4.3",
     "@dfinity/auth-client": "3.4.3",
     "@dfinity/candid": "3.4.3",
