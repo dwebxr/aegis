@@ -163,9 +163,36 @@ Deploy the complete code with Base Sepolia and leave `D2A_SCORE_ENABLED` unset s
 
 Add both CDP keys to production while keeping `X402_NETWORK=eip155:84532`. This moves score, briefing, and briefing changes to CDP. Redeploy, run `cdp-smoke`, then complete and verify one real payment through score and one through briefing. Confirm journal final records and settlement metrics.
 
+For the controlled score payment, fund the payer with testnet USDC from the [Circle faucet](https://faucet.circle.com), selecting **Base Sepolia** as the network. The private key must be a `0x`-prefixed 32-byte EVM key. Read it without echoing it or placing it on the command line, then call the paid endpoint exactly once:
+
+```bash
+read -s EVM_PRIVATE_KEY
+export EVM_PRIVATE_KEY
+npx tsx scripts/x402-test-client.ts \
+  --url 'https://aegis-ai.xyz/api/d2a/score?url=https://example.com'
+unset EVM_PRIVATE_KEY
+```
+
+Success requires all of the following: `PAYMENT-REQUIRED accepts[0]` reports `scheme: "exact"` and `network: "eip155:84532"`; the paid response reports status `200`; the decoded `paymentResponse` contains a 32-byte `txHash`; the final line is `Result: SUCCESS`; and the process exits `0`. Any other result exits `1`. Do not rerun the payment client after a failed or indeterminate paid attempt; preserve its output and reconcile it under the safety rules above.
+
+After the transaction is finalized, copy the public fields from `verify-settlement values (signature omitted)` and verify the same authorization on Base Sepolia:
+
+```bash
+npx tsx scripts/verify-settlement.ts \
+  --network eip155:84532 \
+  --tx <txHash> \
+  --payer <payer> \
+  --pay-to <payTo> \
+  --amount <amount> \
+  --nonce <nonce> \
+  --valid-before <validBefore>
+```
+
+Require the verifier to report `status: "settled"`, then match the transaction hash, payer, payee, amount, and nonce to the journal final record and settlement metrics. If finality has not yet reached the receipt, wait and rerun only the read-only verifier with the same values; never create another authorization for that attempt.
+
 ### Phase 2a — preview mainnet dark validation
 
-In Vercel Preview only, set `X402_NETWORK=eip155:8453`, both CDP keys, the intended receiver, and a small test price. Redeploy preview. Complete one small real payment, require `verify-settlement` to return `settled`, and independently confirm the USDC receipt. Do not change production during this step.
+In Vercel Preview only, set `X402_NETWORK=eip155:8453`, both CDP keys, the intended receiver, and a small test price. Redeploy preview. Use `scripts/x402-test-client.ts` as above with the preview score URL and a mainnet-funded payer to complete one small real payment. Require `verify-settlement --network eip155:8453` to return `settled`, and independently confirm the USDC receipt. Do not change production during this step.
 
 ### Phase 2b — production mainnet
 
