@@ -73,6 +73,8 @@ export interface SettlementEvidence {
   receiptBlockHash?: Hex;
   implementation?: Address;
   implementationParentBlock?: string;
+  finalizedImplementation?: Address;
+  finalizedImplementationParentBlock?: string;
   authorizationLogIndex?: number;
   transferLogIndex?: number;
   compensationAllowed: boolean;
@@ -176,8 +178,6 @@ export async function verifySettlement(
   client: SupportedPublicClient,
   input: VerifySettlementInput,
 ): Promise<VerifySettlementResult> {
-  if (!input.txHash) return needsReview("tx-hash-unknown");
-
   try {
     const network = input.network ?? "eip155:8453";
     const networkConfig = NETWORK_CONFIG[network];
@@ -188,76 +188,97 @@ export async function verifySettlement(
     const payer = getAddress(input.payer);
     const payTo = getAddress(input.payTo);
     const [receipt, finalizedBlock] = await Promise.all([
-      client.getTransactionReceipt({ hash: input.txHash }),
+      input.txHash
+        ? client.getTransactionReceipt({ hash: input.txHash })
+        : Promise.resolve(undefined),
       client.getBlock({ blockTag: "finalized" }),
     ]);
-    const baseEvidence: Partial<SettlementEvidence> = {
-      receiptBlock: receipt.blockNumber.toString(),
+    let evidence: Partial<SettlementEvidence> = {
       finalizedBlock: finalizedBlock.number.toString(),
-      receiptBlockHash: receipt.blockHash,
     };
-    if (receipt.blockNumber > finalizedBlock.number) {
-      return needsReview("receipt-not-finalized", baseEvidence);
-    }
+    let targetTransfers: DecodedReceiptEvents["transfers"] = [];
 
-    const canonicalBlock = await client.getBlock({ blockNumber: receipt.blockNumber });
-    if (canonicalBlock.hash?.toLowerCase() !== receipt.blockHash.toLowerCase()) {
-      return needsReview("receipt-not-canonical", baseEvidence);
-    }
-
-    const pin = await pinnedImplementation(client, usdc, receipt.blockNumber);
-    if (!pin) return needsReview("usdc-implementation-not-pinned", baseEvidence);
-    const evidence: Partial<SettlementEvidence> = {
-      ...baseEvidence,
-      implementation: pin.implementation,
-      implementationParentBlock: pin.parentBlock.toString(),
-    };
-    if (!sameAddress(pin.implementation, expectedImplementation)) {
-      return needsReview("usdc-implementation-pin-mismatch", evidence);
-    }
-
-    const events = decodeReceiptEvents(receipt, usdc);
-    const targetTransfers = events.transfers.filter((event) =>
-      sameAddress(event.from, payer)
-      && sameAddress(event.to, payTo)
-      && event.value === input.amount);
-    const authorization = events.used.find((event) =>
-      sameAddress(event.authorizer, payer)
-      && event.nonce.toLowerCase() === input.nonce.toLowerCase());
-    const adjacentTransfer = authorization
-      ? targetTransfers.find((event) => event.logIndex === authorization.logIndex + 1)
-      : undefined;
-
-    if (receipt.status === "success" && authorization && adjacentTransfer) {
-      return {
-        status: "settled",
-        evidence: {
-          ...evidence,
-          authorizationLogIndex: authorization.logIndex,
-          transferLogIndex: adjacentTransfer.logIndex,
-          compensationAllowed: false,
-          reason: "authorization-used-and-adjacent-transfer",
-        },
+    if (receipt) {
+      evidence = {
+        ...evidence,
+        receiptBlock: receipt.blockNumber.toString(),
+        receiptBlockHash: receipt.blockHash,
       };
-    }
+      if (receipt.blockNumber > finalizedBlock.number) {
+        return needsReview("receipt-not-finalized", evidence);
+      }
 
-    const canceled = events.canceled.find((event) =>
-      sameAddress(event.authorizer, payer)
-      && event.nonce.toLowerCase() === input.nonce.toLowerCase());
-    if (canceled && targetTransfers.length === 0) {
-      return {
-        status: "closed-unpaid",
-        evidence: {
-          ...evidence,
-          authorizationLogIndex: canceled.logIndex,
-          compensationAllowed: false,
-          reason: "authorization-canceled-without-transfer",
-        },
+      const canonicalBlock = await client.getBlock({ blockNumber: receipt.blockNumber });
+      if (canonicalBlock.hash?.toLowerCase() !== receipt.blockHash.toLowerCase()) {
+        return needsReview("receipt-not-canonical", evidence);
+      }
+
+      const pin = await pinnedImplementation(client, usdc, receipt.blockNumber);
+      if (!pin) return needsReview("usdc-implementation-not-pinned", evidence);
+      evidence = {
+        ...evidence,
+        implementation: pin.implementation,
+        implementationParentBlock: pin.parentBlock.toString(),
       };
+      if (!sameAddress(pin.implementation, expectedImplementation)) {
+        return needsReview("usdc-implementation-pin-mismatch", evidence);
+      }
+
+      const events = decodeReceiptEvents(receipt, usdc);
+      targetTransfers = events.transfers.filter((event) =>
+        sameAddress(event.from, payer)
+        && sameAddress(event.to, payTo)
+        && event.value === input.amount);
+      const authorization = events.used.find((event) =>
+        sameAddress(event.authorizer, payer)
+        && event.nonce.toLowerCase() === input.nonce.toLowerCase());
+      const adjacentTransfer = authorization
+        ? targetTransfers.find((event) => event.logIndex === authorization.logIndex + 1)
+        : undefined;
+
+      if (receipt.status === "success" && authorization && adjacentTransfer) {
+        return {
+          status: "settled",
+          evidence: {
+            ...evidence,
+            authorizationLogIndex: authorization.logIndex,
+            transferLogIndex: adjacentTransfer.logIndex,
+            compensationAllowed: false,
+            reason: "authorization-used-and-adjacent-transfer",
+          },
+        };
+      }
+
+      const canceled = events.canceled.find((event) =>
+        sameAddress(event.authorizer, payer)
+        && event.nonce.toLowerCase() === input.nonce.toLowerCase());
+      if (canceled && targetTransfers.length === 0) {
+        return {
+          status: "closed-unpaid",
+          evidence: {
+            ...evidence,
+            authorizationLogIndex: canceled.logIndex,
+            compensationAllowed: false,
+            reason: "authorization-canceled-without-transfer",
+          },
+        };
+      }
     }
 
     const finalizedTimestamp = finalizedBlock.timestamp;
     if (finalizedTimestamp >= input.validBefore && targetTransfers.length === 0) {
+      const finalizedPin = await pinnedImplementation(client, usdc, finalizedBlock.number);
+      if (!finalizedPin) {
+        return needsReview("usdc-finalized-implementation-not-pinned", evidence);
+      }
+      const finalizedEvidence: Partial<SettlementEvidence> = {
+        ...evidence,
+        finalizedImplementation: finalizedPin.implementation,
+        finalizedImplementationParentBlock: finalizedPin.parentBlock.toString(),
+      };
+      if (!sameAddress(finalizedPin.implementation, expectedImplementation)) {
+        return needsReview("usdc-finalized-implementation-pin-mismatch", finalizedEvidence);
+      }
       const authorizationState = await client.readContract({
         address: usdc,
         abi: authorizationAbi,
@@ -269,12 +290,13 @@ export async function verifySettlement(
         return {
           status: "closed-unpaid",
           evidence: {
-            ...evidence,
+            ...finalizedEvidence,
             compensationAllowed: true,
             reason: "authorization-expired-and-unused-at-finalized-head",
           },
         };
       }
+      evidence = finalizedEvidence;
     }
 
     return needsReview("settlement-state-indeterminate", evidence);

@@ -10,6 +10,7 @@ const mockCaptureException = jest.fn();
 const mockAddBreadcrumb = jest.fn();
 const mockCaptureMessage = jest.fn();
 const mockAcquirePaymentWork = jest.fn();
+const mockReadPaymentDurableState = jest.fn();
 const mockCanonicalPaymentIdentity = jest.fn((_paymentPayload: unknown) => "payment-identity");
 let mockReceiver = "";
 
@@ -37,6 +38,7 @@ jest.mock("@/lib/d2a/settlementJournal", () => ({
   acquirePaymentWork: (...args: unknown[]) => mockAcquirePaymentWork(...args),
   canonicalPaymentIdentity: (paymentPayload: unknown) =>
     mockCanonicalPaymentIdentity(paymentPayload),
+  readPaymentDurableState: (...args: unknown[]) => mockReadPaymentDurableState(...args),
 }));
 jest.mock("@x402/next", () => ({
   withX402: (handler: (request: NextRequest) => Promise<NextResponse>) => handler,
@@ -151,6 +153,7 @@ describe("GET /api/d2a/score (free test path)", () => {
     mockGetScoreBudgetRetryAfter.mockResolvedValue(60);
     mockDistributedRateLimitByKey.mockResolvedValue(null);
     mockAcquirePaymentWork.mockResolvedValue(true);
+    mockReadPaymentDurableState.mockResolvedValue({ final: null, claim: null });
   });
 
   afterAll(() => {
@@ -339,6 +342,32 @@ describe("GET /api/d2a/score (free test path)", () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it.each(["final", "claim"])(
+    "rejects a durable %s before reserving paid work or running expensive processing",
+    async (field) => {
+      mockReadPaymentDurableState.mockResolvedValueOnce({
+        final: field === "final" ? { attemptToken: "attempt", txHash: "0xtx", settledAt: 1 } : null,
+        claim: field === "claim" ? { attemptToken: "attempt", createdAt: 1 } : null,
+      });
+
+      const response = await route.GET(request(
+        `https://example.com/used-${field}`,
+        undefined,
+        paymentSignature(),
+      ));
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual(expect.objectContaining({
+        reason: "payment_already_used",
+      }));
+      expect(mockReadPaymentDurableState).toHaveBeenCalledWith("payment-identity");
+      expect(mockAcquirePaymentWork).not.toHaveBeenCalled();
+      expect(mockExtractArticle).not.toHaveBeenCalled();
+      expect(mockTryReserveScoreBudget).not.toHaveBeenCalled();
+      expect(mockScoreOneText).not.toHaveBeenCalled();
+    },
+  );
+
   it("reports KV exceptions during paid-work acquisition", async () => {
     mockAcquirePaymentWork.mockRejectedValueOnce(new Error("journal down"));
     const response = await route.GET(request(
@@ -401,6 +430,7 @@ describe("score route deployment guards", () => {
     mockGetScoreBudgetRetryAfter.mockResolvedValue(60);
     mockDistributedRateLimitByKey.mockResolvedValue(null);
     mockAcquirePaymentWork.mockResolvedValue(true);
+    mockReadPaymentDurableState.mockResolvedValue({ final: null, claim: null });
   });
 
   afterEach(() => {

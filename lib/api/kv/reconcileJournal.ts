@@ -36,16 +36,30 @@ export async function writeResolution(
   }
   const key = resolutionKey(hash, resolutionToken);
   await beforeWrite();
+  const indexed = await reconcileKV.zadd("resolution-index", { score: epoch, member: key });
+  if (indexed === undefined || indexed === null) {
+    throw new Error(`Resolution index could not be written before its record: ${key}`);
+  }
+  await beforeWrite();
   const result = await reconcileKV.set(
     key,
     resolution,
     { nx: true },
   );
-  if (result === undefined || result === null) return result === undefined ? undefined : false;
-  await beforeWrite();
-  const indexed = await reconcileKV.zadd("resolution-index", { score: epoch, member: key });
-  if (indexed === undefined || indexed === null) {
-    throw new Error(`Resolution was written but could not be indexed: ${key}`);
+  if (result === undefined) return undefined;
+  if (result === null) {
+    const keys = await reconcileKV.zrange<string[]>("resolution-index", 0, -1);
+    if (keys === undefined) {
+      throw new Error(`Resolution index is unavailable while checking existing record: ${key}`);
+    }
+    if (!keys.includes(key)) {
+      await beforeWrite();
+      const repaired = await reconcileKV.zadd("resolution-index", { score: epoch, member: key });
+      if (repaired === undefined || repaired === null) {
+        throw new Error(`Existing resolution index could not be repaired: ${key}`);
+      }
+    }
+    return false;
   }
   return true;
 }

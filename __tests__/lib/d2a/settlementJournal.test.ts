@@ -27,6 +27,7 @@ import {
   onBeforeSettle,
   onSettleFailure,
   readFinalAndAttempt,
+  readPaymentDurableState,
 } from "@/lib/d2a/settlementJournal";
 
 const AUTHORIZATION = {
@@ -120,6 +121,19 @@ describe("settlementJournal", () => {
 
     mockJournal.set.mockResolvedValueOnce(null);
     await expect(acquirePaymentWork("payment-hash")).resolves.toBe(false);
+  });
+
+  it("reads final and claim together before paid work is acquired", async () => {
+    const final = { attemptToken: "attempt", txHash: "0xtx", settledAt: 1 };
+    const claim = { attemptToken: "attempt", createdAt: 1 };
+    mockJournal.mget.mockResolvedValueOnce([final, claim]);
+
+    await expect(readPaymentDurableState("payment-hash")).resolves.toEqual({ final, claim });
+    expect(mockJournal.mget).toHaveBeenCalledWith(
+      "payment-hash:final",
+      "payment-hash:claim",
+    );
+    expect(mockJournal.set).not.toHaveBeenCalled();
   });
 
   it("keeps verify results separate from settlement SLO metrics", async () => {

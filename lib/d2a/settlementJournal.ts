@@ -59,6 +59,11 @@ export interface SettlementReadResult {
   attempt: SettlementAttempt | null;
 }
 
+export interface PaymentDurableState {
+  final: SettlementFinal | null;
+  claim: SettlementClaim | null;
+}
+
 function attemptKey(hash: string, attemptToken: string): string {
   return `${hash}:a:${attemptToken}`;
 }
@@ -148,6 +153,18 @@ export async function acquirePaymentWork(identity: string): Promise<boolean | un
     ex: PAYMENT_WORK_TTL_SECONDS,
   });
   return result === undefined ? undefined : result === "OK";
+}
+
+/** Read both durable payment-use markers before reserving expensive score work. */
+export async function readPaymentDurableState(
+  hash: string,
+): Promise<PaymentDurableState | undefined> {
+  const values = await journalKV.mget<[
+    SettlementFinal | null,
+    SettlementClaim | null,
+  ]>(finalKey(hash), claimKey(hash));
+  if (values === undefined) return undefined;
+  return { final: values[0] ?? null, claim: values[1] ?? null };
 }
 
 export async function readClaim(hash: string): Promise<SettlementClaim | null | undefined> {

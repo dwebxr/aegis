@@ -399,6 +399,7 @@ describe("/api/d2a/score x402 v2 contract", () => {
     jest.doMock("@/lib/d2a/settlementJournal", () => ({
       acquirePaymentWork,
       canonicalPaymentIdentity,
+      readPaymentDurableState: jest.fn().mockResolvedValue({ final: null, claim: null }),
     }));
     jest.doMock("@/lib/api/rateLimit", () => ({
       distributedRateLimitByKey: jest.fn().mockResolvedValue(null),
@@ -465,6 +466,126 @@ describe("/api/d2a/score x402 v2 contract", () => {
     }
     },
   );
+
+  it("rejects a resend after failed settlement without running the LLM again", async () => {
+    const requirementFake = new FakeFacilitator();
+    const requirementHarness = harness(
+      requirementFake,
+      async () => NextResponse.json({ ok: true }),
+    );
+    const payment = await paymentFor(requirementHarness.endpoint);
+
+    const routeFake = new FakeFacilitator();
+    routeFake.settle.mockResolvedValue({
+      success: false,
+      transaction: "",
+      network: NETWORK,
+      errorReason: "settlement failed",
+    });
+    const routeServer = new x402ResourceServer(strictFacilitatorClient(routeFake))
+      .register(NETWORK, new ExactEvmScheme());
+    let durableClaim = false;
+    routeServer.onBeforeSettle(async () => {
+      durableClaim = true;
+    });
+    const acquirePaymentWork = jest.fn().mockResolvedValue(true);
+    const readPaymentDurableState = jest.fn(async () => ({
+      final: null,
+      claim: durableClaim ? { attemptToken: "attempt", createdAt: 1 } : null,
+    }));
+    const scoreOneText = jest.fn().mockResolvedValue({
+      originality: 7,
+      insight: 8,
+      credibility: 9,
+      composite: 7,
+      verdict: "quality",
+      reason: "Useful",
+      topics: ["technology"],
+      vSignal: 8,
+      cContext: 5,
+      lSlop: 1.5,
+      tier: "claude",
+    });
+    const extractArticle = jest.fn().mockResolvedValue({
+      status: 200,
+      data: {
+        title: "Example",
+        content: "A sufficiently long article body for scoring.",
+        source: "example.com",
+      },
+    });
+    const tryReserveScoreBudget = jest.fn().mockResolvedValue(true);
+    const previousEnv = { ...process.env };
+    process.env.D2A_SCORE_ENABLED = "true";
+    delete process.env.D2A_SCORE_FREE_ENABLED;
+    delete process.env.D2A_PAYMENTS_DISABLED;
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    jest.resetModules();
+    jest.doMock("@/lib/d2a/x402Server", () => ({
+      X402_NETWORK: NETWORK,
+      X402_RECEIVER: RECEIVER,
+      X402_SCORE_PRICE: "$0.02",
+      resourceServer: routeServer,
+    }));
+    jest.doMock("@/lib/d2a/settlementJournal", () => ({
+      acquirePaymentWork,
+      canonicalPaymentIdentity: realCanonicalPaymentIdentity,
+      readPaymentDurableState,
+    }));
+    jest.doMock("@/lib/api/rateLimit", () => ({
+      distributedRateLimitByKey: jest.fn().mockResolvedValue(null),
+    }));
+    jest.doMock("@/lib/api/kv/namespace", () => ({
+      scoreCacheKV: {
+        get: jest.fn().mockResolvedValue(null),
+        set: jest.fn().mockResolvedValue("OK"),
+      },
+    }));
+    jest.doMock("@/lib/extraction/extractArticle.server", () => ({ extractArticle }));
+    jest.doMock("@/lib/api/dailyBudget", () => ({
+      tryReserveScoreBudget,
+      getScoreBudgetRetryAfter: jest.fn().mockResolvedValue(60),
+    }));
+    jest.doMock("@/lib/scoring/scoreWithClaude.server", () => ({ scoreOneText }));
+    jest.doMock("@sentry/nextjs", () => ({
+      addBreadcrumb: jest.fn(),
+      captureException: jest.fn(),
+      captureMessage: jest.fn(),
+    }));
+    try {
+      const actualRoute = require("@/app/api/d2a/score/route") as
+        typeof import("@/app/api/d2a/score/route");
+
+      const first = await actualRoute.GET(request(payment, "https://example.com/first"));
+      const resend = await actualRoute.GET(request(payment, "https://example.net/resend"));
+
+      expect(first.status).toBe(402);
+      expect(resend.status).toBe(409);
+      expect(await resend.json()).toEqual(expect.objectContaining({
+        reason: "payment_already_used",
+      }));
+      expect(readPaymentDurableState).toHaveBeenCalledTimes(2);
+      expect(acquirePaymentWork).toHaveBeenCalledTimes(1);
+      expect(extractArticle).toHaveBeenCalledTimes(1);
+      expect(tryReserveScoreBudget).toHaveBeenCalledTimes(1);
+      expect(scoreOneText).toHaveBeenCalledTimes(1);
+      expect(routeFake.verify).toHaveBeenCalledTimes(2);
+      expect(routeFake.settle).toHaveBeenCalledTimes(1);
+    } finally {
+      process.env = { ...previousEnv };
+      for (const moduleName of [
+        "@/lib/d2a/x402Server",
+        "@/lib/d2a/settlementJournal",
+        "@/lib/api/rateLimit",
+        "@/lib/api/kv/namespace",
+        "@/lib/extraction/extractArticle.server",
+        "@/lib/api/dailyBudget",
+        "@/lib/scoring/scoreWithClaude.server",
+        "@sentry/nextjs",
+      ]) jest.dontMock(moduleName);
+      jest.resetModules();
+    }
+  });
 
   it("(h) decorates wrapper-generated 402 responses with CORS and no-store", async () => {
     const fake = new FakeFacilitator();

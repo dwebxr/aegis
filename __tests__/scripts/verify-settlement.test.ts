@@ -14,6 +14,7 @@ const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address;
 const PAYER = "0x1111111111111111111111111111111111111111" as Address;
 const PAY_TO = "0x2222222222222222222222222222222222222222" as Address;
 const IMPLEMENTATION = "0x3333333333333333333333333333333333333333" as Address;
+const OTHER_IMPLEMENTATION = "0x7777777777777777777777777777777777777777" as Address;
 const TX = `0x${"4".repeat(64)}` as Hex;
 const NONCE = `0x${"5".repeat(64)}` as Hex;
 const BLOCK_HASH = `0x${"6".repeat(64)}` as Hex;
@@ -48,6 +49,8 @@ function clientFor(logs: TransactionReceipt["logs"], options: {
   finalizedTimestamp?: bigint;
   status?: TransactionReceipt["status"];
   upgrades?: unknown[];
+  finalizedUpgrades?: unknown[];
+  finalizedImplementation?: Address;
   authorizationState?: boolean;
 } = {}) {
   const receiptBlock = options.receiptBlock ?? 100n;
@@ -67,12 +70,22 @@ function clientFor(logs: TransactionReceipt["logs"], options: {
           timestamp: options.finalizedTimestamp ?? 500n,
         })
         : Promise.resolve({ number: receiptBlock, hash: BLOCK_HASH })),
-    getStorageAt: jest.fn().mockImplementation(({ slot }: { slot: Hex }) => {
+    getStorageAt: jest.fn().mockImplementation(({
+      slot,
+      blockNumber,
+    }: { slot: Hex; blockNumber: bigint }) => {
       expect(slot).toBe(ZOS_IMPLEMENTATION_SLOT);
-      return Promise.resolve(pad(IMPLEMENTATION, { size: 32 }));
+      const implementation = blockNumber === finalizedBlock
+          || blockNumber === finalizedBlock - 1n
+        ? options.finalizedImplementation ?? IMPLEMENTATION
+        : IMPLEMENTATION;
+      return Promise.resolve(pad(implementation, { size: 32 }));
     }),
     readContract: jest.fn().mockResolvedValue(options.authorizationState ?? true),
-    getLogs: jest.fn().mockResolvedValue(options.upgrades ?? []),
+    getLogs: jest.fn().mockImplementation(({ fromBlock }: { fromBlock: bigint }) =>
+      Promise.resolve(fromBlock === finalizedBlock
+        ? options.finalizedUpgrades ?? []
+        : options.upgrades ?? [])),
   };
 }
 
@@ -149,6 +162,8 @@ describe("verifySettlement", () => {
       evidence: expect.objectContaining({
         compensationAllowed: true,
         finalizedBlock: "200",
+        finalizedImplementation: IMPLEMENTATION,
+        finalizedImplementationParentBlock: "199",
         receiptBlock: "100",
       }),
     });
@@ -157,6 +172,32 @@ describe("verifySettlement", () => {
       blockNumber: 200n,
       args: [PAYER, NONCE],
     }));
+    expect(client.getStorageAt).toHaveBeenCalledWith(expect.objectContaining({
+      blockNumber: 200n,
+    }));
+    expect(client.getStorageAt).toHaveBeenCalledWith(expect.objectContaining({
+      blockNumber: 199n,
+    }));
+  });
+
+  it("returns needs-review when the finalized state block has a different implementation", async () => {
+    const client = clientFor([], {
+      finalizedTimestamp: 400n,
+      finalizedImplementation: OTHER_IMPLEMENTATION,
+      authorizationState: false,
+    });
+
+    const result = await verifySettlement(client as never, input);
+
+    expect(result).toEqual({
+      status: "needs-review",
+      evidence: expect.objectContaining({
+        implementation: IMPLEMENTATION,
+        finalizedImplementation: OTHER_IMPLEMENTATION,
+        reason: "usdc-finalized-implementation-pin-mismatch",
+      }),
+    });
+    expect(client.readContract).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -188,12 +229,47 @@ describe("verifySettlement", () => {
     });
   });
 
-  it("returns needs-review without making RPC calls when txHash is unknown", async () => {
-    const client = clientFor([]);
+  it("allows expired and unused compensation without a receipt after pinning finalized state", async () => {
+    const client = clientFor([], {
+      finalizedTimestamp: 400n,
+      authorizationState: false,
+    });
 
     const result = await verifySettlement(client as never, { ...input, txHash: undefined });
 
-    expect(result.evidence.reason).toBe("tx-hash-unknown");
+    expect(result).toEqual({
+      status: "closed-unpaid",
+      evidence: expect.objectContaining({
+        compensationAllowed: true,
+        finalizedBlock: "200",
+        finalizedImplementation: IMPLEMENTATION,
+        finalizedImplementationParentBlock: "199",
+        reason: "authorization-expired-and-unused-at-finalized-head",
+      }),
+    });
     expect(client.getTransactionReceipt).not.toHaveBeenCalled();
+    expect(client.readContract).toHaveBeenCalledWith(expect.objectContaining({
+      blockNumber: 200n,
+    }));
+  });
+
+  it("rejects receipt-less compensation when the finalized implementation mismatches", async () => {
+    const client = clientFor([], {
+      finalizedTimestamp: 400n,
+      finalizedImplementation: OTHER_IMPLEMENTATION,
+      authorizationState: false,
+    });
+
+    const result = await verifySettlement(client as never, { ...input, txHash: undefined });
+
+    expect(result).toEqual({
+      status: "needs-review",
+      evidence: expect.objectContaining({
+        finalizedImplementation: OTHER_IMPLEMENTATION,
+        reason: "usdc-finalized-implementation-pin-mismatch",
+      }),
+    });
+    expect(client.getTransactionReceipt).not.toHaveBeenCalled();
+    expect(client.readContract).not.toHaveBeenCalled();
   });
 });

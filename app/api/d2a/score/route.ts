@@ -12,6 +12,7 @@ import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
 import {
   acquirePaymentWork,
   canonicalPaymentIdentity,
+  readPaymentDurableState,
 } from "@/lib/d2a/settlementJournal";
 import {
   resourceServer,
@@ -183,6 +184,26 @@ async function handleScore(request: NextRequest): Promise<NextResponse> {
       );
     }
     try {
+      const durableState = await readPaymentDurableState(paymentIdentity);
+      if (durableState?.final || durableState?.claim) {
+        return NextResponse.json(
+          {
+            error: "This payment has already been used",
+            reason: "payment_already_used",
+          },
+          { status: 409 },
+        );
+      }
+      if (durableState === undefined) {
+        return errorResponse(
+          503,
+          "payment_in_progress",
+          "This payment is already processing another scoring request",
+          parsedUrl,
+          undefined,
+          10,
+        );
+      }
       const acquired = await acquirePaymentWork(paymentIdentity);
       if (acquired !== true) {
         return errorResponse(
