@@ -8,8 +8,8 @@ info:
     content across Nostr, Farcaster, RSS, X, and arbitrary URLs using the
     V/C/L rubric (V=signal, C=context, L=slop) with a multi-tier scoring
     cascade (local LLMs -> BYOK Claude -> IC LLM -> server Claude ->
-    heuristic fallback). This document describes the 19 public HTTP
-    endpoints exposed by the Next.js app at https://aegis-ai.xyz/api.
+    heuristic fallback). This document describes the public HTTP endpoints
+    exposed by the Next.js app at https://aegis-ai.xyz/api.
     D2A endpoints additionally implement the x402 payment protocol and
     CORS for cross-origin agent-to-agent consumption.
   license:
@@ -161,8 +161,8 @@ paths:
       description: |
         Returns either a principal-specific briefing (`?principal=`) or a
         paginated global summary. When `X402_RECEIVER` is configured, the
-        endpoint is wrapped in x402 payment middleware and callers must
-        include `Authorization: Bearer <x402-token>` (see https://x402.org).
+        endpoint is wrapped in x402 v2 payment middleware and callers must
+        include a `PAYMENT-SIGNATURE` header (see https://x402.org).
         If `X402_FREE_TIER_ENABLED` is `true`, `?preview=true` returns a
         truncated payload without payment. Supports CORS for allowlisted
         origins.
@@ -215,6 +215,9 @@ paths:
       responses:
         '200':
           description: Per-user or global briefing.
+          headers:
+            PAYMENT-RESPONSE:
+              $ref: '#/components/headers/PaymentResponse'
           content:
             application/json:
               schema:
@@ -224,11 +227,18 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '402':
-          description: x402 payment required (when receiver configured and preview disabled).
+          description: >
+            x402 payment required, or settlement failed after a successful
+            handler response. Protocol details are carried in the payment headers.
+          headers:
+            PAYMENT-REQUIRED:
+              $ref: '#/components/headers/PaymentRequired'
+            PAYMENT-RESPONSE:
+              $ref: '#/components/headers/PaymentResponse'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/X402SettlementFailureResponse'
         '404':
           description: No briefing available for principal, or no global briefings.
           content:
@@ -265,7 +275,7 @@ paths:
       operationId: getD2ABriefingJpyc
       security:
         - {}
-        - x402: []
+        - openPayX402: []
       parameters:
         - name: principal
           in: query
@@ -379,7 +389,8 @@ paths:
         (true diff with updated/removed requires server-side snapshot
         storage which is not implemented). When `X402_RECEIVER` is
         configured, the endpoint is wrapped in the same x402 payment
-        middleware as `/api/d2a/briefing`. If `X402_FREE_TIER_ENABLED` is
+        middleware as `/api/d2a/briefing`, using an x402 v2
+        `PAYMENT-SIGNATURE` header. If `X402_FREE_TIER_ENABLED` is
         `true`, `?preview=true` returns the diff without payment but with
         `title`/`sourceUrl` redacted (hashes and ranks only).
       operationId: getD2ABriefingChanges
@@ -406,6 +417,9 @@ paths:
       responses:
         '200':
           description: List of new items since `since`.
+          headers:
+            PAYMENT-RESPONSE:
+              $ref: '#/components/headers/PaymentResponse'
           content:
             application/json:
               schema:
@@ -413,11 +427,18 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '402':
-          description: x402 payment required (when receiver configured and preview disabled).
+          description: >
+            x402 payment required, or settlement failed after a successful
+            handler response. Protocol details are carried in the payment headers.
+          headers:
+            PAYMENT-REQUIRED:
+              $ref: '#/components/headers/PaymentRequired'
+            PAYMENT-RESPONSE:
+              $ref: '#/components/headers/PaymentResponse'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/X402SettlementFailureResponse'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':
@@ -426,6 +447,88 @@ paths:
       tags: [D2A]
       summary: CORS preflight
       operationId: d2aBriefingChangesOptions
+      responses:
+        '204':
+          description: Preflight response with CORS headers.
+
+  /api/d2a/score:
+    get:
+      tags: [D2A, Scoring]
+      summary: Score a URL's content quality (x402-paid)
+      description: |
+        Extracts an HTTP(S) article and scores it with Claude using Aegis's
+        V/C/L rubric. Production callers must provide an x402 v2
+        `PAYMENT-SIGNATURE`; settlement occurs only after a successful 2xx
+        handler response. The URL is sent as a query parameter and can appear
+        in access logs. Identical URL/model results are cached for one hour.
+      operationId: getD2AScore
+      security:
+        - x402: []
+      parameters:
+        - name: url
+          in: query
+          required: true
+          description: HTTP(S) article URL to extract and score. Query order is preserved; fragments are ignored for caching.
+          schema:
+            type: string
+            format: uri
+            maxLength: 2048
+      responses:
+        '200':
+          description: URL extraction and V/C/L scoring result.
+          headers:
+            PAYMENT-RESPONSE:
+              $ref: '#/components/headers/PaymentResponse'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/D2AScoreResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '402':
+          description: >
+            x402 payment required, or settlement failed after scoring. An
+            unpaid response carries `PAYMENT-REQUIRED`; a settlement response
+            carries `PAYMENT-RESPONSE`.
+          headers:
+            PAYMENT-REQUIRED:
+              $ref: '#/components/headers/PaymentRequired'
+            PAYMENT-RESPONSE:
+              $ref: '#/components/headers/PaymentResponse'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/X402SettlementFailureResponse'
+        '422':
+          description: The page contained no sufficiently meaningful article text.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          description: Article extraction, scoring, or payment facilitator failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: >
+            Endpoint disabled/unconfigured, KV unavailable, daily budget
+            exhausted, or another score for this URL is still in progress.
+            In-progress responses use `Retry-After: 10`; the marker expires
+            naturally and is never explicitly deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    options:
+      tags: [D2A]
+      summary: CORS preflight
+      operationId: d2aScoreOptions
       responses:
         '204':
           description: Preflight response with CORS headers.
@@ -1299,16 +1402,32 @@ components:
         token is passed in the JSON body, not a header, on /api/push/send;
         this security scheme documents the credential semantically.)
     x402:
-      type: http
-      scheme: bearer
-      bearerFormat: x402
+      type: apiKey
+      in: header
+      name: PAYMENT-SIGNATURE
       description: |
-        x402 payment protocol authorization (see https://x402.org). Applies
-        to `/api/d2a/briefing` and `/api/d2a/briefing/changes` (x402 v2,
-        USDC) when `X402_RECEIVER` is configured, and to
-        `/api/d2a/briefing-jpyc` (OpenPay-flavored x402 v1, JPYC on
-        Polygon) when `OPENPAY_MERCHANT_ADDRESS` is configured — in both
-        cases `preview=true` (with the free tier enabled) bypasses payment.
+        Base64 x402 v2 payment payload (see https://x402.org). Applies to
+        `/api/d2a/briefing`, `/api/d2a/briefing/changes`, and
+        `/api/d2a/score` when their payment gates are enabled. Briefing
+        preview routes can bypass payment when their free tier is enabled;
+        score requires payment in production.
+    openPayX402:
+      type: apiKey
+      in: header
+      name: X-PAYMENT
+      description: >
+        OpenPay-flavored x402 v1 payment payload for
+        `/api/d2a/briefing-jpyc` on Polygon.
+
+  headers:
+    PaymentRequired:
+      description: Base64-encoded x402 v2 PaymentRequired object.
+      schema:
+        type: string
+    PaymentResponse:
+      description: Base64-encoded x402 v2 settlement result.
+      schema:
+        type: string
 
   responses:
     BadRequest:
@@ -1342,6 +1461,82 @@ components:
       properties:
         error:
           type: string
+        reason:
+          type: string
+
+    X402SettlementFailureResponse:
+      type: object
+      description: >
+        x402 v2 error body. The library currently emits an empty JSON object
+        for unpaid and settlement-failure responses; PAYMENT-REQUIRED or
+        PAYMENT-RESPONSE is authoritative.
+      additionalProperties: true
+
+    D2AScoreResponse:
+      type: object
+      required: [url, title, source, scoredAt, engine, model, cached, score]
+      properties:
+        url:
+          type: string
+          format: uri
+        title:
+          type: string
+        source:
+          type: string
+        author:
+          type: string
+        publishedDate:
+          type: string
+        scoredAt:
+          type: string
+          format: date-time
+        engine:
+          type: string
+          enum: [claude]
+        model:
+          type: string
+        cached:
+          type: boolean
+        score:
+          type: object
+          required: [vSignal, cContext, lSlop, originality, insight, credibility, composite, verdict, reason, topics]
+          properties:
+            vSignal:
+              type: number
+              minimum: 0
+              maximum: 10
+            cContext:
+              type: number
+              minimum: 0
+              maximum: 10
+            lSlop:
+              type: number
+              minimum: 0
+              maximum: 10
+            originality:
+              type: number
+              minimum: 0
+              maximum: 10
+            insight:
+              type: number
+              minimum: 0
+              maximum: 10
+            credibility:
+              type: number
+              minimum: 0
+              maximum: 10
+            composite:
+              type: number
+              minimum: 0
+              maximum: 10
+            verdict:
+              $ref: '#/components/schemas/Verdict'
+            reason:
+              type: string
+            topics:
+              type: array
+              items:
+                type: string
 
     Verdict:
       type: string
@@ -1779,11 +1974,11 @@ components:
           format: uri
         endpoints:
           type: object
-          description: Human-readable endpoint descriptors for briefing/changes/info/health.
+          description: Human-readable endpoint descriptors for briefing/changes/score/info/health.
           additionalProperties: true
         payment:
           type: object
-          required: [protocol, receiver, network, price, currency, asset, usdcContract]
+          required: [protocol, receiver, network, price, priceNote, currency, asset, usdcContract]
           properties:
             protocol:
               type: string
@@ -1794,6 +1989,9 @@ components:
               type: string
             price:
               type: string
+            priceNote:
+              type: string
+              description: Briefing price note; each endpoints[].price is authoritative.
             currency:
               type: string
               description: >
