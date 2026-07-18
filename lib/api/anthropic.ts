@@ -65,7 +65,11 @@ export async function callAnthropic(opts: CallAnthropicOptions): Promise<Anthrop
   }
 
   const data: AnthropicMessagesResponse = await res.json();
-  const first = data.content?.[0];
-  const text = first && first.type === "text" ? first.text : "";
+  // Claude 5-family responses may lead with non-text blocks (e.g. thinking);
+  // collect every text block instead of assuming content[0] is the answer.
+  const text = (data.content ?? [])
+    .filter((block): block is { type: "text"; text: string } => block.type === "text")
+    .map(block => block.text)
+    .join("");
   return { ok: true, status: res.status, text, raw: data };
 }
