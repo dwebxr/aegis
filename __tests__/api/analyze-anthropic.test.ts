@@ -128,7 +128,7 @@ describe("POST /api/analyze — Anthropic API path", () => {
       );
 
       const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
-      expect(body.model).toBe("claude-sonnet-4-20250514");
+      expect(body.model).toBe("claude-sonnet-5");
       expect(body.max_tokens).toBe(1000);
     });
 
