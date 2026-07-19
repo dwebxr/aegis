@@ -1,6 +1,7 @@
 import { x402ResourceServer } from "@x402/next";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
+import { bazaarResourceServerExtension } from "@x402/extensions/bazaar";
 import {
   onAfterSettle,
   onAfterVerify,
@@ -42,6 +43,7 @@ const facilitatorClient = strictFacilitatorClient(
 
 export const resourceServer = new x402ResourceServer(facilitatorClient)
   .register(X402_NETWORK, new ExactEvmScheme())
+  .registerExtension(bazaarResourceServerExtension)
   .onAfterVerify(onAfterVerify)
   .onBeforeSettle(onBeforeSettle)
   .onAfterSettle(onAfterSettle)

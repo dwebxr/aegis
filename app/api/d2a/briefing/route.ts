@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withX402 } from "@x402/next";
 import { distributedRateLimit } from "@/lib/api/rateLimit";
+import { BRIEFING_BAZAAR_METADATA } from "@/lib/d2a/bazaar";
 import { buildBriefingResponse } from "@/lib/d2a/briefingHandler";
 import { resourceServer, X402_NETWORK, X402_PRICE, X402_RECEIVER } from "@/lib/d2a/x402Server";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
@@ -18,7 +19,7 @@ const x402Config = {
     payTo: X402_RECEIVER,
     maxTimeoutSeconds: 60,
   },
-  description: "Aegis curated briefing — AI-scored content feed with V/C/L metrics",
+  ...BRIEFING_BAZAAR_METADATA,
 };
 
 async function handleGet(request: NextRequest): Promise<NextResponse> {
