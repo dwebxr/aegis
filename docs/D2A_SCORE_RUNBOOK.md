@@ -49,6 +49,24 @@ After deploy, bypass stale intermediaries when checking the descriptor:
 curl -fsS "https://aegis-ai.xyz/api/d2a/info?cb=$(date +%s)"
 ```
 
+## Bazaar 掲載の確認手順
+
+The CDP facilitator catalogs each Bazaar-enabled resource only after it has completed at least one successful settlement for that resource. After deploying, complete one real CDP-facilitated settlement for each of `/api/d2a/score`, `/api/d2a/briefing`, and `/api/d2a/briefing/changes`. Verify each settlement under the procedure below before checking discovery; never create a replacement authorization for an indeterminate payment.
+
+The read-only CDP discovery catalog is public and requires no CDP API key. Its cache can take up to 10 minutes to reflect a new or updated resource. Check all three production endpoints with:
+
+```bash
+npx tsx scripts/bazaar-check.ts
+```
+
+Before indexing completes, the script prints `not-listed` for missing endpoints and exits `0`. After the cache window, require all three lines to print `listed`; automation can enforce this with:
+
+```bash
+npx tsx scripts/bazaar-check.ts --strict
+```
+
+`--strict` exits `1` when any endpoint is absent. Do not use the facilitator's `EXTENSION-RESPONSES` header as the listing signal: [x402-foundation/x402#2112](https://github.com/x402-foundation/x402/issues/2112) documents cases where the header is absent and discovery fails silently. The discovery catalog result is authoritative for this check.
+
 ## Settlement verification
 
 The verifier is read-only and uses a public Base RPC unless `--rpc-url` or `BASE_RPC_URL` is supplied:

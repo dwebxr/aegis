@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { withX402 } from "@x402/next";
 import { distributedRateLimit } from "@/lib/api/rateLimit";
+import { BRIEFING_CHANGES_BAZAAR_METADATA } from "@/lib/d2a/bazaar";
 import { errMsg } from "@/lib/utils/errors";
 import { getRawGlobalBriefings } from "@/lib/d2a/briefingProvider";
 import { resourceServer, X402_NETWORK, X402_PRICE, X402_RECEIVER } from "@/lib/d2a/x402Server";
@@ -22,7 +23,7 @@ const x402Config = {
     payTo: X402_RECEIVER,
     maxTimeoutSeconds: 60,
   },
-  description: "Aegis briefing change feed — diffs since a given timestamp",
+  ...BRIEFING_CHANGES_BAZAAR_METADATA,
 };
 
 async function handleGet(request: NextRequest): Promise<NextResponse> {

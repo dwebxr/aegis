@@ -9,6 +9,7 @@ import { getScoreBudgetRetryAfter, tryReserveScoreBudget } from "@/lib/api/daily
 import { scoreCacheKV } from "@/lib/api/kv/namespace";
 import { distributedRateLimitByKey } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
+import { SCORE_BAZAAR_METADATA } from "@/lib/d2a/bazaar";
 import {
   acquirePaymentWork,
   canonicalPaymentIdentity,
@@ -46,7 +47,7 @@ const x402Config = {
     payTo: X402_RECEIVER,
     maxTimeoutSeconds: 300,
   },
-  description: "Score a URL's content quality (V/C/L) with AI",
+  ...SCORE_BAZAAR_METADATA,
 };
 
 interface ScoreResponse {
