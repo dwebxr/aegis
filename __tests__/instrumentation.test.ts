@@ -91,3 +91,8 @@ describe("instrumentation onRequestError()", () => {
     expect(captureRequestError).not.toHaveBeenCalled();
   });
 });
+
+// No top-level import in this file (the SDK must only be reached through
+// require() inside the tests), so mark it a module explicitly — otherwise its
+// top-level consts land in the global scope and collide with other suites.
+export {};
