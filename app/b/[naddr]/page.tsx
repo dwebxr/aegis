@@ -1,10 +1,10 @@
-import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { decode } from "nostr-tools/nip19";
 import type { AddressPointer } from "nostr-tools/nip19";
 import { parseBriefingMarkdown } from "@/lib/briefing/serialize";
 import type { ParsedBriefing } from "@/lib/briefing/serialize";
 import { SharedBriefingView } from "@/components/shared/SharedBriefingView";
+import { BriefingNotFound } from "@/components/shared/BriefingNotFound";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";
 import { loadServerPool } from "@/lib/nostr/serverPool";
 import { withTimeout } from "@/lib/utils/timeout";
@@ -19,7 +19,16 @@ interface PageProps {
 
 const briefingCache = new Map<string, { data: ParsedBriefing | null; at: number }>();
 
+/**
+ * bech32 with the naddr HRP. Checked before anything else because the work
+ * behind this route is a 15-second relay query over WebSockets: a crawler
+ * walking junk paths must be rejected by a regex, not by a relay round trip.
+ */
+const NADDR_PATTERN = /^naddr1[023456789acdefghjklmnpqrstuvwxyz]{20,}$/;
+
 async function fetchBriefing(naddr: string): Promise<ParsedBriefing | null> {
+  if (!NADDR_PATTERN.test(naddr)) return null;
+
   const cached = briefingCache.get(naddr);
   if (cached && Date.now() - cached.at < 30_000) return cached.data;
 
@@ -77,6 +86,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return {
       title: "Briefing Not Found | Aegis",
       alternates: { canonical: `/b/${naddr}` },
+      // The page answers 200 so it can be cached; noindex is what keeps a
+      // missing briefing out of search results.
+      robots: { index: false, follow: false },
     };
   }
 
@@ -106,7 +118,10 @@ export default async function SharedBriefingPage({ params }: PageProps) {
   const briefing = await fetchBriefing(naddr);
 
   if (!briefing) {
-    notFound();
+    // Not notFound(): a 404 is never cached, so every crawl of a dead link
+    // re-rendered this route on the server. At 200 it lands in the ISR cache
+    // declared by `revalidate` above and repeats cost nothing.
+    return <BriefingNotFound naddr={naddr} />;
   }
 
   return <SharedBriefingView briefing={briefing} naddr={naddr} />;

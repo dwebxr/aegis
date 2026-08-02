@@ -97,7 +97,9 @@ describe("GET /api/feed/rss", () => {
   it("includes Cache-Control header for edge caching", async () => {
     (getLatestBriefing as jest.Mock).mockResolvedValue(makeBriefing());
     const res = await RSS_GET(makeReq(`/api/feed/rss?principal=${PRINCIPAL}`));
-    expect(res.headers.get("Cache-Control")).toContain("s-maxage=300");
+    // 15 minutes: the briefing behind the feed is regenerated at most daily, so
+    // the window costs no perceptible freshness and collapses pollers.
+    expect(res.headers.get("Cache-Control")).toContain("s-maxage=900");
   });
 
   it("emits Aegis observability headers", async () => {

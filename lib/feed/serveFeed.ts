@@ -7,7 +7,25 @@ import { buildFeed } from "./buildFeed";
 import { APP_URL } from "@/lib/config";
 import { errMsg } from "@/lib/utils/errors";
 
-const CACHE_HEADER = "public, max-age=300, s-maxage=300, stale-while-revalidate=600";
+// The briefing behind this feed is regenerated at most daily, so a 15-minute
+// shared window costs no freshness a reader can perceive and collapses every
+// poller onto one function invocation per window.
+const CACHE_HEADER = "public, max-age=300, s-maxage=900, stale-while-revalidate=600";
+// A malformed request is answered the same way forever, so let the edge own it
+// rather than waking a function for each repeat.
+const BAD_REQUEST_CACHE = "public, s-maxage=3600, stale-while-revalidate=86400";
+// "No briefing yet" flips to a real feed as soon as one is published — short
+// enough that a new publisher's feed appears promptly.
+const NOT_FOUND_CACHE = "public, s-maxage=300";
+// Upstream trouble: cache just enough to blunt a retry storm, not so long that
+// recovery is invisible.
+const UPSTREAM_ERROR_CACHE = "public, s-maxage=30";
+
+function jsonError(error: string, status: number, cacheControl: string): NextResponse {
+  const response = NextResponse.json({ error }, { status });
+  response.headers.set("Cache-Control", cacheControl);
+  return response;
+}
 
 type FeedFormat = "rss" | "atom";
 
@@ -29,21 +47,23 @@ function selfLinks(principal: string): { rss: string; atom: string } {
  * briefing in different envelopes; only the serializer + Content-Type differ.
  */
 export async function serveFeed(request: NextRequest, format: FeedFormat): Promise<NextResponse> {
-  const limited = await distributedRateLimit(request, 30, 60);
-  if (limited) return limited;
-
   const principal = request.nextUrl.searchParams.get("principal");
   if (!principal) {
-    return NextResponse.json(
-      { error: "Missing required `principal` query parameter" },
-      { status: 400 },
-    );
+    // Answered before the rate limiter on purpose: this reply depends on
+    // nothing, is byte-identical for every caller, and has a single cache key,
+    // so the KV round trip the limiter would spend counting it is the only cost
+    // in the path. Everything below — which does vary by caller-supplied input
+    // — stays behind the limiter.
+    return jsonError("Missing required `principal` query parameter", 400, BAD_REQUEST_CACHE);
   }
+
+  const limited = await distributedRateLimit(request, 30, 60);
+  if (limited) return limited;
 
   try {
     Principal.fromText(principal);
   } catch {
-    return NextResponse.json({ error: "Invalid principal format" }, { status: 400 });
+    return jsonError("Invalid principal format", 400, BAD_REQUEST_CACHE);
   }
 
   // Per-principal cap: 60/hour (≈ once a minute). Stops IP-rotating attackers
@@ -65,16 +85,27 @@ export async function serveFeed(request: NextRequest, format: FeedFormat): Promi
       tags: { route: `feed-${format}`, failure: "ic-fetch" },
       extra: { principal },
     });
-    return NextResponse.json(
-      { error: "Briefing source temporarily unavailable" },
-      { status: 502 },
-    );
+    return jsonError("Briefing source temporarily unavailable", 502, UPSTREAM_ERROR_CACHE);
   }
   if (!briefing) {
-    return NextResponse.json(
-      { error: "No briefing available for this principal" },
-      { status: 404 },
-    );
+    return jsonError("No briefing available for this principal", 404, NOT_FOUND_CACHE);
+  }
+
+  // The briefing is fully identified by when it was generated and how many
+  // items it carries, so a conditional request can be answered here — before
+  // building and serialising the feed, which is the expensive half of this
+  // handler. Weak: the bytes may differ across deployments (self-links carry
+  // APP_URL) while the content they describe is the same.
+  const etag = `W/"${briefing.generatedAt}-${briefing.items.length}"`;
+  if (request.headers.get("if-none-match") === etag) {
+    return new NextResponse(null, {
+      status: 304,
+      headers: {
+        ETag: etag,
+        "Last-Modified": new Date(briefing.generatedAt).toUTCString(),
+        "Cache-Control": CACHE_HEADER,
+      },
+    });
   }
 
   // Per-item shape is not validated by briefingProvider — defend against a
@@ -91,10 +122,7 @@ export async function serveFeed(request: NextRequest, format: FeedFormat): Promi
       tags: { route: `feed-${format}`, failure: "serialize" },
       extra: { principal, itemCount: briefing.items.length },
     });
-    return NextResponse.json(
-      { error: "Briefing data is malformed and cannot be rendered" },
-      { status: 502 },
-    );
+    return jsonError("Briefing data is malformed and cannot be rendered", 502, UPSTREAM_ERROR_CACHE);
   }
 
   return new NextResponse(xml, {
@@ -102,6 +130,8 @@ export async function serveFeed(request: NextRequest, format: FeedFormat): Promi
     headers: {
       "Content-Type": SERIALIZERS[format].contentType,
       "Cache-Control": CACHE_HEADER,
+      ETag: etag,
+      "Last-Modified": new Date(briefing.generatedAt).toUTCString(),
       "X-Aegis-Briefing-Items": String(briefing.items.length),
       "X-Aegis-Generated-At": briefing.generatedAt,
     },
