@@ -13,10 +13,11 @@ import { createCdpFacilitatorConfig } from "@/lib/d2a/cdpFacilitator";
 
 const FACILITATOR_URL = process.env.X402_FACILITATOR_URL?.trim() || "https://x402.org/facilitator";
 
-export const X402_NETWORK = (process.env.X402_NETWORK?.trim() || "eip155:84532") as `${string}:${string}`;
-export const X402_PRICE = process.env.X402_PRICE?.trim() || "$0.01";
-export const X402_SCORE_PRICE = process.env.X402_SCORE_PRICE?.trim() || "$0.02";
-export const X402_RECEIVER = process.env.X402_RECEIVER_ADDRESS?.trim() || "";
+// Defined in x402Env.ts (dependency-free) and re-exported here so the free
+// discovery routes can read them without pulling in this module's payment
+// stack. Paid routes keep importing them from here unchanged.
+export { X402_NETWORK, X402_PRICE, X402_SCORE_PRICE, X402_RECEIVER } from "./x402Env";
+import { X402_NETWORK } from "./x402Env";
 
 const cdpApiKeyId = process.env.CDP_API_KEY_ID?.trim() || "";
 const cdpApiKeySecret = process.env.CDP_API_KEY_SECRET?.trim() || "";

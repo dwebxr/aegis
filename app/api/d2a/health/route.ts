@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
-import { X402_RECEIVER, X402_NETWORK } from "@/lib/d2a/x402Server";
+import { X402_RECEIVER, X402_NETWORK } from "@/lib/d2a/x402Env";
 import { checkIcCanisterReachable, getDeployMeta } from "@/lib/ic/health";
 
 export const dynamic = "force-dynamic";
