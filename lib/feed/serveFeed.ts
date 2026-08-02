@@ -92,10 +92,11 @@ export async function serveFeed(request: NextRequest, format: FeedFormat): Promi
   }
 
   // The briefing is fully identified by when it was generated and how many
-  // items it carries, so a conditional request can be answered here — before
-  // building and serialising the feed, which is the expensive half of this
-  // handler. Weak: the bytes may differ across deployments (self-links carry
-  // APP_URL) while the content they describe is the same.
+  // items it carries, so a conditional request can be answered here, skipping
+  // buildFeed + serialisation and the response body. It does NOT skip the IC
+  // read above — that is the more expensive half, and the validator is derived
+  // from what it returns. Weak: the bytes may differ across deployments
+  // (self-links carry APP_URL) while the content they describe is the same.
   const etag = `W/"${briefing.generatedAt}-${briefing.items.length}"`;
   if (request.headers.get("if-none-match") === etag) {
     return new NextResponse(null, {
