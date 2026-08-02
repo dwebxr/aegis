@@ -26,19 +26,44 @@ EOF
 fi
 
 BASE_URL="${BASE_URL:-http://localhost:3000}"
+SCRIPT="loadtest/read-paths.k6.js"
 
 case "$BASE_URL" in
   *aegis-ai.xyz*|*aegis.dwebxr.xyz*)
-    echo "  ⚠  Targeting PRODUCTION ($BASE_URL)."
-    echo "  ⚠  This will issue ~250-400 requests over 4-5 minutes against the live"
-    echo "  ⚠  rate limiters. Stay below 25 concurrent VUs and confirm no real"
-    echo "  ⚠  user activity is impacted. Press Ctrl+C in the next 5 seconds to abort."
-    sleep 5
+    # The full scenario is a staging exercise, not a production one. Measured
+    # against the current build it issues roughly 9,700 requests and ~5,600
+    # function invocations — about 200-260 CPU seconds, which is close to a
+    # whole day of this deployment's normal Vercel Active CPU on a free plan
+    # shared with a live payment service. An earlier version of this warning
+    # said "~250-400 requests" and gave a five-second Ctrl+C window; both were
+    # off by more than an order of magnitude, so the full run is now opt-in and
+    # production defaults to the small scenario.
+    if [ "${LOADTEST_ALLOW_PROD:-}" != "1" ]; then
+      cat >&2 <<EOF
+ERROR: refusing to load-test PRODUCTION ($BASE_URL) without an explicit opt-in.
+
+  The full scenario costs ~9,700 requests / ~5,600 function invocations /
+  ~200-260 CPU seconds — roughly one day of this project's Active CPU budget,
+  on a plan shared with the live payment service.
+
+  Against production, run the small scenario instead:
+      BASE_URL=$BASE_URL loadtest/run.sh          # after setting the opt-in below
+  It is 3 VUs for 60s. To run it:
+      LOADTEST_ALLOW_PROD=1 BASE_URL=$BASE_URL loadtest/run.sh
+
+  To run the FULL scenario (staging only):
+      BASE_URL=https://<staging-host> loadtest/run.sh
+EOF
+      exit 3
+    fi
+    SCRIPT="loadtest/read-paths-prod.k6.js"
+    echo "  ⚠  Targeting PRODUCTION ($BASE_URL) with the reduced scenario (3 VUs × 60s)."
     ;;
 esac
 
 echo "k6 load test"
 echo "  target:    $BASE_URL"
+echo "  scenario:  $SCRIPT"
 echo "  principal: ${AEGIS_FEED_PRINCIPAL:-<not set — feed e2e path skipped>}"
 echo
-exec k6 run loadtest/read-paths.k6.js
+exec k6 run "$SCRIPT"
