@@ -43,20 +43,39 @@ const parser = new Parser({
     "User-Agent": "Aegis/2.0 Content Quality Filter",
     Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
   },
+  // Same custom fields the /api/fetch/rss route declares, so thumbnails survive.
+  customFields: {
+    item: [
+      ["media:thumbnail", "media:thumbnail", { keepArray: false }],
+      ["media:content", "media:content", { keepArray: false }],
+    ],
+  },
 });
 
-/** Mirrors lib/utils/text.ts stripHtmlToText for the subset feeds actually emit. */
-function stripHtml(html) {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
+/** Feeds escape attribute values, so `&amp;`/`&#038;` reach us inside URLs. */
+function decodeEntities(text) {
+  return text
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
+    .replace(/&(?:amp|#0*38);/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, "\"")
-    .replace(/&#39;/g, "'")
+    .replace(/&#0*39;/g, "'");
+}
+
+/**
+ * Strips tags and collapses whitespace like lib/utils/text.ts stripHtmlToText,
+ * and additionally decodes the common entities. Production does not decode —
+ * it re-reads the feed every cycle and any oddity is transient — but this
+ * snapshot is frozen until someone regenerates it, so it is worth cleaning.
+ */
+function stripHtml(html) {
+  return decodeEntities(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " "),
+  )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -65,11 +84,26 @@ function stripHtml(html) {
 function safeLink(link) {
   if (typeof link !== "string") return undefined;
   try {
-    const u = new URL(link);
+    const u = new URL(decodeEntities(link));
     return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : undefined;
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Thumbnail, mirroring extractImage in app/api/fetch/rss/route.ts. Without it
+ * the demo renders text-only cards, which is not what the live pipeline shows.
+ */
+function extractImage(item, rawContent) {
+  if (item.enclosure?.url && /image/i.test(item.enclosure.type || "")) {
+    return safeLink(item.enclosure.url);
+  }
+  const media = item["media:thumbnail"] || item["media:content"];
+  const url = typeof media === "string" ? media : media?.$?.url;
+  if (typeof url === "string") return safeLink(url);
+  const inline = String(rawContent).match(/<img[^>]+src=["']([^"']+)["']/i);
+  return inline?.[1] ? safeLink(inline[1]) : undefined;
 }
 
 const items = [];
@@ -96,6 +130,7 @@ for (const { feedUrl, label } of FEEDS) {
         text,
         author: item.creator || item.author || feed.title || label,
         sourceUrl: safeLink(item.link),
+        imageUrl: extractImage(item, rawContent),
         feedUrl,
       };
     })

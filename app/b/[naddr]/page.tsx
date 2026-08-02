@@ -11,10 +11,25 @@ import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
 
 export const maxDuration = 30;
-export const revalidate = 3600;
+// 5 minutes, not an hour: this window also applies to a "not found" render, and
+// a share link opened before the briefing has propagated to the relays would
+// otherwise keep showing "not found" long after it arrived.
+export const revalidate = 300;
 
 interface PageProps {
   params: Promise<{ naddr: string }>;
+}
+
+/**
+ * Empty on purpose: nothing is prerendered at build time, but declaring it is
+ * what registers this route in the prerender manifest, which is what makes the
+ * `revalidate` above real. Without it Next classifies the route as fully dynamic
+ * (verified: no dynamicRoutes entry, and responses carried
+ * `Cache-Control: private, no-store` with no x-nextjs-cache header), so every
+ * request — including repeat crawls of the same link — paid for a full render.
+ */
+export async function generateStaticParams() {
+  return [];
 }
 
 const briefingCache = new Map<string, { data: ParsedBriefing | null; at: number }>();
@@ -118,9 +133,10 @@ export default async function SharedBriefingPage({ params }: PageProps) {
   const briefing = await fetchBriefing(naddr);
 
   if (!briefing) {
-    // Not notFound(): a 404 is never cached, so every crawl of a dead link
-    // re-rendered this route on the server. At 200 it lands in the ISR cache
-    // declared by `revalidate` above and repeats cost nothing.
+    // Not notFound(): Next never stores a 404 in the route cache, so every crawl
+    // of a dead link re-rendered on the server. At 200 this render joins the ISR
+    // cache (verified: x-nextjs-cache MISS then HIT) and repeats are free.
+    // generateMetadata marks it noindex so it stays out of search results.
     return <BriefingNotFound naddr={naddr} />;
   }
 
