@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Principal } from "@dfinity/principal";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import { distributedRateLimit, distributedRateLimitByKey } from "@/lib/api/rateLimit";
 import { getLatestBriefing } from "@/lib/d2a/briefingProvider";
 import { buildFeed } from "./buildFeed";

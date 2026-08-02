@@ -65,4 +65,17 @@ export default withSentryConfig(withPWA(nextConfig), {
   org: process.env.SENTRY_ORG || "",
   project: process.env.SENTRY_PROJECT || "",
   disableSourceMapUpload: !process.env.SENTRY_AUTH_TOKEN,
+  webpack: {
+    // Stop the Sentry plugin wrapping every route handler / app-dir component at
+    // build time. The wrapper pulled the 2.68MB @sentry/node + OpenTelemetry
+    // chunk into routes that never import Sentry (/api/health among them), so
+    // each cold start evaluated it before serving anything. Uncaught errors are
+    // still reported: Next hands them to onRequestError in instrumentation.ts,
+    // and explicit reports go through lib/observability.ts.
+    // What this gives up is automatic transaction/span instrumentation, which was
+    // already sampled at 0.1 and is not what the DSN is configured for.
+    autoInstrumentServerFunctions: false,
+    autoInstrumentAppDirectory: false,
+    autoInstrumentMiddleware: false,
+  },
 });

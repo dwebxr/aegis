@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import { TwitterApi } from "twitter-api-v2";
 import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";

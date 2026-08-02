@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import { distributedRateLimit } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
 

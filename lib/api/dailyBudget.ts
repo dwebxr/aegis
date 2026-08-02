@@ -9,7 +9,7 @@
  * before — resets on cold start, each instance gets its own budget).
  */
 
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import { dailyBudgetKV, scoreBudgetKV } from "./kv/namespace";
 
 const _parsed = parseInt((process.env.ANTHROPIC_DAILY_BUDGET || "500").trim(), 10);

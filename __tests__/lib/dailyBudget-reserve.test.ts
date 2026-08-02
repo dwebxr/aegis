@@ -1,6 +1,6 @@
 const mockCaptureException = jest.fn();
 
-jest.mock("@sentry/nextjs", () => ({
+jest.mock("@/lib/observability", () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 

@@ -1,5 +1,5 @@
 import "server-only";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import { extractFromHtml } from "@extractus/article-extractor";
 import { type ExtractionResult, getUrlCached, setUrlCache } from "@/lib/cache/urlExtract";
 import { errMsg } from "@/lib/utils/errors";

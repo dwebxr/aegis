@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import type {
   HTTPTransportContext,
   SettleContext,

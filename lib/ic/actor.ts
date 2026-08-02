@@ -13,7 +13,10 @@ export async function createBackendActorAsync(identity?: Identity): Promise<_SER
   try {
     await withTimeout(agent.syncTime(), 5000, "syncTime timeout");
   } catch (err) {
-    console.error("[ic] syncTime failed:", errMsg(err));
+    // Not an incident: the timeout is swallowed here on purpose and the actor is
+    // still returned, so the caller proceeds against the replica's own clock.
+    // Logged at warn so it stays in stdout without being triaged as an error.
+    console.warn("[ic] syncTime failed:", errMsg(err));
   }
   return Actor.createActor<_SERVICE>(idlFactory, {
     agent,

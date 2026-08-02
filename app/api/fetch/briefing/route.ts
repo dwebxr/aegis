@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import { decode } from "nostr-tools/nip19";
 import type { AddressPointer } from "nostr-tools/nip19";
 import { KIND_LONG_FORM, mergeRelays } from "@/lib/nostr/types";

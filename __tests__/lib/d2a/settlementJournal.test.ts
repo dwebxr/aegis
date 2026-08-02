@@ -14,7 +14,7 @@ const mockCaptureException = jest.fn();
 
 jest.mock("@/lib/api/kv/journalNamespace", () => ({ journalKV: mockJournal }));
 jest.mock("@/lib/api/kv/namespace", () => ({ metricsKV: mockMetrics }));
-jest.mock("@sentry/nextjs", () => ({ captureException: mockCaptureException }));
+jest.mock("@/lib/observability", () => ({ captureException: mockCaptureException }));
 
 import type { SettleContext, SettleResultContext } from "@x402/core/server";
 import { decodePaymentSignatureHeader } from "@x402/core/http";

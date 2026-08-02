@@ -8,7 +8,7 @@ jest.mock("@/lib/utils/safeFetch.server", () => ({
 jest.mock("@extractus/article-extractor", () => ({
   extractFromHtml: (...args: unknown[]) => mockExtractFromHtml(...args),
 }));
-jest.mock("@sentry/nextjs", () => ({
+jest.mock("@/lib/observability", () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
