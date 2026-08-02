@@ -1,7 +1,7 @@
 import { GET } from "@/app/api/health/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";
-import { checkCanisterCycles, _resetCyclesCache } from "@/lib/ic/health";
+import { checkCanisterCycles, _resetCyclesCache, _resetReachableCache } from "@/lib/ic/health";
 
 jest.mock("@/lib/ic/health", () => {
   const actual = jest.requireActual("@/lib/ic/health");
@@ -22,6 +22,7 @@ describe("GET /api/health", () => {
   beforeEach(() => {
     _resetRateLimits();
     _resetCyclesCache();
+    _resetReachableCache();
     // Default: IC canister reachable (400 = expected with empty CBOR body)
     fetchMock.mockResolvedValue({ status: 400, ok: false });
     // Default: cycles well above threshold

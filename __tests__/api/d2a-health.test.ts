@@ -1,6 +1,7 @@
 import { GET, OPTIONS } from "@/app/api/d2a/health/route";
 import { NextRequest } from "next/server";
 import { _resetRateLimits } from "@/lib/api/rateLimit";
+import { _resetReachableCache } from "@/lib/ic/health";
 
 const fetchMock = jest.fn();
 global.fetch = fetchMock;
@@ -16,6 +17,8 @@ describe("GET /api/d2a/health", () => {
 
   beforeEach(() => {
     _resetRateLimits();
+    // Reachability is cached per instance; each case sets its own upstream state.
+    _resetReachableCache();
     fetchMock.mockReset();
     // Default: IC canister reachable (400 = expected with empty CBOR body)
     fetchMock.mockResolvedValue({ status: 400, ok: false });
