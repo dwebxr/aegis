@@ -72,13 +72,15 @@ describe("extractArticle", () => {
   });
 
   it("caps fetched HTML before extraction and extracted text before returning", async () => {
-    const oversizedHtml = "a".repeat(5_000_100);
+    const oversizedHtml = "a".repeat(600_000);
     mockSafeFetch.mockResolvedValueOnce(htmlResponse(oversizedHtml));
     mockExtractFromHtml.mockResolvedValueOnce(article("b".repeat(12_000)));
 
     const result = await extractArticle("https://example.com/large");
 
-    expect((mockExtractFromHtml.mock.calls[0][0] as string).length).toBe(5_000_000);
+    // 512KB: enough for the heaviest real page measured, and a hard bound on how
+    // much markup the DOM parser — the CPU-dominant step — has to walk.
+    expect((mockExtractFromHtml.mock.calls[0][0] as string).length).toBe(512_000);
     expect(result.data?.content).toHaveLength(10_000);
   });
 
