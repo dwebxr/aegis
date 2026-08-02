@@ -1,0 +1,126 @@
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+import Parser from "rss-parser";
+
+/**
+ * Regenerates public/demo-feed.json — the static snapshot the anonymous demo
+ * renders from.
+ *
+ * The demo used to run the live ingestion pipeline in the visitor's browser,
+ * which meant every anonymous visit invoked /api/fetch/rss and /api/fetch/url on
+ * the server. Serving a committed snapshot from the CDN instead makes the demo
+ * cost zero server CPU. Scoring is deliberately NOT baked in: the browser still
+ * runs the real heuristic scorer over these items, so the demo shows live
+ * pipeline output over frozen input.
+ *
+ * Feed list mirrors lib/demo/sources.ts (the source of truth — __tests__ assert
+ * the snapshot only contains feeds listed there). Item shape mirrors the
+ * `buildItems` mapping in app/api/fetch/rss/route.ts closely enough for display;
+ * exact parity is not required because nothing downstream re-parses it.
+ *
+ * Usage: node scripts/generate-demo-feed.mjs
+ */
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(__dirname, "..");
+const OUT = path.join(root, "public", "demo-feed.json");
+
+const FEEDS = [
+  { feedUrl: "https://hnrss.org/frontpage", label: "Hacker News" },
+  { feedUrl: "https://www.coindesk.com/arc/outboundfeeds/rss/", label: "CoinDesk" },
+  { feedUrl: "https://www.theverge.com/rss/index.xml", label: "The Verge" },
+];
+
+/** Items per feed. Matches MAX_ITEMS_PER_SOURCE in lib/ingestion/scheduler.ts. */
+const ITEMS_PER_FEED = 5;
+/** Matches MAX_TEXT_LENGTH in lib/ingestion/fetchers.ts. */
+const MAX_TEXT_LENGTH = 2000;
+
+const parser = new Parser({
+  timeout: 15000,
+  headers: {
+    "User-Agent": "Aegis/2.0 Content Quality Filter",
+    Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
+  },
+});
+
+/** Mirrors lib/utils/text.ts stripHtmlToText for the subset feeds actually emit. */
+function stripHtml(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Only http(s) links are kept — same rule as app/api/fetch/rss/safeRssLink.ts. */
+function safeLink(link) {
+  if (typeof link !== "string") return undefined;
+  try {
+    const u = new URL(link);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const items = [];
+const failed = [];
+for (const { feedUrl, label } of FEEDS) {
+  let feed;
+  try {
+    feed = await parser.parseURL(feedUrl);
+  } catch (err) {
+    // One unreachable feed must not block regenerating the snapshot from the
+    // rest — the operator re-runs this script when the source comes back.
+    console.warn(`${label}: SKIPPED (${err instanceof Error ? err.message : String(err)})`);
+    failed.push(label);
+    continue;
+  }
+  const picked = (feed.items || [])
+    .map(item => {
+      const rawContent =
+        item["content:encoded"] || item.content || item.contentSnippet || item.summary || "";
+      const text = `${item.title || ""}\n\n${stripHtml(String(rawContent))}`
+        .slice(0, MAX_TEXT_LENGTH)
+        .trim();
+      return {
+        text,
+        author: item.creator || item.author || feed.title || label,
+        sourceUrl: safeLink(item.link),
+        feedUrl,
+      };
+    })
+    // Drop title-only entries: they carry no signal for the scorer to show.
+    .filter(i => i.text.length >= 200)
+    .slice(0, ITEMS_PER_FEED);
+  console.log(`${label}: ${picked.length} items`);
+  items.push(...picked);
+}
+
+if (items.length === 0) {
+  console.error("No feed produced items — refusing to overwrite the snapshot with an empty demo.");
+  process.exit(1);
+}
+
+const snapshot = {
+  // Bumped only on a breaking shape change; lib/demo/feed.ts refuses anything else.
+  schemaVersion: 1,
+  generatedAt: new Date().toISOString(),
+  note: "Static demo snapshot — regenerate with `node scripts/generate-demo-feed.mjs`.",
+  items,
+};
+
+await fs.writeFile(OUT, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+console.log(`Wrote ${items.length} items to ${path.relative(root, OUT)}`);
+if (failed.length > 0) {
+  console.warn(`Snapshot is missing: ${failed.join(", ")} — re-run when those feeds respond.`);
+}

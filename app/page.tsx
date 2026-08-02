@@ -22,7 +22,7 @@ import { useAgent } from "@/contexts/AgentContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { useFilterMode } from "@/contexts/FilterModeContext";
 import { useTranslation } from "@/hooks/useTranslation";
-import { DEMO_SOURCES } from "@/lib/demo/sources";
+import { loadDemoFeed } from "@/lib/demo/feed";
 // buildFollowGraph pulls in nostr-tools + @noble crypto to traverse the
 // follow graph — ~60 kB of minified code. Imported lazily inside the WoT
 // effect to keep the landing-page bundle smaller.
@@ -403,8 +403,6 @@ function AegisAppInner() {
 
   const getSchedulerSourcesRef = useRef(getSchedulerSources);
   getSchedulerSourcesRef.current = getSchedulerSources;
-  const isDemoRef = useRef(isDemoMode);
-  isDemoRef.current = isDemoMode;
   const principalTextRef = useRef(principalText);
   principalTextRef.current = principalText;
   const identityRef = useRef(identity);
@@ -412,23 +410,45 @@ function AegisAppInner() {
   const scoreTextRef = useRef(scoreText);
   scoreTextRef.current = scoreText;
 
-  const demoSchedulerSources = useMemo(() =>
-    DEMO_SOURCES.map(s => ({
-      type: s.type as "rss" | "url" | "nostr",
-      config: { feedUrl: s.feedUrl! },
-      enabled: true,
-    })),
-  []);
+  // The demo renders from a committed CDN snapshot instead of the live pipeline.
+  // Anonymous visitors are the bulk of traffic and every one of them used to
+  // trigger /api/fetch/rss + /api/fetch/url ~5s after hydration — the largest
+  // single source of this deployment's Vercel Active CPU. Filtering and scoring
+  // still run here in the browser, so the demo shows real pipeline output.
+  useEffect(() => {
+    if (!isDemoMode || !bannerDismissed) return;
+    const controller = new AbortController();
+    // `cancelled` and not just the abort signal: if the response already
+    // resolved when the user signs in, aborting no longer stops the `.then`,
+    // and demo items (owner "") would be appended after clearDemoContent() has
+    // run — leaving demo content sitting in an authenticated session.
+    let cancelled = false;
+    loadDemoFeed(controller.signal)
+      .then(items => {
+        if (cancelled) return;
+        // addContent dedupes, so a re-run after an auth flip cannot double-add.
+        for (const item of items) addContent(item);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.warn("[demo] Static demo feed unavailable:", errMsg(err));
+        // Surfaced rather than swallowed: an empty demo is indistinguishable
+        // from "the filter rejected everything", which would read as working.
+        addNotification("Demo content could not be loaded. Try reloading the page.", "error");
+      });
+    return () => { cancelled = true; controller.abort(); };
+  }, [isDemoMode, bannerDismissed, addContent, addNotification]);
 
   useEffect(() => {
+    // Only authenticated users have real sources to ingest. Anonymous visitors
+    // (landing and demo alike) are served from the static snapshot above, so
+    // constructing the scheduler for them would poll upstream feeds through our
+    // own API routes for content nobody asked for.
+    if (!isAuthenticated) return;
+
     const scheduler = new IngestionScheduler({
       onNewContent: addContentBuffered,
-      getSources: () => {
-        const userSources = getSchedulerSourcesRef.current();
-        if (userSources.length > 0) return userSources;
-        if (isDemoRef.current) return demoSchedulerSources;
-        return [];
-      },
+      getSources: () => getSchedulerSourcesRef.current(),
       getUserContext: () => userContextRef.current,
       getSkipAI: () => filterModeRef.current === "lite",
       scoreFn: (text, userContext) => scoreTextRef.current(text, userContext),
@@ -520,8 +540,15 @@ function AegisAppInner() {
     });
     schedulerRef.current = scheduler;
     scheduler.start();
-    return () => scheduler.stop();
-  }, [addContentBuffered, demoSchedulerSources, addNotification]);
+    return () => {
+      scheduler.stop();
+      schedulerRef.current = null;
+    };
+    // isAuthenticated gates construction, so signing in rebuilds the scheduler:
+    // its in-memory dedup and ETag/Last-Modified cache start empty, and the
+    // first cycle after sign-in refetches feeds instead of 304-ing them. The
+    // persisted dedup store still suppresses re-scoring.
+  }, [isAuthenticated, addContentBuffered, addNotification]);
 
   useEffect(() => {
     if (isAuthenticated) clearDemoContent();
