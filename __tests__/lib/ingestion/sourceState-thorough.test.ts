@@ -228,8 +228,10 @@ describe("persistence — loadSourceStates / saveSourceStates", () => {
 });
 
 describe("constants", () => {
-  it("BASE_CYCLE_MS is 2 minutes", () => {
-    expect(BASE_CYCLE_MS).toBe(2 * 60 * 1000);
+  // Never below MIN_INTERVAL_MS: a tick faster than the shortest per-source
+  // interval can only find nothing due, and every open tab pays for it.
+  it("BASE_CYCLE_MS is 5 minutes", () => {
+    expect(BASE_CYCLE_MS).toBe(5 * 60 * 1000);
   });
 
   it("BACKOFF_MS has 4 escalating values", () => {
