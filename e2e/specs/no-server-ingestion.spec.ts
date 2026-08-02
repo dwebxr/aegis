@@ -32,21 +32,22 @@ test.describe("Anonymous visits cost no server ingestion", () => {
     expect(ingestionCalls).toEqual([]);
   });
 
-  test("demo mode renders content from the static snapshot, not the fetch API", async ({ landingPage }) => {
+  // Deliberately does not wait for the dashboard to render: what this asserts is
+  // the network property, and coupling it to the demo transition would make a
+  // CPU regression indistinguishable from an unrelated rendering failure. That
+  // the demo reads /demo-feed.json and never an API route is pinned by
+  // __tests__/lib/demo/feed.test.ts.
+  test("entering the demo never calls /api/fetch/*", async ({ landingPage }) => {
     const page = landingPage.page;
     const ingestionCalls: string[] = [];
-    let snapshotRequested = false;
     page.on("request", req => {
       const { pathname } = new URL(req.url());
       if (pathname.startsWith("/api/fetch/")) ingestionCalls.push(`${req.method()} ${pathname}`);
-      if (pathname === "/demo-feed.json") snapshotRequested = true;
     });
 
     await landingPage.enterDemo();
-    await expect(page.getByTestId("aegis-dashboard")).toBeVisible();
     await page.waitForTimeout(PAST_FIRST_CYCLE_MS);
 
-    expect(snapshotRequested).toBe(true);
     expect(ingestionCalls).toEqual([]);
   });
 });
