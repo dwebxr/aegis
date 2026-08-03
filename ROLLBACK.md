@@ -168,10 +168,21 @@ query to confirm the canister responds again.
 
 ### Why the probe is cached
 
-`/api/health` caches the cycles probe in-process for 60 seconds
-(`CYCLES_CACHE_TTL_MS` in `lib/ic/health.ts`). This keeps the cost of
-frequent uptime polling bounded: one IC query per minute per serverless
-instance instead of one per request.
+`/api/health` caches the cycles probe in-process, with a TTL that depends on
+what the probe found (`CYCLES_CACHE_TTL_MS` in `lib/ic/health.ts`):
+
+| outcome | cached for | why |
+|---|---|---|
+| `ok`    | 15 min | a balance well above the floor does not move in minutes |
+| `low`   | 60 s   | the paging state — re-probe so a top-up clears it promptly |
+| `error` | 30 s   | describes the probe, not the canister |
+
+This keeps frequent uptime polling bounded to one IC query per instance per
+window instead of one per request. The cost: an `ok` -> `low` transition can
+surface up to 15 minutes late, and up to ~15.5 minutes once the 30-second
+shared-cache window on healthy `/api/health` responses is included. The
+top-up procedure above is unaffected — once the state is `low` it is re-probed
+every 60 seconds, so recovery shows up promptly.
 
 ## Feature-flag kill switches
 

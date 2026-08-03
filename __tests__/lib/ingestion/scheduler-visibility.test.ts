@@ -96,6 +96,26 @@ describe("IngestionScheduler visibility gate", () => {
     expect(getSources).toHaveBeenCalledTimes(1);
   });
 
+  // The listeners are armed the moment start() returns, but the dedup store is
+  // only loaded inside the 5s timer. A cycle in between would run against an
+  // empty dedup set — re-fetching and re-emitting everything already seen, then
+  // persisting that empty-based snapshot over the real history.
+  it("does not run a catch-up cycle before the dedup store has loaded", async () => {
+    scheduler.start();
+    setHidden(true);
+    jest.advanceTimersByTime(2000);
+    await flush();
+
+    setHidden(false);
+    await flush();
+    expect(getSources).not.toHaveBeenCalled();
+
+    // Once init has run, the scheduler behaves normally again.
+    jest.advanceTimersByTime(5000);
+    await flush();
+    expect(getSources).toHaveBeenCalled();
+  });
+
   it("stops listening for visibility changes after stop()", async () => {
     scheduler.start();
     setHidden(true);

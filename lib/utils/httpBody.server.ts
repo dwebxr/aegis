@@ -1,17 +1,27 @@
 import "server-only";
 
+export interface CappedText {
+  text: string;
+  /** True when the body hit the cap, so `text` is a prefix of the real body.
+   *  Callers that persist or share what they parsed need to know: a document
+   *  cut mid-structure can parse cleanly and still be wrong. */
+  truncated: boolean;
+}
+
 // Reads a fetch Response body as UTF-8 text, hard-capped at maxBytes, canceling
 // the stream once the cap is reached. Unlike res.text(), this never buffers an
 // unbounded body: a server returning a huge chunked response (no Content-Length,
 // so a Content-Length pre-check is useless) cannot exhaust function memory.
-export async function readCappedText(res: Response, maxBytes: number): Promise<string> {
+export async function readCappedText(res: Response, maxBytes: number): Promise<CappedText> {
   const reader = res.body?.getReader();
   if (!reader) {
     // No readable stream (a synthetic/empty Response). Real fetch responses —
     // including the unbounded chunked ones this guards against — always expose a
     // body stream, so this branch only sees small/empty bodies. Still cap it.
     const text = await res.text();
-    return text.length > maxBytes ? text.slice(0, maxBytes) : text;
+    return text.length > maxBytes
+      ? { text: text.slice(0, maxBytes), truncated: true }
+      : { text, truncated: false };
   }
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -37,5 +47,8 @@ export async function readCappedText(res: Response, maxBytes: number): Promise<s
     offset += take;
   }
   // fatal:false: a multibyte char may straddle the byte cap; tolerate the partial.
-  return new TextDecoder("utf-8", { fatal: false }).decode(capped);
+  return {
+    text: new TextDecoder("utf-8", { fatal: false }).decode(capped),
+    truncated: total >= maxBytes,
+  };
 }

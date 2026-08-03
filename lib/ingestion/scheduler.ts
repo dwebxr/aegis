@@ -61,6 +61,8 @@ export class IngestionScheduler {
   private initialTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private callbacks: SchedulerCallbacks;
   private running = false;
+  /** False until dedup.init() has resolved; gates every cycle. See safeCycle. */
+  private ready = false;
   private lastActivityAt = Date.now();
   private sourceStates: Map<string, SourceRuntimeState>;
   private dedup: ArticleDeduplicator;
@@ -89,6 +91,14 @@ export class IngestionScheduler {
    * sees is unchanged. Same shape as contexts/ContentContext.tsx.
    */
   private safeCycle = (): void => {
+    // Nothing may run before dedup.init() has loaded the persisted store. The
+    // visibility and activity listeners are armed the moment start() returns,
+    // but init sits behind the 5s timer below — so a tab backgrounded and
+    // restored inside that window could otherwise start a cycle against an
+    // empty dedup set: every already-seen article would be re-fetched,
+    // re-scored and re-emitted, and the cycle's flush() would then persist that
+    // empty-based snapshot over the real history.
+    if (!this.ready) return;
     if (typeof document !== "undefined" && document.hidden) return;
     if (Date.now() - this.lastActivityAt > IDLE_PAUSE_MS) return;
     this.runCycle().catch(err => {
@@ -121,6 +131,9 @@ export class IngestionScheduler {
       } catch (err) {
         console.error("[scheduler] Dedup init failed, first cycle may have reduced dedup coverage:", errMsg(err));
       }
+      // Set even when init threw: the dedup store is then as loaded as it will
+      // get, and refusing to ingest at all would be worse than reduced coverage.
+      this.ready = true;
       this.safeCycle();
     };
     this.initialTimeoutId = setTimeout(() => {
@@ -139,6 +152,7 @@ export class IngestionScheduler {
   }
 
   stop(): void {
+    this.ready = false;
     if (this.initialTimeoutId) {
       clearTimeout(this.initialTimeoutId);
       this.initialTimeoutId = null;

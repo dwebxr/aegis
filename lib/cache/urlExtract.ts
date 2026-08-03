@@ -24,6 +24,10 @@ export interface ExtractionResult {
   data?: ExtractedArticle;
   error?: string;
   status: number;
+  /** Set when the source body hit its byte cap. Such a result answers the
+   *  request and may be reused inside this instance, but is never written to
+   *  the shared cache — a prefix of a page must not become everyone's copy. */
+  partial?: boolean;
 }
 
 const urlCache = new Map<string, { data: ExtractionResult; expiresAt: number }>();
@@ -140,7 +144,7 @@ export async function withUrlCache(
     const result = await extract();
     if (result.data) {
       setUrlCache(url, result);
-      await writeShared(url, result);
+      if (!result.partial) await writeShared(url, result);
     }
     return result;
   })().finally(() => inFlight.delete(url));

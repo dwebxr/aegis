@@ -9,11 +9,13 @@ import { stripHtmlToText } from "@/lib/utils/text";
 import { withTimeout } from "@/lib/utils/timeout";
 import { blockPrivateUrl } from "@/lib/utils/url";
 
-// Only the article body is wanted, and the extractor works on the head of the
-// document. 512KB covers the heaviest real page seen in testing (415KB) with
-// room to spare, while capping how much HTML a hostile or bloated page can make
-// the DOM parser walk — parsing is the single most CPU-expensive step here.
-const MAX_HTML_BYTES = 512_000;
+// Bounds how much markup the DOM parser has to walk — parsing is the single
+// most CPU-expensive step here — without cutting real pages off. 512KB was
+// tried first and rejected: mainstream article pages routinely exceed it (a
+// live WIRED article measured 1.8MB), and extractFromHtml returns null on a
+// document truncated before <article>, turning a working 200 into a 422. 2MB
+// clears the pages that were checked and is still a 60% cut from the old 5MB.
+const MAX_HTML_BYTES = 2_000_000;
 
 async function fetchAndExtract(url: string) {
   const res = await safeFetch(url, {
@@ -25,8 +27,8 @@ async function fetchAndExtract(url: string) {
   if (!contentType.includes("html") && !contentType.includes("text")) {
     throw new Error(`Unsupported content type: ${contentType}`);
   }
-  const html = await readCappedText(res, MAX_HTML_BYTES);
-  return extractFromHtml(html, url);
+  const { text: html, truncated } = await readCappedText(res, MAX_HTML_BYTES);
+  return { article: await extractFromHtml(html, url), truncated };
 }
 
 export async function extractArticle(url: string): Promise<ExtractionResult> {
@@ -49,8 +51,9 @@ export async function extractArticle(url: string): Promise<ExtractionResult> {
 
   return withUrlCache(url, async () => {
     let article;
+    let truncated = false;
     try {
-      article = await withTimeout(fetchAndExtract(url), 15_000, "Article extraction timed out");
+      ({ article, truncated } = await withTimeout(fetchAndExtract(url), 15_000, "Article extraction timed out"));
     } catch (err) {
       const safeUrl = `${parsed.origin}${parsed.pathname}`;
       console.error("[fetch/url] Extract failed:", safeUrl, errMsg(err));
@@ -84,6 +87,10 @@ export async function extractArticle(url: string): Promise<ExtractionResult> {
         imageUrl: article.image || undefined,
       },
       status: 200,
+      // A body that hit the byte cap may be missing the end of the article. It
+      // is good enough to answer this request, but it must not be published to
+      // the cache every other visitor reads for the next 24 hours.
+      partial: truncated,
     };
   });
 }

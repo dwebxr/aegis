@@ -574,8 +574,11 @@ paths:
       summary: D2A service descriptor (well-known manifest)
       description: |
         Machine-readable manifest describing D2A endpoints, pricing,
-        payment protocol, and the V/C/L scoring schema. Cached for 5
-        minutes at the edge.
+        payment protocol, and the V/C/L scoring schema. Edge-cached with
+        `max-age=300, s-maxage=3600, stale-while-revalidate=86400`. The
+        document only changes when the deployment's configuration does, and
+        deploying purges the cache, so it is never older than the running
+        deployment.
       operationId: getD2AInfo
       responses:
         '200':
@@ -1022,7 +1025,11 @@ paths:
                     urls:
                       type: array
                       minItems: 1
-                      maxItems: 10
+                      maxItems: 3
+                      description: >-
+                        At most 3 URLs per request; anything beyond the third is
+                        dropped without an error. Each URL is fetched and DOM-parsed,
+                        so the cap bounds the CPU one request can demand.
                       items:
                         type: string
                         format: uri

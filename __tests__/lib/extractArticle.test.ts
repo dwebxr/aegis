@@ -72,15 +72,15 @@ describe("extractArticle", () => {
   });
 
   it("caps fetched HTML before extraction and extracted text before returning", async () => {
-    const oversizedHtml = "a".repeat(600_000);
+    const oversizedHtml = "a".repeat(2_100_000);
     mockSafeFetch.mockResolvedValueOnce(htmlResponse(oversizedHtml));
     mockExtractFromHtml.mockResolvedValueOnce(article("b".repeat(12_000)));
 
     const result = await extractArticle("https://example.com/large");
 
-    // 512KB: enough for the heaviest real page measured, and a hard bound on how
-    // much markup the DOM parser — the CPU-dominant step — has to walk.
-    expect((mockExtractFromHtml.mock.calls[0][0] as string).length).toBe(512_000);
+    // 2MB: clears the real article pages that were checked (the heaviest was
+    // 1.8MB) while still bounding what the DOM parser has to walk.
+    expect((mockExtractFromHtml.mock.calls[0][0] as string).length).toBe(2_000_000);
     expect(result.data?.content).toHaveLength(10_000);
   });
 
@@ -116,5 +116,29 @@ describe("extractArticle", () => {
       expect.any(Error),
       expect.objectContaining({ extra: { url: "https://example.com/article" } }),
     );
+  });
+});
+
+describe("extractArticle truncation handling", () => {
+  it("marks a capped body partial so it is not published to the shared cache", async () => {
+    mockSafeFetch.mockResolvedValueOnce(htmlResponse("a".repeat(2_100_000)));
+    mockExtractFromHtml.mockResolvedValueOnce(article());
+
+    const result = await extractArticle("https://example.com/huge");
+
+    // Still answers the request — it just must not become everyone's copy for
+    // the next 24 hours, because the tail of the page was never read.
+    expect(result.status).toBe(200);
+    expect(result.partial).toBe(true);
+  });
+
+  it("does not mark a complete body partial", async () => {
+    mockSafeFetch.mockResolvedValueOnce(htmlResponse());
+    mockExtractFromHtml.mockResolvedValueOnce(article());
+
+    const result = await extractArticle("https://example.com/normal");
+
+    expect(result.status).toBe(200);
+    expect(result.partial).toBe(false);
   });
 });

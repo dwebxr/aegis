@@ -16,7 +16,7 @@ function streamFromChunks(chunks: string[]): Response {
 describe("readCappedText", () => {
   it("returns the full body when under the cap", async () => {
     const res = streamFromChunks(["<html>", "hello", "</html>"]);
-    expect(await readCappedText(res, 1_000)).toBe("<html>hello</html>");
+    expect((await readCappedText(res, 1_000)).text).toBe("<html>hello</html>");
   });
 
   it("caps an oversized body AND stops reading the stream (DoS protection)", async () => {
@@ -30,7 +30,7 @@ describe("readCappedText", () => {
       },
     });
     const res = { body } as unknown as Response;
-    const out = await readCappedText(res, 5_000);
+    const out = (await readCappedText(res, 5_000)).text;
     expect(out.length).toBe(5_000);
     // The reader must stop near the cap, not drain the (effectively unbounded) stream.
     expect(chunksProduced).toBeLessThan(20);
@@ -38,11 +38,23 @@ describe("readCappedText", () => {
 
   it("falls back to a capped text() when there is no body stream", async () => {
     const res = { body: null, text: async () => "y".repeat(100) } as unknown as Response;
-    expect(await readCappedText(res, 50)).toBe("y".repeat(50));
+    expect((await readCappedText(res, 50)).text).toBe("y".repeat(50));
   });
 
   it("returns empty string for an empty stream", async () => {
     const res = streamFromChunks([]);
-    expect(await readCappedText(res, 1_000)).toBe("");
+    expect((await readCappedText(res, 1_000)).text).toBe("");
+  });
+});
+
+describe("readCappedText truncation flag", () => {
+  it("reports truncated when the body hits the cap", async () => {
+    const res = streamFromChunks(["z".repeat(200)]);
+    expect(await readCappedText(res, 50)).toEqual({ text: "z".repeat(50), truncated: true });
+  });
+
+  it("reports not truncated when the whole body fits", async () => {
+    const res = streamFromChunks(["short body"]);
+    expect(await readCappedText(res, 1_000)).toEqual({ text: "short body", truncated: false });
   });
 });
