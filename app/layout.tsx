@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { ProductAnalytics } from "@/components/analytics/ProductAnalytics";
 import { Providers } from "@/components/Providers";
 import { APP_URL } from "@/lib/config";
 import "./globals.css";
@@ -162,7 +162,7 @@ export default function RootLayout({
       </head>
       <body>
         <Providers>{children}</Providers>
-        {process.env.NODE_ENV === "production" && <Analytics />}
+        {process.env.NODE_ENV === "production" && <ProductAnalytics />}
         {process.env.NODE_ENV === "production" && <SpeedInsights sampleRate={0.3} />}
       </body>
     </html>
