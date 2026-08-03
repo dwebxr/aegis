@@ -392,6 +392,13 @@ export function ContentProvider({ children, preferenceCallbacks }: { children: R
   }, []);
 
   const backfillImageUrls = useCallback((): (() => void) => {
+    // Signed-in users only. Anonymous visitors see the static demo snapshot,
+    // whose images are baked in at generation time — backfilling for them would
+    // put a server fetch-and-parse back into every demo visit, which is the
+    // cost the snapshot exists to remove. Measured on production before this
+    // guard: entering the demo issued one POST /api/fetch/ogimage every time.
+    if (!isAuthenticated) return () => {};
+
     const items = contentRef.current
       .filter((c): c is ContentItem & { sourceUrl: string } => !!c.sourceUrl && !c.imageUrl && /^https?:\/\//i.test(c.sourceUrl))
       .slice(0, 30);

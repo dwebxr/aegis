@@ -91,3 +91,12 @@ describe("loadDemoFeed", () => {
     expect(items.length).toBeLessThanOrEqual(2);
   });
 });
+
+describe("public/demo-feed.json thumbnails", () => {
+  it("ships images so the runtime og-image backfill has nothing to do", () => {
+    // The backfill is a server fetch-and-parse per visit; baking the images in
+    // at generation time is what keeps a demo visit at zero server functions.
+    const withImage = snapshot.items.filter(i => (i as { imageUrl?: string }).imageUrl).length;
+    expect(withImage / snapshot.items.length).toBeGreaterThan(0.8);
+  });
+});

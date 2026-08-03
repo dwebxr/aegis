@@ -106,6 +106,34 @@ function extractImage(item, rawContent) {
   return inline?.[1] ? safeLink(inline[1]) : undefined;
 }
 
+/**
+ * Fetches the article page and reads its og:image / twitter:image.
+ *
+ * Baked in here so the demo never needs the runtime og-image backfill, which
+ * is a server fetch-and-parse per visit — the exact cost the static snapshot
+ * exists to remove. Best effort: an item simply ships without an image if the
+ * page is unreachable or declares none.
+ */
+async function fetchOgImage(pageUrl) {
+  if (!pageUrl) return undefined;
+  try {
+    const res = await fetch(pageUrl, {
+      headers: { "user-agent": "AegisBot/1.0 (+https://aegis-ai.xyz)" },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) return undefined;
+    const html = (await res.text()).slice(0, 512_000);
+    const meta = html.match(
+      /<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)(?::src)?["'][^>]*>/i,
+    );
+    const content = meta?.[0].match(/content=["']([^"']+)["']/i)?.[1];
+    if (!content) return undefined;
+    return safeLink(new URL(content, pageUrl).toString());
+  } catch {
+    return undefined;
+  }
+}
+
 const items = [];
 const failed = [];
 for (const { feedUrl, label } of FEEDS) {
@@ -137,7 +165,12 @@ for (const { feedUrl, label } of FEEDS) {
     // Drop title-only entries: they carry no signal for the scorer to show.
     .filter(i => i.text.length >= 200)
     .slice(0, ITEMS_PER_FEED);
-  console.log(`${label}: ${picked.length} items`);
+  // Fill the gaps the feed itself did not provide.
+  for (const item of picked) {
+    if (!item.imageUrl) item.imageUrl = await fetchOgImage(item.sourceUrl);
+  }
+  const withImage = picked.filter(i => i.imageUrl).length;
+  console.log(`${label}: ${picked.length} items (${withImage} with an image)`);
   items.push(...picked);
 }
 

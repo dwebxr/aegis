@@ -1,36 +1,40 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-02T22:23:48.261Z",
+  "generatedAt": "2026-08-03T00:33:34.803Z",
   "note": "Static demo snapshot — regenerate with `node scripts/generate-demo-feed.mjs`.",
   "items": [
     {
-      "text": "EU Age Verification Project Mandates Hardware-Bound Attestation\n\nArticle URL: https://linuxiac.com/eu-age-verification-project-mandates-hardware-bound-attestation/ Comments URL: https://news.ycombinator.com/item?id=49148128 Points: 42 # Comments: 17",
+      "text": "AI poster wins Ohio State Fair contest\n\nArticle URL: https://www.ohiostatefair.com/p/get-involved/arts/poster-contest Comments URL: https://news.ycombinator.com/item?id=49149188 Points: 88 # Comments: 75",
+      "author": "AlexAplin",
+      "sourceUrl": "https://www.ohiostatefair.com/p/get-involved/arts/poster-contest",
+      "imageUrl": "https://cdn.saffire.com/images.ashx?t=ig&rid=OhioStateFair&i=Header-3-2026_OSF_Poster_Contest.jpeg&cb=e24bb70e",
+      "feedUrl": "https://hnrss.org/frontpage"
+    },
+    {
+      "text": "Californians' data deletion requests, DROP, become enforceable Aug. 1\n\nArticle URL: https://www.nbcsandiego.com/nbc-7-responds-2/californians-data-deletion-requests-drop-become-enforceable-aug-1/4054771/ Comments URL: https://news.ycombinator.com/item?id=49148987 Points: 57 # Comments: 18",
+      "author": "MilnerRoute",
+      "sourceUrl": "https://www.nbcsandiego.com/nbc-7-responds-2/californians-data-deletion-requests-drop-become-enforceable-aug-1/4054771/",
+      "imageUrl": "https://media.nbcsandiego.com/2026/07/drop-website-1.jpg?quality=85&strip=all&resize=1200%2C675",
+      "feedUrl": "https://hnrss.org/frontpage"
+    },
+    {
+      "text": "EU Age Verification Project Mandates Hardware-Bound Attestation\n\nArticle URL: https://linuxiac.com/eu-age-verification-project-mandates-hardware-bound-attestation/ Comments URL: https://news.ycombinator.com/item?id=49148128 Points: 123 # Comments: 70",
       "author": "RobotToaster",
       "sourceUrl": "https://linuxiac.com/eu-age-verification-project-mandates-hardware-bound-attestation/",
+      "imageUrl": "https://linuxiac.com/wp-content/uploads/2026/08/eu-digital-identity.jpg",
       "feedUrl": "https://hnrss.org/frontpage"
     },
     {
-      "text": "Show HN: Make your Framework 12 sound like a creaky door\n\nI was poking through the iio devices on my Framework the other day and turns out Framework 12s have a pretty accurate hinge angle sensor! So I made a version of LidAngleSensor ( https://github.com/samhenrigold/LidAngleSensor ) but for the Framework 12 on Linux, so you can make your hinge sound rusty Comments URL: https://news.ycombinator.com/item?id=49148048 Points: 16 # Comments: 2",
+      "text": "Show HN: Make your Framework 12 sound like a creaky door\n\nI was poking through the iio devices on my Framework the other day and turns out Framework 12s have a pretty accurate hinge angle sensor! So I made a version of LidAngleSensor ( https://github.com/samhenrigold/LidAngleSensor ) but for the Framework 12 on Linux, so you can make your hinge sound rusty Comments URL: https://news.ycombinator.com/item?id=49148048 Points: 39 # Comments: 4",
       "author": "arcaege",
       "sourceUrl": "https://github.com/ArcaEge/creakwork12",
+      "imageUrl": "https://opengraph.githubassets.com/e9a9335fedd95791c4a5efd2685d8e4e21f9ddc38df7bf740209b59a10c267ca/ArcaEge/creakwork12",
       "feedUrl": "https://hnrss.org/frontpage"
     },
     {
-      "text": "Sharing an X11 Server Across Hosts with FamilyWild\n\nArticle URL: https://dobrowolski.dev/article/sharing-an-x-server-across-hosts-with-familywild/ Comments URL: https://news.ycombinator.com/item?id=49147978 Points: 14 # Comments: 3",
+      "text": "Sharing an X11 Server Across Hosts with FamilyWild\n\nArticle URL: https://dobrowolski.dev/article/sharing-an-x-server-across-hosts-with-familywild/ Comments URL: https://news.ycombinator.com/item?id=49147978 Points: 33 # Comments: 8",
       "author": "shirozuki",
       "sourceUrl": "https://dobrowolski.dev/article/sharing-an-x-server-across-hosts-with-familywild/",
-      "feedUrl": "https://hnrss.org/frontpage"
-    },
-    {
-      "text": "Adding Go's Defer to the TypeScript Compiler\n\nArticle URL: https://healeycodes.com/adding-defer-to-the-typescript-compiler Comments URL: https://news.ycombinator.com/item?id=49147853 Points: 10 # Comments: 1",
-      "author": "healeycodes",
-      "sourceUrl": "https://healeycodes.com/adding-defer-to-the-typescript-compiler",
-      "feedUrl": "https://hnrss.org/frontpage"
-    },
-    {
-      "text": "Show HN: MicroCodex Coding Agent – OpenAI/codex reimplemented in C++ <1MB binary\n\nArticle URL: https://github.com/paoloanzn/microcodex Comments URL: https://news.ycombinator.com/item?id=49147842 Points: 8 # Comments: 2",
-      "author": "paoloanzn",
-      "sourceUrl": "https://github.com/paoloanzn/microcodex",
       "feedUrl": "https://hnrss.org/frontpage"
     },
     {
