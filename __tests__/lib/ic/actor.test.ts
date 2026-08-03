@@ -40,7 +40,9 @@ describe("createBackendActorAsync", () => {
 
   it("still creates actor when syncTime fails (clock drift tolerance)", async () => {
     mockSyncTime.mockRejectedValueOnce(new Error("Network unreachable"));
-    const errorSpy = jest.spyOn(console, "error").mockImplementation();
+    // warn, not error: the failure is swallowed by design and the actor is
+    // still usable, so it is not an incident to triage.
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
 
     const actor = await createBackendActorAsync();
 
@@ -49,9 +51,9 @@ describe("createBackendActorAsync", () => {
     expect(mockActorCreateActor).toHaveBeenCalledTimes(1);
     expect(actor).toHaveProperty("getUserEvaluations");
 
-    // Error was logged with the real errMsg() utility
-    expect(errorSpy).toHaveBeenCalledWith("[ic] syncTime failed:", "Network unreachable");
-    errorSpy.mockRestore();
+    // Logged with the real errMsg() utility
+    expect(warnSpy).toHaveBeenCalledWith("[ic] syncTime failed:", "Network unreachable");
+    warnSpy.mockRestore();
   });
 
   it("agent receives the same host as sync version", async () => {

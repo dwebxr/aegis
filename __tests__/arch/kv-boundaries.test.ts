@@ -162,7 +162,7 @@ describe("KV architecture boundaries", () => {
     const expected: Record<string, string[]> = {
       "lib/api/kv/internal/raw.ts": ["getRawKV"],
       "lib/api/kv/internal/factory.ts": ["kvNamespace"],
-      "lib/api/kv/namespace.ts": ["dailyBudgetKV", "metricsKV", "rateLimitKV", "scoreBudgetKV", "scoreCacheKV"],
+      "lib/api/kv/namespace.ts": ["dailyBudgetKV", "metricsKV", "rateLimitKV", "scoreBudgetKV", "scoreCacheKV", "urlExtractKV"],
       "lib/api/kv/journalNamespace.ts": ["journalKV"],
       "lib/api/kv/reconcileJournal.ts": [
         "IndexedResolution",

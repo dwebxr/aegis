@@ -103,13 +103,16 @@ describe("POST /api/fetch/url — batch mode", () => {
     expect(data.results[0].title).toBe("Valid");
   });
 
-  it("limits batch to 10 URLs", async () => {
+  // The cap is a direct multiplier on this route's CPU: each URL in a batch is
+  // DOM-parsed concurrently. It tracks MAX_ENRICH_PER_CYCLE in the scheduler,
+  // the only caller.
+  it("limits batch to 3 URLs", async () => {
     const urls = Array.from({ length: 15 }, (_, i) => `https://example.com/${i}`);
     mockExtract.mockResolvedValue(fakeArticle());
 
     const res = await POST(makeRequest({ urls }));
     const data = await res.json();
-    expect(data.results).toHaveLength(10);
+    expect(data.results).toHaveLength(3);
   });
 
   it("returns error for private/SSRF URLs in batch", async () => {

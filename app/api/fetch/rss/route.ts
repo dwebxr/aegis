@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import Parser from "rss-parser";
 import { distributedGuardAndParse } from "@/lib/api/rateLimit";
 import { errMsg } from "@/lib/utils/errors";
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Feed returned HTTP ${res.status}` }, { status: 502 });
     }
 
-    const xml = await readCappedText(res, MAX_RSS_BYTES);
+    const { text: xml } = await readCappedText(res, MAX_RSS_BYTES);
     const feed = await parser.parseString(xml);
 
     const response = NextResponse.json({

@@ -7,7 +7,6 @@ const mockTryReserveScoreBudget = jest.fn();
 const mockGetScoreBudgetRetryAfter = jest.fn();
 const mockDistributedRateLimitByKey = jest.fn();
 const mockCaptureException = jest.fn();
-const mockAddBreadcrumb = jest.fn();
 const mockCaptureMessage = jest.fn();
 const mockAcquirePaymentWork = jest.fn();
 const mockReadPaymentDurableState = jest.fn();
@@ -43,9 +42,8 @@ jest.mock("@/lib/d2a/settlementJournal", () => ({
 jest.mock("@x402/next", () => ({
   withX402: (handler: (request: NextRequest) => Promise<NextResponse>) => handler,
 }));
-jest.mock("@sentry/nextjs", () => ({
+jest.mock("@/lib/observability", () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
-  addBreadcrumb: (...args: unknown[]) => mockAddBreadcrumb(...args),
   captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
 }));
 

@@ -574,8 +574,11 @@ paths:
       summary: D2A service descriptor (well-known manifest)
       description: |
         Machine-readable manifest describing D2A endpoints, pricing,
-        payment protocol, and the V/C/L scoring schema. Cached for 5
-        minutes at the edge.
+        payment protocol, and the V/C/L scoring schema. Edge-cached with
+        `max-age=300, s-maxage=3600, stale-while-revalidate=86400`. The
+        document only changes when the deployment's configuration does, and
+        deploying purges the cache, so it is never older than the running
+        deployment.
       operationId: getD2AInfo
       responses:
         '200':
@@ -1022,7 +1025,11 @@ paths:
                     urls:
                       type: array
                       minItems: 1
-                      maxItems: 10
+                      maxItems: 3
+                      description: >-
+                        At most 3 URLs per request; anything beyond the third is
+                        dropped without an error. Each URL is fetched and DOM-parsed,
+                        so the cap bounds the CPU one request can demand.
                       items:
                         type: string
                         format: uri
@@ -1083,7 +1090,9 @@ paths:
         `[score X.X]`. No authentication: anyone with the principal can
         subscribe (matches the existing `/api/d2a/briefing` semantics —
         see Decision 1 in the project plan). Edge-cached with
-        `s-maxage=300, stale-while-revalidate=600`.
+        `s-maxage=900, stale-while-revalidate=600`. Supports conditional
+        requests: send `If-None-Match` with the weak `ETag` from a previous
+        response to get `304 Not Modified` with no body.
       parameters:
         - name: principal
           in: query
@@ -1163,6 +1172,19 @@ paths:
         Reports status of Anthropic key, Sentry DSN, Vercel KV, and IC
         canister reachability. `ok` requires Anthropic key AND IC canister;
         Sentry and KV are advisory.
+
+        Caching: a healthy (200) response with no `Authorization` header is
+        given `public, max-age=0, s-maxage=30` — the shared cache may reuse it
+        for up to 30s; the caller itself may not. A 503, or any response to a
+        request carrying `Authorization`, is `no-store`. `Vary: Authorization`
+        is always sent because the body's `checks`/`flags` are gated on it.
+
+        Freshness bounds a monitor should assume: the cycles balance is probed
+        at most every 15 minutes while `ok` (60s while `low`, 30s after a failed
+        probe), and canister reachability at most every 30s. With the 30s shared
+        window on top, a drop below the cycles threshold can surface up to ~15.5
+        minutes late and an unreachable canister up to ~60s late. Degraded
+        states are never cached, so once `status` flips the next request sees it.
       operationId: getHealth
       responses:
         '200':

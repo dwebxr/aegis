@@ -24,7 +24,10 @@ export const MAX_CONSECUTIVE_FAILURES = 5;
 /** After 6 hours, auto-disabled sources get a single retry attempt. */
 export const AUTO_RECOVERY_MS = 6 * 60 * 60 * 1000;
 
-export const BASE_CYCLE_MS = 2 * 60 * 1000;
+// The scheduler wakes on this interval and then honours each source's own
+// nextFetchAt. MIN_INTERVAL_MS below is 5 minutes, so a 2-minute tick spent two
+// of every three wake-ups finding nothing due — pure overhead in every open tab.
+export const BASE_CYCLE_MS = 5 * 60 * 1000;
 const MAX_INTERVAL_MS = 2 * 60 * 60 * 1000;
 const MIN_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_INTERVAL_MS = 20 * 60 * 1000;

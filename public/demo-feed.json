@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-02T22:23:48.261Z",
+  "note": "Static demo snapshot — regenerate with `node scripts/generate-demo-feed.mjs`.",
+  "items": [
+    {
+      "text": "EU Age Verification Project Mandates Hardware-Bound Attestation\n\nArticle URL: https://linuxiac.com/eu-age-verification-project-mandates-hardware-bound-attestation/ Comments URL: https://news.ycombinator.com/item?id=49148128 Points: 42 # Comments: 17",
+      "author": "RobotToaster",
+      "sourceUrl": "https://linuxiac.com/eu-age-verification-project-mandates-hardware-bound-attestation/",
+      "feedUrl": "https://hnrss.org/frontpage"
+    },
+    {
+      "text": "Show HN: Make your Framework 12 sound like a creaky door\n\nI was poking through the iio devices on my Framework the other day and turns out Framework 12s have a pretty accurate hinge angle sensor! So I made a version of LidAngleSensor ( https://github.com/samhenrigold/LidAngleSensor ) but for the Framework 12 on Linux, so you can make your hinge sound rusty Comments URL: https://news.ycombinator.com/item?id=49148048 Points: 16 # Comments: 2",
+      "author": "arcaege",
+      "sourceUrl": "https://github.com/ArcaEge/creakwork12",
+      "feedUrl": "https://hnrss.org/frontpage"
+    },
+    {
+      "text": "Sharing an X11 Server Across Hosts with FamilyWild\n\nArticle URL: https://dobrowolski.dev/article/sharing-an-x-server-across-hosts-with-familywild/ Comments URL: https://news.ycombinator.com/item?id=49147978 Points: 14 # Comments: 3",
+      "author": "shirozuki",
+      "sourceUrl": "https://dobrowolski.dev/article/sharing-an-x-server-across-hosts-with-familywild/",
+      "feedUrl": "https://hnrss.org/frontpage"
+    },
+    {
+      "text": "Adding Go's Defer to the TypeScript Compiler\n\nArticle URL: https://healeycodes.com/adding-defer-to-the-typescript-compiler Comments URL: https://news.ycombinator.com/item?id=49147853 Points: 10 # Comments: 1",
+      "author": "healeycodes",
+      "sourceUrl": "https://healeycodes.com/adding-defer-to-the-typescript-compiler",
+      "feedUrl": "https://hnrss.org/frontpage"
+    },
+    {
+      "text": "Show HN: MicroCodex Coding Agent – OpenAI/codex reimplemented in C++ <1MB binary\n\nArticle URL: https://github.com/paoloanzn/microcodex Comments URL: https://news.ycombinator.com/item?id=49147842 Points: 8 # Comments: 2",
+      "author": "paoloanzn",
+      "sourceUrl": "https://github.com/paoloanzn/microcodex",
+      "feedUrl": "https://hnrss.org/frontpage"
+    },
+    {
+      "text": "Rachika Nayar’s Heaven Come Crashing is an instrumental epic of desperate longing\n\nTwo minutes and thirty seconds into the title track of Rachika Nayar's Heaven Come Crashing , an absolutely massive drum and bass beat drops. As a fan of Nayar's debut record Our Hands Against The Dusk , it caught me off guard. That album has no percussion on it at all. Heaven Comes Crashing is almost entirely drum-free, too. There are some rapid-fire mechanical hi-hats on the second track, \"Tetramorph,\" and the back half of track six, \"Gayatri,\" has what sounds like a snare buried deep in the mix. But it isn't until track seven that Nayar delivers an unexpected drum explosion, before immediately retreating to the soothing wash of \"Sleepless,\" … Read the full story at The Verge.",
+      "author": "Terrence O’Brien",
+      "sourceUrl": "https://www.theverge.com/entertainment/974271/rachika-nayars-heaven-come-crashing-music-review",
+      "imageUrl": "https://platform.theverge.com/wp-content/uploads/sites/2/2026/08/rachika-nayar.jpg?quality=90&strip=all&crop=0,0,100,100",
+      "feedUrl": "https://www.theverge.com/rss/index.xml"
+    },
+    {
+      "text": "Fender’s CEO seems to think your bandmates are just analog AI\n\nEdward “Bud” Cole speaks in Japan in 2023. | Image: Jun Sato/WireImage Fender CEO Edward \"Bud\" Cole gave an interview to T3 in May celebrating the 75th anniversary of the Telecaster with comments on AI and music that initially flew under the radar. But it has started making the rounds recently , pouring more fuel on an already raging fire of bad PR following the company pissing off basically the entire guitar-playing community by sending cease-and-desist letters to builders, claiming copyright of the Stratocaster body shape. Some influential guitar YouTubers have even said they're done buying Fender gear in the wake of the controversy. And Cole's resurfaced comments comparing cover songs and bandmates to a sort … Read the full story at The Verge.",
+      "author": "Terrence O’Brien",
+      "sourceUrl": "https://www.theverge.com/ai-artificial-intelligence/974265/fender-ceo-bud-cole-ai-music",
+      "imageUrl": "https://platform.theverge.com/wp-content/uploads/sites/2/2026/08/gettyimages-1259130896.jpg?quality=90&strip=all&crop=0,0,100,100",
+      "feedUrl": "https://www.theverge.com/rss/index.xml"
+    },
+    {
+      "text": "Xbox prices are increasing by up to €200 or £170\n\nWhen Microsoft announced its latest round of Xbox price bumps in June, it only gave US pricing. Now we know the pricing increases for the EU and UK , and they're dramatic. Depending on the model, Xbox prices are increasing by up to &euro;200 or &pound;170. The 1TB Xbox Series X with a disc drive is going up by over 30 percent from &pound;499.99 / &euro;599.99 to &pound;669.99 / &euro;799.99. The 512GB Xbox Series S is getting a price increase of over 43 percent, jumping from &pound;299.99 / &euro;349.99 to &pound;429.99 / &euro;499.99. While other consoles have received price bumps as RAM and storage prices skyrocket due to demand from the AI industry, none have been quite as dramatic as Microso … Read the full story at The Verge.",
+      "author": "Terrence O’Brien",
+      "sourceUrl": "https://www.theverge.com/games/974253/xbox-prices-increasing-200-euros",
+      "imageUrl": "https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/24895379/VLS_5062.JPG?quality=90&strip=all&crop=0,0,100,100",
+      "feedUrl": "https://www.theverge.com/rss/index.xml"
+    },
+    {
+      "text": "Skylight&#8217;s smart calendars are up to $90 off during its back-to-school sale\n\nThe 15-inch Skylight Calendar 2 can stand on a table or mounted to the wall. | Image: Skylight The start of a new school year can feel hectic, as parents juggle their kids’ classes, extracurriculars and sports on top of work, appointments, and other responsibilities. It&#8217;s easy for things to slip through the cracks, but Skylight&#8217;s shared smart calendars can help keep everyone on track, and from August 2nd through August 9th they&#8217;re up to $90 off. The sale includes the 10-inch Skylight Calendar for $119.99 ($50 off) , the 15-inch Skylight Calendar 2 for $259.99 ($20 off) , and the 27-inch Skylight Calendar Max for $479.99 ($90 off) . The 10-inch model takes up the least amount of space, though the newer, larger 15-inch Calendar 2 features faster performance, a brighter display, and swappable magnetic frames. The 27-inch Calendar Max, meanwhile, offers the sharpest and largest screen and must be mounted to the wall (the other models can stand on a table or be mounted), making it the easiest option for large families to view from across the room. The Skylight Calendar Where to Buy: $169.99 $119.99 at Skylight (10-inch) $279.99 $259.99 at Skylight (15-inch) Regardless of which model you choose, every Skylight Calendar includes the same set of organizational features. Each member of your household can have their own color-coded profile, and each can sync events from Google, Outlook, Apple, Cozi, or Yahoo calendars. You can also create shared lists for groceries, chores, and other to-dos that everyone can access from the calendar or the companion mobile app, and even send your grocery list to Instacart with a couple of taps. Built-in weather forecasts also can help you plan around upcoming events, and you can also share calendar access with family members and trusted contacts. Skylight Calendar Max Where to Buy: $629.99 at Best Buy (27-inch model) $599.99 $479.99 at Skyligh",
+      "author": "Sheena Vasani",
+      "sourceUrl": "https://www.theverge.com/gadgets/973789/skylight-calendar-2-max-back-to-school-deal-sale",
+      "imageUrl": "https://platform.theverge.com/wp-content/uploads/sites/2/2026/01/Copy-of-Cal-2-Lifestyle-6.png?quality=90&strip=all&crop=0,0,100,100",
+      "feedUrl": "https://www.theverge.com/rss/index.xml"
+    },
+    {
+      "text": "HP’s HyperX Omen 15 isn’t quite the budget-friendly gaming laptop its predecessor was\n\nTough sell. | Photo: Antonio G. Di Benedetto / The Verge The HP HyperX Omen 15, which I first saw at CES , replaces the HP Victus 15 , a longtime bestselling budget gaming laptop. The Victus cost just $800, or less when on sale, and was a good entry point to decent laptop gaming. The Omen 15 has nice little upgrades over the Victus. Its RTX 5050 Laptop GPU can play 2026's latest games, albeit on low-ish settings. But it's also got a brighter 16:10 aspect ratio display with higher refresh rate, and a 1080p webcam to make it a little better for non-gaming stuff. I'd call it a working-class gaming laptop, but thanks to RAMageddon , the Omen 15 starts at $1,200 - a far cry from the $800 that made its … Read the full story at The Verge.",
+      "author": "Antonio G. Di Benedetto",
+      "sourceUrl": "https://www.theverge.com/tech/974155/hp-hyperx-omen-15-gaming-laptop-rtx-5050-review",
+      "imageUrl": "https://platform.theverge.com/wp-content/uploads/sites/2/2026/07/268675_HP_HyperX_Omen_15_gaming_laptop_ADiBenedetto_0012.jpg?quality=90&strip=all&crop=0,0,100,100",
+      "feedUrl": "https://www.theverge.com/rss/index.xml"
+    }
+  ]
+}

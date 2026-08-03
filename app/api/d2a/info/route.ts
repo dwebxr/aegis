@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_STABLECOINS } from "@x402/evm";
 import { rateLimit } from "@/lib/api/rateLimit";
 import { corsOptionsResponse, withCors } from "@/lib/d2a/cors";
+// From x402Env, not x402Server: this route only needs the configured values,
+// and importing the payment stack made a free discovery endpoint evaluate
+// @x402/next + the settlement journal on every cold start.
 import {
   X402_NETWORK,
   X402_PRICE,
   X402_RECEIVER,
   X402_SCORE_PRICE,
-} from "@/lib/d2a/x402Server";
+} from "@/lib/d2a/x402Env";
 import { OPENPAY_MERCHANT, OPENPAY_URL } from "@/lib/d2a/openpayGate";
 import { APP_URL } from "@/lib/config";
 
@@ -152,7 +155,11 @@ export async function GET(request: NextRequest) {
       x402V1Endpoints: ["/api/d2a/briefing-jpyc"],
     },
   });
-  res.headers.set("Cache-Control", "public, max-age=300, s-maxage=300");
+  // This document only changes when the deployment's configuration does, and a
+  // deploy purges the CDN, so the window can be long. It is the endpoint agent
+  // directories poll to discover the service — the one place where collapsing
+  // repeat reads onto the edge matters most.
+  res.headers.set("Cache-Control", "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400");
   return withCors(res, request.headers.get("origin"));
 }
 

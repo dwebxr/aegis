@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import { withX402 } from "@x402/next";
 import { distributedRateLimit } from "@/lib/api/rateLimit";
 import { BRIEFING_CHANGES_BAZAAR_METADATA } from "@/lib/d2a/bazaar";

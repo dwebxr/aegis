@@ -48,7 +48,8 @@ export async function GET(request: NextRequest) {
   // HEALTH_DETAIL_TOKEN is unset, behavior is unchanged (ops tooling keeps working);
   // set it to stop leaking config posture to anonymous callers.
   const detailToken = process.env.HEALTH_DETAIL_TOKEN?.trim();
-  const showDetail = !detailToken || request.headers.get("authorization") === `Bearer ${detailToken}`;
+  const authorization = request.headers.get("authorization");
+  const showDetail = !detailToken || authorization === `Bearer ${detailToken}`;
   const body: Record<string, unknown> = {
     status: allOk ? "ok" : "degraded",
     ...(warnings.length > 0 && { warnings }),
@@ -63,6 +64,25 @@ export async function GET(request: NextRequest) {
     body.flags = getFlagSnapshot();
   }
   const response = NextResponse.json(body, { status: allOk ? 200 : 503 });
-  response.headers.set("Cache-Control", "no-store");
+  // A shared 30s window on healthy responses collapses however often this is
+  // polled into at most two function invocations a minute. Three rules keep it
+  // from lying:
+  //   - only 200s. A 503 is never cached, so a degraded deployment is reported
+  //     the moment the next request arrives rather than after the window.
+  //   - no stale-while-revalidate. It would let the edge keep serving the last
+  //     "ok" after the state changed, defeating monitors that alert on status
+  //     alone.
+  //   - never when Authorization is present. The body varies by that header
+  //     (detailed checks/flags), so a request carrying one is served fresh and
+  //     stored nowhere; Vary is belt-and-braces for any intermediary that would
+  //     cache it anyway.
+  // max-age=0 keeps the browser/monitor itself from reusing a response — only
+  // the shared cache gets the window.
+  const cacheable = allOk && !authorization;
+  response.headers.set(
+    "Cache-Control",
+    cacheable ? "public, max-age=0, s-maxage=30" : "no-store",
+  );
+  response.headers.set("Vary", "Authorization");
   return response;
 }

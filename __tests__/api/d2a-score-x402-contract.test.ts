@@ -425,8 +425,7 @@ describe("/api/d2a/score x402 v2 contract", () => {
       getScoreBudgetRetryAfter: jest.fn().mockResolvedValue(60),
     }));
     jest.doMock("@/lib/scoring/scoreWithClaude.server", () => ({ scoreOneText }));
-    jest.doMock("@sentry/nextjs", () => ({
-      addBreadcrumb: jest.fn(),
+    jest.doMock("@/lib/observability", () => ({
       captureException: jest.fn(),
       captureMessage: jest.fn(),
     }));
@@ -460,7 +459,7 @@ describe("/api/d2a/score x402 v2 contract", () => {
         "@/lib/extraction/extractArticle.server",
         "@/lib/api/dailyBudget",
         "@/lib/scoring/scoreWithClaude.server",
-        "@sentry/nextjs",
+        "@/lib/observability",
       ]) jest.dontMock(moduleName);
       jest.resetModules();
     }
@@ -547,8 +546,7 @@ describe("/api/d2a/score x402 v2 contract", () => {
       getScoreBudgetRetryAfter: jest.fn().mockResolvedValue(60),
     }));
     jest.doMock("@/lib/scoring/scoreWithClaude.server", () => ({ scoreOneText }));
-    jest.doMock("@sentry/nextjs", () => ({
-      addBreadcrumb: jest.fn(),
+    jest.doMock("@/lib/observability", () => ({
       captureException: jest.fn(),
       captureMessage: jest.fn(),
     }));
@@ -581,7 +579,7 @@ describe("/api/d2a/score x402 v2 contract", () => {
         "@/lib/extraction/extractArticle.server",
         "@/lib/api/dailyBudget",
         "@/lib/scoring/scoreWithClaude.server",
-        "@sentry/nextjs",
+        "@/lib/observability",
       ]) jest.dontMock(moduleName);
       jest.resetModules();
     }

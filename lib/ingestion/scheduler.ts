@@ -25,6 +25,12 @@ import { fetchRSS, fetchNostr, fetchURL, fetchFarcaster, type RawItem, type Fetc
 
 const MAX_ITEMS_PER_SOURCE = 5;
 const MAX_ENRICH_PER_CYCLE = 3;
+/** A tab that is open and visible but untouched still polls forever. Cycles
+ *  pause after this long with no interaction and resume on the next one, so a
+ *  browser left open overnight stops invoking /api/fetch/* on our behalf. */
+const IDLE_PAUSE_MS = 2 * 60 * 60 * 1000;
+/** Cheap, high-signal proof that someone is actually at the tab. */
+const ACTIVITY_EVENTS = ["pointerdown", "keydown"] as const;
 const ENRICH_MIN_WORDS = 100;
 const MAX_TEXT_LENGTH = 2000;
 const MAX_DISPLAY_TEXT = 300;
@@ -55,6 +61,9 @@ export class IngestionScheduler {
   private initialTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private callbacks: SchedulerCallbacks;
   private running = false;
+  /** False until dedup.init() has resolved; gates every cycle. See safeCycle. */
+  private ready = false;
+  private lastActivityAt = Date.now();
   private sourceStates: Map<string, SourceRuntimeState>;
   private dedup: ArticleDeduplicator;
   /** ETag / Last-Modified cache per source key */
@@ -72,19 +81,60 @@ export class IngestionScheduler {
     };
   }
 
-  start(): void {
-    if (this.intervalId || this.initialTimeoutId) return;
-    const safeCycle = () => this.runCycle().catch(err => {
+  /**
+   * Runs a cycle unless nobody is watching.
+   *
+   * Every cycle ends in /api/fetch/* calls against our own functions, so a
+   * backgrounded or abandoned tab was billing us for content no one would read.
+   * Both gates are paired with listeners that run one catch-up cycle the moment
+   * the tab becomes visible or the user interacts again, so what a present user
+   * sees is unchanged. Same shape as contexts/ContentContext.tsx.
+   */
+  private safeCycle = (): void => {
+    // Nothing may run before dedup.init() has loaded the persisted store. The
+    // visibility and activity listeners are armed the moment start() returns,
+    // but init sits behind the 5s timer below — so a tab backgrounded and
+    // restored inside that window could otherwise start a cycle against an
+    // empty dedup set: every already-seen article would be re-fetched,
+    // re-scored and re-emitted, and the cycle's flush() would then persist that
+    // empty-based snapshot over the real history.
+    if (!this.ready) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    if (Date.now() - this.lastActivityAt > IDLE_PAUSE_MS) return;
+    this.runCycle().catch(err => {
       console.error("[scheduler] Unhandled cycle error:", errMsg(err));
       this.running = false;
     });
+  };
+
+  private onVisibilityChange = (): void => {
+    if (!document.hidden) {
+      this.lastActivityAt = Date.now();
+      this.safeCycle();
+    }
+  };
+
+  private onActivity = (): void => {
+    const resumingFromIdle = Date.now() - this.lastActivityAt > IDLE_PAUSE_MS;
+    this.lastActivityAt = Date.now();
+    // Only the interaction that ENDS an idle pause triggers a catch-up; without
+    // this, every click would kick off a cycle.
+    if (resumingFromIdle) this.safeCycle();
+  };
+
+  start(): void {
+    if (this.intervalId || this.initialTimeoutId) return;
+    this.lastActivityAt = Date.now();
     const initAndStart = async () => {
       try {
         await this.dedup.init();
       } catch (err) {
         console.error("[scheduler] Dedup init failed, first cycle may have reduced dedup coverage:", errMsg(err));
       }
-      await safeCycle();
+      // Set even when init threw: the dedup store is then as loaded as it will
+      // get, and refusing to ingest at all would be worse than reduced coverage.
+      this.ready = true;
+      this.safeCycle();
     };
     this.initialTimeoutId = setTimeout(() => {
       initAndStart().catch(err => {
@@ -92,10 +142,17 @@ export class IngestionScheduler {
         this.running = false;
       });
     }, 5000);
-    this.intervalId = setInterval(safeCycle, BASE_CYCLE_MS);
+    this.intervalId = setInterval(this.safeCycle, BASE_CYCLE_MS);
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", this.onVisibilityChange);
+      for (const event of ACTIVITY_EVENTS) {
+        document.addEventListener(event, this.onActivity, { passive: true });
+      }
+    }
   }
 
   stop(): void {
+    this.ready = false;
     if (this.initialTimeoutId) {
       clearTimeout(this.initialTimeoutId);
       this.initialTimeoutId = null;
@@ -103,6 +160,12 @@ export class IngestionScheduler {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this.onVisibilityChange);
+      for (const event of ACTIVITY_EVENTS) {
+        document.removeEventListener(event, this.onActivity);
+      }
     }
   }
 

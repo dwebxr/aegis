@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     if (res.ok) {
       // Stream-read with a hard 2MB cap. A Content-Length pre-check is bypassable
       // (chunked responses omit it), so cap the actual bytes read instead.
-      const html = await readCappedText(res, 2_000_000);
+      const { text: html } = await readCappedText(res, 2_000_000);
 
       const host = parsedUrl.hostname.replace("www.", "");
       if ((host === "youtube.com" || host === "m.youtube.com") && feeds.length === 0) {

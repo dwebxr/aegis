@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import { decodePaymentSignatureHeader } from "@x402/core/http";
 import { getFacilitatorResponseError } from "@x402/core/server";
 import { withX402 } from "@x402/next";
@@ -377,11 +377,12 @@ async function handleScore(request: NextRequest): Promise<NextResponse> {
     reportOperationalError(error, "cache_write_failed", parsedUrl);
   }
 
-  Sentry.addBreadcrumb({
-    category: "d2a-score.usage",
-    level: "info",
-    data: { model: ANTHROPIC_DEFAULT_MODEL },
-  });
+  // The usage breadcrumb was dropped along with the build-time Sentry wrapper
+  // that gave each request its own isolation scope. Without that scope a
+  // breadcrumb lands on the instance-wide scope and attaches to whatever error
+  // a LATER, unrelated request reports — it would misattribute rather than
+  // inform. The sampled message below carries the same field and is a complete
+  // event on its own, so nothing is lost.
   if (Math.random() < 0.1) {
     Sentry.captureMessage("D2A score usage", {
       level: "info",

@@ -7,9 +7,29 @@ import type { D2ABriefingResponse, GlobalBriefingContributor, GlobalBriefingResp
 import { withTimeout } from "@/lib/utils/timeout";
 import { nsToMs } from "@/lib/utils/icTime";
 
+/**
+ * Built once per instance and reused. Creating an HttpAgent costs ~50ms of CPU
+ * (key material, root-key setup) against ~3-5ms to reuse one, and every read
+ * below was paying that afresh. Safe to share: the agent carries no identity —
+ * all three callers make anonymous queries — so there is no principal to leak
+ * between requests.
+ */
+let cachedAgent: HttpAgent | null = null;
+
 async function createActor(): Promise<_SERVICE> {
-  const agent = await HttpAgent.create({ host: getHost() });
-  return Actor.createActor<_SERVICE>(idlFactory, { agent, canisterId: getCanisterId() });
+  try {
+    cachedAgent ??= await HttpAgent.create({ host: getHost() });
+  } catch (err) {
+    // Never let a failed build poison the slot: the next call retries cleanly.
+    cachedAgent = null;
+    throw err;
+  }
+  return Actor.createActor<_SERVICE>(idlFactory, { agent: cachedAgent, canisterId: getCanisterId() });
+}
+
+/** Test seam: forces the next call to build a fresh agent. */
+export function _resetBriefingAgent(): void {
+  cachedAgent = null;
 }
 
 /** The on-chain briefingScore carries a recency-decay factor (exp(-λ·age),

@@ -84,15 +84,20 @@ interface WindowEntry {
 const MAX_WINDOW_ENTRIES = 10_000;
 const windows = new Map<string, WindowEntry>();
 
-let cleanupTimer: ReturnType<typeof setInterval> | null = null;
-if (typeof setInterval !== "undefined") {
-  cleanupTimer = setInterval(() => {
-    const now = Date.now();
-    windows.forEach((entry, key) => {
-      if (now >= entry.resetAt) windows.delete(key);
-    });
-  }, 60_000);
-  if (typeof cleanupTimer === "object" && "unref" in cleanupTimer) cleanupTimer.unref();
+// Expired windows are swept when the limiter next runs, not on a timer. The
+// module-scope setInterval that used to do this armed itself in every function
+// instance at import time — waking each one every 60s for the lifetime of the
+// instance, whether or not it ever rate-limited anything. Sweeping inline is
+// the same work at the same frequency, but only in instances doing the work.
+const CLEANUP_INTERVAL_MS = 60_000;
+let lastCleanupAt = Date.now();
+
+function sweepExpiredWindows(now: number): void {
+  if (now - lastCleanupAt < CLEANUP_INTERVAL_MS) return;
+  lastCleanupAt = now;
+  windows.forEach((entry, key) => {
+    if (now >= entry.resetAt) windows.delete(key);
+  });
 }
 
 function getClientIP(request: NextRequest): string {
@@ -107,10 +112,7 @@ function getClientIP(request: NextRequest): string {
 
 export function _resetRateLimits(): void {
   windows.clear();
-  if (cleanupTimer) {
-    clearInterval(cleanupTimer);
-    cleanupTimer = null;
-  }
+  lastCleanupAt = Date.now();
 }
 
 function inMemoryRateLimitByKey(
@@ -121,6 +123,7 @@ function inMemoryRateLimitByKey(
 ): NextResponse | null {
   const bucketKey = `key:${key}`;
   const now = Date.now();
+  sweepExpiredWindows(now);
   const entry = windows.get(bucketKey);
 
   if (!entry || now >= entry.resetAt) {
@@ -211,6 +214,7 @@ export async function distributedGuardAndParse<T = Record<string, unknown>>(
 export function rateLimit(request: NextRequest, limit = 30, windowMs = 60_000): NextResponse | null {
   const ip = getClientIP(request);
   const now = Date.now();
+  sweepExpiredWindows(now);
   const entry = windows.get(ip);
 
   if (!entry || now >= entry.resetAt) {

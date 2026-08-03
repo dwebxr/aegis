@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import { Principal } from "@dfinity/principal";
 import { errMsg } from "@/lib/utils/errors";
 import { getLatestBriefing, getGlobalBriefingSummaries } from "@/lib/d2a/briefingProvider";

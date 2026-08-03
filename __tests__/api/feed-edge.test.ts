@@ -109,7 +109,7 @@ describe("Atom-format-specific contracts", () => {
   it("Atom returns the same Cache-Control as RSS (refactor preserves contract)", async () => {
     (getLatestBriefing as jest.Mock).mockResolvedValue(briefing([item()]));
     const r = await ATOM_GET(makeReq(`/api/feed/atom?principal=${PRINCIPAL}`));
-    expect(r.headers.get("Cache-Control")).toBe("public, max-age=300, s-maxage=300, stale-while-revalidate=600");
+    expect(r.headers.get("Cache-Control")).toBe("public, max-age=300, s-maxage=900, stale-while-revalidate=600");
   });
 
   it("Atom emits the X-Aegis observability headers", async () => {

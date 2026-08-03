@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Principal } from "@dfinity/principal";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@/lib/observability";
 import { distributedRateLimit, parseJsonBody } from "@/lib/api/rateLimit";
 import { generatePushToken, isAllowedPushEndpoint } from "@/lib/api/pushToken";
 import { createServerControllerActorAsync } from "@/lib/ic/actor.server";
