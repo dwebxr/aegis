@@ -98,7 +98,11 @@ describe("featureFlags", () => {
 
   it("default values match the intended production posture (kill switches default ON, x402 free tier default OFF)", () => {
     for (const [envName, val] of Object.entries(process.env)) {
-      if (envName.startsWith("FEATURE_") || envName === "X402_FREE_TIER_ENABLED") {
+      if (
+        envName.startsWith("FEATURE_")
+        || envName === "X402_FREE_TIER_ENABLED"
+        || envName === "OPENPAY_USDC_RAIL_ENABLED"
+      ) {
         void val;
         delete process.env[envName];
       }
@@ -110,5 +114,6 @@ describe("featureFlags", () => {
     expect(snap.briefingAggregation).toBe(true);
     expect(snap.pushSend).toBe(true);
     expect(snap.x402FreeTier).toBe(false);
+    expect(snap.openpayUsdcRail).toBe(false);
   });
 });

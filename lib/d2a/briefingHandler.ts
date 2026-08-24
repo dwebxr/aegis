@@ -10,7 +10,8 @@ import { isFeatureEnabled } from "@/lib/featureFlags";
 const X402_FREE_TIER = isFeatureEnabled("x402FreeTier");
 
 /** Briefing content generation shared by /api/d2a/briefing (x402 v2, USDC on Base)
- *  and /api/d2a/briefing-jpyc (OpenPay x402 v1, JPYC on Polygon).
+ *  and /api/d2a/briefing-jpyc (OpenPay: x402 v1 JPYC on Polygon, plus an opt-in
+ *  USDC-on-Base rail via the OpenPay relay, x402 v1 or v2).
  *
  *  Extracted verbatim from the briefing route's handleGet MINUS the rate-limit
  *  call — each route rate-limits before its own payment gate so unauthenticated

@@ -13,6 +13,12 @@ interface FlagDef {
 
 // Adding a flag? Document the kill-switch behaviour in `description`.
 export const FLAGS = {
+  openpayUsdcRail: {
+    envName: "OPENPAY_USDC_RAIL_ENABLED",
+    defaultValue: false,
+    description: "USDC (Base mainnet) rail on /api/d2a/briefing-jpyc via the OpenPay x402 relay. OFF (default): the route is JPYC-only and never touches the relay or KV. ON also requires OPENPAY_RESOURCE_ID.",
+    scope: "server",
+  },
   x402FreeTier: {
     envName: "X402_FREE_TIER_ENABLED",
     defaultValue: false,

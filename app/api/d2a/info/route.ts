@@ -11,7 +11,8 @@ import {
   X402_RECEIVER,
   X402_SCORE_PRICE,
 } from "@/lib/d2a/x402Env";
-import { OPENPAY_MERCHANT, OPENPAY_URL } from "@/lib/d2a/openpayGate";
+import { openpayConfigError, OPENPAY_URL } from "@/lib/d2a/openpayGate";
+import { usdcRailConfig } from "@/lib/d2a/openpayUsdc";
 import { APP_URL } from "@/lib/config";
 
 // Same registry the ExactEvmScheme paywall settles against — keeps the advertised
@@ -36,6 +37,11 @@ if (SCORE_FREE_ENABLED && IS_PRODUCTION) {
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 60, 60_000);
   if (limited) return limited;
+  const usdc = usdcRailConfig();
+  const openpayEnabled = openpayConfigError() === null;
+  // One truth for "does this deployment take USDC": the rail's own config AND
+  // the shared OpenPay gate, so x402Versions and rails.usdc.enabled agree.
+  const usdcLive = usdc.enabled && openpayEnabled;
 
   const res = NextResponse.json({
     name: "Aegis",
@@ -100,14 +106,40 @@ export async function GET(request: NextRequest) {
         method: "GET",
         // "unavailable" (not "none") when the merchant is unset: unlike briefing's
         // free-when-unset fallback, this route serves nothing without its gate (503).
-        auth: OPENPAY_MERCHANT ? "x402" : "unavailable",
+        auth: openpayEnabled ? "x402" : "unavailable",
         x402Version: 1,
+        x402Versions: usdcLive ? [1, 2] : [1],
         network: "eip155:137",
         currency: "JPYC",
         price: "per OpenPay catalog — the 402 accepts payload is authoritative",
         facilitator: OPENPAY_URL,
         description:
-          "JPYC-paid curated briefing via OpenPay (OpenPay-flavored x402 v1 EIP-3009 authorization; vanilla x402 clients are not compatible). Same content and params as /api/d2a/briefing.",
+          "JPYC-paid curated briefing via OpenPay (OpenPay-flavored x402 v1 EIP-3009 authorization; vanilla x402 clients are not compatible on the JPYC rail). USDC (Base mainnet) rail via the OpenPay relay when enabled — vanilla x402 v2 clients are supported there. Same content and params as /api/d2a/briefing.",
+        rails: {
+          jpyc: {
+            network: "eip155:137",
+            currency: "JPYC",
+            x402Versions: [1],
+            enabled: openpayEnabled,
+            request: "X-PAYMENT (OpenPay-flavored x402 v1)",
+            response: "X-PAYMENT-RESPONSE",
+          },
+          usdc: {
+            network: "eip155:8453",
+            currency: "USD Coin",
+            x402Versions: [1, 2],
+            enabled: usdcLive,
+            ...(usdcLive
+              ? {}
+              : { reason: usdc.enabled ? (openpayConfigError() ?? "OpenPay gate unavailable") : usdc.reason }),
+            via: "OpenPay x402 relay (CDP)",
+            request:
+              "PAYMENT-SIGNATURE (x402 v2) or X-PAYMENT with network 'base' (x402 v1)",
+            response: "PAYMENT-RESPONSE / X-PAYMENT-RESPONSE",
+            price:
+              "per OpenPay relay requirements — the 402 PAYMENT-REQUIRED header is authoritative",
+          },
+        },
         params: {
           principal: "(optional) IC principal — returns that contributor's FULL briefing (content, sourceUrl, reason, full scores). Omitted → global ranked INDEX (topItems: title/sourceUrl/topics/score/verdict; sourceUrl redacted under preview); take principals from contributors[].principal",
           since: "(optional) ISO 8601 — exclude briefings generated before this timestamp",
@@ -151,7 +183,8 @@ export async function GET(request: NextRequest) {
     },
     compatibility: {
       x402Version: 2,
-      // OpenPay-gated endpoints speak x402 v1 (OpenPay-flavored); everything else v2.
+      // briefing-jpyc also speaks v2 when its USDC rail is enabled; consult
+      // endpoints.briefingJpyc.x402Versions for the deployment's live versions.
       x402V1Endpoints: ["/api/d2a/briefing-jpyc"],
     },
   });

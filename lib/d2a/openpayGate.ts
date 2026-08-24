@@ -60,6 +60,10 @@ export function openpayConfigError(): string | null {
   return null;
 }
 
+export function isEvmAddress(s: unknown): s is string {
+  return typeof s === "string" && /^0x[0-9a-fA-F]{40}$/.test(s);
+}
+
 export interface OpenPayAccept {
   scheme: string;
   network: string;
@@ -76,7 +80,7 @@ export interface OpenPayAccept {
 
 /** Normalize for resource-identity comparison: lowercase scheme+host, strip
  *  trailing slashes and query/hash. Returns null for unparseable URLs. */
-function normalizeResource(raw: unknown): string | null {
+export function normalizeResource(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   let url: URL;
   try {
@@ -175,8 +179,14 @@ export async function fetchAccepts(): Promise<OpenPayAccept[] | null> {
   return accepts;
 }
 
-export function json402(accepts: OpenPayAccept[], error: string): NextResponse {
-  return NextResponse.json({ x402Version: 1, accepts, error }, { status: 402 });
+export function json402(
+  accepts: OpenPayAccept[],
+  error: string,
+  paymentRequiredHeader?: string,
+): NextResponse {
+  const response = NextResponse.json({ x402Version: 1, accepts, error }, { status: 402 });
+  if (paymentRequiredHeader) response.headers.set("PAYMENT-REQUIRED", paymentRequiredHeader);
+  return response;
 }
 
 export type ParsedPayment =

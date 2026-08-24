@@ -266,22 +266,25 @@ paths:
   /api/d2a/briefing-jpyc:
     get:
       tags: [D2A]
-      summary: JPYC-paid curated briefing via OpenPay (x402 v1, Polygon)
+      summary: JPYC or opt-in USDC-paid curated briefing via OpenPay
       description: |
-        Same content and parameters as `/api/d2a/briefing`, but paid in
-        JPYC on Polygon (`eip155:137`) through the OpenPay gateway
-        (https://open-pay.jp). Speaks **x402 v1 with an OpenPay-flavored
-        EIP-3009 authorization — vanilla x402 clients are not
-        compatible.** Payment requirements come from the OpenPay catalog
-        (the 402 `accepts` payload is authoritative; prices may change
-        without notice). Settlement only happens after content is
-        successfully built — failed requests are never charged. When
-        `X402_FREE_TIER_ENABLED` is `true`, `?preview=true` returns a
-        truncated payload without payment.
+        Same content and parameters as `/api/d2a/briefing`. The unchanged JPYC
+        rail uses OpenPay-flavored x402 v1 on Polygon (`eip155:137`); vanilla
+        x402 clients are not compatible on that rail. An opt-in USDC rail uses
+        the OpenPay relay on Base mainnet and accepts either x402 v2
+        `PAYMENT-SIGNATURE` or x402 v1 `X-PAYMENT` with network `base`.
+        A USDC challenge can advertise up to two accepts (JPYC then USDC), and
+        its `PAYMENT-REQUIRED` header is the authoritative x402 v2 requirement.
+        Content is built before settlement. After a settle attempt, a 402 is
+        returned only when an allowlisted reason establishes that no funds were
+        broadcast; indeterminate outcomes return 503 for reconciliation. When
+        `X402_FREE_TIER_ENABLED` is `true`, `?preview=true` returns a truncated
+        payload without payment.
       operationId: getD2ABriefingJpyc
       security:
         - {}
         - openPayX402: []
+        - x402: []
       parameters:
         - name: principal
           in: query
@@ -329,6 +332,16 @@ paths:
           description: >
             Per-user or global briefing. Paid responses carry an
             `X-PAYMENT-RESPONSE` header (base64 OpenPay settle receipt).
+            USDC x402 v2 responses also carry `PAYMENT-RESPONSE`.
+          headers:
+            X-PAYMENT-RESPONSE:
+              description: >
+                Base64 settle receipt. JPYC: the OpenPay facilitator settle
+                result. USDC: `{success, transaction, network, payer}` only.
+              schema:
+                type: string
+            PAYMENT-RESPONSE:
+              $ref: '#/components/headers/PaymentResponse'
           content:
             application/json:
               schema:
@@ -339,9 +352,22 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '402':
           description: >
-            OpenPay x402 v1 payment required — body is
-            `{x402Version: 1, accepts, error}` where `accepts` holds the
-            single validated OpenPay payment requirement.
+            Payment required or a definitely-unbroadcast verify/settle
+            rejection. The error is `payment_required`,
+            `invalid_payment_payload`, `ambiguous_payment`,
+            `payment_requirements_mismatch`, or an OpenPay rejection reason
+            such as `insufficient_funds`, `invalid_signature`,
+            `invalid_payment_requirements`, `invalid_scheme`,
+            `invalid_network`, `payment_expired`,
+            `invalid_exact_evm_payload_authorization_valid_after`,
+            `invalid_exact_evm_payload_authorization_valid_before`,
+            `invalid_exact_evm_payload_authorization_value`,
+            `invalid_exact_evm_payload_signature`,
+            `invalid_exact_evm_payload_recipient_mismatch`,
+            `unsupported_scheme`, or `unsupported_network`.
+          headers:
+            PAYMENT-REQUIRED:
+              $ref: '#/components/headers/PaymentRequired'
           content:
             application/json:
               schema:
@@ -353,10 +379,17 @@ paths:
                     enum: [1]
                   accepts:
                     type: array
+                    maxItems: 2
                     items:
                       type: object
                   error:
                     type: string
+        '409':
+          description: The USDC authorization was already settled (`payment_already_used`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: No briefing available for principal, or no global briefings.
           content:
@@ -371,7 +404,17 @@ paths:
           description: >
             OpenPay gate unavailable — merchant not configured, catalog
             unreachable, or this resource not (yet) registered in the
-            OpenPay catalog.
+            OpenPay catalog. USDC-specific failures include
+            `payment_in_progress`, `verification_unavailable`,
+            `settlement_unknown`, `settlement_deadline_exceeded`, and
+            `OpenPay USDC rail not available`. Clients may retry only when a
+            `Retry-After` header is present; unknown settlement states require
+            operator reconciliation.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                description: Seconds to wait before retrying when retry is safe.
           content:
             application/json:
               schema:
@@ -1443,7 +1486,8 @@ components:
       description: |
         Base64 x402 v2 payment payload (see https://x402.org). Applies to
         `/api/d2a/briefing`, `/api/d2a/briefing/changes`, and
-        `/api/d2a/score` when their payment gates are enabled. Briefing
+        `/api/d2a/score` when their payment gates are enabled, plus the opt-in
+        USDC rail on `/api/d2a/briefing-jpyc`. Briefing
         preview routes can bypass payment when their free tier is enabled;
         score requires payment in production.
     openPayX402:
@@ -1451,8 +1495,8 @@ components:
       in: header
       name: X-PAYMENT
       description: >
-        OpenPay-flavored x402 v1 payment payload for
-        `/api/d2a/briefing-jpyc` on Polygon.
+        OpenPay-flavored x402 v1 payment payload for the JPYC rail on Polygon
+        (the same header carries the USDC v1 payload when network is `base`).
 
   headers:
     PaymentRequired:
