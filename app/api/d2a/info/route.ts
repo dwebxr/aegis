@@ -11,11 +11,7 @@ import {
   X402_RECEIVER,
   X402_SCORE_PRICE,
 } from "@/lib/d2a/x402Env";
-import {
-  openpayConfigError,
-  OPENPAY_MERCHANT,
-  OPENPAY_URL,
-} from "@/lib/d2a/openpayGate";
+import { openpayConfigError, OPENPAY_URL } from "@/lib/d2a/openpayGate";
 import { usdcRailConfig } from "@/lib/d2a/openpayUsdc";
 import { APP_URL } from "@/lib/config";
 
