@@ -416,6 +416,32 @@ describe("OFF regression", () => {
     expect(relayCalls(fetchMock)).toHaveLength(0);
     expect(mockOpenpayPaymentKV.get).not.toHaveBeenCalled();
   });
+
+  it("keeps the legacy gate's merchant check (non-empty only) when the flag is off", async () => {
+    // The old route only required a non-empty merchant; the USDC rail's stricter
+    // address-format check must not turn a working JPYC deployment into a 503.
+    delete process.env.OPENPAY_USDC_RAIL_ENABLED;
+    process.env.OPENPAY_MERCHANT_ADDRESS = "not-an-address";
+    const fetchMock = installFetchMock();
+    const { GET } = await loadRoute();
+    const res = await GET(makeRequest());
+    // Discovery is consulted (legacy path); the catalog merchant simply fails
+    // to match, which the legacy gate reports as the resource being unavailable.
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("OpenPay resource not available");
+    expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/api/discovery"))).toBe(true);
+    expect(relayCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("disables only the USDC rail when the merchant is not an address", async () => {
+    process.env.OPENPAY_MERCHANT_ADDRESS = "not-an-address";
+    const fetchMock = installFetchMock();
+    const { GET, usdc } = await loadRoute();
+    expect(usdc.usdcRailConfig()).toEqual({ enabled: false, reason: "merchant address malformed" });
+    await GET(makeRequest({ "payment-signature": makeV2Header() }));
+    expect(fetchMock.mock.calls.some(call => String(call[0]).includes("/relay/requirements"))).toBe(false);
+    expect(mockOpenpayPaymentKV.get).not.toHaveBeenCalled();
+  });
 });
 
 describe("challenge and face validation", () => {
@@ -547,6 +573,22 @@ describe("challenge and face validation", () => {
     now += 31_000;
     await GET(makeRequest());
     expect(fetchMock.mock.calls.filter(call => String(call[0]).includes("/requirements"))).toHaveLength(2);
+  });
+
+  it("treats a pathologically nested requirements response as no face, not a 500", async () => {
+    const face = makeFace();
+    let nested: Record<string, unknown> = { name: "USD Coin", version: "2" };
+    for (let i = 0; i < 200; i++) nested = { deeper: nested };
+    face.v2Accept = { ...face.v2Accept, extra: nested };
+    face.paymentRequiredHeader = requiredHeader(face.v2Accept);
+    installFetchMock({ requirements: () => jsonResponse(face) });
+    const { GET } = await loadRoute();
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(402);
+    expect((await res.json()).accepts).toHaveLength(1);
+    expect(res.headers.get("PAYMENT-REQUIRED")).toBeNull();
+    expect(res.headers.get("Cache-Control")).toBe("no-store, private");
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("validation threw"));
   });
 
   it("caches a valid face for five minutes", async () => {
@@ -920,6 +962,30 @@ describe("verify, content, deadline, and settlement", () => {
     expect(mockOpenpayPaymentKV.set.mock.calls.filter(call => String(call[0]).endsWith(":state"))).toHaveLength(0);
   });
 
+  it("re-checks the deadline after a slow claim: no settle, record becomes rejected", async () => {
+    // The claim is a KV round-trip with no timeout of its own. If it is the
+    // step that eats the budget, settle must still not start.
+    let now = 1_000_000;
+    jest.spyOn(Date, "now").mockImplementation(() => now);
+    const fetchMock = installFetchMock();
+    const { GET, usdc } = await loadRoute();
+    const originalSet = mockOpenpayPaymentKV.set.getMockImplementation()!;
+    mockOpenpayPaymentKV.set.mockImplementation(async (key, value, options) => {
+      if (key.endsWith(":state") && options?.nx) now += 41_000;
+      return originalSet(key, value, options);
+    });
+    const auth = makeAuthorization({ validBefore: String(Math.floor(now / 1000) + 200) });
+    const res = await GET(makeRequest({ "payment-signature": makeV2Header({ auth }) }));
+    mockOpenpayPaymentKV.set.mockImplementation(originalSet);
+    expect(res.status).toBe(503);
+    expect((await res.json()).reason).toBe("settlement_deadline_exceeded");
+    expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/relay/settle"))).toBe(false);
+    expect(mockOpenpayStore.get(`${usdc.paymentIdentity(auth)}:state`)).toEqual(
+      expect.objectContaining({ status: "rejected", reason: "settlement_deadline_exceeded" }),
+    );
+    expect(mockOpenpayStore.has(`${usdc.paymentIdentity(auth)}:lock`)).toBe(false);
+  });
+
   it.each([
     ["v2", "payment-signature", makeV2Header(), true],
     ["v1", "x-payment", makeV1Header(), false],
@@ -968,6 +1034,23 @@ describe("verify, content, deadline, and settlement", () => {
     );
   });
 
+  it("accepts a checksum-cased payer that differs from the authorization's casing", async () => {
+    // Authorization signed with an all-lowercase `from`; the relay reports the
+    // payer in EIP-55 checksum casing. Same address, different bytes.
+    const lowerFrom = FROM.toLowerCase();
+    expect(lowerFrom).not.toBe(FROM);
+    installFetchMock({
+      relaySettle: () => jsonResponse({ success: true, transaction: TRANSACTION, network: "eip155:8453", payer: FROM }),
+    });
+    const { GET } = await loadRoute();
+    const auth = makeAuthorization({ from: lowerFrom });
+    const res = await GET(makeRequest({ "payment-signature": makeV2Header({ auth }) }));
+    expect(res.status).toBe(200);
+    const receipt = JSON.parse(Buffer.from(res.headers.get("PAYMENT-RESPONSE")!, "base64").toString("utf8"));
+    expect(receipt).toEqual({ success: true, transaction: TRANSACTION, network: "eip155:8453", payer: FROM });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
   const unknownSettles: Array<[string, FetchHandler]> = [
     ["nonce already used", () => jsonResponse({ success: false, errorReason: "nonce_already_used" })],
     ["duplicate", () => jsonResponse({ success: false, errorReason: "duplicate_settlement" })],
@@ -1009,7 +1092,7 @@ describe("verify, content, deadline, and settlement", () => {
   it.each(["null", "throw"] as const)("delivers content when final state write returns %s", async (mode) => {
     mockKvControl.finalWrite = mode;
     const fetchMock = installFetchMock();
-    const { GET } = await loadRoute();
+    const { GET, usdc } = await loadRoute();
     const header = makeV2Header();
     const first = await GET(makeRequest({ "payment-signature": header }));
     expect(first.status).toBe(200);
@@ -1017,8 +1100,14 @@ describe("verify, content, deadline, and settlement", () => {
       "[openpay-usdc] state write failed",
       expect.objectContaining({ level: "error" }),
     );
+    // The durable `pending` claim alone must fence a retry — drop the 150s lock
+    // so the assertion does not pass merely because the lock is still held.
+    const identity = usdc.paymentIdentity(makeAuthorization());
+    mockOpenpayStore.delete(`${identity}:lock`);
+    expect(mockOpenpayStore.get(`${identity}:state`)).toEqual(expect.objectContaining({ status: "pending" }));
     const second = await GET(makeRequest({ "payment-signature": header }));
     expect(second.status).toBe(503);
+    expect((await second.json()).reason).toBe("payment_in_progress");
     expect(fetchMock.mock.calls.filter(call => String(call[0]).endsWith("/relay/settle"))).toHaveLength(1);
   });
 

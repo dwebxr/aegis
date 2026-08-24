@@ -240,20 +240,38 @@ describe("GET /api/d2a/info with the USDC rail configured", () => {
     jest.resetModules();
   });
 
-  it("advertises v1/v2 while keeping the rail disabled when the merchant is missing", async () => {
-    process.env.OPENPAY_USDC_RAIL_ENABLED = "true";
-    process.env.OPENPAY_RESOURCE_ID = "158883b0-b76d-432d-a89e-577b583a0f5d";
-    delete process.env.OPENPAY_MERCHANT_ADDRESS;
+  async function freshInfo() {
     jest.resetModules();
     const { GET: freshGET } = await import("@/app/api/d2a/info/route");
     const freshRateLimit = await import("@/lib/api/rateLimit");
     freshRateLimit._resetRateLimits();
-
     const res = await freshGET(makeRequest());
-    const data = await res.json();
-    expect(data.endpoints.briefingJpyc.x402Versions).toEqual([1, 2]);
-    expect(data.endpoints.briefingJpyc.rails.usdc.enabled).toBe(false);
-    expect(data.endpoints.briefingJpyc.rails.usdc.reason).toBeUndefined();
+    return (await res.json()).endpoints.briefingJpyc;
+  }
+
+  it("does not advertise v2 while the rail is disabled for a missing merchant (one truth)", async () => {
+    process.env.OPENPAY_USDC_RAIL_ENABLED = "true";
+    process.env.OPENPAY_RESOURCE_ID = "158883b0-b76d-432d-a89e-577b583a0f5d";
+    delete process.env.OPENPAY_MERCHANT_ADDRESS;
+
+    const jpyc = await freshInfo();
+    expect(jpyc.x402Versions).toEqual([1]);
+    expect(jpyc.rails.usdc.enabled).toBe(false);
+    expect(jpyc.rails.usdc.reason).toBe("merchant address malformed");
+    expect(jpyc.rails.jpyc.enabled).toBe(false);
+  });
+
+  it("advertises v1/v2 and an enabled USDC rail when fully configured", async () => {
+    process.env.OPENPAY_USDC_RAIL_ENABLED = "true";
+    process.env.OPENPAY_RESOURCE_ID = "158883b0-b76d-432d-a89e-577b583a0f5d";
+    process.env.OPENPAY_MERCHANT_ADDRESS = "0x52d4901142e2B5680027da5EB47C86CB02a3cA81";
+
+    const jpyc = await freshInfo();
+    expect(jpyc.x402Versions).toEqual([1, 2]);
+    expect(jpyc.rails.usdc.enabled).toBe(true);
+    expect(jpyc.rails.usdc.reason).toBeUndefined();
+    expect(jpyc.rails.usdc.x402Versions).toEqual([1, 2]);
+    expect(jpyc.rails.jpyc.enabled).toBe(true);
   });
 });
 

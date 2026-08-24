@@ -334,6 +334,12 @@ paths:
             `X-PAYMENT-RESPONSE` header (base64 OpenPay settle receipt).
             USDC x402 v2 responses also carry `PAYMENT-RESPONSE`.
           headers:
+            X-PAYMENT-RESPONSE:
+              description: >
+                Base64 settle receipt. JPYC: the OpenPay facilitator settle
+                result. USDC: `{success, transaction, network, payer}` only.
+              schema:
+                type: string
             PAYMENT-RESPONSE:
               $ref: '#/components/headers/PaymentResponse'
           content:

@@ -57,7 +57,6 @@ function isAllowedFacilitatorUrl(raw: string): boolean {
 export function openpayConfigError(): string | null {
   if (!isAllowedFacilitatorUrl(OPENPAY_URL)) return "OpenPay URL misconfigured";
   if (!OPENPAY_MERCHANT) return "OpenPay merchant not configured";
-  if (!isEvmAddress(OPENPAY_MERCHANT)) return "OpenPay merchant misconfigured";
   return null;
 }
 

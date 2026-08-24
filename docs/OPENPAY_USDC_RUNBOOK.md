@@ -4,7 +4,7 @@
 
 ## 状態と KV
 
-状態機械は `none → pending → settled | rejected | unknown` です。`pending` が 150 秒以上経過した場合は orphan と扱い、自動 settle や自動再試行はしません。
+状態機械は `none → pending → settled | rejected | unknown` です。`rejected` は「何も broadcast されていない」確定状態なので、同じ authorization の再試行で `rejected → pending` に戻れます (settle 直前に deadline を超えた場合も `rejected` になります)。`pending` が 150 秒以上経過した場合は orphan と扱い、自動 settle や自動再試行はしません。
 
 - 状態: `aegis:openpay:<id>:state`（90 日 TTL）
 - 排他ロック: `aegis:openpay:<id>:lock`（150 秒 TTL）

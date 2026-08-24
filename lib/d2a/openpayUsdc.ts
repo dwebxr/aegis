@@ -48,6 +48,13 @@ export function usdcRailConfig():
   if (!RESOURCE_ID_PATTERN.test(OPENPAY_RESOURCE_ID)) {
     return { enabled: false, reason: "resource id missing or malformed" };
   }
+  // The JPYC gate only requires a non-empty merchant (its catalog match is
+  // string equality). USDC pins payTo to this value, so it must be an address —
+  // checked here rather than in openpayConfigError so the flag-OFF route keeps
+  // its exact previous behaviour.
+  if (!isEvmAddress(OPENPAY_MERCHANT)) {
+    return { enabled: false, reason: "merchant address malformed" };
+  }
   if (!isEvmAddress(OPENPAY_USDC_ASSET)) {
     return { enabled: false, reason: "usdc asset malformed" };
   }
@@ -92,11 +99,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
+// Requirements come from the network; a deeply nested `extra` or accepts entry
+// must not be able to overflow the stack and escape validation as a 500.
+const MAX_CANONICAL_DEPTH = 32;
+
+function canonicalize(value: unknown, depth = 0): unknown {
+  if (depth > MAX_CANONICAL_DEPTH) throw new RangeError("requirements nested too deeply");
+  if (Array.isArray(value)) return value.map(item => canonicalize(item, depth + 1));
   if (!isPlainObject(value)) return value;
   const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(value).sort()) sorted[key] = canonicalize(value[key]);
+  for (const key of Object.keys(value).sort()) sorted[key] = canonicalize(value[key], depth + 1);
   return sorted;
 }
 
@@ -239,7 +251,13 @@ async function loadUsdcFace(): Promise<UsdcFace | null> {
   } catch {
     return rejectFace("requirements body is not JSON");
   }
-  return validateFace(data);
+  try {
+    return validateFace(data);
+  } catch (err) {
+    // Validation is fail-closed: a throw on hostile input means "no USDC face",
+    // never a 500 that would skip the route's no-store/CORS wrapper.
+    return rejectFace(`validation threw: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 export async function fetchUsdcFace(): Promise<UsdcFace | null> {

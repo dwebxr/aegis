@@ -55,6 +55,9 @@ const SETTLE_DEADLINE_MS = 40_000;
  *  attempt, 402 is returned only for allowlisted, definitely-unbroadcast failures.
  */
 async function handleGet(request: NextRequest): Promise<NextResponse> {
+  // The settle deadline is measured from function entry: the rate-limit KV
+  // round-trip below is part of the 60s budget too.
+  const startedAt = Date.now();
   const limited = await distributedRateLimit(request, 30, 60);
   if (limited) return limited;
 
@@ -83,6 +86,7 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
       "usdc-v2",
       { paymentSignatureHeader: signatureHeader },
       parseV2PaymentHeader(signatureHeader),
+      startedAt,
     );
   }
   if (paymentHeader) {
@@ -93,6 +97,7 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
         "usdc-v1",
         { paymentHeader },
         parsed,
+        startedAt,
       );
     }
     return handleJpycLegacy(request);
@@ -165,8 +170,8 @@ async function handleUsdc(
   rail: Rail,
   input: RelayInput,
   parsed: ParsedPayment,
+  startedAt: number,
 ): Promise<NextResponse> {
-  const startedAt = Date.now();
   if (!parsed.ok) {
     logUsdcEvent(rail, "match", "rejected", startedAt, undefined, parsed.error);
     return json402([], "invalid_payment_payload");
@@ -295,6 +300,32 @@ async function handleUsdc(
     return retryResponse(10);
   }
   logUsdcEvent(rail, "claim", "claimed", startedAt, identity);
+
+  // KV round-trips are not time-bounded, so re-check right before funds can
+  // move: a slow claim must not push settle past the function budget, where a
+  // kill mid-settle would leave money moved and nothing recorded or delivered.
+  // Nothing was broadcast, so the record becomes `rejected` (retry allowed).
+  if (Date.now() - startedAt > SETTLE_DEADLINE_MS) {
+    await writePaymentState(identity, {
+      status: "rejected",
+      at: Date.now(),
+      reason: "settlement_deadline_exceeded",
+    });
+    await releaseLock(identity);
+    logUsdcEvent(
+      rail,
+      "deadline",
+      "exceeded_after_claim",
+      startedAt,
+      identity,
+      "settlement_deadline_exceeded",
+    );
+    return unavailableResponse(
+      "settlement_deadline_exceeded",
+      "settlement_deadline_exceeded",
+      5,
+    );
+  }
 
   const settlement = await relaySettle(input, auth);
   if (settlement.ok) {

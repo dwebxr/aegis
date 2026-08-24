@@ -43,6 +43,9 @@ export async function GET(request: NextRequest) {
   if (limited) return limited;
   const usdc = usdcRailConfig();
   const openpayEnabled = openpayConfigError() === null;
+  // One truth for "does this deployment take USDC": the rail's own config AND
+  // the shared OpenPay gate, so x402Versions and rails.usdc.enabled agree.
+  const usdcLive = usdc.enabled && openpayEnabled;
 
   const res = NextResponse.json({
     name: "Aegis",
@@ -109,7 +112,7 @@ export async function GET(request: NextRequest) {
         // free-when-unset fallback, this route serves nothing without its gate (503).
         auth: OPENPAY_MERCHANT ? "x402" : "unavailable",
         x402Version: 1,
-        x402Versions: usdc.enabled ? [1, 2] : [1],
+        x402Versions: usdcLive ? [1, 2] : [1],
         network: "eip155:137",
         currency: "JPYC",
         price: "per OpenPay catalog — the 402 accepts payload is authoritative",
@@ -129,7 +132,7 @@ export async function GET(request: NextRequest) {
             network: "eip155:8453",
             currency: "USD Coin",
             x402Versions: [1, 2],
-            enabled: usdc.enabled && openpayEnabled,
+            enabled: usdcLive,
             ...(usdc.enabled ? {} : { reason: usdc.reason }),
             via: "OpenPay x402 relay (CDP)",
             request:
