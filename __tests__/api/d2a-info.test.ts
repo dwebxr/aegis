@@ -217,6 +217,9 @@ describe("GET /api/d2a/info", () => {
     expect(jpyc.price).toContain("OpenPay catalog");
     expect(jpyc.facilitator).toBe("https://open-pay.jp");
     expect(jpyc.description).toContain("vanilla x402 clients are not compatible");
+    expect(jpyc.x402Versions).toEqual([1]);
+    expect(jpyc.rails.usdc.enabled).toBe(false);
+    expect(jpyc.rails.usdc.reason).toBe("flag off");
   });
 
   it("marks x402 versions per endpoint and lists v1 endpoints in compatibility", async () => {
@@ -226,6 +229,31 @@ describe("GET /api/d2a/info", () => {
     expect(data.endpoints.changes.x402Version).toBe(2);
     expect(data.compatibility.x402Version).toBe(2);
     expect(data.compatibility.x402V1Endpoints).toEqual(["/api/d2a/briefing-jpyc"]);
+  });
+});
+
+describe("GET /api/d2a/info with the USDC rail configured", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("advertises v1/v2 while keeping the rail disabled when the merchant is missing", async () => {
+    process.env.OPENPAY_USDC_RAIL_ENABLED = "true";
+    process.env.OPENPAY_RESOURCE_ID = "158883b0-b76d-432d-a89e-577b583a0f5d";
+    delete process.env.OPENPAY_MERCHANT_ADDRESS;
+    jest.resetModules();
+    const { GET: freshGET } = await import("@/app/api/d2a/info/route");
+    const freshRateLimit = await import("@/lib/api/rateLimit");
+    freshRateLimit._resetRateLimits();
+
+    const res = await freshGET(makeRequest());
+    const data = await res.json();
+    expect(data.endpoints.briefingJpyc.x402Versions).toEqual([1, 2]);
+    expect(data.endpoints.briefingJpyc.rails.usdc.enabled).toBe(false);
+    expect(data.endpoints.briefingJpyc.rails.usdc.reason).toBeUndefined();
   });
 });
 
