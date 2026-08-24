@@ -340,6 +340,7 @@ beforeEach(() => {
   // The rail refuses to advertise without KV (every state read fails closed).
   // The namespace itself is mocked above; only the presence check reads this.
   process.env.KV_REST_API_URL = "https://kv.example.test";
+  process.env.KV_REST_API_TOKEN = "kv-token";
   delete process.env.OPENPAY_URL;
   delete process.env.OPENPAY_RESOURCE_URL;
   delete process.env.OPENPAY_USDC_ASSET;
@@ -437,8 +438,12 @@ describe("OFF regression", () => {
     expect(relayCalls(fetchMock)).toHaveLength(0);
   });
 
-  it("does not advertise USDC without KV — every payment would 503 before settle", async () => {
-    delete process.env.KV_REST_API_URL;
+  it.each([
+    ["URL missing", () => { delete process.env.KV_REST_API_URL; }],
+    ["token missing", () => { delete process.env.KV_REST_API_TOKEN; }],
+    ["token blank", () => { process.env.KV_REST_API_TOKEN = "   "; }],
+  ])("does not advertise USDC without KV (%s) — every payment would 503 before settle", async (_name, breakKv) => {
+    breakKv();
     const fetchMock = installFetchMock();
     const { GET, usdc } = await loadRoute();
     expect(usdc.usdcRailConfig()).toEqual({ enabled: false, reason: "kv not configured" });
@@ -1072,6 +1077,9 @@ describe("verify, content, deadline, and settlement", () => {
     // An allowlisted reason next to a transaction hash contradicts itself.
     ["allowlisted reason with broadcast evidence", () => jsonResponse({ success: false, errorReason: "insufficient_funds", transaction: TRANSACTION })],
     ["allowlisted reason with txHash", () => jsonResponse({ success: false, errorReason: "invalid_signature", txHash: TRANSACTION })],
+    ["allowlisted reason with transactionHash", () => jsonResponse({ success: false, errorReason: "insufficient_funds", transactionHash: TRANSACTION })],
+    ["allowlisted reason with hash", () => jsonResponse({ success: false, errorReason: "insufficient_funds", hash: TRANSACTION })],
+    ["allowlisted reason with receipt", () => jsonResponse({ success: false, errorReason: "insufficient_funds", receipt: { status: "0x1" } })],
     ["duplicate", () => jsonResponse({ success: false, errorReason: "duplicate_settlement" })],
     ["empty reason", () => jsonResponse({ success: false, errorReason: "" })],
     ["non-2xx", () => jsonResponse({ success: true, transaction: TRANSACTION, network: "base", payer: FROM }, 502)],

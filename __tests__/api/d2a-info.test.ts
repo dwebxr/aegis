@@ -266,6 +266,7 @@ describe("GET /api/d2a/info with the USDC rail configured", () => {
     process.env.OPENPAY_RESOURCE_ID = "158883b0-b76d-432d-a89e-577b583a0f5d";
     process.env.OPENPAY_MERCHANT_ADDRESS = "0x52d4901142e2B5680027da5EB47C86CB02a3cA81";
     process.env.KV_REST_API_URL = "https://kv.example.test";
+    process.env.KV_REST_API_TOKEN = "kv-token";
 
     const jpyc = await freshInfo();
     expect(jpyc.x402Versions).toEqual([1, 2]);
@@ -280,6 +281,7 @@ describe("GET /api/d2a/info with the USDC rail configured", () => {
     process.env.OPENPAY_RESOURCE_ID = "158883b0-b76d-432d-a89e-577b583a0f5d";
     process.env.OPENPAY_MERCHANT_ADDRESS = "0x52d4901142e2B5680027da5EB47C86CB02a3cA81";
     process.env.KV_REST_API_URL = "https://kv.example.test";
+    process.env.KV_REST_API_TOKEN = "kv-token";
     process.env.OPENPAY_URL = "ftp://open-pay.jp";
 
     const jpyc = await freshInfo();

@@ -75,8 +75,9 @@ export function usdcRailConfig():
   }
   // The rail fails closed on every KV read, so without KV every payment would
   // 503 before settle. Better not to advertise USDC at all than to advertise a
-  // rail nobody can pay on. Same variable getRawKV() keys on.
-  if (!process.env.KV_REST_API_URL?.trim()) {
+  // rail nobody can pay on. getRawKV() only checks the URL, but @vercel/kv
+  // itself needs the token too — a URL without a token throws on first use.
+  if (!process.env.KV_REST_API_URL?.trim() || !process.env.KV_REST_API_TOKEN?.trim()) {
     return { enabled: false, reason: "kv not configured" };
   }
   return { enabled: true };
