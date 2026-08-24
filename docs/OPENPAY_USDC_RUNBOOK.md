@@ -27,6 +27,8 @@
 3. unknown/orphan pending の照合手段を用意する。同一署名を OpenPay の状態照会へ渡し、settled なら「返金またはコンテンツ提供」を運営判断し、rejected なら state を削除して同一 authorization の再試行を許可できる。結果が不明な間は state を削除しない。
 4. 少額 1 件を実決済し、asset、amount、payTo、transaction、payer、`PAYMENT-RESPONSE` の内容を照合する。同じ header の再送が 409 になることも確認する。
 
+5. KV (`KV_REST_API_URL` / `KV_REST_API_TOKEN`) が本番に設定されていることを確認する。USDC rail は状態読取を fail-closed にしているため、KV が無いと全支払いが settle 前に 503 になります。`usdcRailConfig()` は KV 未設定なら rail を広告しません (`/api/d2a/info` の `rails.usdc.reason` = `kv not configured`)。
+
 確認後に `OPENPAY_RESOURCE_ID` と `OPENPAY_USDC_RAIL_ENABLED=true` を設定し、通常のレビュー済みデプロイ手順を実行します。
 
 ## ロールバック

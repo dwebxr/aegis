@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
         method: "GET",
         // "unavailable" (not "none") when the merchant is unset: unlike briefing's
         // free-when-unset fallback, this route serves nothing without its gate (503).
-        auth: OPENPAY_MERCHANT ? "x402" : "unavailable",
+        auth: openpayEnabled ? "x402" : "unavailable",
         x402Version: 1,
         x402Versions: usdcLive ? [1, 2] : [1],
         network: "eip155:137",
@@ -133,7 +133,9 @@ export async function GET(request: NextRequest) {
             currency: "USD Coin",
             x402Versions: [1, 2],
             enabled: usdcLive,
-            ...(usdc.enabled ? {} : { reason: usdc.reason }),
+            ...(usdcLive
+              ? {}
+              : { reason: usdc.enabled ? (openpayConfigError() ?? "OpenPay gate unavailable") : usdc.reason }),
             via: "OpenPay x402 relay (CDP)",
             request:
               "PAYMENT-SIGNATURE (x402 v2) or X-PAYMENT with network 'base' (x402 v1)",

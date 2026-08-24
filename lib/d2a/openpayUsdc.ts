@@ -11,6 +11,7 @@ import {
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import * as Sentry from "@/lib/observability";
 import { readCappedText } from "@/lib/utils/httpBody.server";
+import { withTimeout } from "@/lib/utils/timeout";
 
 export const OPENPAY_RESOURCE_ID = process.env.OPENPAY_RESOURCE_ID?.trim() || "";
 const OPENPAY_USDC_ASSET = (
@@ -33,6 +34,10 @@ export const LOCK_TTL_S = 150;
 export const STATE_TTL_S = 90 * 24 * 3600;
 export const MAX_TIMEOUT_SECONDS = 3600;
 export const CLOCK_SKEW_S = 60;
+// A state write after settle must not hold paid content hostage to a stalled
+// KV: the durable `pending` claim already fences a re-settle, so on timeout we
+// report and deliver.
+export const STATE_WRITE_TIMEOUT_MS = 3_000;
 
 const RESOURCE_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -67,6 +72,12 @@ export function usdcRailConfig():
     }
   } catch {
     return { enabled: false, reason: "max amount malformed" };
+  }
+  // The rail fails closed on every KV read, so without KV every payment would
+  // 503 before settle. Better not to advertise USDC at all than to advertise a
+  // rail nobody can pay on. Same variable getRawKV() keys on.
+  if (!process.env.KV_REST_API_URL?.trim()) {
+    return { enabled: false, reason: "kv not configured" };
   }
   return { enabled: true };
 }
@@ -470,7 +481,11 @@ function reportStateWriteFailure(id: string, status: PaymentStatus): void {
 
 export async function writePaymentState(id: string, state: PaymentState): Promise<boolean> {
   try {
-    const result = await openpayPaymentKV.set(`${id}:state`, state, { ex: STATE_TTL_S });
+    const result = await withTimeout(
+      openpayPaymentKV.set(`${id}:state`, state, { ex: STATE_TTL_S }),
+      STATE_WRITE_TIMEOUT_MS,
+      "openpay state write timeout",
+    );
     if (result === "OK") return true;
   } catch {
     // Report below without leaking the authorization or full identity.
@@ -612,10 +627,23 @@ export async function relaySettle(input: RelayInput, auth: UsdcAuthorization): P
     && data?.success === false
     && reason
     && SETTLE_REJECT_ALLOWLIST.has(reason)
+    // A "rejected" reply that also carries a transaction hash or receipt
+    // contradicts itself; funds may have moved, so it is not a definite
+    // rejection whatever the reason string says.
+    && !hasBroadcastEvidence(data)
   ) {
     return { ok: false, error: reason, indeterminate: false };
   }
   return settlementUnknown(auth, reason || "settlement_unknown");
+}
+
+const BROADCAST_EVIDENCE_KEYS = ["transaction", "txHash", "transactionHash", "hash", "receipt"] as const;
+
+function hasBroadcastEvidence(data: Record<string, unknown>): boolean {
+  return BROADCAST_EVIDENCE_KEYS.some(key => {
+    const value = data[key];
+    return value !== undefined && value !== null && value !== "" && value !== false;
+  });
 }
 
 export function logUsdcEvent(

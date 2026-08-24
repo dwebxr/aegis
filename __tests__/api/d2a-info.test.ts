@@ -265,6 +265,7 @@ describe("GET /api/d2a/info with the USDC rail configured", () => {
     process.env.OPENPAY_USDC_RAIL_ENABLED = "true";
     process.env.OPENPAY_RESOURCE_ID = "158883b0-b76d-432d-a89e-577b583a0f5d";
     process.env.OPENPAY_MERCHANT_ADDRESS = "0x52d4901142e2B5680027da5EB47C86CB02a3cA81";
+    process.env.KV_REST_API_URL = "https://kv.example.test";
 
     const jpyc = await freshInfo();
     expect(jpyc.x402Versions).toEqual([1, 2]);
@@ -272,6 +273,31 @@ describe("GET /api/d2a/info with the USDC rail configured", () => {
     expect(jpyc.rails.usdc.reason).toBeUndefined();
     expect(jpyc.rails.usdc.x402Versions).toEqual([1, 2]);
     expect(jpyc.rails.jpyc.enabled).toBe(true);
+  });
+
+  it("names the shared gate as the reason when the rail is configured but OpenPay is not", async () => {
+    process.env.OPENPAY_USDC_RAIL_ENABLED = "true";
+    process.env.OPENPAY_RESOURCE_ID = "158883b0-b76d-432d-a89e-577b583a0f5d";
+    process.env.OPENPAY_MERCHANT_ADDRESS = "0x52d4901142e2B5680027da5EB47C86CB02a3cA81";
+    process.env.KV_REST_API_URL = "https://kv.example.test";
+    process.env.OPENPAY_URL = "ftp://open-pay.jp";
+
+    const jpyc = await freshInfo();
+    expect(jpyc.auth).toBe("unavailable");
+    expect(jpyc.x402Versions).toEqual([1]);
+    expect(jpyc.rails.usdc.enabled).toBe(false);
+    expect(jpyc.rails.usdc.reason).toBe("OpenPay URL misconfigured");
+  });
+
+  it("does not advertise USDC when KV is not configured", async () => {
+    process.env.OPENPAY_USDC_RAIL_ENABLED = "true";
+    process.env.OPENPAY_RESOURCE_ID = "158883b0-b76d-432d-a89e-577b583a0f5d";
+    process.env.OPENPAY_MERCHANT_ADDRESS = "0x52d4901142e2B5680027da5EB47C86CB02a3cA81";
+    delete process.env.KV_REST_API_URL;
+
+    const jpyc = await freshInfo();
+    expect(jpyc.x402Versions).toEqual([1]);
+    expect(jpyc.rails.usdc.reason).toBe("kv not configured");
   });
 });
 

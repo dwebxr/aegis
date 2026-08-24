@@ -9,7 +9,7 @@ const mockOpenpaySetOptions = new Map<string, unknown>();
 const mockKvControl = {
   unavailable: false,
   claim: "normal" as "normal" | "exists" | "unavailable",
-  finalWrite: "normal" as "normal" | "null" | "throw",
+  finalWrite: "normal" as "normal" | "null" | "throw" | "hang",
 };
 const mockOpenpayPaymentKV = {
   get: jest.fn(async (key: string) => {
@@ -25,6 +25,7 @@ const mockOpenpayPaymentKV = {
     if (key.endsWith(":state") && !options?.nx) {
       if (mockKvControl.finalWrite === "throw") throw new Error("KV write failed");
       if (mockKvControl.finalWrite === "null") return null;
+      if (mockKvControl.finalWrite === "hang") return new Promise<never>(() => {});
     }
     if (options?.nx && mockOpenpayStore.has(key)) return null;
     mockOpenpayStore.set(key, value);
@@ -336,6 +337,9 @@ beforeEach(() => {
   process.env.OPENPAY_MERCHANT_ADDRESS = MERCHANT;
   process.env.OPENPAY_USDC_RAIL_ENABLED = "true";
   process.env.OPENPAY_RESOURCE_ID = RESOURCE_ID;
+  // The rail refuses to advertise without KV (every state read fails closed).
+  // The namespace itself is mocked above; only the presence check reads this.
+  process.env.KV_REST_API_URL = "https://kv.example.test";
   delete process.env.OPENPAY_URL;
   delete process.env.OPENPAY_RESOURCE_URL;
   delete process.env.OPENPAY_USDC_ASSET;
@@ -431,6 +435,18 @@ describe("OFF regression", () => {
     expect((await res.json()).error).toBe("OpenPay resource not available");
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/api/discovery"))).toBe(true);
     expect(relayCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("does not advertise USDC without KV — every payment would 503 before settle", async () => {
+    delete process.env.KV_REST_API_URL;
+    const fetchMock = installFetchMock();
+    const { GET, usdc } = await loadRoute();
+    expect(usdc.usdcRailConfig()).toEqual({ enabled: false, reason: "kv not configured" });
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(402);
+    expect((await res.json()).accepts).toHaveLength(1);
+    expect(res.headers.get("PAYMENT-REQUIRED")).toBeNull();
+    expect(fetchMock.mock.calls.some(call => String(call[0]).includes("/relay/requirements"))).toBe(false);
   });
 
   it("disables only the USDC rail when the merchant is not an address", async () => {
@@ -1053,6 +1069,9 @@ describe("verify, content, deadline, and settlement", () => {
 
   const unknownSettles: Array<[string, FetchHandler]> = [
     ["nonce already used", () => jsonResponse({ success: false, errorReason: "nonce_already_used" })],
+    // An allowlisted reason next to a transaction hash contradicts itself.
+    ["allowlisted reason with broadcast evidence", () => jsonResponse({ success: false, errorReason: "insufficient_funds", transaction: TRANSACTION })],
+    ["allowlisted reason with txHash", () => jsonResponse({ success: false, errorReason: "invalid_signature", txHash: TRANSACTION })],
     ["duplicate", () => jsonResponse({ success: false, errorReason: "duplicate_settlement" })],
     ["empty reason", () => jsonResponse({ success: false, errorReason: "" })],
     ["non-2xx", () => jsonResponse({ success: true, transaction: TRANSACTION, network: "base", payer: FROM }, 502)],
@@ -1089,13 +1108,21 @@ describe("verify, content, deadline, and settlement", () => {
     expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["null", "throw"] as const)("delivers content when final state write returns %s", async (mode) => {
+  it.each(["null", "throw", "hang"] as const)("delivers content when final state write returns %s", async (mode) => {
     mockKvControl.finalWrite = mode;
+    if (mode === "hang") jest.useFakeTimers();
     const fetchMock = installFetchMock();
     const { GET, usdc } = await loadRoute();
     const header = makeV2Header();
-    const first = await GET(makeRequest({ "payment-signature": header }));
+    const pendingFirst = GET(makeRequest({ "payment-signature": header }));
+    // A KV that never answers must not hold the paid content past the 3s bound.
+    if (mode === "hang") await jest.advanceTimersByTimeAsync(usdc.STATE_WRITE_TIMEOUT_MS + 1);
+    const first = await pendingFirst;
     expect(first.status).toBe(200);
+    if (mode === "hang") {
+      jest.useRealTimers();
+      mockKvControl.finalWrite = "normal";
+    }
     expect(mockCaptureMessage).toHaveBeenCalledWith(
       "[openpay-usdc] state write failed",
       expect.objectContaining({ level: "error" }),
