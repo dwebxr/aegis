@@ -246,8 +246,25 @@ describe("GET /api/d2a/info with the USDC rail configured", () => {
     const freshRateLimit = await import("@/lib/api/rateLimit");
     freshRateLimit._resetRateLimits();
     const res = await freshGET(makeRequest());
+    expect(res.status).toBe(200);
     return (await res.json()).endpoints.briefingJpyc;
   }
+
+  it.each([undefined, "bad"])("marks JPYC unavailable and USDC disabled for resourceId %p", async (id) => {
+    process.env.OPENPAY_USDC_RAIL_ENABLED = "true";
+    process.env.OPENPAY_MERCHANT_ADDRESS = "0x52d4901142e2B5680027da5EB47C86CB02a3cA81";
+    process.env.KV_REST_API_URL = "https://kv.example.test";
+    process.env.KV_REST_API_TOKEN = "kv-token";
+    if (id === undefined) delete process.env.OPENPAY_RESOURCE_ID;
+    else process.env.OPENPAY_RESOURCE_ID = id;
+
+    const jpyc = await freshInfo();
+    expect(jpyc.auth).toBe("unavailable");
+    expect(jpyc.x402Versions).toEqual([1]);
+    expect(jpyc.rails.jpyc.enabled).toBe(false);
+    expect(jpyc.rails.usdc.enabled).toBe(false);
+    expect(jpyc.rails.usdc.reason).toBe("resource id missing or malformed");
+  });
 
   it("does not advertise v2 while the rail is disabled for a missing merchant (one truth)", async () => {
     process.env.OPENPAY_USDC_RAIL_ENABLED = "true";

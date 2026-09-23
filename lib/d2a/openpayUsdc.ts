@@ -2,8 +2,10 @@ import { createHash } from "node:crypto";
 import { openpayPaymentKV } from "@/lib/api/kv/namespace";
 import {
   isEvmAddress,
+  isOpenPayResourceId,
   normalizeResource,
   OPENPAY_MERCHANT,
+  OPENPAY_RESOURCE_ID,
   OPENPAY_RESOURCE_URL,
   OPENPAY_URL,
   type OpenPayAccept,
@@ -13,7 +15,6 @@ import * as Sentry from "@/lib/observability";
 import { readCappedText } from "@/lib/utils/httpBody.server";
 import { withTimeout } from "@/lib/utils/timeout";
 
-export const OPENPAY_RESOURCE_ID = process.env.OPENPAY_RESOURCE_ID?.trim() || "";
 const OPENPAY_USDC_ASSET = (
   process.env.OPENPAY_USDC_ASSET?.trim()
   || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
@@ -39,8 +40,6 @@ export const CLOCK_SKEW_S = 60;
 // report and deliver.
 export const STATE_WRITE_TIMEOUT_MS = 3_000;
 
-const RESOURCE_ID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DIGITS_PATTERN = /^[0-9]+$/;
 const STRICT_BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 const NONCE_PATTERN = /^0x[0-9a-fA-F]{64}$/;
@@ -50,13 +49,9 @@ export function usdcRailConfig():
   | { enabled: true }
   | { enabled: false; reason: string } {
   if (!isFeatureEnabled("openpayUsdcRail")) return { enabled: false, reason: "flag off" };
-  if (!RESOURCE_ID_PATTERN.test(OPENPAY_RESOURCE_ID)) {
+  if (!isOpenPayResourceId(OPENPAY_RESOURCE_ID)) {
     return { enabled: false, reason: "resource id missing or malformed" };
   }
-  // The JPYC gate only requires a non-empty merchant (its catalog match is
-  // string equality). USDC pins payTo to this value, so it must be an address —
-  // checked here rather than in openpayConfigError so the flag-OFF route keeps
-  // its exact previous behaviour.
   if (!isEvmAddress(OPENPAY_MERCHANT)) {
     return { enabled: false, reason: "merchant address malformed" };
   }
