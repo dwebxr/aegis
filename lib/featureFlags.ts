@@ -16,7 +16,7 @@ export const FLAGS = {
   openpayUsdcRail: {
     envName: "OPENPAY_USDC_RAIL_ENABLED",
     defaultValue: false,
-    description: "USDC (Base mainnet) rail on /api/d2a/briefing-jpyc via the OpenPay x402 relay. OFF (default): the route is JPYC-only and never touches the relay or KV. ON also requires OPENPAY_RESOURCE_ID.",
+    description: "USDC (Base mainnet) rail on /api/d2a/briefing-jpyc via the OpenPay x402 relay. OFF (default): the route is JPYC-only and never touches the relay or USDC payment KV. OPENPAY_RESOURCE_ID is required for the whole paid route regardless of this flag.",
     scope: "server",
   },
   x402FreeTier: {

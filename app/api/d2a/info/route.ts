@@ -104,8 +104,8 @@ export async function GET(request: NextRequest) {
       briefingJpyc: {
         url: "/api/d2a/briefing-jpyc",
         method: "GET",
-        // "unavailable" (not "none") when the merchant is unset: unlike briefing's
-        // free-when-unset fallback, this route serves nothing without its gate (503).
+        // "unavailable" (not "none") when the shared gate is misconfigured:
+        // unlike briefing's free-when-unset fallback, paid requests return 503.
         auth: openpayEnabled ? "x402" : "unavailable",
         x402Version: 1,
         x402Versions: usdcLive ? [1, 2] : [1],

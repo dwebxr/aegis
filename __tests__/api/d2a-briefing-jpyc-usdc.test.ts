@@ -64,6 +64,7 @@ const ATTACKER = "0x00000000000000000000000000000000000000AA";
 const FROM = "0xA100000000000000000000000000000000000001";
 const OTHER_FROM = "0xb200000000000000000000000000000000000002";
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const FORWARDER = "0x0F4560a777415580F0680F8B56a79B0022C6B848";
 const JPYC = "0xE7C3D8C9a439feDe00D2600032D5dB0Be71C3c29";
 const RESOURCE = "https://aegis-ai.xyz/api/d2a/briefing-jpyc";
 const RESOURCE_ID = "158883b0-b76d-432d-a89e-577b583a0f5d";
@@ -123,20 +124,21 @@ function makeJpycAccept(): Record<string, unknown> {
     scheme: "exact",
     network: "eip155:137",
     asset: JPYC,
-    payTo: "0x1111111111111111111111111111111111111111",
+    payTo: FORWARDER,
     maxAmountRequired: "1000000000000000000",
     resource: RESOURCE,
     description: "Aegis briefing",
     mimeType: "application/json",
     maxTimeoutSeconds: 300,
-    extra: { openpay: { merchant: MERCHANT } },
+    extra: { openpay: { mode: "forwarder-split", forwarder: FORWARDER, merchant: MERCHANT } },
   };
 }
 
 function makeDiscovery(): Record<string, unknown> {
   return {
-    x402Version: 1,
-    items: [{ resource: RESOURCE, accepts: [makeJpycAccept()] }],
+    id: RESOURCE_ID,
+    resource: RESOURCE,
+    accepts: [makeJpycAccept()],
   };
 }
 
@@ -260,7 +262,7 @@ interface FetchHandlers {
 function installFetchMock(handlers: FetchHandlers = {}): jest.Mock {
   const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.endsWith("/api/discovery")) {
+    if (url === `https://open-pay.jp/api/discovery/${RESOURCE_ID}`) {
       return (handlers.discovery ?? (() => jsonResponse(makeDiscovery())))(url, init);
     }
     if (url.includes("/api/x402/relay/requirements")) {
@@ -411,31 +413,28 @@ describe("OFF regression", () => {
     expect(mockOpenpayPaymentKV.get).not.toHaveBeenCalled();
   });
 
-  it("falls back to JPYC when the flag is on but resourceId is malformed", async () => {
-    process.env.OPENPAY_RESOURCE_ID = "bad";
+  it.each([undefined, "bad"])("503s paid requests when resourceId is %p even with the flag on", async (id) => {
+    if (id === undefined) delete process.env.OPENPAY_RESOURCE_ID;
+    else process.env.OPENPAY_RESOURCE_ID = id;
     const fetchMock = installFetchMock();
-    const { GET } = await loadRoute();
+    const { GET, usdc } = await loadRoute();
+    expect(usdc.usdcRailConfig()).toEqual({ enabled: false, reason: "resource id missing or malformed" });
     const res = await GET(makeRequest({ "payment-signature": makeV2Header() }));
-    expect(res.status).toBe(402);
-    expect((await res.json()).accepts).toHaveLength(1);
-    expect(relayCalls(fetchMock)).toHaveLength(0);
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("OpenPay resource id missing or malformed");
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(mockOpenpayPaymentKV.get).not.toHaveBeenCalled();
   });
 
-  it("keeps the legacy gate's merchant check (non-empty only) when the flag is off", async () => {
-    // The old route only required a non-empty merchant; the USDC rail's stricter
-    // address-format check must not turn a working JPYC deployment into a 503.
+  it("rejects a malformed merchant as a config error without discovery when the flag is off", async () => {
     delete process.env.OPENPAY_USDC_RAIL_ENABLED;
     process.env.OPENPAY_MERCHANT_ADDRESS = "not-an-address";
     const fetchMock = installFetchMock();
     const { GET } = await loadRoute();
     const res = await GET(makeRequest());
-    // Discovery is consulted (legacy path); the catalog merchant simply fails
-    // to match, which the legacy gate reports as the resource being unavailable.
     expect(res.status).toBe(503);
-    expect((await res.json()).error).toBe("OpenPay resource not available");
-    expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/api/discovery"))).toBe(true);
-    expect(relayCalls(fetchMock)).toHaveLength(0);
+    expect((await res.json()).error).toBe("OpenPay merchant address malformed");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -454,19 +453,40 @@ describe("OFF regression", () => {
     expect(fetchMock.mock.calls.some(call => String(call[0]).includes("/relay/requirements"))).toBe(false);
   });
 
-  it("disables only the USDC rail when the merchant is not an address", async () => {
+  it("disables USDC and rejects the paid route when the merchant is not an address", async () => {
     process.env.OPENPAY_MERCHANT_ADDRESS = "not-an-address";
     const fetchMock = installFetchMock();
     const { GET, usdc } = await loadRoute();
     expect(usdc.usdcRailConfig()).toEqual({ enabled: false, reason: "merchant address malformed" });
-    await GET(makeRequest({ "payment-signature": makeV2Header() }));
-    expect(fetchMock.mock.calls.some(call => String(call[0]).includes("/relay/requirements"))).toBe(false);
+    const res = await GET(makeRequest({ "payment-signature": makeV2Header() }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("OpenPay merchant address malformed");
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(mockOpenpayPaymentKV.get).not.toHaveBeenCalled();
   });
 });
 
 describe("challenge and face validation", () => {
-  it("combines JPYC and USDC and forwards the exact PAYMENT-REQUIRED string", async () => {
+  it("advertises only healthy USDC when JPYC seller pins reject the listing", async () => {
+    const face = makeFace();
+    const fetchMock = installFetchMock({ discovery: () => jsonResponse({
+      ...makeDiscovery(),
+      accepts: [{
+        ...makeJpycAccept(),
+        extra: { openpay: { mode: "forwarder-split", forwarder: FORWARDER, merchant: ATTACKER } },
+      }],
+    }) });
+    const { GET } = await loadRoute();
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(402);
+    expect((await res.json()).accepts).toEqual([face.v1Accepts]);
+    expect(res.headers.get("PAYMENT-REQUIRED")).toBe(face.paymentRequiredHeader);
+    expect(warnSpy).toHaveBeenCalledWith("[openpay-jpyc] listing rejected: JPYC recipient mismatch");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([RESOURCE_ID, RESOURCE_ID.toUpperCase()])("combines JPYC and USDC for resourceId %s and forwards the exact PAYMENT-REQUIRED string", async (id) => {
+    process.env.OPENPAY_RESOURCE_ID = ` ${id} `;
     const face = makeFace();
     const fetchMock = installFetchMock({ requirements: () => jsonResponse(face) });
     const { GET } = await loadRoute();
@@ -479,6 +499,10 @@ describe("challenge and face validation", () => {
     expect(res.headers.get("Cache-Control")).toBe("no-store, private");
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://aegis.dwebxr.xyz");
     expect(relayCalls(fetchMock)).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://open-pay.jp/api/x402/relay/requirements?resourceId=${RESOURCE_ID}`,
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 
   it("serves a USDC-only challenge when discovery is unavailable", async () => {
@@ -671,12 +695,15 @@ describe("rail selection and requirements matching", () => {
   it.each([
     ["v2", "payment-signature", makeV2Header(), "paymentSignatureHeader"],
     ["v1", "x-payment", makeV1Header(), "paymentHeader"],
-  ])("relays the raw %s header under %s", async (_rail, headerName, header, bodyKey) => {
+  ])("relays the raw %s header under %s with a normalized resourceId", async (_rail, headerName, header, bodyKey) => {
+    process.env.OPENPAY_RESOURCE_ID = RESOURCE_ID.toUpperCase();
     const fetchMock = installFetchMock();
     const { GET } = await loadRoute();
     expect((await GET(makeRequest({ [headerName]: header }))).status).toBe(200);
     const verifyCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/relay/verify"));
     expect(bodyOf(verifyCall)).toEqual({ resourceId: RESOURCE_ID, [bodyKey]: header });
+    const settleCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/relay/settle"));
+    expect(bodyOf(settleCall)).toEqual({ resourceId: RESOURCE_ID, [bodyKey]: header });
   });
 
   it("keeps Polygon X-PAYMENT on the facilitator path", async () => {
