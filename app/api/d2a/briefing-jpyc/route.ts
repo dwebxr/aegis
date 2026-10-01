@@ -138,7 +138,7 @@ async function handleJpycLegacy(request: NextRequest): Promise<NextResponse> {
 }
 
 async function handleChallenge(): Promise<NextResponse> {
-  const [accepts, face] = await Promise.all([fetchAccepts("challenge"), fetchUsdcFace()]);
+  const [accepts, face] = await Promise.all([fetchAccepts("challenge"), fetchUsdcFace("challenge")]);
   if (!accepts && !face) {
     return NextResponse.json({ error: "OpenPay resource not available" }, { status: 503 });
   }
@@ -221,7 +221,7 @@ async function handleUsdc(
   const resumingFromRejected = durable.kind === "state" && durable.state.status === "rejected";
   logUsdcEvent(rail, "state", resumingFromRejected ? "rejected" : "clear", startedAt, identity);
 
-  const face = await fetchUsdcFace();
+  const face = await fetchUsdcFace("payment");
   if (!face) {
     logUsdcEvent(rail, "face", "unavailable", startedAt, identity);
     return NextResponse.json({ error: "OpenPay USDC rail not available" }, { status: 503 });
