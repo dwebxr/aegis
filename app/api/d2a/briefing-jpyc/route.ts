@@ -106,7 +106,10 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
 }
 
 async function handleJpycLegacy(request: NextRequest): Promise<NextResponse> {
-  const accepts = await fetchAccepts();
+  // Any payment header means these terms may be verified and settled, so they
+  // must be recent; a bare request only gets a 402 and can use older terms.
+  const hasPayment = Boolean(request.headers.get("x-payment") || request.headers.get("payment-signature"));
+  const accepts = await fetchAccepts(hasPayment ? "payment" : "challenge");
   if (!accepts) {
     return NextResponse.json({ error: "OpenPay resource not available" }, { status: 503 });
   }
@@ -135,7 +138,7 @@ async function handleJpycLegacy(request: NextRequest): Promise<NextResponse> {
 }
 
 async function handleChallenge(): Promise<NextResponse> {
-  const [accepts, face] = await Promise.all([fetchAccepts(), fetchUsdcFace()]);
+  const [accepts, face] = await Promise.all([fetchAccepts("challenge"), fetchUsdcFace()]);
   if (!accepts && !face) {
     return NextResponse.json({ error: "OpenPay resource not available" }, { status: 503 });
   }

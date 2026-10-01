@@ -488,20 +488,140 @@ describe("GET /api/d2a/briefing-jpyc — gate preconditions", () => {
     const discoveryCalls = fetchMock.mock.calls.filter(c => String(c[0]) === DISCOVERY_URL);
     expect(discoveryCalls).toHaveLength(1);
   });
+});
 
-  it("does not reuse expired accepts when discovery fails and retries immediately", async () => {
-    let now = 1_000_000;
+describe("GET /api/d2a/briefing-jpyc — discovery cache age", () => {
+  const MINUTE = 60_000;
+  let now: number;
+
+  beforeEach(() => {
+    now = 1_000_000;
     jest.spyOn(Date, "now").mockImplementation(() => now);
-    let available = true;
-    const fetchMock = installFetchMock({ discovery: () => jsonResponse(makeDiscovery(), available ? 200 : 503) });
+  });
+
+  const discoveryCalls = (fetchMock: jest.Mock) =>
+    fetchMock.mock.calls.filter(c => String(c[0]) === DISCOVERY_URL).length;
+  const unpaid = () => makeRequest({ principal: PRINCIPAL });
+  const paid = () => makeRequest({ principal: PRINCIPAL }, { "x-payment": paymentHeader() });
+
+  it("serves an unpaid 402 from cache until 30 minutes, then refetches", async () => {
+    const fetchMock = installFetchMock({});
     const { GET } = await loadRoute();
-    expect((await GET(makeRequest({ principal: PRINCIPAL }))).status).toBe(402);
-    now += 5 * 60_000;
+    expect((await GET(unpaid())).status).toBe(402);
+    now += 30 * MINUTE - 1;
+    expect((await GET(unpaid())).status).toBe(402);
+    expect(discoveryCalls(fetchMock)).toBe(1);
+    now += 1;
+    expect((await GET(unpaid())).status).toBe(402);
+    expect(discoveryCalls(fetchMock)).toBe(2);
+  });
+
+  it("verifies an X-PAYMENT request against terms under 5 minutes old", async () => {
+    const fetchMock = installFetchMock({});
+    const { GET } = await loadRoute();
+    expect((await GET(paid())).status).toBe(200);
+    now += 5 * MINUTE - 1;
+    expect((await GET(paid())).status).toBe(200);
+    expect(discoveryCalls(fetchMock)).toBe(1);
+    now += 1;
+    expect((await GET(paid())).status).toBe(200);
+    expect(discoveryCalls(fetchMock)).toBe(2);
+  });
+
+  it("refetches for a payment request when an unpaid request cached the entry", async () => {
+    const fresh = makeAccept({ maxAmountRequired: "3000000000000000000" });
+    let accepts = [makeAccept()];
+    const fetchMock = installFetchMock({ discovery: () => jsonResponse(makeDiscovery(accepts)) });
+    const { GET } = await loadRoute();
+    expect((await GET(unpaid())).status).toBe(402);
+    now += 10 * MINUTE;
+    accepts = [fresh];
+    expect((await (await GET(unpaid())).json()).accepts).toEqual([makeAccept()]);
+    expect(discoveryCalls(fetchMock)).toBe(1);
+    expect((await GET(paid())).status).toBe(200);
+    expect(discoveryCalls(fetchMock)).toBe(2);
+    expect(fetchMock.mock.calls.find(c => String(c[0]).endsWith("/api/facilitator/verify"))?.[1]?.body)
+      .toContain('"maxAmountRequired":"3000000000000000000"');
+    expect((await (await GET(unpaid())).json()).accepts).toEqual([fresh]);
+    expect(discoveryCalls(fetchMock)).toBe(2);
+  });
+
+  it("treats PAYMENT-SIGNATURE alone as a payment request when the USDC rail is off", async () => {
+    const fetchMock = installFetchMock({});
+    const { GET } = await loadRoute();
+    expect((await GET(unpaid())).status).toBe(402);
+    now += 5 * MINUTE;
+    await GET(makeRequest({ principal: PRINCIPAL }, { "payment-signature": "c2ln" }));
+    expect(discoveryCalls(fetchMock)).toBe(2);
+  });
+
+  it("treats an empty X-PAYMENT header as unpaid", async () => {
+    const fetchMock = installFetchMock({});
+    const { GET } = await loadRoute();
+    expect((await GET(unpaid())).status).toBe(402);
+    now += 5 * MINUTE;
+    expect((await GET(makeRequest({ principal: PRINCIPAL }, { "x-payment": "" }))).status).toBe(402);
+    expect(discoveryCalls(fetchMock)).toBe(1);
+  });
+
+  it("times the cache from when the fetch started", async () => {
+    const first = deferred<Response>();
+    const started = deferred<void>();
+    let calls = 0;
+    const fetchMock = installFetchMock({
+      discovery: () => {
+        if (calls++ > 0) return jsonResponse(makeDiscovery());
+        started.resolve();
+        return first.promise;
+      },
+    });
+    const { GET } = await loadRoute();
+    const pending = GET(paid());
+    await started.promise;
+    now += 4_000;
+    first.resolve(jsonResponse(makeDiscovery()));
+    expect((await pending).status).toBe(200);
+    now = 1_000_000 + 5 * MINUTE;
+    await GET(paid());
+    expect(discoveryCalls(fetchMock)).toBe(2);
+  });
+
+  it.each([
+    ["a network error", () => { throw new TypeError("fetch failed"); }],
+    ["an HTTP error", () => jsonResponse({ error: "down" }, 503)],
+    ["a rejected listing", () => jsonResponse(makeDiscovery([makeSplitAccept({ merchant: FORWARDER })]))],
+  ])("does not cache %s; the next request refetches", async (_label, failure) => {
+    let failing = true;
+    const fetchMock = installFetchMock({
+      discovery: () => (failing ? failure() : jsonResponse(makeDiscovery())),
+    });
+    const { GET } = await loadRoute();
+    expect((await GET(unpaid())).status).toBe(503);
+    failing = false;
+    expect((await GET(unpaid())).status).toBe(402);
+    expect(discoveryCalls(fetchMock)).toBe(2);
+    expect((await GET(unpaid())).status).toBe(402);
+    expect(discoveryCalls(fetchMock)).toBe(2);
+  });
+
+  it("keeps serving the last good entry to unpaid requests while payment requests refetch a failing listing", async () => {
+    let available = true;
+    const fetchMock = installFetchMock({
+      discovery: () => jsonResponse(makeDiscovery(), available ? 200 : 503),
+    });
+    const { GET } = await loadRoute();
+    expect((await GET(unpaid())).status).toBe(402);
+    now += 10 * MINUTE;
     available = false;
-    expect((await GET(makeRequest({ principal: PRINCIPAL }))).status).toBe(503);
+    expect((await GET(paid())).status).toBe(503);
+    expect(discoveryCalls(fetchMock)).toBe(2);
+    expect((await GET(unpaid())).status).toBe(402);
+    expect(discoveryCalls(fetchMock)).toBe(2);
+    expect((await GET(paid())).status).toBe(503);
+    expect(discoveryCalls(fetchMock)).toBe(3);
     available = true;
-    expect((await GET(makeRequest({ principal: PRINCIPAL }))).status).toBe(402);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect((await GET(paid())).status).toBe(200);
+    expect(discoveryCalls(fetchMock)).toBe(4);
   });
 });
 

@@ -32,7 +32,12 @@ const VERIFY_TIMEOUT_MS = 10_000;
 // longest single leg but the route's worst-case chain must stay inside maxDuration.
 const SETTLE_TIMEOUT_MS = 15_000;
 
-const ACCEPTS_CACHE_TTL_MS = 5 * 60_000;
+// Each discovery lookup costs OpenPay KV reads, so the cache age depends on
+// what the listing is used for. A request carrying a payment header is
+// verified and settled against it and must see recent terms; an unpaid
+// request only advertises them in a 402.
+export const ACCEPTS_PAYMENT_MAX_AGE_MS = 5 * 60_000;
+export const ACCEPTS_CHALLENGE_MAX_AGE_MS = 30 * 60_000;
 const MAX_DISCOVERY_BODY_BYTES = 512 * 1024;
 const MAX_ACCEPTS = 16;
 const MAX_ACCEPT_DEPTH = 8;
@@ -211,22 +216,30 @@ async function loadAccepts(): Promise<OpenPayAccept[] | null> {
   }
 }
 
+export type AcceptsPurpose = "payment" | "challenge";
+
 /** Return the first structurally valid accept after checking every seller pin.
- *  The 402 body, verify and settle use this same verbatim entry. Successful
- *  lookups are cached for 5 minutes; failures and expired entries are not reused.
- *  Concurrent cold misses share a fetch, and resets fence off stale results. */
-export async function fetchAccepts(): Promise<OpenPayAccept[] | null> {
+ *  The 402 body, verify and settle use this same verbatim entry. Only lookups
+ *  that passed validation are cached, timed from when the fetch started; a
+ *  "payment" caller reuses them for 5 minutes, a "challenge" (unpaid 402)
+ *  caller for 30. Failures are never cached, but they don't evict the last
+ *  good entry either, so a challenge can keep serving it while a payment
+ *  caller refetches. Concurrent misses share a fetch (its result is fresh for
+ *  either purpose), and resets fence off stale results. */
+export async function fetchAccepts(purpose: AcceptsPurpose = "payment"): Promise<OpenPayAccept[] | null> {
   if (openpayConfigError()) return null;
-  if (acceptsCache && Date.now() - acceptsCache.at < ACCEPTS_CACHE_TTL_MS) {
+  const maxAge = purpose === "challenge" ? ACCEPTS_CHALLENGE_MAX_AGE_MS : ACCEPTS_PAYMENT_MAX_AGE_MS;
+  if (acceptsCache && Date.now() - acceptsCache.at < maxAge) {
     return acceptsCache.accepts;
   }
   if (acceptsInFlight) return acceptsInFlight;
 
   const generation = acceptsGeneration;
+  const startedAt = Date.now();
   const pending = loadAccepts()
     .then((accepts) => {
       if (generation === acceptsGeneration && accepts) {
-        acceptsCache = { accepts, at: Date.now() };
+        acceptsCache = { accepts, at: startedAt };
       }
       return accepts;
     })
