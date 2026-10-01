@@ -649,6 +649,23 @@ describe("challenge and face validation", () => {
     expect(fetchMock.mock.calls.filter(call => String(call[0]).includes("/requirements"))).toHaveLength(2);
   });
 
+  it("keeps the JPYC listing for 30 minutes on the challenge path", async () => {
+    let now = 1_000_000;
+    jest.spyOn(Date, "now").mockImplementation(() => now);
+    const fetchMock = installFetchMock();
+    const { GET } = await loadRoute();
+    const discoveryCalls = () => fetchMock.mock.calls.filter(call => String(call[0]).includes("/api/discovery/")).length;
+    expect((await GET(makeRequest())).status).toBe(402);
+    now += 30 * 60_000 - 1;
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(402);
+    expect((await res.json()).accepts).toHaveLength(2);
+    expect(discoveryCalls()).toBe(1);
+    now += 1;
+    expect((await GET(makeRequest())).status).toBe(402);
+    expect(discoveryCalls()).toBe(2);
+  });
+
   it("single-flights concurrent face requests", async () => {
     let resolveFace!: (response: Response) => void;
     const pending = new Promise<Response>(resolve => { resolveFace = resolve; });

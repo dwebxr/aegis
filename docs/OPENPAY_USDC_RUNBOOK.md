@@ -41,6 +41,8 @@ JPYC discovery は `GET /api/discovery/<OPENPAY_RESOURCE_ID>` のみを参照し
 
 全 accept の `extra.openpay.merchant` を `OPENPAY_MERCHANT_ADDRESS` に固定し、`mode = forwarder-split`、有効な `forwarder`、`payTo = forwarder` を検証します。アドレスの checksum casing は許容します。一つでも pin に違反すれば listing 全体を拒否します。forwarder 自体は固定アドレスではなく、listing 内の整合性を検証するため、上流の fee / forwarder 更新は引き続き反映されます。JPYC が拒否されても USDC face が正常なら、未払い challenge は USDC のみの 402 を返します。
 
+discovery の結果は、検証を通ったものだけを取得開始時刻つきでキャッシュします。支払いヘッダ (`X-PAYMENT` / `PAYMENT-SIGNATURE`) がある request は 5 分以内、無い request (402 を返すだけ) は 30 分以内のものを使います。失敗はキャッシュしませんが、最後に成功したエントリも消しません。そのため discovery が落ちている間、30 分以内なら未払い request には古い条件の 402 が返り、支払い request だけが 503 になり得ます。価格や手数料の変更は 402 に最大 30 分遅れて反映されます。古い条件で支払った request は 5 分以内の listing で verify され、失敗して新しい条件の 402 が返ります (送金は発生しません)。
+
 デプロイ後に JPYC が 503 になったら、live の `/api/discovery/<id>` 応答を設定値と照合して原因を分けてください。
 
 - **上流の不一致**: live 応答の id / resource / merchant / mode / forwarder / payTo が pins に違反する場合は、ロールバックせず拒否を維持し、OpenPay と調査します。ロールバックすると脆弱な URL-match gate を再び有効にしてしまいます。
