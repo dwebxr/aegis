@@ -43,6 +43,8 @@ JPYC discovery は `GET /api/discovery/<OPENPAY_RESOURCE_ID>` のみを参照し
 
 discovery の結果は、検証を通ったものだけを取得開始時刻つきでキャッシュします。支払いヘッダ (`X-PAYMENT` / `PAYMENT-SIGNATURE`) がある request は 5 分以内、無い request (402 を返すだけ) は 30 分以内のものを使います。失敗はキャッシュしませんが、最後に成功したエントリも消しません。そのため discovery が落ちている間、30 分以内なら未払い request には古い条件の 402 が返り、支払い request だけが 503 になり得ます。価格や手数料の変更は 402 に最大 30 分遅れて反映されます。古い条件で支払った request は 5 分以内の listing で verify され、失敗して新しい条件の 402 が返ります (送金は発生しません)。
 
+USDC の requirements (`/api/x402/relay/requirements`) も同じ 2 段のキャッシュです。支払いリクエスト (`PAYMENT-SIGNATURE`、または network が base の `X-PAYMENT`) は 5 分以内の face と照合し、未払いの 402 は 30 分以内の face を載せます。face も検証を通ったものだけを取得開始時刻つきでキャッシュします。discovery と違い、USDC は失敗を 30 秒保持します (OpenPay の障害中に呼び出しが殺到しないように)。この 30 秒は成功キャッシュを上書き・延長・削除しません。30 分以内の成功 face があれば未払いの 402 はそれを載せ続け、無ければ 402 は JPYC だけになります。30 秒の間の支払いリクエストは requirements を呼ばずに 503 を返し、verify も settle も行いません。古い 402 の条件で署名された支払いは、5 分以内の face との照合で `payment_requirements_mismatch` の 402 (新しい `PAYMENT-REQUIRED` 付き) になり、relay は呼ばれません。
+
 デプロイ後に JPYC が 503 になったら、live の `/api/discovery/<id>` 応答を設定値と照合して原因を分けてください。
 
 - **上流の不一致**: live 応答の id / resource / merchant / mode / forwarder / payTo が pins に違反する場合は、ロールバックせず拒否を維持し、OpenPay と調査します。ロールバックすると脆弱な URL-match gate を再び有効にしてしまいます。

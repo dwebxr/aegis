@@ -8,6 +8,7 @@ import {
   OPENPAY_RESOURCE_ID,
   OPENPAY_RESOURCE_URL,
   OPENPAY_URL,
+  type AcceptsPurpose,
   type OpenPayAccept,
 } from "@/lib/d2a/openpayGate";
 import { isFeatureEnabled } from "@/lib/featureFlags";
@@ -26,7 +27,13 @@ export const USDC_V2_NETWORK = "eip155:8453";
 export const REQUIREMENTS_TIMEOUT_MS = 5_000;
 export const RELAY_VERIFY_TIMEOUT_MS = 10_000;
 export const RELAY_SETTLE_TIMEOUT_MS = 15_000;
-export const FACE_CACHE_TTL_MS = 5 * 60_000;
+// Same split as the JPYC discovery cache (each requirements call costs OpenPay
+// KV reads): a payment request is matched against a face at most 5 minutes
+// old, an unpaid challenge may advertise one up to 30 minutes old. A failure
+// is held for 30 seconds so an OpenPay outage isn't hammered; it never
+// replaces, extends or evicts the last good face.
+export const FACE_PAYMENT_MAX_AGE_MS = 5 * 60_000;
+export const FACE_CHALLENGE_MAX_AGE_MS = 30 * 60_000;
 export const FACE_NEGATIVE_TTL_MS = 30_000;
 export const MAX_HEADER_BYTES = 16 * 1024;
 export const MAX_RELAY_BODY_BYTES = 64 * 1024;
@@ -267,20 +274,24 @@ async function loadUsdcFace(): Promise<UsdcFace | null> {
   }
 }
 
-export async function fetchUsdcFace(): Promise<UsdcFace | null> {
+export async function fetchUsdcFace(purpose: AcceptsPurpose = "payment"): Promise<UsdcFace | null> {
   if (!usdcRailConfig().enabled) return null;
 
   const now = Date.now();
-  if (faceCache && now - faceCache.at < FACE_CACHE_TTL_MS) return faceCache.face;
+  const maxAge = purpose === "challenge" ? FACE_CHALLENGE_MAX_AGE_MS : FACE_PAYMENT_MAX_AGE_MS;
+  // The good face is checked first: a recent failure must not hide a face
+  // that is still young enough for this purpose.
+  if (faceCache && now - faceCache.at < maxAge) return faceCache.face;
   if (negativeCacheAt !== null && now - negativeCacheAt < FACE_NEGATIVE_TTL_MS) return null;
   if (faceInFlight) return faceInFlight;
 
   const generation = faceGeneration;
+  const startedAt = now;
   const pending = loadUsdcFace()
     .then((face) => {
       if (generation !== faceGeneration) return face;
       if (face) {
-        faceCache = { face, at: Date.now() };
+        faceCache = { face, at: startedAt };
         negativeCacheAt = null;
       } else {
         negativeCacheAt = Date.now();

@@ -309,6 +309,18 @@ function relayCalls(fetchMock: jest.Mock): unknown[][] {
   return fetchMock.mock.calls.filter(call => String(call[0]).includes("/api/x402/relay/"));
 }
 
+function deferredResponse() {
+  let resolve!: (response: Response) => void;
+  let markStarted!: () => void;
+  const response = new Promise<Response>(done => { resolve = done; });
+  const started = new Promise<void>(done => { markStarted = done; });
+  return {
+    started,
+    resolve,
+    start: () => { markStarted(); return response; },
+  };
+}
+
 function bodyOf(call: unknown[]): Record<string, unknown> {
   return JSON.parse(String((call[1] as RequestInit).body)) as Record<string, unknown>;
 }
@@ -636,36 +648,6 @@ describe("challenge and face validation", () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("validation threw"));
   });
 
-  it("caches a valid face for five minutes", async () => {
-    let now = 1_000_000;
-    jest.spyOn(Date, "now").mockImplementation(() => now);
-    const fetchMock = installFetchMock();
-    const { GET } = await loadRoute();
-    await GET(makeRequest());
-    await GET(makeRequest());
-    expect(fetchMock.mock.calls.filter(call => String(call[0]).includes("/requirements"))).toHaveLength(1);
-    now += 301_000;
-    await GET(makeRequest());
-    expect(fetchMock.mock.calls.filter(call => String(call[0]).includes("/requirements"))).toHaveLength(2);
-  });
-
-  it("keeps the JPYC listing for 30 minutes on the challenge path", async () => {
-    let now = 1_000_000;
-    jest.spyOn(Date, "now").mockImplementation(() => now);
-    const fetchMock = installFetchMock();
-    const { GET } = await loadRoute();
-    const discoveryCalls = () => fetchMock.mock.calls.filter(call => String(call[0]).includes("/api/discovery/")).length;
-    expect((await GET(makeRequest())).status).toBe(402);
-    now += 30 * 60_000 - 1;
-    const res = await GET(makeRequest());
-    expect(res.status).toBe(402);
-    expect((await res.json()).accepts).toHaveLength(2);
-    expect(discoveryCalls()).toBe(1);
-    now += 1;
-    expect((await GET(makeRequest())).status).toBe(402);
-    expect(discoveryCalls()).toBe(2);
-  });
-
   it("single-flights concurrent face requests", async () => {
     let resolveFace!: (response: Response) => void;
     const pending = new Promise<Response>(resolve => { resolveFace = resolve; });
@@ -691,6 +673,191 @@ describe("challenge and face validation", () => {
     expect((await res.json()).accepts).toHaveLength(1);
     const call = fetchMock.mock.calls.find(item => String(item[0]).includes("/requirements"));
     expect((call[1] as RequestInit).signal?.aborted).toBe(true);
+  });
+});
+
+describe("requirements cache age", () => {
+  const MINUTE = 60_000;
+  let now: number;
+  let nonce = 0;
+
+  beforeEach(() => {
+    now = 1_000_000;
+    jest.spyOn(Date, "now").mockImplementation(() => now);
+  });
+
+  const requirementsCalls = (fetchMock: jest.Mock) =>
+    fetchMock.mock.calls.filter(call => String(call[0]).includes("/requirements")).length;
+  const settlementCalls = (fetchMock: jest.Mock) =>
+    fetchMock.mock.calls.filter(call => /\/relay\/(verify|settle)$/.test(String(call[0]))).length;
+  // A fresh nonce per request: a settled authorization would 409 before the face is read.
+  const freshAuth = () => makeAuthorization({ nonce: `0x${(++nonce).toString(16).padStart(64, "0")}` });
+  const unpaid = () => makeRequest();
+  const paidV2 = () => makeRequest({ "payment-signature": makeV2Header({ auth: freshAuth() }) });
+  const paidV1 = () => makeRequest({ "x-payment": makeV1Header(freshAuth()) });
+  const faceWithAmount = (amount: string): FaceRecord => {
+    const face = makeFace();
+    face.v1Accepts.maxAmountRequired = amount;
+    face.v2Accept.amount = amount;
+    face.paymentRequiredHeader = requiredHeader(face.v2Accept);
+    return face;
+  };
+
+  it("serves the unpaid 402's USDC face from cache until 30 minutes, then refetches", async () => {
+    const fetchMock = installFetchMock();
+    const { GET } = await loadRoute();
+    expect((await (await GET(unpaid())).json()).accepts).toHaveLength(2);
+    now += 30 * MINUTE - 1;
+    expect((await (await GET(unpaid())).json()).accepts).toHaveLength(2);
+    expect(requirementsCalls(fetchMock)).toBe(1);
+    now += 1;
+    expect((await (await GET(unpaid())).json()).accepts).toHaveLength(2);
+    expect(requirementsCalls(fetchMock)).toBe(2);
+  });
+
+  it.each([
+    ["PAYMENT-SIGNATURE", paidV2],
+    ["X-PAYMENT on base", paidV1],
+  ])("matches a %s payment against a face under 5 minutes old", async (_name, paid) => {
+    const fetchMock = installFetchMock();
+    const { GET } = await loadRoute();
+    expect((await GET(paid())).status).toBe(200);
+    now += 5 * MINUTE - 1;
+    expect((await GET(paid())).status).toBe(200);
+    expect(requirementsCalls(fetchMock)).toBe(1);
+    now += 1;
+    expect((await GET(paid())).status).toBe(200);
+    expect(requirementsCalls(fetchMock)).toBe(2);
+  });
+
+  it("times the face from when the fetch started", async () => {
+    const first = deferredResponse();
+    let calls = 0;
+    const fetchMock = installFetchMock({
+      requirements: () => (calls++ === 0 ? first.start() : jsonResponse(makeFace())),
+    });
+    const { GET } = await loadRoute();
+    const pending = GET(paidV2());
+    await first.started;
+    now += 4_000;
+    first.resolve(jsonResponse(makeFace()));
+    expect((await pending).status).toBe(200);
+    now = 1_000_000 + 5 * MINUTE;
+    expect((await GET(paidV2())).status).toBe(200);
+    expect(requirementsCalls(fetchMock)).toBe(2);
+  });
+
+  it("refetches for a payment after an unpaid request cached the face, and the next 402 sees the new face", async () => {
+    let face = makeFace();
+    const fetchMock = installFetchMock({ requirements: () => jsonResponse(face) });
+    const { GET } = await loadRoute();
+    await GET(unpaid());
+    now += 10 * MINUTE;
+    face = faceWithAmount("5000");
+    expect((await (await GET(unpaid())).json()).accepts[1].maxAmountRequired).toBe("6000");
+    expect(requirementsCalls(fetchMock)).toBe(1);
+    const auth = makeAuthorization({ nonce: `0x${"aa".repeat(32)}`, value: "5000" });
+    const res = await GET(makeRequest({ "payment-signature": makeV2Header({ auth, accepted: face.v2Accept }) }));
+    expect(res.status).toBe(200);
+    expect(requirementsCalls(fetchMock)).toBe(2);
+    expect((await (await GET(unpaid())).json()).accepts[1].maxAmountRequired).toBe("5000");
+    expect(requirementsCalls(fetchMock)).toBe(2);
+  });
+
+  it("rejects a payment signed against a stale 402 with the fresh terms, without calling the relay", async () => {
+    let face = makeFace();
+    const fetchMock = installFetchMock({ requirements: () => jsonResponse(face) });
+    const { GET } = await loadRoute();
+    await GET(unpaid());
+    now += 10 * MINUTE;
+    face = faceWithAmount("5000");
+    expect((await (await GET(unpaid())).json()).accepts[1].maxAmountRequired).toBe("6000");
+    const res = await GET(paidV2());
+    expect(res.status).toBe(402);
+    expect((await res.json()).error).toBe("payment_requirements_mismatch");
+    const required = JSON.parse(Buffer.from(res.headers.get("PAYMENT-REQUIRED") ?? "", "base64").toString("utf8"));
+    expect(required.accepts[0].amount).toBe("5000");
+    expect(settlementCalls(fetchMock)).toBe(0);
+    expect(mockOpenpayPaymentKV.set).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["404", () => jsonResponse({}, 404)],
+    ["non-JSON", () => new Response("not json", { status: 200 })],
+    ["oversized", () => new Response("x".repeat(512 * 1024 + 1), { status: 200 })],
+    ["a rejected face", () => {
+      const face = makeFace();
+      face.v1Accepts.payTo = ATTACKER;
+      return jsonResponse(face);
+    }],
+  ])("holds a %s failure for exactly 30 seconds and never serves it as a face", async (_name, failure) => {
+    let failing = true;
+    const fetchMock = installFetchMock({
+      requirements: () => (failing ? failure() : jsonResponse(makeFace())),
+    });
+    const { GET } = await loadRoute();
+    expect((await (await GET(unpaid())).json()).accepts).toHaveLength(1);
+    failing = false;
+    now += 30_000 - 1;
+    expect((await (await GET(unpaid())).json()).accepts).toHaveLength(1);
+    expect(requirementsCalls(fetchMock)).toBe(1);
+    now += 1;
+    expect((await (await GET(unpaid())).json()).accepts).toHaveLength(2);
+    expect(requirementsCalls(fetchMock)).toBe(2);
+  });
+
+  it("503s a payment while a failure is held, without verify or settle", async () => {
+    const fetchMock = installFetchMock({ requirements: () => jsonResponse({}, 503) });
+    const { GET } = await loadRoute();
+    expect((await GET(unpaid())).status).toBe(402);
+    now += 10_000;
+    const res = await GET(paidV2());
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("OpenPay USDC rail not available");
+    expect(requirementsCalls(fetchMock)).toBe(1);
+    expect(settlementCalls(fetchMock)).toBe(0);
+    expect(mockOpenpayPaymentKV.set).not.toHaveBeenCalled();
+  });
+
+  it("keeps serving the last good face to unpaid requests after a failed payment refetch", async () => {
+    let available = true;
+    const fetchMock = installFetchMock({
+      requirements: () => (available ? jsonResponse(makeFace()) : jsonResponse({}, 503)),
+    });
+    const { GET } = await loadRoute();
+    await GET(unpaid());
+    now += 10 * MINUTE;
+    available = false;
+    expect((await GET(paidV2())).status).toBe(503);
+    expect(requirementsCalls(fetchMock)).toBe(2);
+    expect((await (await GET(unpaid())).json()).accepts).toHaveLength(2);
+    now += 30_000 - 1;
+    expect((await GET(paidV2())).status).toBe(503);
+    expect(requirementsCalls(fetchMock)).toBe(2);
+    expect(settlementCalls(fetchMock)).toBe(0);
+    available = true;
+    now += 1;
+    expect((await GET(paidV2())).status).toBe(200);
+    expect(requirementsCalls(fetchMock)).toBe(3);
+  });
+
+  it("does not extend the good face past 30 minutes when a refetch fails just before expiry", async () => {
+    let available = true;
+    const fetchMock = installFetchMock({
+      requirements: () => (available ? jsonResponse(makeFace()) : jsonResponse({}, 503)),
+    });
+    const { GET } = await loadRoute();
+    await GET(unpaid());
+    now += 30 * MINUTE - 1_000;
+    available = false;
+    expect((await GET(paidV2())).status).toBe(503);
+    expect(requirementsCalls(fetchMock)).toBe(2);
+    now = 1_000_000 + 30 * MINUTE;
+    const res = await GET(unpaid());
+    expect(res.status).toBe(402);
+    expect((await res.json()).accepts).toHaveLength(1);
+    expect(res.headers.get("PAYMENT-REQUIRED")).toBeNull();
+    expect(requirementsCalls(fetchMock)).toBe(2);
   });
 });
 
