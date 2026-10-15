@@ -2,8 +2,8 @@
  * @jest-environment jsdom
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 const VALID_JSON_RESPONSE = JSON.stringify({
   vSignal: 8,
@@ -68,10 +68,24 @@ afterEach(async () => {
 describe("MEDIAPIPE_GENAI_VERSION", () => {
   it("matches the installed package version to prevent JS/wasm mismatch", () => {
     const { MEDIAPIPE_GENAI_VERSION } = require("@/lib/mediapipe/engine");
-    const packagePath = join(process.cwd(), "node_modules/@mediapipe/tasks-genai/package.json");
-    const { version } = JSON.parse(readFileSync(packagePath, "utf8"));
+    let packageDir = dirname(require.resolve("@mediapipe/tasks-genai"));
 
-    expect(MEDIAPIPE_GENAI_VERSION).toBe(version);
+    while (true) {
+      const packagePath = join(packageDir, "package.json");
+      if (existsSync(packagePath)) {
+        const { name, version } = JSON.parse(readFileSync(packagePath, "utf8"));
+        if (name === "@mediapipe/tasks-genai") {
+          expect(MEDIAPIPE_GENAI_VERSION).toBe(version);
+          return;
+        }
+      }
+
+      const parentDir = dirname(packageDir);
+      if (parentDir === packageDir) break;
+      packageDir = parentDir;
+    }
+
+    throw new Error("Could not find package.json for @mediapipe/tasks-genai");
   });
 });
 
