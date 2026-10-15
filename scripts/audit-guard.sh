@@ -1,48 +1,28 @@
 #!/usr/bin/env bash
-# Fail when `npm audit` reports any HIGH or CRITICAL severity vulnerability.
-#
-# Run before deploy:
-#   scripts/audit-guard.sh
-#
-# Accepted moderate vulnerabilities (e.g. dompurify in @scalar/api-reference-react)
-# are documented in PRE_DEPLOY.md "Known accepted limitations". A moderate→high
-# escalation MUST trip this script and force a re-evaluation.
-
+# Production high/critical findings always fail. Full-tree exceptions are
+# advisory- and package-scoped, expiring entries in audit-allowlist.json.
 set -euo pipefail
 
-if ! command -v npm >/dev/null 2>&1; then
-  echo "error: npm not on PATH" >&2
+for tool in npm node; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "audit-guard: CANNOT AUDIT — $tool not on PATH" >&2
+    exit 2
+  fi
+done
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+cd "$script_dir/.."
+audit_dir=$(mktemp -d) || exit 2
+trap 'rm -rf "$audit_dir"' EXIT
+
+# npm exits 1 for valid reports containing vulnerabilities. Preserve that report
+# for evaluation; malformed/empty/error JSON is never treated as a clean audit.
+full_status=0
+prod_status=0
+npm audit --json >"$audit_dir/full.json" 2>"$audit_dir/full.err" || full_status=$?
+npm audit --omit=dev --json >"$audit_dir/prod.json" 2>"$audit_dir/prod.err" || prod_status=$?
+if (( full_status > 1 || prod_status > 1 )); then
+  echo "audit-guard: CANNOT AUDIT — npm exited full=$full_status prod=$prod_status" >&2
   exit 2
 fi
-
-if ! command -v jq >/dev/null 2>&1; then
-  echo "error: jq required (brew install jq)" >&2
-  exit 2
-fi
-
-# Capture audit output. npm audit exits non-zero when vulns exist; we want to
-# read the JSON regardless of exit code.
-audit_json=$(npm audit --json 2>/dev/null || true)
-
-if [ -z "$audit_json" ]; then
-  echo "error: npm audit produced no output" >&2
-  exit 2
-fi
-
-high_count=$(echo "$audit_json" | jq '[.vulnerabilities | to_entries[] | select(.value.severity == "high" or .value.severity == "critical")] | length')
-
-if [ "$high_count" -eq 0 ]; then
-  echo "audit-guard: PASS — 0 high/critical vulnerabilities"
-  moderate_count=$(echo "$audit_json" | jq '[.vulnerabilities | to_entries[] | select(.value.severity == "moderate")] | length')
-  echo "audit-guard: $moderate_count moderate (review against PRE_DEPLOY.md accepted list)"
-  exit 0
-fi
-
-echo "audit-guard: FAIL — $high_count high/critical vulnerabilities"
-echo
-echo "$audit_json" | jq -r '.vulnerabilities | to_entries[] | select(.value.severity == "high" or .value.severity == "critical") | "  \(.key): \(.value.severity) — \(.value.via[0].title // .value.via[0])"'
-echo
-echo "Either patch the dependency, or add a documented exception to"
-echo "PRE_DEPLOY.md 'Known accepted limitations' if the attack vector is"
-echo "verified unreachable, then revisit this guard's exclusion list."
-exit 1
+node "$script_dir/audit-guard-lib.cjs" "$audit_dir/full.json" "$audit_dir/prod.json" "$script_dir/audit-allowlist.json"

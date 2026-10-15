@@ -1,0 +1,30 @@
+{
+  "vulnerabilities": {
+    "braces": {
+      "name": "braces",
+      "severity": "high",
+      "via": [
+        {
+          "name": "braces",
+          "severity": "high",
+          "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+          "title": "Unbounded brace expansion"
+        }
+      ]
+    },
+    "micromatch": {
+      "name": "micromatch",
+      "severity": "high",
+      "via": [
+        "braces"
+      ]
+    },
+    "fast-glob": {
+      "name": "fast-glob",
+      "severity": "high",
+      "via": [
+        "micromatch"
+      ]
+    }
+  }
+}

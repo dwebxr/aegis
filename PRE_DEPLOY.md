@@ -101,35 +101,45 @@ Implications operators need to know:
 
 ## Known accepted limitations
 
-### Dependency audit: clean
+### Dependency audit: production clean; time-limited dev exception
 
-`npm audit` reports **0 vulnerabilities** on both the full tree and the
-production tree (`--omit=dev`). This is maintained, not incidental — the
-limitations previously listed here have been resolved:
+`npm audit --omit=dev` reports **0 vulnerabilities** (including 0 high/critical).
+The full tree currently reports **35 high and 5 moderate**, with no critical or
+low findings. The high advisory is `braces` **GHSA-vfj7-8cjw-p6xm**, inherited by
+`micromatch` / `fast-glob` and dev tooling (`jest`, `eslint-config-next`, `shadcn`).
+There is no patched braces release; it is absent from the production audit.
 
-- The production-chain moderates (the `@coinbase/cdp-sdk` → legacy
-  `@solana/web3.js` v1 subtree, plus `ws` and `brace-expansion`) cleared once
-  `ws` was pinned to 8.21.0 and `@coinbase/cdp-sdk` resolved to 1.50.0, which
-  drops the legacy Solana v1 chain (`jayson` / `rpc-websockets` / `uuid@8.3.2`).
-- The dev-only `@tootallnate/once` advisory (jsdom → jest-environment-jsdom
-  chain) is patched in place by the `@tootallnate/once: 2.0.1` override — a
-  non-breaking patch within `http-proxy-agent`'s declared `"2"` range, so no
-  semver-major jest/jsdom downgrade is required.
-- The `dompurify` CVEs on `/api-docs` cleared once `@scalar/api-reference-react`
-  reached 0.9.38.
+`scripts/audit-allowlist.json` accepts only that GHSA **and** the vulnerable
+package name `braces`, through **2026-12-31** inclusive. Accepted findings are
+printed as warnings with their GHSA and expiry. Production high/critical
+findings can never use this exception. Unknown advisories, missing `via`
+references, and empty advisory chains fail; invalid or unavailable npm audit
+output exits 2 (cannot audit), never PASS.
+
+The remaining dev-only moderate advisory is `sprintf-js`
+**GHSA-hp3w-g68c-fv3c**, inherited through `argparse`, `js-yaml` 3.x,
+`@istanbuljs/load-nyc-config`, and `babel-plugin-istanbul`. No patched release is
+available; the latest compatible parents retain this chain. It has no allowlist
+entry. The guard follows **every** advisory root of each high/critical package,
+including moderate roots: consequently the current full-tree audit **fails**
+for 15 Jest-related entries that inherit both braces and sprintf-js. Resolving
+that policy conflict is required before the guard can PASS; do not broaden the
+braces exception to hide the moderate advisory.
 
 Verification + standing guardrail:
 ```sh
-npm audit --omit=dev     # production tree — must report "found 0 vulnerabilities"
-npm audit                # full tree — also 0
-npm run audit:guard      # automated — fails the build on any high/critical
+npm audit --omit=dev --json # production tree — currently 0; any high/critical fails
+npm audit --json            # review all roots, including remaining moderates/lows
+npm run audit:guard         # 0 = PASS, 1 = policy failure, 2 = cannot audit
 ```
 
-`npm run audit:guard` (`scripts/audit-guard.sh`) is the standing guardrail: it
-fails non-zero on any `high` or `critical` severity, so a future moderate→high
-escalation cannot ship silently. If a new moderate appears that cannot be
-patched in-range, document it here with its reachability analysis before
-accepting it.
+Re-check both audits and the braces advisory before deployment and before the
+exception expires. When a patched braces release ships, refresh only the
+relevant dependency chain, run `npm ci`, type-check, and run the focused and full
+tests on Node 20 and Node 24. Remove the braces entry from
+`scripts/audit-allowlist.json` once no high/critical finding needs it, update this
+subsection, and require `npm run audit:guard` to PASS. Do not extend the expiry
+without a new operator review.
 
 ### Task #32 — Qwen3 / Llama4Scout cycle-cost verification
 
