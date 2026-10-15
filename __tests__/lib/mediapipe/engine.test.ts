@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 
-export {}; // ensure this file is treated as a module
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 const VALID_JSON_RESPONSE = JSON.stringify({
   vSignal: 8,
@@ -62,6 +63,30 @@ afterEach(async () => {
   } catch {
     // ignore
   }
+});
+
+describe("MEDIAPIPE_GENAI_VERSION", () => {
+  it("matches the installed package version to prevent JS/wasm mismatch", () => {
+    const { MEDIAPIPE_GENAI_VERSION } = require("@/lib/mediapipe/engine");
+    let packageDir = dirname(require.resolve("@mediapipe/tasks-genai"));
+
+    while (true) {
+      const packagePath = join(packageDir, "package.json");
+      if (existsSync(packagePath)) {
+        const { name, version } = JSON.parse(readFileSync(packagePath, "utf8"));
+        if (name === "@mediapipe/tasks-genai") {
+          expect(MEDIAPIPE_GENAI_VERSION).toBe(version);
+          return;
+        }
+      }
+
+      const parentDir = dirname(packageDir);
+      if (parentDir === packageDir) break;
+      packageDir = parentDir;
+    }
+
+    throw new Error("Could not find package.json for @mediapipe/tasks-genai");
+  });
 });
 
 // ─── isWebGPUAvailable ───
@@ -358,11 +383,11 @@ describe("getOrCreateInference", () => {
     const mockInf = makeMockInference(VALID_JSON_RESPONSE);
     mockCreateFromOptions.mockResolvedValue(mockInf);
 
-    const { getOrCreateInference } = require("@/lib/mediapipe/engine");
+    const { getOrCreateInference, MEDIAPIPE_GENAI_VERSION } = require("@/lib/mediapipe/engine");
     await getOrCreateInference();
 
     expect(mockForGenAiTasks).toHaveBeenCalledWith(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@0.10.27/wasm",
+      `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@${MEDIAPIPE_GENAI_VERSION}/wasm`,
     );
     expect(mockCreateFromOptions.mock.calls[0][0]).toBe(wasmFileset);
   });
