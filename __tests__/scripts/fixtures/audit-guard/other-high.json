@@ -1,0 +1,15 @@
+{
+  "vulnerabilities": {
+    "axios": {
+      "name": "axios",
+      "severity": "high",
+      "via": [
+        {
+          "name": "axios",
+          "severity": "high",
+          "url": "https://github.com/advisories/GHSA-44g4-m2mj-wpvx"
+        }
+      ]
+    }
+  }
+}

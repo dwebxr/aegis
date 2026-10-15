@@ -1,0 +1,8 @@
+[
+  {
+    "ghsa": "GHSA-vfj7-8cjw-p6xm",
+    "package": "braces",
+    "expires": "2026-12-31",
+    "reason": "No patched release; reachable only via dev tooling (jest / eslint / shadcn); production tree (npm audit --omit=dev) is clean."
+  }
+]

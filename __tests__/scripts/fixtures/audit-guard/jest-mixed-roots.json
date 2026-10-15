@@ -1,0 +1,42 @@
+{
+  "vulnerabilities": {
+    "braces": {
+      "name": "braces",
+      "severity": "high",
+      "via": [
+        {
+          "name": "braces",
+          "severity": "high",
+          "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+          "title": "Unbounded brace expansion"
+        }
+      ]
+    },
+    "micromatch": {
+      "name": "micromatch",
+      "severity": "high",
+      "via": ["braces"]
+    },
+    "sprintf-js": {
+      "name": "sprintf-js",
+      "severity": "moderate",
+      "via": [
+        {
+          "name": "sprintf-js",
+          "severity": "moderate",
+          "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c"
+        }
+      ]
+    },
+    "argparse": {
+      "name": "argparse",
+      "severity": "moderate",
+      "via": ["sprintf-js"]
+    },
+    "jest": {
+      "name": "jest",
+      "severity": "high",
+      "via": ["micromatch", "argparse"]
+    }
+  }
+}

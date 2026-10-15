@@ -65,7 +65,7 @@ sources ──► ingestion ──► quick filter ──► AI scoring cascade 
 
 ### Prerequisites
 
-- Node.js **≥ 20**
+- Node.js **≥ 22.12.0** (Node **24** for development, CI, and production)
 - npm (other package managers untested; only `npm` is used in scripts)
 - (Optional) [`dfx`](https://internetcomputer.org/docs/current/developer-docs/setup/install/) **0.30.2+** if you plan to modify the Motoko canister
 
