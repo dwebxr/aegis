@@ -39,7 +39,7 @@
     "@noble/hashes": "1.8.0",
     "@scalar/api-reference-react": "^0.9.47",
     "@sentry/nextjs": "^10.48.0",
-    "@serwist/next": "9.5.11",
+    "@serwist/next": "9.5.13",
     "@tailwindcss/postcss": "^4.2.1",
     "@vercel/analytics": "1.6.1",
     "@vercel/kv": "3.0.0",
@@ -52,7 +52,7 @@
     "clsx": "^2.1.1",
     "feed": "^4.2.2",
     "lucide-react": "^0.577.0",
-    "next": "^15.5.19",
+    "next": "^15.5.28",
     "nostr-tools": "2.23.5",
     "postcss": "^8.5.15",
     "radix-ui": "^1.4.3",
@@ -60,11 +60,11 @@
     "react-dom": "18.3.1",
     "rss-parser": "3.13.0",
     "server-only": "^0.0.1",
-    "serwist": "9.5.11",
+    "serwist": "9.5.13",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",
     "twitter-api-v2": "1.29.0",
-    "undici": "6.27.0",
+    "undici": "6.28.1",
     "uuid": "^14.0.1",
     "web-push": "3.6.7",
     "ws": "8.21.0"
@@ -96,13 +96,14 @@
     "typescript": "5.9.3"
   },
   "overrides": {
-    "axios": "1.16.1",
-    "fast-uri": "3.1.2",
+    "axios": "1.20.0",
+    "fast-uri": "3.1.8",
     "postcss": "$postcss",
     "@tootallnate/once": "2.0.1",
     "viem": {
       ".": "2.49.0",
       "ws": "8.21.0"
-    }
+    },
+    "@ai-sdk/provider-utils": "4.0.59"
   }
 }
