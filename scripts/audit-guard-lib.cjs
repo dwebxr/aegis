@@ -13,7 +13,10 @@ function parseAudit(input, label) {
     catch { throw new Error(`${label}: audit output is not JSON`); }
   }
   if (!isRecord(input) || Object.hasOwn(input, "error")) {
-    throw new Error(`${label}: npm error or invalid audit object`);
+    const details = isRecord(input) && isRecord(input.error)
+      ? [input.error.code, input.error.summary].filter(value => typeof value === "string" && value).join(": ")
+      : "";
+    throw new Error(`${label}: npm error or invalid audit object${details ? ` — ${details}` : ""}`);
   }
   if (!Object.hasOwn(input, "vulnerabilities") || !isRecord(input.vulnerabilities)) {
     throw new Error(`${label}: missing or invalid vulnerabilities`);
@@ -108,13 +111,20 @@ module.exports = { evaluate };
 if (require.main === module) {
   try {
     const { readFileSync } = require("node:fs");
-    const [fullPath, prodPath, allowlistPath] = process.argv.slice(2);
-    const result = evaluate({
+    const [fullPath, prodPath, allowlistPath, fullStatus = "0", prodStatus = "0"] = process.argv.slice(2);
+    let result = evaluate({
       full: readFileSync(fullPath, "utf8"),
       prod: readFileSync(prodPath, "utf8"),
       allowlist: JSON.parse(readFileSync(allowlistPath, "utf8")),
+      // Allowlist expiry uses the UTC calendar day, regardless of local timezone.
       today: new Date().toISOString().slice(0, 10),
     });
+    if (Number(fullStatus) > 1 || Number(prodStatus) > 1) {
+      result = {
+        status: "cannot-audit", exitCode: 2, warnings: [],
+        failures: [`npm exited full=${fullStatus} prod=${prodStatus}`, ...result.failures],
+      };
+    }
     for (const warning of result.warnings) console.log(`audit-guard: WARNING — ${warning}`);
     for (const failure of result.failures) console.error(`audit-guard: ${failure}`);
     console.log(`audit-guard: ${result.status === "cannot-audit" ? "CANNOT AUDIT" : result.status.toUpperCase()}`);

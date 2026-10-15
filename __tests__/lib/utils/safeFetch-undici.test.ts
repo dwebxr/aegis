@@ -38,6 +38,22 @@ describe("safeFetch — real undici connect-time DNS pinning", () => {
 
   afterEach(() => jest.restoreAllMocks());
 
+  it("hands the verified connect-time public address to the socket", async () => {
+    const publicAddress = { address: "1.1.1.1", family: 4 };
+    jest.mocked(connectLookup).mockImplementation(((_host: string, _opts: unknown,
+      callback: (error: Error | null, addresses: Address[]) => void) => {
+      callback(null, [publicAddress]);
+    }) as typeof connectLookup);
+
+    await expect(safeFetch("http://public.example.test/")).rejects.toMatchObject({
+      cause: { message: "Test blocked unexpected socket address" },
+    });
+    expect(preCheckLookup).toHaveBeenCalledWith("public.example.test", { all: true, verbatim: true });
+    expect(connectLookup).toHaveBeenCalledWith("public.example.test", { all: true, verbatim: true }, expect.any(Function));
+    expect(net.connect).toHaveBeenCalled();
+    expect(handedToSocket).toEqual([[publicAddress]]);
+  });
+
   it.each([
     ["public pre-check followed by private rebinding", [{ address: "10.0.0.5", family: 4 }], /SSRF blocked/],
     ["mixed A/AAAA with private IPv6", [{ address: "8.8.8.8", family: 4 }, { address: "fd00::5", family: 6 }], /SSRF blocked/],

@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 
 const input = () => ({ full: braces, prod: clean, allowlist, today: "2026-10-15" });
 const finding = (via: unknown[]) => ({ severity: "high", via });
+const npmError = { error: { code: "ENOTFOUND", summary: "getaddrinfo ENOTFOUND registry.npmjs.org" } };
 
 describe("audit guard advisory policy", () => {
   it("fails every production high, even the allowlisted GHSA", () => {
@@ -130,6 +131,14 @@ describe("audit guard advisory policy", () => {
     expect(evaluate({ ...input(), allowlist: [{ ...allowlist[0], expires: "later" }] }).exitCode).toBe(2);
   });
 
+  it.each(["full", "prod"])("includes npm error code and summary for the %s tree", tree => {
+    const result = evaluate({ ...input(), [tree]: JSON.stringify(npmError) });
+    expect(result).toMatchObject({ status: "cannot-audit", exitCode: 2 });
+    expect(result.failures).toEqual([
+      `${tree}: npm error or invalid audit object — ${npmError.error.code}: ${npmError.error.summary}`,
+    ]);
+  });
+
   it("passes an empty valid report and reports moderate/low counts", () => {
     expect(evaluate({ ...input(), full: clean }).exitCode).toBe(0);
     const result = evaluate({ ...input(), prod: { vulnerabilities: { minor: { severity: "moderate", via: [] } } } });
@@ -142,18 +151,31 @@ describe("audit guard shell exit codes (fake npm, no network)", () => {
   it.each([
     [1, JSON.stringify(clean), 0],
     [1, JSON.stringify(otherHigh), 1],
-    [1, '{"error":{"code":"ENOTFOUND"}}', 2],
+    [1, JSON.stringify(npmError), 2],
+    [2, JSON.stringify(npmError), 2],
     [2, JSON.stringify(clean), 2],
+    [1, "not JSON", 2],
   ])("preserves shell exit-code policy (case %#)", (npmStatus, output, expected) => {
     const dir = mkdtempSync(join(tmpdir(), "aegis-audit-test-"));
     try {
       writeFileSync(join(dir, "report.json"), output);
-      writeFileSync(join(dir, "npm"), `#!/bin/sh\ncat "$AUDIT_FIXTURE"\nexit ${npmStatus}\n`, { mode: 0o755 });
+      writeFileSync(join(dir, "npm"), `#!/bin/sh\ncat "$AUDIT_FIXTURE"\necho "npm stderr diagnostic" >&2\nexit ${npmStatus}\n`, { mode: 0o755 });
       const result = spawnSync("bash", ["scripts/audit-guard.sh"], {
         cwd: process.cwd(), encoding: "utf8",
         env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, AUDIT_FIXTURE: join(dir, "report.json") },
       });
       expect({ code: result.status, error: result.error }).toEqual({ code: expected, error: undefined });
+      if (expected === 2) {
+        expect(result.stdout).toContain("CANNOT AUDIT");
+        expect(result.stdout).not.toContain("PASS");
+        expect(result.stderr).toContain("npm stderr (full):\nnpm stderr diagnostic");
+        expect(result.stderr).toContain("npm stderr (prod):\nnpm stderr diagnostic");
+      } else {
+        expect(result.stderr).not.toContain("npm stderr diagnostic");
+      }
+      if (output === JSON.stringify(npmError)) {
+        expect(result.stderr).toContain(`${npmError.error.code}: ${npmError.error.summary}`);
+      }
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

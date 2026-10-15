@@ -21,8 +21,14 @@ full_status=0
 prod_status=0
 npm audit --json >"$audit_dir/full.json" 2>"$audit_dir/full.err" || full_status=$?
 npm audit --omit=dev --json >"$audit_dir/prod.json" 2>"$audit_dir/prod.err" || prod_status=$?
-if (( full_status > 1 || prod_status > 1 )); then
-  echo "audit-guard: CANNOT AUDIT — npm exited full=$full_status prod=$prod_status" >&2
-  exit 2
+audit_status=0
+node "$script_dir/audit-guard-lib.cjs" "$audit_dir/full.json" "$audit_dir/prod.json" "$script_dir/audit-allowlist.json" "$full_status" "$prod_status" || audit_status=$?
+if (( audit_status == 2 )); then
+  for tree in full prod; do
+    if [[ -s "$audit_dir/$tree.err" ]]; then
+      echo "audit-guard: npm stderr ($tree):" >&2
+      cat "$audit_dir/$tree.err" >&2
+    fi
+  done
 fi
-node "$script_dir/audit-guard-lib.cjs" "$audit_dir/full.json" "$audit_dir/prod.json" "$script_dir/audit-allowlist.json"
+exit "$audit_status"

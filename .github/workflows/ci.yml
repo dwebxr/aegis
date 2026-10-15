@@ -18,7 +18,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -44,13 +44,13 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
 
       - run: npm run audit:guard
-        name: Security audit (audit:guard — blocks on any high/critical)
+        name: Security audit (blocks all production high/critical; full tree except time-limited scripts/audit-allowlist.json advisories)
 
   e2e:
     runs-on: ubuntu-latest
@@ -60,7 +60,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -90,7 +90,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci

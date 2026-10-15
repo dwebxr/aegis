@@ -71,10 +71,13 @@ vercel --prod
 - [ ] `npm run lint` — clean
 - [ ] `npm run build` — succeeds
 - [ ] `npm run audit:guard` — passes under the dependency audit policy below; production tree currently reports 0 vulnerabilities
+- [ ] Run `npm audit signatures` and confirm the freshly pinned `next@15.5.28`, `sanitize-html@2.18.1` (2.18.x), and `@ai-sdk/provider-utils@4.0.59` remain published and are not deprecated: `npm view <pkg>@<ver> deprecated` must succeed with no deprecation message for each.
 - [ ] Local production build smoke test: `npm run build && npm start`
 - [ ] If touching `canisters/`: dry-run the upgrade against `dfx start --clean` (see ROLLBACK.md)
 - [ ] If touching auth or session code: manual login flow on staging (II + linked Nostr)
 - [ ] Confirm `git status` is clean and the deploying SHA matches `main`
+
+Next 15.5.28 also fixes **GHSA-2464-fhr4-w9xw (critical)**, which `npm audit` may not list yet.
 
 ## Translation endpoint: BYOK-only
 
@@ -112,7 +115,7 @@ There is no patched braces release; it is absent from the production audit.
 For each high/critical package in the full tree, the guard follows `via` to all
 root advisories, then considers only roots whose severity is high or critical.
 That set must be non-empty, and every member must match both the GHSA and
-vulnerable package name of an unexpired allowlist entry (`today <= expires`).
+vulnerable package name of an unexpired allowlist entry (`today <= expires`, using the UTC date).
 Moderate, low, and info roots do not affect acceptance. A high/critical package
 with no high/critical roots fails with **unexplained severity**. Missing `via`
 references fail, and cycles do not invent advisory roots.
@@ -141,7 +144,7 @@ npm run audit:guard         # 0 = PASS, 1 = policy failure, 2 = cannot audit
 Re-check both audits and the braces advisory before deployment and before the
 exception expires. When a patched braces release ships, refresh only the
 relevant dependency chain, run `npm ci`, type-check, and run the focused and full
-tests on Node 20 and Node 24. Remove the braces entry from
+tests on Node 24. Remove the braces entry from
 `scripts/audit-allowlist.json` once no high/critical finding needs it, update this
 subsection, and require `npm run audit:guard` to PASS. Do not extend the expiry
 without a new operator review.
