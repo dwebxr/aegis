@@ -2,6 +2,7 @@ import { evaluate } from "@/scripts/audit-guard-lib.cjs";
 import clean from "./fixtures/audit-guard/clean.json";
 import braces from "./fixtures/audit-guard/braces-chain.json";
 import otherHigh from "./fixtures/audit-guard/other-high.json";
+import mixedRoots from "./fixtures/audit-guard/jest-mixed-roots.json";
 import allowlist from "@/scripts/audit-allowlist.json";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -23,6 +24,37 @@ describe("audit guard advisory policy", () => {
     expect(result.exitCode).toBe(0);
     expect(result.warnings).toHaveLength(3);
     expect(result.warnings.join("\n")).toMatch(/fast-glob via braces GHSA-vfj7-8cjw-p6xm until 2026-12-31/);
+  });
+
+  it("accepts a package reaching allowlisted high braces and unlisted moderate sprintf-js", () => {
+    const result = evaluate({ ...input(), full: mixedRoots });
+    expect(result).toMatchObject({ status: "pass", exitCode: 0, failures: [] });
+    expect(result.warnings).toHaveLength(3);
+    expect(result.warnings.join("\n")).toMatch(/accepted jest via braces GHSA-vfj7-8cjw-p6xm until 2026-12-31/);
+    expect(result.warnings.join("\n")).not.toMatch(/sprintf-js/);
+    expect(result.summaries?.full.moderate).toBe(2);
+  });
+
+  it.each(["high", "critical"])("rejects a package also reaching an unlisted %s root", severity => {
+    const full = { vulnerabilities: {
+      ...structuredClone(mixedRoots.vulnerabilities),
+      ...structuredClone(otherHigh.vulnerabilities),
+    } };
+    full.vulnerabilities.axios.severity = severity;
+    full.vulnerabilities.axios.via[0].severity = severity;
+    full.vulnerabilities.jest.via.push("axios");
+    const result = evaluate({ ...input(), full });
+    expect(result.exitCode).toBe(1);
+    expect(result.failures.join("\n")).toMatch(/full: jest: GHSA-44g4-m2mj-wpvx \(axios\) is not allowlisted/);
+    expect(result.warnings.join("\n")).not.toMatch(/accepted jest /);
+  });
+
+  it("rejects unexplained high severity when a package has only moderate roots", () => {
+    const full = structuredClone(mixedRoots);
+    full.vulnerabilities.jest.via = ["argparse"];
+    const result = evaluate({ ...input(), full });
+    expect(result.exitCode).toBe(1);
+    expect(result.failures).toEqual(["full: jest: unexplained severity: empty high/critical root advisory set"]);
   });
 
   it("includes the expiry day, but fails explicitly after it", () => {
@@ -50,7 +82,7 @@ describe("audit guard advisory policy", () => {
     const full = { vulnerabilities: { a: finding(["b"]), b: finding(["a"]) } };
     const result = evaluate({ ...input(), full });
     expect(result.exitCode).toBe(1);
-    expect(result.failures.join("\n")).toMatch(/empty root advisory set/);
+    expect(result.failures.join("\n")).toMatch(/unexplained severity: empty high\/critical root advisory set/);
   });
 
   it("rejects missing references even alongside an allowed advisory", () => {
@@ -71,10 +103,10 @@ describe("audit guard advisory policy", () => {
     expect(evaluate({ ...input(), full }).exitCode).toBe(1);
   });
 
-  it("requires every root advisory to be allowlisted, including lower severities", () => {
+  it.each(["moderate", "low", "info"])("ignores unlisted %s roots alongside an allowlisted high root", severity => {
     const full = structuredClone(braces);
-    full.vulnerabilities.braces.via.push({ ...otherHigh.vulnerabilities.axios.via[0], severity: "low", title: "Another advisory" });
-    expect(evaluate({ ...input(), full }).exitCode).toBe(1);
+    full.vulnerabilities.braces.via.push({ ...otherHigh.vulnerabilities.axios.via[0], severity, title: "Another advisory" });
+    expect(evaluate({ ...input(), full }).exitCode).toBe(0);
   });
 
   it("does not match a GHSA embedded in an unrelated URL", () => {

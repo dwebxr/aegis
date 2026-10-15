@@ -70,7 +70,7 @@ vercel --prod
 - [ ] `npm test` — all suites pass
 - [ ] `npm run lint` — clean
 - [ ] `npm run build` — succeeds
-- [ ] `npm run audit:guard` — passes (fails on any high/critical); `npm audit` currently reports 0
+- [ ] `npm run audit:guard` — passes under the dependency audit policy below; production tree currently reports 0 vulnerabilities
 - [ ] Local production build smoke test: `npm run build && npm start`
 - [ ] If touching `canisters/`: dry-run the upgrade against `dfx start --clean` (see ROLLBACK.md)
 - [ ] If touching auth or session code: manual login flow on staging (II + linked Nostr)
@@ -109,22 +109,27 @@ low findings. The high advisory is `braces` **GHSA-vfj7-8cjw-p6xm**, inherited b
 `micromatch` / `fast-glob` and dev tooling (`jest`, `eslint-config-next`, `shadcn`).
 There is no patched braces release; it is absent from the production audit.
 
-`scripts/audit-allowlist.json` accepts only that GHSA **and** the vulnerable
-package name `braces`, through **2026-12-31** inclusive. Accepted findings are
-printed as warnings with their GHSA and expiry. Production high/critical
-findings can never use this exception. Unknown advisories, missing `via`
-references, and empty advisory chains fail; invalid or unavailable npm audit
-output exits 2 (cannot audit), never PASS.
+For each high/critical package in the full tree, the guard follows `via` to all
+root advisories, then considers only roots whose severity is high or critical.
+That set must be non-empty, and every member must match both the GHSA and
+vulnerable package name of an unexpired allowlist entry (`today <= expires`).
+Moderate, low, and info roots do not affect acceptance. A high/critical package
+with no high/critical roots fails with **unexplained severity**. Missing `via`
+references fail, and cycles do not invent advisory roots.
 
-The remaining dev-only moderate advisory is `sprintf-js`
-**GHSA-hp3w-g68c-fv3c**, inherited through `argparse`, `js-yaml` 3.x,
-`@istanbuljs/load-nyc-config`, and `babel-plugin-istanbul`. No patched release is
-available; the latest compatible parents retain this chain. It has no allowlist
-entry. The guard follows **every** advisory root of each high/critical package,
-including moderate roots: consequently the current full-tree audit **fails**
-for 15 Jest-related entries that inherit both braces and sprintf-js. Resolving
-that policy conflict is required before the guard can PASS; do not broaden the
-braces exception to hide the moderate advisory.
+`scripts/audit-allowlist.json` accepts only `braces` **GHSA-vfj7-8cjw-p6xm**,
+through **2026-12-31** inclusive. The current braces-chain highs are accepted,
+so `npm run audit:guard` **passes**, printing warnings with the GHSA and expiry.
+Any production high/critical finding fails; the allowlist never applies to the
+production tree. Invalid or unavailable npm audit output exits 2 (cannot
+audit), never PASS.
+
+Known dev-only moderates are `sprintf-js` **GHSA-hp3w-g68c-fv3c** and its
+dependents `argparse`, `js-yaml` 3.x, `@istanbuljs/load-nyc-config`, and
+`babel-plugin-istanbul`. No fix is available; the latest compatible parents
+retain this chain. These moderates remain visible in the audit counts and have
+no allowlist entry. Jest-related packages that reach both braces and sprintf-js
+are accepted because all their high/critical roots match the braces exception.
 
 Verification + standing guardrail:
 ```sh

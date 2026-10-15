@@ -53,7 +53,7 @@ function evaluate({ full, prod, allowlist, today }) {
 
   for (const [name, finding] of Object.entries(fullTree)) {
     if (!isHigh(finding)) continue;
-    const roots = new Map();
+    const highRoots = new Map();
     const errors = new Set();
     const visited = new Set();
     function visit(packageName) {
@@ -70,14 +70,17 @@ function evaluate({ full, prod, allowlist, today }) {
             ? /^https:\/\/github\.com\/advisories\/(GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4})$/.exec(via.url) : null;
           if (!match || typeof via.name !== "string" || !via.name) {
             errors.add("root advisory has no valid GHSA URL or package name");
-          } else roots.set(`${via.name}:${match[1]}`, { ghsa: match[1], package: via.name });
+          } else if (isHigh(via)) {
+            // Lower-severity roots do not explain or block a high/critical finding.
+            highRoots.set(`${via.name}:${match[1]}`, { ghsa: match[1], package: via.name });
+          }
         }
       }
     }
     visit(name);
-    if (roots.size === 0) errors.add("empty root advisory set");
+    if (highRoots.size === 0) errors.add("unexplained severity: empty high/critical root advisory set");
     const accepted = [];
-    for (const root of roots.values()) {
+    for (const root of highRoots.values()) {
       const entry = allowlist.find(item => item.ghsa === root.ghsa && item.package === root.package);
       if (!entry) errors.add(`${root.ghsa} (${root.package}) is not allowlisted (GHSA and package must match)`);
       else if (today > entry.expires) errors.add(`${root.ghsa} (${root.package}) expired ${entry.expires}`);
