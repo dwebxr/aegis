@@ -12,6 +12,8 @@ import { isWebGPUAvailable } from "@/lib/utils/webgpu";
 // "@/lib/mediapipe/engine".
 export { isWebGPUAvailable };
 
+export const MEDIAPIPE_GENAI_VERSION = "0.10.29";
+
 let inference: LlmInference | null = null;
 let inferencePromise: Promise<LlmInference> | null = null;
 let loadedModelId: MediaPipeModelId | null = null;
@@ -82,7 +84,7 @@ export async function getOrCreateInference(): Promise<LlmInference> {
     );
     // Pin to installed version to prevent JS/wasm version mismatch
     const genai = await FilesetResolver.forGenAiTasks(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@0.10.27/wasm",
+      `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@${MEDIAPIPE_GENAI_VERSION}/wasm`,
     );
 
     const modelDef = MEDIAPIPE_MODELS[selectedId];
