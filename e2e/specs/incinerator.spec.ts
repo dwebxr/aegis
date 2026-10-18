@@ -96,11 +96,10 @@ test.describe("Incinerator — Data Inspection", () => {
     await expect(incineratorPage.page.getByText("publish your insights")).toBeVisible();
   });
 
-  test("pipeline stages S1-S4 are displayed", async ({ incineratorPage }) => {
+  test("pipeline stages S1-S3 are displayed", async ({ incineratorPage }) => {
     await expect(incineratorPage.page.getByText("Heuristic Filter")).toBeVisible();
     await expect(incineratorPage.page.getByText("Structural")).toBeVisible();
     await expect(incineratorPage.page.getByText("LLM Score")).toBeVisible();
-    await expect(incineratorPage.page.getByText("Cross-Valid")).toBeVisible();
   });
 });
 

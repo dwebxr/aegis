@@ -21,9 +21,8 @@ test.describe("Responsive Layout", () => {
   test("mobile landing page renders with full-width CTA", async ({ page }) => {
     const tryDemo = page.getByTestId("aegis-landing-try-demo");
     await tryDemo.waitFor({ state: "visible", timeout: TIMEOUTS.long });
-    const box = await tryDemo.boundingBox();
-    expect(box).toBeTruthy();
-    expect(box!.width).toBeGreaterThan(300);
+    // Wait for mobile sizing after hydration; mismatch tracked in https://github.com/dwebxr/aegis/issues/44.
+    await expect.poll(async () => (await tryDemo.boundingBox())?.width ?? 0).toBeGreaterThan(300);
   });
 
   test("mobile nav switches between tabs correctly", async ({ page }) => {
@@ -71,7 +70,7 @@ test.describe("Responsive Layout", () => {
     // Dropdown closes after selection; reopen to verify
     await page.getByTestId("aegis-filter-more").click();
     await page.getByTestId("aegis-filter-more-panel").waitFor({ state: "visible" });
-    await expect(slopFilter).toHaveAttribute("aria-pressed", "true");
+    await expect(slopFilter).toHaveAttribute("aria-current", "true");
     await expect(page.getByTestId("aegis-filter-quality")).toHaveAttribute("aria-pressed", "false");
   });
 

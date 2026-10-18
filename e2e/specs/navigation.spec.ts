@@ -1,26 +1,28 @@
 import { test, expect, clickNav } from "../fixtures/base";
 
-test.describe("Desktop Sidebar Navigation", () => {
-  test("sidebar shows 5 main navigation items", async ({ navigationPage }) => {
+test.describe("Demo Navigation", () => {
+  test("shows 5 main navigation items for the viewport", async ({ navigationPage, isMobile }) => {
     const ids = ["dashboard", "briefing", "incinerator", "d2a", "sources"];
     for (const id of ids) {
-      const nav = navigationPage.sidebarNav(id);
-      if (await nav.isVisible().catch(() => false)) {
-        await expect(nav).toBeVisible();
-      }
+      const nav = isMobile ? navigationPage.mobileNav(id) : navigationPage.sidebarNav(id);
+      await expect(nav).toBeVisible();
     }
   });
 
-  test("clicking each tab navigates to correct content", async ({ navigationPage }) => {
+  test("clicking each tab navigates to correct content", async ({ navigationPage, isMobile }) => {
     await clickNav(navigationPage.page, "sources");
     await expect(navigationPage.page.getByTestId("aegis-sources-heading")).toBeVisible();
 
     await clickNav(navigationPage.page, "incinerator");
     await expect(navigationPage.page.getByTestId("aegis-incinerator-heading")).toBeVisible();
 
-    // Analytics is in sidebar footer (desktop) or auth-only mobile footer — skip if not available
-    const analyticsBtn = navigationPage.sidebarNav("analytics");
-    if (await analyticsBtn.isVisible().catch(() => false)) {
+    // Demo Analytics is available on desktop; the mobile footer requires auth.
+    if (isMobile) {
+      await expect(navigationPage.mobileNav("analytics")).toHaveCount(0);
+      await expect(navigationPage.page.getByTestId("aegis-incinerator-heading")).toBeVisible();
+    } else {
+      const analyticsBtn = navigationPage.sidebarNav("analytics");
+      await expect(analyticsBtn).toBeVisible();
       await analyticsBtn.click();
       await expect(navigationPage.page.getByTestId("aegis-analytics-heading")).toBeVisible();
     }
