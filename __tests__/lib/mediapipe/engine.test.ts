@@ -564,7 +564,7 @@ describe("destroyInference", () => {
     await destroyInference();
     expect(lastStatus.loaded).toBe(false);
     expect(lastStatus.loading).toBe(false);
-    expect(lastStatus.modelId).toBeUndefined();
+    expect(lastStatus.modelId).toBe(mockModelId);
     expect(lastStatus.error).toBeUndefined();
   });
 

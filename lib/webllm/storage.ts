@@ -1,3 +1,5 @@
+import { clearLocalEngineRecovery } from "@/lib/localAI/budget";
+
 const STORAGE_KEY = "aegis-webllm-enabled";
 
 export function isWebLLMEnabled(): boolean {
@@ -7,6 +9,7 @@ export function isWebLLMEnabled(): boolean {
 
 export function setWebLLMEnabled(enabled: boolean): void {
   if (typeof globalThis.localStorage === "undefined") return;
+  if (isWebLLMEnabled() !== enabled) clearLocalEngineRecovery("webllm");
   if (enabled) {
     localStorage.setItem(STORAGE_KEY, "true");
   } else {

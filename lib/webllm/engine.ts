@@ -5,7 +5,18 @@ import { buildScoringPrompt } from "@/lib/scoring/prompt";
 import { parseScoreResponse } from "@/lib/scoring/parseResponse";
 import { createStatusEmitter } from "@/lib/utils/statusEmitter";
 import { isWebGPUAvailable } from "@/lib/utils/webgpu";
-import { LOCAL_SCORE_TIMEOUT_MS, LOCAL_INIT_COOLDOWN_MS, LocalEngineInitFailedError, LocalEngineInitPendingError, resetLocalEngine, runWithLocalEngine } from "@/lib/localAI/budget";
+import {
+  LOCAL_SCORE_TIMEOUT_MS,
+  LOCAL_INIT_COOLDOWN_MS,
+  LocalEngineInitFailedError,
+  LocalEngineUnavailableError,
+  LocalEngineInitPendingError,
+  createLocalEngineInitError,
+  assertLocalEngineReady,
+  clearLocalEngineRecovery,
+  resetLocalEngine,
+  runWithLocalEngine,
+} from "@/lib/localAI/budget";
 import { errMsg } from "@/lib/utils/errors";
 
 // Re-exported so existing callers (and tests) can keep importing from
@@ -17,7 +28,7 @@ const MODEL_ID = "Llama-3.1-8B-Instruct-q4f16_1-MLC";
 let engine: MLCEngine | null = null;
 let enginePromise: Promise<MLCEngine> | null = null;
 let generation = 0;
-let initFailure: { error: LocalEngineInitFailedError; retryAt: number } | null = null;
+let initFailure: { error: LocalEngineInitFailedError | LocalEngineUnavailableError; retryAt: number } | null = null;
 
 const { emit: emitStatus, onStatusChange } = createStatusEmitter<WebLLMStatus>({
   available: false,
@@ -45,6 +56,8 @@ export async function getOrCreateEngine(): Promise<MLCEngine> {
   if (engine) return engine;
   if (enginePromise) return enginePromise;
   if (initFailure && Date.now() < initFailure.retryAt) throw initFailure.error;
+
+  assertLocalEngineReady("webllm");
 
   const initGeneration = generation;
   const isCurrent = () => initGeneration === generation;
@@ -76,7 +89,7 @@ export async function getOrCreateEngine(): Promise<MLCEngine> {
     } catch (err) {
       if (!isCurrent()) throw err;
       emitStatus({ loading: false, error: String(err) });
-      throw new LocalEngineInitFailedError("webllm", errMsg(err), err);
+      throw createLocalEngineInitError("webllm", errMsg(err), err);
     }
   })();
   enginePromise = pending;
@@ -84,7 +97,7 @@ export async function getOrCreateEngine(): Promise<MLCEngine> {
   void pending.catch((error) => {
     if (enginePromise === pending) {
       enginePromise = null;
-      initFailure = { error, retryAt: Date.now() + LOCAL_INIT_COOLDOWN_MS };
+      initFailure = { error, retryAt: error instanceof LocalEngineInitFailedError ? Date.now() + LOCAL_INIT_COOLDOWN_MS : Infinity };
     }
   });
   return pending;
@@ -99,6 +112,7 @@ export async function scoreWithWebLLM(
   // MLCEngine uses OpenAI-compatible chat.completions.create() API
   const response = await runWithLocalEngine({
     engine: "webllm",
+    priority: "scoring",
     init: getOrCreateEngine,
     infer: eng => eng.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
@@ -122,6 +136,8 @@ export function isWebLLMLoaded(): boolean {
 
 export async function destroyEngine(expected?: MLCEngine): Promise<void> {
   if (expected && engine !== expected) return;
+  // A safety teardown retains recovery; user toggles/model changes clear it.
+  if (!expected) clearLocalEngineRecovery("webllm");
   generation++;
   const previous = engine;
   engine = null;

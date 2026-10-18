@@ -56,7 +56,7 @@ afterEach(() => {
 
 describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
   it("shares the stored transient init failure for 60s without another init", async () => {
-    mockCreate.mockRejectedValueOnce(new Error("download failed")).mockResolvedValue(instance());
+    mockCreate.mockRejectedValueOnce(new Error("Failed to fetch")).mockResolvedValue(instance());
     const engine = load(name);
     const { LocalEngineTransientError } = require("@/lib/localAI/budget");
     const failure = await engine.init().catch(error => error);
@@ -72,9 +72,9 @@ describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
   });
 
   it("off/on clears the init failure cooldown immediately", async () => {
-    mockCreate.mockRejectedValueOnce(new Error("download failed")).mockResolvedValue(instance());
+    mockCreate.mockRejectedValueOnce(new Error("Failed to fetch")).mockResolvedValue(instance());
     const engine = load(name);
-    await expect(engine.init()).rejects.toThrow("download failed");
+    await expect(engine.init()).rejects.toThrow("Failed to fetch");
     await engine.destroy();
     await engine.init();
     expect(mockCreate).toHaveBeenCalledTimes(2);
@@ -97,7 +97,7 @@ describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it("safety release destroys a hung instance and the next request re-initializes", async () => {
+  it("safety release blocks re-initialization for five minutes, then allows recovery", async () => {
     const hung = instance();
     const fresh = instance();
     hung.generateResponse.mockReturnValue(new Promise(() => {}));
@@ -112,10 +112,66 @@ describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
     await queued;
     expect(engine.loaded()).toBe(false);
     expect(name === "mediapipe" ? hung.close : hung.unload).toHaveBeenCalledTimes(1);
+    await expect(engine.init()).rejects.toThrow("engine is recovering");
+    await expect(engine.score("fresh", [])).rejects.toThrow("engine is recovering");
+    await jest.advanceTimersByTimeAsync(299_999);
+    await expect(engine.score("fresh", [])).rejects.toThrow("engine is recovering");
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
     await expect(engine.score("fresh", [])).resolves.toMatchObject({ composite: 8 });
     expect(mockCreate).toHaveBeenCalledTimes(2);
     expect(hung.generateResponse).toHaveBeenCalledTimes(1);
     expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it("an off/on teardown clears safety recovery immediately", async () => {
+    const hung = instance();
+    hung.generateResponse.mockReturnValue(new Promise(() => {}));
+    mockCreate.mockResolvedValueOnce(hung).mockResolvedValue(instance());
+    const engine = load(name);
+    const timedOut = expect(engine.score("hung", [])).rejects.toThrow("timed out");
+    await jest.advanceTimersByTimeAsync(50_000);
+    await timedOut;
+    await expect(engine.score("blocked", [])).rejects.toThrow("engine is recovering");
+    await engine.destroy();
+    await expect(engine.score("fresh", [])).resolves.toMatchObject({ composite: 8 });
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("changing the enabled setting clears recovery even without an extra teardown", async () => {
+    localStorage.clear();
+    const setEnabled = name === "mediapipe"
+      ? jest.requireActual<typeof import("@/lib/mediapipe/storage")>("@/lib/mediapipe/storage").setMediaPipeEnabled
+      : jest.requireActual<typeof import("@/lib/webllm/storage")>("@/lib/webllm/storage").setWebLLMEnabled;
+    setEnabled(true);
+    const hung = instance();
+    hung.generateResponse.mockReturnValue(new Promise(() => {}));
+    mockCreate.mockResolvedValueOnce(hung).mockResolvedValue(instance());
+    const engine = load(name);
+    const timedOut = expect(engine.score("hung", [])).rejects.toThrow("timed out");
+    await jest.advanceTimersByTimeAsync(50_000);
+    await timedOut;
+    setEnabled(true); // Rewriting the same config must not clear recovery.
+    await expect(engine.init()).rejects.toThrow("engine is recovering");
+    setEnabled(false);
+    setEnabled(true);
+    await expect(engine.score("fresh", [])).resolves.toMatchObject({ composite: 8 });
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["no WebGPU", "no adapter", "No GPU adapter found", "out of memory", "model HTTP 404", "unknown initialization failure"])("caches permanent init failure: %s", async failure => {
+    if (failure === "no WebGPU") Object.defineProperty(navigator, "gpu", { value: undefined, configurable: true });
+    else if (failure === "no adapter") (navigator.gpu!.requestAdapter as jest.Mock).mockResolvedValue(null);
+    else mockCreate.mockRejectedValue(new Error(failure));
+    const engine = load(name);
+    const { LocalEngineUnavailableError, LocalEngineTransientError } = require("@/lib/localAI/budget");
+    const error = await engine.init().catch(err => err);
+    expect(error).toBeInstanceOf(LocalEngineUnavailableError);
+    expect(error).not.toBeInstanceOf(LocalEngineTransientError);
+    await jest.advanceTimersByTimeAsync(600_000);
+    await expect(engine.init()).rejects.toBe(error);
+    await expect(engine.score("article", [])).rejects.toBe(error);
+    expect(mockCreate).toHaveBeenCalledTimes(failure === "no WebGPU" || failure === "no adapter" ? 0 : 1);
   });
 
   it("destroy interrupts active inference, clears waiters and permits immediate re-init", async () => {
@@ -135,7 +191,7 @@ describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
   });
 
   it.each(["adapter", "import", "create"])("clears loading on %s failure and clears the error on retry", async stage => {
-    const failure = new Error(`${stage} failed`);
+    const failure = new Error(`${stage} failed: NetworkError`);
     if (stage === "adapter") (navigator.gpu!.requestAdapter as jest.Mock).mockRejectedValueOnce(failure);
     if (stage === "import") mockImportError = failure;
     mockCreate.mockResolvedValue(instance());
@@ -263,7 +319,7 @@ it.each(["fileset", "create"])("reports version skew after a %s failure only whe
   expect(globalThis.fetch).toHaveBeenCalledWith("/vendor/mediapipe/tasks-genai@0.10.29/wasm/genai_wasm_internal.js", { method: "HEAD" });
   expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ loading: false, error: expect.stringContaining("reload the page") }));
   (globalThis.fetch as jest.Mock).mockResolvedValue({ status: 200 });
-  await jest.advanceTimersByTimeAsync(60_000);
+  await engine.destroy();
   await expect(engine.init()).rejects.toMatchObject({ cause: failure });
   expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ loading: false, error: "wasm failed" }));
 });
@@ -279,4 +335,42 @@ it("bounds the skew probe and clears loading even while that probe is stuck", as
   expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ loading: false, error: "fileset failed" }));
   await jest.advanceTimersByTimeAsync(3_000);
   await failed;
+});
+
+it("changing MediaPipe models clears safety recovery and emits the newly selected model", async () => {
+  const hung = instance();
+  hung.generateResponse.mockReturnValue(new Promise(() => {}));
+  mockCreate.mockResolvedValueOnce(hung).mockResolvedValue(instance());
+  const engine = load("mediapipe");
+  const timedOut = expect(engine.score("hung", [])).rejects.toThrow("timed out");
+  await jest.advanceTimersByTimeAsync(50_000);
+  await timedOut;
+  await expect(engine.init()).rejects.toThrow("engine is recovering");
+  mockModel = "gemma-4-e2b";
+  const status = jest.fn();
+  engine.subscribe(status);
+  // FeedSection writes the model selection and tears down even an unloaded model.
+  await engine.destroy();
+  expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ modelId: mockModel, loaded: false, loading: false }));
+  await expect(engine.score("fresh", [])).resolves.toMatchObject({ composite: 8 });
+  expect(mockCreate).toHaveBeenCalledTimes(2);
+});
+
+it("writing a different MediaPipe model clears safety recovery", async () => {
+  localStorage.clear();
+  const { setMediaPipeConfig } = jest.requireActual<typeof import("@/lib/mediapipe/storage")>("@/lib/mediapipe/storage");
+  setMediaPipeConfig({ enabled: true, modelId: "gemma-3-1b" });
+  const hung = instance();
+  hung.generateResponse.mockReturnValue(new Promise(() => {}));
+  mockCreate.mockResolvedValueOnce(hung).mockResolvedValue(instance());
+  const engine = load("mediapipe");
+  const timedOut = expect(engine.score("hung", [])).rejects.toThrow("timed out");
+  await jest.advanceTimersByTimeAsync(50_000);
+  await timedOut;
+  setMediaPipeConfig({ enabled: true, modelId: "gemma-3-1b" });
+  await expect(engine.init()).rejects.toThrow("engine is recovering");
+  mockModel = "gemma-4-e2b";
+  setMediaPipeConfig({ enabled: true, modelId: "gemma-4-e2b" });
+  await expect(engine.score("fresh", [])).resolves.toMatchObject({ composite: 8 });
+  expect(mockCreate).toHaveBeenCalledTimes(2);
 });

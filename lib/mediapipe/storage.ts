@@ -1,3 +1,4 @@
+import { clearLocalEngineRecovery } from "@/lib/localAI/budget";
 import type { MediaPipeConfig, MediaPipeModelId } from "./types";
 import { DEFAULT_MEDIAPIPE_CONFIG, MEDIAPIPE_MODELS } from "./types";
 
@@ -24,7 +25,11 @@ export function getMediaPipeConfig(): MediaPipeConfig {
 
 export function setMediaPipeConfig(config: MediaPipeConfig): void {
   if (typeof globalThis.localStorage === "undefined") return;
+  const previous = getMediaPipeConfig();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  if (previous.enabled !== config.enabled || previous.modelId !== config.modelId) {
+    clearLocalEngineRecovery("mediapipe");
+  }
 }
 
 export function getSelectedMediaPipeModelId(): MediaPipeModelId {

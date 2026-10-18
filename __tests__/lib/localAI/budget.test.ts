@@ -1,5 +1,10 @@
 import {
   LOCAL_INIT_WAIT_MS,
+  clearLocalEngineRecovery,
+  createLocalEngineInitError,
+  LocalEngineInitFailedError,
+  LocalEngineUnavailableError,
+  LocalEngineRecoveringError,
   LOCAL_QUEUE_WAIT_MS,
   LOCAL_INTERRUPT_GRACE_MS,
   LOCAL_SCORE_TIMEOUT_MS,
@@ -19,7 +24,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-beforeEach(() => { jest.useFakeTimers(); });
+beforeEach(() => { jest.useFakeTimers(); clearLocalEngineRecovery("mediapipe"); clearLocalEngineRecovery("webllm"); });
 afterEach(() => { jest.useRealTimers(); });
 
 describe.each(["mediapipe", "webllm"] as const)("%s budgets", engine => {
@@ -82,6 +87,24 @@ describe.each(["mediapipe", "webllm"] as const)("%s budgets", engine => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
+  it("serves scoring ahead of three queued translations and preserves FIFO within each priority", async () => {
+    const opts = options();
+    const order: string[] = [];
+    const run = (id: string, priority: "scoring" | "translation") => runWithLocalEngine({ ...opts, priority,
+      infer: () => { order.push(id); return new Promise(resolve => setTimeout(() => resolve(id), 1_000)); },
+    });
+    const jobs = [run("active", "translation")];
+    await jest.advanceTimersByTimeAsync(0);
+    jobs.push(run("t1", "translation"), run("t2", "translation"), run("t3", "translation"));
+    jobs.push(run("s1", "scoring"), run("s2", "scoring"));
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(order).toEqual(["active", "s1"]);
+    await jest.advanceTimersByTimeAsync(5_000);
+    await Promise.all(jobs);
+    expect(order).toEqual(["active", "s1", "s2", "t1", "t2", "t3"]);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
   it("removes waiters at 15s without running or leaking them", async () => {
     const opts = options();
     const running = deferred<string>();
@@ -129,7 +152,7 @@ describe.each(["mediapipe", "webllm"] as const)("%s budgets", engine => {
     await jest.advanceTimersByTimeAsync(1);
     await queued;
     expect(opts.destroy).toHaveBeenCalledWith(await opts.init());
-    await expect(runWithLocalEngine(opts)).rejects.toBeInstanceOf(LocalEngineInitPendingError);
+    await expect(runWithLocalEngine(opts)).rejects.toBeInstanceOf(LocalEngineRecoveringError);
     expect(opts.infer).toHaveBeenCalledTimes(1);
     expect(jest.getTimerCount()).toBe(0);
   });
@@ -178,4 +201,17 @@ it("has independent engine slots and a common transient error type", async () =>
   for (const ErrorType of [LocalEngineInitPendingError, LocalEngineBusyError, LocalEngineTimeoutError]) {
     expect(new ErrorType("mediapipe")).toBeInstanceOf(LocalEngineTransientError);
   }
+});
+
+describe("initialization failure classification", () => {
+  it.each(["Failed to fetch", "Load failed", "NetworkError", "network request failed", "fetch failed", "ECONNRESET", "request timed out", "HTTP 408", "HTTP 429", "HTTP 503", "GPU device lost"])("keeps a temporary failure retryable: %s", message => {
+    const cause = new Error(message);
+    const error = createLocalEngineInitError("mediapipe", message, cause);
+    expect(error).toBeInstanceOf(LocalEngineInitFailedError);
+    expect(error.cause).toBe(cause);
+  });
+
+  it.each(["WebGPU not available", "No GPU adapter found", "unsupported feature", "out of memory", "Array buffer allocation failed", "fetch failed: HTTP 404", "unknown error"])("makes a permanent or unrecognized failure terminal: %s", message => {
+    expect(createLocalEngineInitError("webllm", message, null)).toBeInstanceOf(LocalEngineUnavailableError);
+  });
 });

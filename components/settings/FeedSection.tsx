@@ -146,8 +146,8 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
     // Also clear a failed model's init cooldown when it was never loaded.
     const { destroyInference } = await import("@/lib/mediapipe/engine");
     await destroyInference();
+    setMediapipeStatus(prev => ({ ...prev, loaded: false, loading: false, error: undefined, modelId }));
     if (mediapipeStatus.loaded || mediapipeStatus.loading) {
-      setMediapipeStatus(prev => ({ ...prev, loaded: false, modelId }));
       addNotification(`Switched to ${MEDIAPIPE_MODELS[modelId].label} — will download on next use`, "success");
     }
   }, [mediapipeConfig, mediapipeStatus.loaded, mediapipeStatus.loading, addNotification]);

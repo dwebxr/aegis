@@ -4,6 +4,7 @@ export const LOCAL_INIT_WAIT_MS = 15_000;
 export const LOCAL_QUEUE_WAIT_MS = 15_000;
 export const LOCAL_INTERRUPT_GRACE_MS = 5_000;
 export const LOCAL_INIT_COOLDOWN_MS = 60_000;
+export const LOCAL_RECOVERY_COOLDOWN_MS = 5 * 60_000;
 export const LOCAL_SCORE_TIMEOUT_MS = 45_000;
 export const LOCAL_TRANSLATE_TIMEOUT_MS = 60_000;
 
@@ -34,6 +35,39 @@ export class LocalEngineInitFailedError extends LocalEngineTransientError {
   }
 }
 
+export class LocalEngineUnavailableError extends Error {
+  constructor(public readonly engine: LocalEngine, message: string, public readonly cause: unknown) {
+    super(message);
+    this.name = new.target.name;
+  }
+}
+
+/** Retry only known temporary failures; unsupported hardware/models need a change. */
+export function createLocalEngineInitError(engine: LocalEngine, message: string, cause: unknown): LocalEngineInitFailedError | LocalEngineUnavailableError {
+  const permanent = /WebGPU not available|No GPU adapter found|not supported|unsupported|out of memory|allocation failed|\b40[01345]\b/i.test(message);
+  const transient = /Failed to fetch|Load failed|NetworkError|network (?:request failed|error)|fetch failed|ECONNRESET|ECONNREFUSED|timed?\s*out|\btimeout\b|\b(?:408|429|5\d\d)\b|device (?:was )?lost/i.test(message);
+  return !permanent && transient
+    ? new LocalEngineInitFailedError(engine, message, cause)
+    : new LocalEngineUnavailableError(engine, message, cause);
+}
+
+export class LocalEngineRecoveringError extends LocalEngineTransientError {
+  constructor(engine: LocalEngine) {
+    super(engine, "The browser AI engine is recovering after a stalled request. Please retry in a few minutes.");
+  }
+}
+
+const recoveringUntil = new Map<LocalEngine, number>();
+
+export function clearLocalEngineRecovery(engine: LocalEngine): void {
+  recoveringUntil.delete(engine);
+}
+
+export function assertLocalEngineReady(engine: LocalEngine): void {
+  if (Date.now() < (recoveringUntil.get(engine) ?? 0)) throw new LocalEngineRecoveringError(engine);
+  recoveringUntil.delete(engine);
+}
+
 export class LocalEngineTimeoutError extends LocalEngineTransientError {
   constructor(engine: LocalEngine) {
     super(engine, "The browser AI request timed out and was interrupted. Please retry shortly.");
@@ -41,6 +75,7 @@ export class LocalEngineTimeoutError extends LocalEngineTransientError {
 }
 
 interface Job {
+  priority: "scoring" | "translation";
   start: () => void;
   cancel: () => void;
 }
@@ -66,15 +101,18 @@ export function resetLocalEngine(instance: object): void {
   queue.active?.cancel();
 }
 
-export async function runWithLocalEngine<E extends object, T>({ engine, init, infer, inferTimeoutMs, interrupt, destroy }: {
+export async function runWithLocalEngine<E extends object, T>({ engine, init, infer, inferTimeoutMs, interrupt, destroy, priority = "translation" }: {
   engine: LocalEngine;
   init: () => Promise<E>;
   infer: (engine: E) => Promise<T>;
   inferTimeoutMs: number;
   interrupt: (engine: E) => void | Promise<void>;
   destroy: (engine: E) => void | Promise<void>;
+  priority?: "scoring" | "translation";
 }): Promise<T> {
+  assertLocalEngineReady(engine);
   const instance = await withTimeout(init(), LOCAL_INIT_WAIT_MS, new LocalEngineInitPendingError(engine));
+  assertLocalEngineReady(engine);
   let queue = queues.get(instance);
   if (!queue) {
     queue = { waiting: [], destroyed: false };
@@ -102,6 +140,7 @@ export async function runWithLocalEngine<E extends object, T>({ engine, init, in
       if (!state.destroyed) state.waiting.shift()?.start();
     };
     const job: Job = {
+      priority,
       start: () => {
         clearTimeout(queueTimer);
         state.active = job;
@@ -118,6 +157,7 @@ export async function runWithLocalEngine<E extends object, T>({ engine, init, in
           // Keep the slot until the original promise settles after interruption.
           // MediaPipe cancellation cannot stop prefilling, so bound that wait too.
           safetyTimer = setTimeout(() => {
+            recoveringUntil.set(engine, Date.now() + LOCAL_RECOVERY_COOLDOWN_MS);
             resetLocalEngine(instance);
             try { void Promise.resolve(destroy(instance)).catch(() => {}); } catch { /* already retired */ }
           }, LOCAL_INTERRUPT_GRACE_MS);
@@ -131,7 +171,9 @@ export async function runWithLocalEngine<E extends object, T>({ engine, init, in
       },
     };
     if (state.active) {
-      state.waiting.push(job);
+      const firstTranslation = priority === "scoring" ? state.waiting.findIndex(waiter => waiter.priority === "translation") : -1;
+      if (firstTranslation === -1) state.waiting.push(job);
+      else state.waiting.splice(firstTranslation, 0, job);
       queueTimer = setTimeout(() => {
         const index = state.waiting.indexOf(job);
         if (index !== -1) state.waiting.splice(index, 1);

@@ -7,7 +7,7 @@ if (!AbortSignal.timeout) AbortSignal.timeout = () => new AbortController().sign
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { ContentItem } from "@/lib/types/content";
-import { LocalEngineBusyError, resetLocalEngine } from "@/lib/localAI/budget";
+import { LocalEngineBusyError, LocalEngineInitFailedError, LocalEngineUnavailableError, resetLocalEngine, clearLocalEngineRecovery } from "@/lib/localAI/budget";
 import { translateContent } from "@/lib/translation/engine";
 import type { TranslationBackend, TranslationLanguage } from "@/lib/translation/types";
 
@@ -67,6 +67,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   resetLocalEngine(mockInstance);
+  clearLocalEngineRecovery(mockBrowser);
   globalThis.fetch = originalFetch;
   jest.useRealTimers();
 });
@@ -131,9 +132,9 @@ describe.each(["mediapipe", "webllm"] as const)("%s translation retries with rea
     expect(mockInfer).toHaveBeenCalledTimes(4);
   });
 
-  it.each(["auto", "browser"] as const)("caps %s transient failures per item at three waves and still permits manual retry", async backend => {
+  it.each(["auto", "browser"] as const)("caps %s init failures per item at three waves and still permits manual retry", async backend => {
     mockBackend = backend;
-    mockInit.mockRejectedValue(new LocalEngineBusyError(browser));
+    mockInit.mockRejectedValue(new LocalEngineInitFailedError(browser, "Failed to fetch", new Error("network")));
     const { result, items, patch, rerender } = harness(2);
     await act(async () => {
       for (const item of items) result.current.requestAutoTranslate(item.id);
@@ -142,6 +143,7 @@ describe.each(["mediapipe", "webllm"] as const)("%s translation retries with rea
     await act(async () => { await jest.advanceTimersByTimeAsync(120_000); });
     expect(mockInit).toHaveBeenCalledTimes(6);
     expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining("Translateで再試行"), "info");
+    expect(mockNotify).not.toHaveBeenCalledWith(expect.stringContaining("IC LLM"), expect.anything());
     rerender();
     await act(async () => {
       for (const item of items) result.current.requestAutoTranslate(item.id);
@@ -159,6 +161,78 @@ describe.each(["mediapipe", "webllm"] as const)("%s translation retries with rea
     rerender();
     await act(async () => { await jest.advanceTimersByTimeAsync(1_000); });
     expect(patch).toHaveBeenCalledTimes(2); // new target language gets a fresh budget
+  });
+
+  // Adapted from the external slow2 probe: exercise the real queue and retry timer,
+  // with assertions on eventual throughput rather than diagnostic console output.
+  it.each(["browser", "auto"] as const)("%s translates all eight items with 20s inference and no engine failures", async backend => {
+    mockBackend = backend;
+    mockInfer.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve("この記事は科学の進歩について説明しています。"), 20_000)));
+    const { result, items, patch } = harness(8);
+    await act(async () => {
+      for (const item of items) result.current.requestAutoTranslate(item.id);
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    for (let minute = 0; minute < 10; minute++) {
+      await act(async () => { await jest.advanceTimersByTimeAsync(60_000); });
+    }
+    expect(patch).toHaveBeenCalledTimes(8);
+    expect(mockInfer).toHaveBeenCalledTimes(8);
+    expect(items.every(item => item.translation?.backend === browser)).toBe(true);
+    expect(mockInterrupt).not.toHaveBeenCalled();
+    expect(mockDestroy).not.toHaveBeenCalled();
+    expect(mockNotify).not.toHaveBeenCalledWith(expect.stringContaining("Translateで再試行"), expect.anything());
+  });
+
+  it.each(["browser", "auto"] as const)("%s keeps initialization pending beyond three retry waves", async backend => {
+    mockBackend = backend;
+    let loaded!: (value: typeof mockInstance) => void;
+    mockInit.mockReturnValue(new Promise(resolve => { loaded = resolve; }));
+    const { result, items, patch } = harness(1);
+    await act(async () => {
+      result.current.requestAutoTranslate(items[0].id);
+      await jest.advanceTimersByTimeAsync(240_000);
+      loaded(mockInstance);
+      await jest.advanceTimersByTimeAsync(1_000);
+    });
+    expect(mockInit).toHaveBeenCalledTimes(5);
+    expect(patch).toHaveBeenCalledTimes(1);
+    expect(mockNotify).not.toHaveBeenCalledWith(expect.stringContaining("Translateで再試行"), expect.anything());
+  });
+
+  it.each(["browser", "auto"] as const)("%s stops automatic retries after three actual inference timeouts", async backend => {
+    mockBackend = backend;
+    let cancelled!: (reason: Error) => void;
+    mockInfer.mockImplementation(() => new Promise((_, reject) => { cancelled = reject; }));
+    mockInterrupt.mockImplementation(() => { cancelled(new Error("interrupted")); });
+    const { result, items, patch } = harness(1);
+    await act(async () => {
+      result.current.requestAutoTranslate(items[0].id);
+      await jest.advanceTimersByTimeAsync(600_000);
+      result.current.requestAutoTranslate(items[0].id);
+      await jest.advanceTimersByTimeAsync(60_000);
+    });
+    expect(mockInfer).toHaveBeenCalledTimes(3);
+    expect(mockInterrupt).toHaveBeenCalledTimes(3);
+    expect(mockDestroy).not.toHaveBeenCalled();
+    expect(patch).not.toHaveBeenCalled();
+    expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining("Translateで再試行"), "info");
+    expect(mockNotify).not.toHaveBeenCalledWith(expect.stringContaining("IC LLM"), expect.anything());
+  });
+
+  it("shows a terminal Browser error without promising retries for permanent initialization failure", async () => {
+    mockBackend = "browser";
+    mockInit.mockRejectedValue(new LocalEngineUnavailableError(browser, "No GPU adapter found", null));
+    const { result, items } = harness(1);
+    await act(async () => {
+      result.current.requestAutoTranslate(items[0].id);
+      await jest.advanceTimersByTimeAsync(600_000);
+      result.current.requestAutoTranslate(items[0].id);
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    expect(mockInit).toHaveBeenCalledTimes(1);
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    expect(mockNotify).toHaveBeenCalledWith("Translation failed: No GPU adapter found", "error");
   });
 
   it("interrupts a translation timeout and allows the next wave to use the slot", async () => {

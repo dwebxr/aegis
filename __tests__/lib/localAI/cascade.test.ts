@@ -30,7 +30,7 @@ import { runScoringCascade } from "@/contexts/content/scoring";
 import { destroyInference, scoreWithMediaPipe } from "@/lib/mediapipe/engine";
 import { destroyEngine, scoreWithWebLLM } from "@/lib/webllm/engine";
 import { translateContent } from "@/lib/translation/engine";
-import { LocalEngineBusyError, LocalEngineInitPendingError, LocalEngineTimeoutError } from "@/lib/localAI/budget";
+import { LocalEngineBusyError, LocalEngineInitPendingError, LocalEngineTimeoutError, LocalEngineRecoveringError, LocalEngineUnavailableError } from "@/lib/localAI/budget";
 import { _resetIcLlmCircuit } from "@/lib/ic/icLlmCircuitBreaker";
 import type { _SERVICE } from "@/lib/ic/declarations";
 
@@ -124,6 +124,62 @@ describe.each(["mediapipe", "webllm"] as const)("%s cascade using real engine bu
     await translation;
     expect(await cascade).toMatchObject({ scoringEngine: browser });
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("serves scoring next when it arrives behind three queued translations", async () => {
+    mockGenerate
+      .mockImplementationOnce(() => new Promise(resolve => setTimeout(() => resolve("これは翻訳された記事です。"), 1_000)))
+      .mockResolvedValueOnce(score)
+      .mockResolvedValue("これは翻訳された記事です。");
+    const active = translateContent({ ...options, backend: "browser" });
+    await jest.advanceTimersByTimeAsync(0);
+    const queued = Array.from({ length: 3 }, () => translateContent({ ...options, backend: "browser" }));
+    await jest.advanceTimersByTimeAsync(0);
+    const cascade = runScoringCascade("article", null, { current: null }, false);
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(await cascade).toMatchObject({ scoringEngine: browser });
+    for (const translation of [active, ...queued]) {
+      await expect(translation).resolves.toMatchObject({ backend: browser });
+    }
+    expect(mockGenerate).toHaveBeenCalledTimes(5);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("falls through recovering engines for scoring and Auto, and reports Browser recovery without reloading", async () => {
+    mockGenerate.mockReturnValueOnce(new Promise(() => {}));
+    const scoreContent = browser === "mediapipe" ? scoreWithMediaPipe : scoreWithWebLLM;
+    const timedOut = expect(scoreContent("hung", [])).rejects.toBeInstanceOf(LocalEngineTimeoutError);
+    await jest.advanceTimersByTimeAsync(50_000);
+    await timedOut;
+    const translateOnChain = jest.fn().mockResolvedValue({ ok: "これはフォールバックで翻訳された記事です。" });
+    const actorRef = { current: { translateOnChain } as unknown as _SERVICE };
+    for (let minute = 0; minute < 5; minute++) {
+      await expect(runScoringCascade("article", null, { current: null }, false)).resolves.toMatchObject({ scoringEngine: "claude-server" });
+      await expect(translateContent({ ...options, actorRef, isAuthenticated: true })).resolves.toMatchObject({ backend: "ic-llm" });
+      await expect(translateContent({ ...options, backend: "browser" })).rejects.toBeInstanceOf(LocalEngineRecoveringError);
+      await expect(translateContent(options)).rejects.toBeInstanceOf(LocalEngineRecoveringError);
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockGenerate).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(60_000);
+    }
+    mockInstance = makeInstance();
+    mockCreate.mockResolvedValue(mockInstance);
+    await expect(scoreContent("fresh", [])).resolves.toMatchObject({ composite: 8 });
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["WebGPU not available", "No GPU adapter found", "Model download HTTP 404"])("Auto skips permanent init failure and Browser surfaces it: %s", async message => {
+    mockCreate.mockRejectedValue(new Error(message));
+    const translateOnChain = jest.fn().mockResolvedValue({ ok: "これはフォールバックで翻訳された記事です。" });
+    const actorRef = { current: { translateOnChain } as unknown as _SERVICE };
+    await expect(translateContent({ ...options, backend: "browser" })).rejects.toBeInstanceOf(LocalEngineUnavailableError);
+    await expect(translateContent({ ...options, actorRef, isAuthenticated: true })).resolves.toMatchObject({ backend: "ic-llm" });
+    await expect(translateContent(options)).resolves.toMatchObject({ status: "skip", reason: "all-backends-failed" });
+    await expect(runScoringCascade("article", null, { current: null }, false)).resolves.toMatchObject({ scoringEngine: "claude-server" });
+    await jest.advanceTimersByTimeAsync(600_000);
+    await expect(translateContent({ ...options, backend: "browser" })).rejects.toBeInstanceOf(LocalEngineUnavailableError);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockGenerate).not.toHaveBeenCalled();
   });
 
   it.each([true, false])("Auto tries IC after a local transient (IC success: %s)", async succeeds => {

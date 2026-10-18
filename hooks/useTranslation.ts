@@ -14,7 +14,12 @@ import type { ContentItem } from "@/lib/types/content";
 import type { ContentSyncStatus } from "@/contexts/content/types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
-import { LocalEngineTransientError } from "@/lib/localAI/budget";
+import {
+  LocalEngineTransientError,
+  LocalEngineTimeoutError,
+  LocalEngineInitFailedError,
+  LocalEngineUnavailableError,
+} from "@/lib/localAI/budget";
 
 // Auto-translation queue concurrency. Rendered cards enqueue their own
 // item IDs; the queue pumps at most four in-flight translations and
@@ -22,7 +27,7 @@ import { LocalEngineTransientError } from "@/lib/localAI/budget";
 // reaches any backend. Manual Translate bypasses this queue.
 const MAX_CONCURRENT = 4;
 const RETRY_INTERVAL_MS = 60_000;
-const MAX_LOCAL_TRANSIENT_ATTEMPTS = 3;
+const MAX_LOCAL_FAILURES = 3;
 
 // Cap on how long we wait for the IC actor before starting auto-
 // translate without it in the cascade. Prevents stranding items if
@@ -34,7 +39,7 @@ const AUTO_NO_BACKEND_MESSAGE =
 const EXPLICIT_BACKEND_UNAVAILABLE_MESSAGE = (backendLabel: string) =>
   `選択した翻訳バックエンド(${backendLabel})が利用できません — Settings→Translationで変更してください`;
 const AUTO_ALL_BACKENDS_FAILED_MESSAGE =
-  "一部の記事を翻訳できませんでした(IC LLMが不安定な場合があります)。未翻訳の記事は展開してTranslateで再試行できます";
+  "一部の記事を翻訳できませんでした。未翻訳の記事は展開してTranslateで再試行できます";
 
 const BACKEND_LABELS: Record<TranslationBackend, string> = {
   auto: "Auto",
@@ -175,14 +180,23 @@ export function useTranslation(
     } catch (err) {
       attempted.failed.add(item.id);
       if (err instanceof LocalEngineTransientError) {
-        const attempts = (attempted.localAttempts.get(item.id) ?? 0) + 1;
+        // Queue contention, model downloads and recovery waits are not failures.
+        const countsTowardCap = err instanceof LocalEngineTimeoutError || err instanceof LocalEngineInitFailedError;
+        const attempts = (attempted.localAttempts.get(item.id) ?? 0) + (countsTowardCap ? 1 : 0);
         if (callerKind === "auto") attempted.localAttempts.set(item.id, attempts);
-        if (callerKind === "auto" && attempts >= MAX_LOCAL_TRANSIENT_ATTEMPTS) {
+        if (callerKind === "auto" && attempts >= MAX_LOCAL_FAILURES) {
           attempted.failed.delete(item.id);
           outcome = { status: "skip", reason: "all-backends-failed", attempted: attempts };
         } else if (localPendingNotifiedLangRef.current !== p.targetLanguage) {
           localPendingNotifiedLangRef.current = p.targetLanguage;
           notifyRef.current(callerKind === "auto" ? `${err.message} Translation will retry automatically.` : err.message, "info");
+        }
+      } else if (err instanceof LocalEngineUnavailableError) {
+        attempted.failed.delete(item.id);
+        attempted.skip.add(item.id);
+        if (failNotifiedLangRef.current !== p.targetLanguage) {
+          failNotifiedLangRef.current = p.targetLanguage;
+          notifyRef.current(`Translation failed: ${err.message}`, "error");
         }
       } else if (err instanceof TranslationBackendUnavailableError) {
         if (!explicitBackendUnavailableNotifiedRef.current) {

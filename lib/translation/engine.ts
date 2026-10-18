@@ -24,7 +24,12 @@ import { isMediaPipeEnabled } from "@/lib/mediapipe/storage";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
-import { LOCAL_TRANSLATE_TIMEOUT_MS, LocalEngineTransientError, runWithLocalEngine } from "@/lib/localAI/budget";
+import {
+  LOCAL_TRANSLATE_TIMEOUT_MS,
+  LocalEngineTransientError,
+  LocalEngineUnavailableError,
+  runWithLocalEngine,
+} from "@/lib/localAI/budget";
 
 // iOS Safari throws `TypeError: Load failed` from `fetch()` during app
 // state transitions (wifi → cellular, background → foreground, Service
@@ -433,7 +438,7 @@ async function translateContentInner(
     return makeSkip("no-backend", 0);
   }
 
-  const failures: Array<{ name: string; reason: string }> = [];
+  const failures: Array<{ name: string; reason: string; permanent?: boolean }> = [];
   let localTransient: LocalEngineTransientError | undefined;
   let attempted = 0;
 
@@ -447,7 +452,7 @@ async function translateContentInner(
       if (err instanceof LocalEngineTransientError) localTransient = err;
       const reason = errMsg(err);
       console.warn(`[translate] ${attempt.name} transport error:`, reason);
-      failures.push({ name: attempt.name, reason });
+      failures.push({ name: attempt.name, reason, permanent: err instanceof LocalEngineUnavailableError });
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "transport-error", reason, elapsedMs: Date.now() - startedAt,
@@ -543,7 +548,7 @@ async function translateContentInner(
   // silent-skip — retrying the same input against the same backends
   // in 60s won't change the outcome.
   const summary = failures.map(f => `${f.name}: ${f.reason}`).join(" | ");
-  if (failures.length > 0 && failures.every(f => INFRA_ERROR_RE.test(f.reason))) {
+  if (failures.length > 0 && failures.every(f => !f.permanent && INFRA_ERROR_RE.test(f.reason))) {
     span.setAttribute("translate.result", "infra-error");
     const error = new Error(
       failures.length === 1

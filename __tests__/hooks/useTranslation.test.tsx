@@ -366,7 +366,7 @@ describe("useTranslation — outcome handling", () => {
     await waitFor(() => expect(mockTranslateContent).toHaveBeenCalledTimes(2));
     await waitFor(() => {
       expect(mockAddNotification).toHaveBeenCalledWith(
-        "一部の記事を翻訳できませんでした(IC LLMが不安定な場合があります)。未翻訳の記事は展開してTranslateで再試行できます",
+        "一部の記事を翻訳できませんでした。未翻訳の記事は展開してTranslateで再試行できます",
         "info",
       );
     });
