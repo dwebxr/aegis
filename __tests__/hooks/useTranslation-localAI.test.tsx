@@ -315,6 +315,46 @@ describe.each(["mediapipe", "webllm"] as const)("%s translation retries with rea
     expect(mockInit).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a BYOK infra failure retryable when the browser engine is permanently unavailable", async () => {
+    mockInit.mockRejectedValue(new LocalEngineUnavailableError(browser, "No GPU adapter found", null));
+    mockApiKey = "test-key";
+    globalThis.fetch = jest.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValue({ ok: true, json: async () => ({ translation: "この記事は科学の進歩を説明しています。" }) });
+    const { result, items, patch } = harness(1);
+    await act(async () => {
+      result.current.requestAutoTranslate(items[0].id);
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(patch).not.toHaveBeenCalled();
+    await act(async () => { await jest.advanceTimersByTimeAsync(61_000); });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    expect(patch).toHaveBeenCalledTimes(1);
+    expect(items[0].translation?.backend).toBe("claude-byok");
+  });
+
+  it("re-queues an in-flight item for the new language after a target-language change", async () => {
+    mockLanguage = "fr";
+    let rejectFirst!: (reason: Error) => void;
+    mockInfer.mockImplementationOnce(() => new Promise((_, reject) => { rejectFirst = reject; }));
+    const { result, items, patch, rerender } = harness(1);
+    await act(async () => {
+      result.current.requestAutoTranslate(items[0].id);
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    expect(mockInfer).toHaveBeenCalledTimes(1);
+    mockLanguage = "ja";
+    rerender();
+    await act(async () => {
+      rejectFirst(new Error("network error"));
+      await jest.advanceTimersByTimeAsync(5_000);
+    });
+    expect(mockInfer).toHaveBeenCalledTimes(2);
+    expect(patch).toHaveBeenCalledTimes(1);
+    expect(items[0].translation?.targetLanguage).toBe("ja");
+  });
+
   it.each(["soft rejection", "transport failure"])("keeps local transient retryable when BYOK only has a %s", async kind => {
     const failure = new LocalEngineBusyError(browser);
     mockInit.mockRejectedValue(failure);

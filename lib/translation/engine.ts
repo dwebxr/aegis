@@ -548,7 +548,10 @@ async function translateContentInner(
   // silent-skip — retrying the same input against the same backends
   // in 60s won't change the outcome.
   const summary = failures.map(f => `${f.name}: ${f.reason}`).join(" | ");
-  if (failures.length > 0 && failures.every(f => !f.permanent && INFRA_ERROR_RE.test(f.reason))) {
+  // A permanently unavailable tier (no WebGPU, no adapter) can never answer,
+  // so it must not veto a retry the remaining tiers' infra failures deserve.
+  const retryable = failures.filter(f => !f.permanent);
+  if (retryable.length > 0 && retryable.every(f => INFRA_ERROR_RE.test(f.reason))) {
     span.setAttribute("translate.result", "infra-error");
     const error = new Error(
       failures.length === 1

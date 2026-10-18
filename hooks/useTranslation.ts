@@ -217,6 +217,16 @@ export function useTranslation(
       return next;
     });
 
+    // The target language changed while this request was in flight: its
+    // result belongs to the discarded language, and the language-change
+    // effect skipped this item because it was still active. Drop the stale
+    // result and queue the item again for the current language.
+    if (attemptedRef.current !== attempted) {
+      if (callerKind === "auto" && autoRequestedIdsRef.current.has(item.id)) enqueueAutoRequest(item.id, false);
+      pumpRef.current();
+      return;
+    }
+
     if (outcome && !isTranslationSkip(outcome)) {
       attempted.failed.delete(item.id);
       attempted.localAttempts.delete(item.id);
@@ -258,7 +268,7 @@ export function useTranslation(
     // slots would otherwise strand queued auto items until an unrelated
     // content/prefs change.
     pumpRef.current();
-  }, [actorRef]);
+  }, [actorRef, enqueueAutoRequest]);
 
   const pumpAutoQueue = useCallback(() => {
     if (!isReadyRef.current) return;
