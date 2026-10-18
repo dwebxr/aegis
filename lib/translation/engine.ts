@@ -20,12 +20,11 @@ import {
 } from "@/lib/ic/icLlmCircuitBreaker";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
-import { isWebLLMLoaded } from "@/lib/webllm/engine";
 import { isMediaPipeEnabled } from "@/lib/mediapipe/storage";
-import { isMediaPipeLoaded } from "@/lib/mediapipe/engine";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
+import { LOCAL_TRANSLATE_TIMEOUT_MS, LocalEngineTransientError, runWithLocalEngine } from "@/lib/localAI/budget";
 
 // iOS Safari throws `TypeError: Load failed` from `fetch()` during app
 // state transitions (wifi → cellular, background → foreground, Service
@@ -66,19 +65,27 @@ async function translateWithOllama(prompt: string): Promise<string> {
 
 async function translateWithWebLLM(prompt: string): Promise<string> {
   const { getOrCreateEngine } = await import("@/lib/webllm/engine");
-  const eng = await getOrCreateEngine();
-  const response = await eng.chat.completions.create({
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.2,
-    max_tokens: 4000,
+  const response = await runWithLocalEngine({
+    engine: "webllm",
+    init: getOrCreateEngine,
+    infer: eng => eng.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      max_tokens: 4000,
+    }),
+    inferTimeoutMs: LOCAL_TRANSLATE_TIMEOUT_MS,
   });
   return response.choices[0]?.message?.content?.trim() ?? "";
 }
 
 async function translateWithMediaPipe(prompt: string): Promise<string> {
   const { getOrCreateInference } = await import("@/lib/mediapipe/engine");
-  const inf = await getOrCreateInference();
-  const raw = await inf.generateResponse(prompt);
+  const raw = await runWithLocalEngine({
+    engine: "mediapipe",
+    init: getOrCreateInference,
+    infer: inf => inf.generateResponse(prompt),
+    inferTimeoutMs: LOCAL_TRANSLATE_TIMEOUT_MS,
+  });
   return raw.trim();
 }
 
@@ -384,9 +391,9 @@ async function translateContentInner(
   if (isOllamaEnabled()) {
     attempts.push({ name: "ollama", fn: () => translateWithOllama(prompt) });
   }
-  if (isMediaPipeEnabled() && isMediaPipeLoaded()) {
+  if (isMediaPipeEnabled()) {
     attempts.push({ name: "mediapipe", fn: () => translateWithMediaPipe(prompt) });
-  } else if (isWebLLMEnabled() && isWebLLMLoaded()) {
+  } else if (isWebLLMEnabled()) {
     attempts.push({ name: "webllm", fn: () => translateWithWebLLM(prompt) });
   }
   const byokKey = getUserApiKey();
@@ -423,6 +430,7 @@ async function translateContentInner(
   }
 
   const failures: Array<{ name: string; reason: string }> = [];
+  let localTransient: LocalEngineTransientError | undefined;
   let attempted = 0;
 
   for (const attempt of attempts) {
@@ -432,6 +440,7 @@ async function translateContentInner(
     try {
       raw = await attempt.fn();
     } catch (err) {
+      if (err instanceof LocalEngineTransientError) localTransient = err;
       const reason = errMsg(err);
       console.warn(`[translate] ${attempt.name} transport error:`, reason);
       failures.push({ name: attempt.name, reason });
@@ -501,6 +510,7 @@ async function translateContentInner(
     }
     const skipReason = definitiveSkipReason(attempt.name, outcome.reason, targetLanguage, text);
     if (skipReason) {
+      if (skipReason !== "already-in-target" && localTransient) throw localTransient;
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "skip", reason: `untranslatable: ${outcome.reason}`, elapsedMs,
@@ -514,6 +524,12 @@ async function translateContentInner(
       itemHint, targetLanguage, backend: attempt.name,
       outcome: "failed", reason: outcome.reason, elapsedMs,
     });
+  }
+
+  // Keep browser loading/busy/timeouts retryable even alongside validator failures.
+  if (localTransient) {
+    span.setAttribute("translate.result", "local-transient");
+    throw localTransient;
   }
 
   // Cascade exhausted. Throw a user-visible notification only when

@@ -143,13 +143,13 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ mobile }) => {
     const updated = { ...mediapipeConfig, modelId };
     setMediaPipeConfig(updated);
     setMediapipeConfigState(updated);
-    if (mediapipeStatus.loaded) {
+    if (mediapipeStatus.loaded || mediapipeStatus.loading) {
       const { destroyInference } = await import("@/lib/mediapipe/engine");
       await destroyInference();
       setMediapipeStatus(prev => ({ ...prev, loaded: false, modelId }));
       addNotification(`Switched to ${MEDIAPIPE_MODELS[modelId].label} — will download on next use`, "success");
     }
-  }, [mediapipeConfig, mediapipeStatus.loaded, addNotification]);
+  }, [mediapipeConfig, mediapipeStatus.loaded, mediapipeStatus.loading, addNotification]);
 
   const handleOllamaToggle = useCallback(async () => {
     const newEnabled = !ollamaConfig.enabled;

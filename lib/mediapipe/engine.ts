@@ -7,6 +7,8 @@ import { parseScoreResponse } from "@/lib/scoring/parseResponse";
 import { createStatusEmitter } from "@/lib/utils/statusEmitter";
 import type { ScoreParseResult } from "@/lib/scoring/types";
 import { isWebGPUAvailable } from "@/lib/utils/webgpu";
+import { withTimeout } from "@/lib/utils/timeout";
+import { LOCAL_SCORE_TIMEOUT_MS, LocalEngineInitPendingError, runWithLocalEngine } from "@/lib/localAI/budget";
 
 // Re-exported so existing callers (and tests) can keep importing from
 // "@/lib/mediapipe/engine".
@@ -17,6 +19,8 @@ export const MEDIAPIPE_GENAI_VERSION = "0.10.29";
 let inference: LlmInference | null = null;
 let inferencePromise: Promise<LlmInference> | null = null;
 let loadedModelId: MediaPipeModelId | null = null;
+let initializingModelId: MediaPipeModelId | null = null;
+let generation = 0;
 
 const { emit: emitStatus, onStatusChange } = createStatusEmitter<MediaPipeStatus>({
   available: false,
@@ -27,6 +31,7 @@ const { emit: emitStatus, onStatusChange } = createStatusEmitter<MediaPipeStatus
 export { onStatusChange };
 
 export async function isWebGPUUsable(): Promise<boolean> {
+  const currentGeneration = generation;
   if (!isWebGPUAvailable()) {
     emitStatus({ available: false, error: "WebGPU not available" });
     return false;
@@ -37,6 +42,7 @@ export async function isWebGPUUsable(): Promise<boolean> {
     return false;
   }
   const adapter = await gpu.requestAdapter();
+  if (currentGeneration !== generation) return adapter !== null;
   if (!adapter) {
     emitStatus({ available: false, error: "No GPU adapter found" });
     return false;
@@ -66,30 +72,40 @@ function describeError(err: unknown): string {
 export async function getOrCreateInference(): Promise<LlmInference> {
   const selectedId = getSelectedMediaPipeModelId();
 
-  if (inference && loadedModelId !== selectedId) {
+  if (
+    (inference && loadedModelId !== selectedId) ||
+    (inferencePromise && initializingModelId !== selectedId)
+  ) {
     await destroyInference();
+    return getOrCreateInference();
   }
   if (inference) return inference;
   if (inferencePromise) return inferencePromise;
 
-  inferencePromise = (async () => {
-    if (!(await isWebGPUUsable())) {
-      throw new Error("WebGPU not available");
-    }
+  const initGeneration = generation;
+  initializingModelId = selectedId;
+  const modelDef = MEDIAPIPE_MODELS[selectedId];
+  const basePath = `/vendor/mediapipe/tasks-genai@${MEDIAPIPE_GENAI_VERSION}/wasm`;
+  const isCurrent = () => initGeneration === generation;
+  const checkCurrent = async () => {
+    if (isCurrent() && selectedId !== getSelectedMediaPipeModelId()) await destroyInference();
+    if (!isCurrent()) throw new LocalEngineInitPendingError("mediapipe");
+  };
 
-    emitStatus({ available: true, loading: true, modelId: selectedId });
-
-    const { FilesetResolver, LlmInference: LlmInferenceCtor } = await import(
-      "@mediapipe/tasks-genai"
-    );
-    // Pin to installed version to prevent JS/wasm version mismatch
-    const genai = await FilesetResolver.forGenAiTasks(
-      `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@${MEDIAPIPE_GENAI_VERSION}/wasm`,
-    );
-
-    const modelDef = MEDIAPIPE_MODELS[selectedId];
-
+  const pending = (async () => {
+    let resolvingFiles = false;
+    emitStatus({ loading: true, error: undefined, modelId: selectedId });
     try {
+      if (!(await isWebGPUUsable())) throw new Error("WebGPU not available");
+      await checkCurrent();
+
+      const { FilesetResolver, LlmInference: LlmInferenceCtor } = await import(
+        "@mediapipe/tasks-genai"
+      );
+      await checkCurrent();
+      resolvingFiles = true;
+      const genai = await FilesetResolver.forGenAiTasks(basePath);
+      await checkCurrent();
       const created = await LlmInferenceCtor.createFromOptions(genai, {
         baseOptions: { modelAssetPath: modelDef.taskFileUrl },
         maxTokens: 1000,
@@ -97,44 +113,65 @@ export async function getOrCreateInference(): Promise<LlmInference> {
         temperature: 0.3,
         randomSeed: 42,
       });
+      if (!isCurrent() || selectedId !== getSelectedMediaPipeModelId()) {
+        created.close();
+        await checkCurrent();
+      }
       inference = created;
       loadedModelId = selectedId;
-      emitStatus({ loaded: true, loading: false, modelId: selectedId });
-      return inference;
+      emitStatus({ loaded: true, loading: false, error: undefined, modelId: selectedId });
+      return created;
     } catch (err) {
+      if (!isCurrent()) throw err;
       const msg = describeError(err);
       // Gemma 3n E2B / Gemma 4 E2B known issue: Array buffer allocation failed
-      if (
-        msg.includes("Array buffer allocation failed") ||
-        msg.toLowerCase().includes("out of memory")
-      ) {
-        emitStatus({
-          loading: false,
-          error: `Memory error: ${modelDef.label} is too large for this device. Switch to Gemma 3 1B in settings.`,
-          modelId: selectedId,
-        });
-      } else {
-        emitStatus({ loading: false, error: msg, modelId: selectedId });
+      const error = msg.includes("Array buffer allocation failed") || msg.toLowerCase().includes("out of memory")
+        ? `Memory error: ${modelDef.label} is too large for this device. Switch to Gemma 3 1B in settings.`
+        : msg;
+      emitStatus({ loading: false, error, modelId: selectedId });
+      if (resolvingFiles) {
+        let missing = false;
+        try {
+          const response = await withTimeout(
+            fetch(`${basePath}/genai_wasm_internal.js`, { method: "HEAD" }),
+            3_000,
+          );
+          missing = response.status === 404;
+        } catch {
+          // A failed probe cannot distinguish offline from a version change.
+        }
+        if (missing && isCurrent()) {
+          const updated = new Error("AI engine files were updated — reload the page to use the new version.");
+          emitStatus({ loading: false, error: updated.message, modelId: selectedId });
+          throw updated;
+        }
       }
       throw err;
     }
   })();
+  inferencePromise = pending;
 
-  inferencePromise.catch((err) => {
-    console.warn("[mediapipe] Engine creation failed:", describeError(err));
-    inferencePromise = null;
+  void pending.catch((err) => {
+    if (inferencePromise === pending) {
+      console.warn("[mediapipe] Engine creation failed:", describeError(err));
+      inferencePromise = null;
+      initializingModelId = null;
+    }
   });
-
-  return inferencePromise;
+  return pending;
 }
 
 export async function scoreWithMediaPipe(
   text: string,
   userTopics: string[],
 ): Promise<ScoreParseResult> {
-  const inf = await getOrCreateInference();
   const prompt = buildScoringPrompt(text, userTopics);
-  const raw = await inf.generateResponse(prompt);
+  const raw = await runWithLocalEngine({
+    engine: "mediapipe",
+    init: getOrCreateInference,
+    infer: inf => inf.generateResponse(prompt),
+    inferTimeoutMs: LOCAL_SCORE_TIMEOUT_MS,
+  });
   const result = parseScoreResponse(raw);
   if (!result) throw new Error("No JSON object found in MediaPipe response");
   return result;
@@ -145,11 +182,12 @@ export function isMediaPipeLoaded(): boolean {
 }
 
 export async function destroyInference(): Promise<void> {
-  if (inference) {
-    inference.close();
-  }
+  generation++;
+  const previous = inference;
   inference = null;
   inferencePromise = null;
   loadedModelId = null;
+  initializingModelId = null;
   emitStatus({ loaded: false, loading: false, modelId: undefined, error: undefined });
+  previous?.close();
 }

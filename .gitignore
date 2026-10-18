@@ -51,6 +51,7 @@ loadtest/last-run.json
 # serwist generated service worker
 public/sw.js
 public/sw.js.map
+public/vendor/mediapipe/
 
 # playwright
 /test-results/

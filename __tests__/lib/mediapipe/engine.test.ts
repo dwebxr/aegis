@@ -387,7 +387,7 @@ describe("getOrCreateInference", () => {
     await getOrCreateInference();
 
     expect(mockForGenAiTasks).toHaveBeenCalledWith(
-      `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@${MEDIAPIPE_GENAI_VERSION}/wasm`,
+      `/vendor/mediapipe/tasks-genai@${MEDIAPIPE_GENAI_VERSION}/wasm`,
     );
     expect(mockCreateFromOptions.mock.calls[0][0]).toBe(wasmFileset);
   });

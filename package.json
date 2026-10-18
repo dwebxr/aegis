@@ -7,7 +7,9 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "predev": "node scripts/copy-mediapipe-wasm.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-mediapipe-wasm.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

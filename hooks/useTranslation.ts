@@ -14,6 +14,7 @@ import type { ContentItem } from "@/lib/types/content";
 import type { ContentSyncStatus } from "@/contexts/content/types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
+import { LocalEngineTransientError } from "@/lib/localAI/budget";
 
 // Auto-translation queue concurrency. Rendered cards enqueue their own
 // item IDs; the queue pumps at most four in-flight translations and
@@ -118,6 +119,7 @@ export function useTranslation(
   // Debounce infrastructure error notifications per language; skip-based
   // visibility notifications are once per hook session.
   const failNotifiedLangRef = useRef("");
+  const localPendingNotifiedLangRef = useRef("");
   const autoNoBackendNotifiedRef = useRef(false);
   const explicitBackendUnavailableNotifiedRef = useRef(false);
   const autoAllBackendsFailedNotifiedRef = useRef(false);
@@ -170,7 +172,12 @@ export function useTranslation(
       outcome = await translateContent(opts);
     } catch (err) {
       attemptedRef.current.failed.add(item.id);
-      if (err instanceof TranslationBackendUnavailableError) {
+      if (err instanceof LocalEngineTransientError) {
+        if (localPendingNotifiedLangRef.current !== p.targetLanguage) {
+          localPendingNotifiedLangRef.current = p.targetLanguage;
+          notifyRef.current(callerKind === "auto" ? `${err.message} Translation will retry automatically.` : err.message, "info");
+        }
+      } else if (err instanceof TranslationBackendUnavailableError) {
         if (!explicitBackendUnavailableNotifiedRef.current) {
           explicitBackendUnavailableNotifiedRef.current = true;
           notifyRef.current(EXPLICIT_BACKEND_UNAVAILABLE_MESSAGE(BACKEND_LABELS[p.backend]), "error");
