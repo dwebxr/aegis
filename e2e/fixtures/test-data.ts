@@ -1,4 +1,5 @@
 /** Static mock data for E2E tests */
+import type { ContentItem } from "../../lib/types/content";
 
 export const MOCK_ANALYZE_QUALITY = {
   originality: 7,
@@ -85,7 +86,7 @@ export const QUALITY_TEXT =
 export const SLOP_TEXT = "WOW check this out!!!";
 
 /** Pre-scored content items for dashboard content card tests. */
-export const MOCK_CONTENT_ITEMS = [
+export const MOCK_CONTENT_ITEMS: ContentItem[] = [
   {
     id: "e2e-quality-1",
     owner: "e2e-test",

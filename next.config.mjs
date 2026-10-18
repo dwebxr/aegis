@@ -1,5 +1,6 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import withSerwist from "@serwist/next";
+import { buildContentSecurityPolicy } from "./lib/security/csp.cjs";
 
 /**
  * @type {import('next').NextConfig}
@@ -30,7 +31,7 @@ const nextConfig = {
           { key: "X-XSS-Protection", value: "1; mode=block" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://va.vercel-scripts.com https://browser.sentry-cdn.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data: blob:; connect-src 'self' https: wss:; font-src 'self' https://fonts.gstatic.com; frame-src https://www.youtube.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" },
+          { key: "Content-Security-Policy", value: buildContentSecurityPolicy(process.env.NODE_ENV) },
         ],
       },
     ];

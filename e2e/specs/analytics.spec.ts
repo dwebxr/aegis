@@ -24,11 +24,11 @@ test.describe("Analytics Tab", () => {
     await expect(authAnalyticsPage.page.getByText("Score Distribution")).toBeVisible();
   });
 
-  test("Evaluation Summary grid shows KPIs", async ({ authAnalyticsPage }) => {
-    await expect(authAnalyticsPage.evalSummary).toBeVisible();
-    await expect(authAnalyticsPage.evalSummary).toContainText("Total Evaluated");
-    await expect(authAnalyticsPage.evalSummary).toContainText("Quality Found");
-    await expect(authAnalyticsPage.evalSummary).toContainText("Slop Caught");
+  test("Activity Trends shows quality, burned, and total KPIs", async ({ authAnalyticsPage }) => {
+    await expect(authAnalyticsPage.activityTrends).toBeVisible();
+    await expect(authAnalyticsPage.activityTrends).toContainText(/\d+\s*quality/);
+    await expect(authAnalyticsPage.activityTrends).toContainText(/\d+\s*burned/);
+    await expect(authAnalyticsPage.activityTrends).toContainText(/\d+\s*total/);
   });
 
   test("demo mode shows analytics demo data banner", async ({ analyticsPage }) => {
@@ -36,9 +36,12 @@ test.describe("Analytics Tab", () => {
     await expect(analyticsPage.demoBanner).toContainText("demo data");
   });
 
-  test("Evaluation Summary shows Total Evaluated with numeric value", async ({ authAnalyticsPage }) => {
-    await expect(authAnalyticsPage.evalSummary).toContainText(/Total Evaluated/);
-    await expect(authAnalyticsPage.evalSummary).toContainText(/\d/);
+  test("Activity Trends shows numeric counts for each KPI", async ({ authAnalyticsPage }) => {
+    const activityTrends = authAnalyticsPage.activityTrends;
+    await expect(activityTrends.getByLabel("Quality items in this period", { exact: true })).toHaveText(/^\d+\s*quality$/);
+    // The slop-count KPI is labeled "burned" in the current UI.
+    await expect(activityTrends.getByLabel("Items burned (filtered as slop)", { exact: true })).toHaveText(/^\d+\s*burned$/);
+    await expect(activityTrends.getByLabel("Total items evaluated", { exact: true })).toHaveText(/^\d+\s*total$/);
   });
 
   test("heading and subtitle contain expected text", async ({ authAnalyticsPage }) => {

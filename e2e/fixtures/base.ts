@@ -1,6 +1,8 @@
 import { test as base } from "@playwright/test";
 import { setupApiMocks } from "./api-mocks";
 import { setupAuthMock } from "./auth-mock";
+import { isolateNetwork } from "./network-isolation";
+import { seedContentCache, emptyDemoFeed } from "./content-cache";
 import { MOCK_CONTENT_ITEMS } from "./test-data";
 import { LandingPage } from "../pages/landing.page";
 import { DashboardPage } from "../pages/dashboard.page";
@@ -65,6 +67,11 @@ export async function clickNav(page: import("@playwright/test").Page, id: string
 }
 
 export const test = base.extend<Fixtures>({
+  context: async ({ context }, use) => {
+    await isolateNetwork(context);
+    await use(context);
+  },
+
   landingPage: async ({ page }, use) => {
     await setupApiMocks(page);
     await page.goto("/");
@@ -81,9 +88,8 @@ export const test = base.extend<Fixtures>({
 
   seededDashboardPage: async ({ page }, use) => {
     await setupApiMocks(page);
-    await page.addInitScript((items) => {
-      localStorage.setItem("aegis-content-cache", JSON.stringify(items));
-    }, MOCK_CONTENT_ITEMS);
+    await emptyDemoFeed(page);
+    await seedContentCache(page, MOCK_CONTENT_ITEMS);
     await page.goto("/");
     await enterDemoMode(page);
     await use(new DashboardPage(page));
@@ -116,6 +122,8 @@ export const test = base.extend<Fixtures>({
 
   briefingPage: async ({ page }, use) => {
     await setupApiMocks(page);
+    // This fixture exercises the empty briefing, before any content is loaded.
+    await emptyDemoFeed(page);
     await page.goto("/");
     await enterDemoMode(page);
     await clickNav(page, "briefing");

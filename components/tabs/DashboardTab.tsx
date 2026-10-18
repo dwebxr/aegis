@@ -747,6 +747,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ content, mobile, onV
                 <button
                   key={mode}
                   data-testid={`aegis-home-mode-${mode}`}
+                  aria-pressed={active}
                   onClick={() => setHomeMode(mode)}
                   className={cn(
                     "px-3 py-2 rounded-sm text-body-sm font-semibold cursor-pointer font-[inherit] transition-fast capitalize",

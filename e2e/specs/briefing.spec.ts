@@ -9,12 +9,10 @@ test.describe("Briefing Tab — Empty State", () => {
 
   test("Start Evaluating button navigates to Incinerator", async ({ briefingPage }) => {
     await briefingPage.waitForLoaded();
-    // startEvalButton may not exist if onTabChange is not passed - check gracefully
     const button = briefingPage.startEvalButton;
-    if (await button.isVisible().catch(() => false)) {
-      await button.click();
-      await expect(briefingPage.page.getByTestId("aegis-incinerator-heading")).toBeVisible();
-    }
+    await expect(button).toBeVisible();
+    await button.click();
+    await expect(briefingPage.page.getByTestId("aegis-incinerator-heading")).toBeVisible();
   });
 });
 

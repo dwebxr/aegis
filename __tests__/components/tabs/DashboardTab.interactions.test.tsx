@@ -317,14 +317,25 @@ describe("DashboardTab — Loading state", () => {
 // ─── Mode toggle persistence ───
 
 describe("DashboardTab — Mode toggle", () => {
-  it("persists homeMode to localStorage", () => {
+  it("exposes the pressed mode and persists both toggle directions to localStorage", () => {
     render(
       <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
+    const feedButton = screen.getByRole("button", { name: "Feed" });
+    const dashboardButton = screen.getByRole("button", { name: "Dashboard" });
+    expect(feedButton).toHaveAttribute("aria-pressed", "true");
+    expect(dashboardButton).toHaveAttribute("aria-pressed", "false");
     expect(localStorage.getItem("aegis-home-mode")).toBe("feed");
 
-    fireEvent.click(screen.getByTestId("aegis-home-mode-dashboard"));
+    fireEvent.click(dashboardButton);
+    expect(feedButton).toHaveAttribute("aria-pressed", "false");
+    expect(dashboardButton).toHaveAttribute("aria-pressed", "true");
     expect(localStorage.getItem("aegis-home-mode")).toBe("dashboard");
+
+    fireEvent.click(feedButton);
+    expect(feedButton).toHaveAttribute("aria-pressed", "true");
+    expect(dashboardButton).toHaveAttribute("aria-pressed", "false");
+    expect(localStorage.getItem("aegis-home-mode")).toBe("feed");
   });
 
   it("restores homeMode from localStorage", () => {
@@ -333,6 +344,8 @@ describe("DashboardTab — Mode toggle", () => {
       <DashboardTab content={[makeItem()]} onValidate={jest.fn()} onFlag={jest.fn()} />
     );
     expect(screen.getByTestId("aegis-home-mode-dashboard").className).toContain("bg-card");
+    expect(screen.getByTestId("aegis-home-mode-dashboard")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("aegis-home-mode-feed")).toHaveAttribute("aria-pressed", "false");
   });
 });
 

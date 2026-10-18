@@ -1,6 +1,7 @@
 import { test, expect } from "../fixtures/base";
 import { setupApiMocks } from "../fixtures/api-mocks";
 import { setupAuthMock } from "../fixtures/auth-mock";
+import { seedContentCache } from "../fixtures/content-cache";
 import { MOCK_CONTENT_ITEMS } from "../fixtures/test-data";
 import { TIMEOUTS } from "../constants";
 
@@ -26,28 +27,32 @@ test.describe("Dashboard — Feed Mode", () => {
   test("quality filter button has aria-pressed=true by default", async ({ dashboardPage }) => {
     // Default verdictFilter is "quality" → aria-pressed should reflect this
     await expect(dashboardPage.filterButton("quality")).toHaveAttribute("aria-pressed", "true");
-    await expect(dashboardPage.filterButton("all")).toHaveAttribute("aria-pressed", "false");
+    await dashboardPage.openMoreFilters();
+    await expect(dashboardPage.filterButton("all")).toBeVisible();
+    await expect(dashboardPage.filterButton("all")).not.toHaveAttribute("aria-current", "true");
   });
 
-  test("clicking slop filter (in More filters) sets aria-pressed=true on slop button", async ({ dashboardPage }) => {
+  test("clicking slop filter (in More filters) marks it current", async ({ dashboardPage }) => {
     await dashboardPage.openMoreFilters();
     await dashboardPage.filterButton("slop").click();
-    // Dropdown closes after selection; reopen to check aria-pressed
+    // Dropdown closes after selection; reopen to check the current menu item.
     await dashboardPage.openMoreFilters();
-    await expect(dashboardPage.filterButton("slop")).toHaveAttribute("aria-pressed", "true");
+    await expect(dashboardPage.filterButton("slop")).toHaveAttribute("aria-current", "true");
     await expect(dashboardPage.filterButton("quality")).toHaveAttribute("aria-pressed", "false");
   });
 
   test("clicking all filter (in More filters) removes item count from Filtered Signal heading", async ({ dashboardPage }) => {
-    // Default filter is "quality" → hasActiveFilter = true → count span visible
+    // Quality is the default and has no extra-filter count. Select slop first.
+    await dashboardPage.openMoreFilters();
+    await dashboardPage.filterButton("slop").click();
     await expect(dashboardPage.page.getByTestId("aegis-filter-count")).toBeVisible();
     // Click "all" via More filters → hasActiveFilter = false → count span hidden
     await dashboardPage.openMoreFilters();
     await dashboardPage.filterButton("all").click();
     await expect(dashboardPage.page.getByTestId("aegis-filter-count")).not.toBeVisible();
-    // Reopen to verify aria-pressed
+    // Reopen to verify the current menu item.
     await dashboardPage.openMoreFilters();
-    await expect(dashboardPage.filterButton("all")).toHaveAttribute("aria-pressed", "true");
+    await expect(dashboardPage.filterButton("all")).toHaveAttribute("aria-current", "true");
   });
 });
 
@@ -67,8 +72,7 @@ test.describe("Dashboard — Dashboard Mode", () => {
 });
 
 test.describe("Dashboard — Content Cards (with pre-seeded content)", () => {
-  // seededDashboardPage pre-populates localStorage["aegis-content-cache"] with MOCK_CONTENT_ITEMS
-  // so cards render deterministically without waiting for async RSS ingestion.
+  // Seed the anonymous cache and disable the demo feed so only our items render.
 
   test("pre-seeded content cards appear in the feed", async ({ seededDashboardPage }) => {
     const card = seededDashboardPage.page.getByTestId("aegis-content-card").first();
@@ -166,7 +170,7 @@ test.describe("Dashboard — Authenticated", () => {
     await authDashboardPage.openMoreFilters();
     await authDashboardPage.filterButton("slop").click();
     await authDashboardPage.openMoreFilters();
-    await expect(authDashboardPage.filterButton("slop")).toHaveAttribute("aria-pressed", "true");
+    await expect(authDashboardPage.filterButton("slop")).toHaveAttribute("aria-current", "true");
   });
 
   test("authenticated user can switch between feed and dashboard modes", async ({ authDashboardPage }) => {
@@ -179,9 +183,7 @@ test.describe("Dashboard — Authenticated", () => {
   test("authenticated user content cards appear when pre-seeded", async ({ page }) => {
     await setupAuthMock(page, true);
     await setupApiMocks(page);
-    await page.addInitScript((items) => {
-      localStorage.setItem("aegis-content-cache", JSON.stringify(items));
-    }, MOCK_CONTENT_ITEMS);
+    await seedContentCache(page, MOCK_CONTENT_ITEMS, "2vxsx-fae");
     await page.goto("/");
     await page.getByTestId("aegis-dashboard").waitFor({ state: "visible", timeout: TIMEOUTS.long });
     const card = page.getByTestId("aegis-content-card").first();

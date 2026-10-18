@@ -5,14 +5,14 @@ export class AnalyticsPage {
   readonly heading: Locator;
   readonly subtitle: Locator;
   readonly demoBanner: Locator;
-  readonly evalSummary: Locator;
+  readonly activityTrends: Locator;
 
   constructor(page: Page) {
     this.page = page;
     this.heading = page.getByTestId("aegis-analytics-heading");
     this.subtitle = page.getByTestId("aegis-analytics-subtitle");
     this.demoBanner = page.getByTestId("aegis-analytics-demo-banner");
-    this.evalSummary = page.getByTestId("aegis-analytics-eval-summary");
+    this.activityTrends = page.getByTestId("aegis-analytics-activity-trends");
   }
 
   async waitForLoaded() {

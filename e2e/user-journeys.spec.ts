@@ -13,8 +13,9 @@ test.describe("User Journeys", () => {
     const result = incineratorPage.resultContainer;
     await expect(result).toBeVisible();
 
-    const scoreGrid = incineratorPage.page.getByTestId("aegis-card-score-grid");
-    await expect(scoreGrid).toBeVisible();
+    await expect(result.getByText("Originality")).toBeVisible();
+    await expect(result.getByText("Insight", { exact: true })).toBeVisible();
+    await expect(result.getByText("Credibility")).toBeVisible();
   });
 
   test("Navigate through all tabs without errors", async ({ dashboardPage }) => {
