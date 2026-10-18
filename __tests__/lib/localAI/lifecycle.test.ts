@@ -55,12 +55,13 @@ afterEach(() => {
 });
 
 describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
-  it("shares the stored transient init failure for 60s without another init", async () => {
-    mockCreate.mockRejectedValueOnce(new Error("Failed to fetch")).mockResolvedValue(instance());
+  it.each([new Error("Failed to fetch"), new Error("unknown initialization failure"), new Error("model HTTP 404"), { type: "error" }])("shares the stored transient init failure for 60s without another init: %s", async cause => {
+    mockCreate.mockRejectedValueOnce(cause).mockResolvedValue(instance());
     const engine = load(name);
-    const { LocalEngineTransientError } = require("@/lib/localAI/budget");
+    const { LocalEngineInitFailedError } = require("@/lib/localAI/budget");
     const failure = await engine.init().catch(error => error);
-    expect(failure).toBeInstanceOf(LocalEngineTransientError);
+    expect(failure).toBeInstanceOf(LocalEngineInitFailedError);
+    expect(failure.cause).toBe(cause);
     await Promise.all(Array.from({ length: 4 }, () => expect(engine.init()).rejects.toBe(failure)));
     await jest.advanceTimersByTimeAsync(59_999);
     await expect(engine.init()).rejects.toBe(failure);
@@ -159,7 +160,7 @@ describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
     expect(mockCreate).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["no WebGPU", "no adapter", "No GPU adapter found", "out of memory", "model HTTP 404", "unknown initialization failure"])("caches permanent init failure: %s", async failure => {
+  it.each(["no WebGPU", "no adapter", "No GPU adapter found", "Browser not supported: Safari's WebGPU lacks features required by MediaPipe.", "out of memory", "Array buffer allocation failed", "Memory error: model is too large for this device."])("caches permanent init failure: %s", async failure => {
     if (failure === "no WebGPU") Object.defineProperty(navigator, "gpu", { value: undefined, configurable: true });
     else if (failure === "no adapter") (navigator.gpu!.requestAdapter as jest.Mock).mockResolvedValue(null);
     else mockCreate.mockRejectedValue(new Error(failure));
@@ -172,6 +173,113 @@ describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
     await expect(engine.init()).rejects.toBe(error);
     await expect(engine.score("article", [])).rejects.toBe(error);
     expect(mockCreate).toHaveBeenCalledTimes(failure === "no WebGPU" || failure === "no adapter" ? 0 : 1);
+  });
+
+  it("expires a shared init at ten minutes, applies cooldown, and gives retries a fresh deadline", async () => {
+    const { LOCAL_INIT_DEADLINE_MS, LOCAL_INIT_COOLDOWN_MS, LocalEngineInitFailedError, LocalEngineInitPendingError } = require("@/lib/localAI/budget");
+    expect(LOCAL_INIT_DEADLINE_MS).toBe(10 * 60_000);
+    mockCreate.mockReturnValue(new Promise(() => {}));
+    const engine = load(name);
+    const status = jest.fn();
+    engine.subscribe(status);
+    const settled = jest.fn();
+    const first = engine.init().catch(error => { settled(); return error; });
+    const waiting = expect(engine.score("article", [])).rejects.toBeInstanceOf(LocalEngineInitPendingError);
+    await jest.advanceTimersByTimeAsync(LOCAL_INIT_DEADLINE_MS - 1);
+    await waiting;
+    expect(settled).not.toHaveBeenCalled();
+    const concurrent = engine.init().catch(error => error);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    const failure = await first;
+    expect(failure).toBeInstanceOf(LocalEngineInitFailedError);
+    expect(await concurrent).toBe(failure);
+    expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ loaded: false, loading: false, error: failure.message }));
+    expect(jest.getTimerCount()).toBe(0);
+    await expect(engine.score("article", [])).rejects.toBe(failure);
+    await jest.advanceTimersByTimeAsync(LOCAL_INIT_COOLDOWN_MS - 1);
+    await expect(engine.init()).rejects.toBe(failure);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    const retried = engine.init().catch(error => { settled(); return error; });
+    await jest.advanceTimersByTimeAsync(LOCAL_INIT_DEADLINE_MS - 1);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(settled).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(await retried).toBeInstanceOf(LocalEngineInitFailedError);
+    expect(settled).toHaveBeenCalledTimes(2);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it.each(["resolve", "reject"] as const)("discards a timed-out init that later %ss without affecting its replacement", async settlement => {
+    const { LOCAL_INIT_DEADLINE_MS, LOCAL_INIT_COOLDOWN_MS, LocalEngineInitFailedError } = require("@/lib/localAI/budget");
+    const old = deferred<ReturnType<typeof instance>>();
+    const next = deferred<ReturnType<typeof instance>>();
+    mockCreate.mockReturnValueOnce(old.promise).mockReturnValueOnce(next.promise);
+    const engine = load(name);
+    const expired = expect(engine.init()).rejects.toBeInstanceOf(LocalEngineInitFailedError);
+    await jest.advanceTimersByTimeAsync(LOCAL_INIT_DEADLINE_MS);
+    await expired;
+    const oldProgress = name === "webllm" ? mockCreate.mock.calls[0][1].initProgressCallback : null;
+    await jest.advanceTimersByTimeAsync(LOCAL_INIT_COOLDOWN_MS);
+    const second = engine.init();
+    await jest.advanceTimersByTimeAsync(0);
+    const status = jest.fn();
+    engine.subscribe(status);
+    status.mockClear();
+    oldProgress?.({ progress: 1 });
+    const stale = instance();
+    if (settlement === "resolve") old.resolve(stale);
+    else old.reject(new Error("late failure"));
+    await jest.advanceTimersByTimeAsync(0);
+    expect(name === "mediapipe" ? stale.close : stale.unload).toHaveBeenCalledTimes(settlement === "resolve" ? 1 : 0);
+    expect(status).not.toHaveBeenCalled();
+    expect(engine.loaded()).toBe(false);
+    const concurrent = engine.init();
+    const fresh = instance();
+    next.resolve(fresh);
+    expect(await second).toBe(fresh);
+    expect(await concurrent).toBe(fresh);
+    await jest.advanceTimersByTimeAsync(LOCAL_INIT_DEADLINE_MS);
+    expect(await engine.init()).toBe(fresh);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it("includes a stalled adapter in the deadline and ignores its late result", async () => {
+    const { LOCAL_INIT_DEADLINE_MS, LocalEngineInitFailedError } = require("@/lib/localAI/budget");
+    const adapter = deferred<object>();
+    (navigator.gpu!.requestAdapter as jest.Mock).mockReturnValue(adapter.promise);
+    const engine = load(name);
+    const expired = expect(engine.init()).rejects.toBeInstanceOf(LocalEngineInitFailedError);
+    await jest.advanceTimersByTimeAsync(LOCAL_INIT_DEADLINE_MS);
+    await expired;
+    const status = jest.fn();
+    engine.subscribe(status);
+    status.mockClear();
+    adapter.resolve({});
+    await jest.advanceTimersByTimeAsync(0);
+    expect(status).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("clears the deadline on destroy without expiring a newer attempt", async () => {
+    const { LOCAL_INIT_DEADLINE_MS, LocalEngineInitFailedError } = require("@/lib/localAI/budget");
+    mockCreate.mockReturnValue(new Promise(() => {}));
+    const engine = load(name);
+    void engine.init().catch(() => {});
+    await jest.advanceTimersByTimeAsync(LOCAL_INIT_DEADLINE_MS - 1);
+    await engine.destroy();
+    expect(jest.getTimerCount()).toBe(0);
+    const expired = expect(engine.init()).rejects.toBeInstanceOf(LocalEngineInitFailedError);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    const status = jest.fn();
+    engine.subscribe(status);
+    expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ loading: true, error: undefined }));
+    await jest.advanceTimersByTimeAsync(LOCAL_INIT_DEADLINE_MS - 1);
+    await expired;
+    expect(jest.getTimerCount()).toBe(0);
   });
 
   it("destroy interrupts active inference, clears waiters and permits immediate re-init", async () => {

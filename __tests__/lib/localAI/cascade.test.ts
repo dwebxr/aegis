@@ -168,7 +168,7 @@ describe.each(["mediapipe", "webllm"] as const)("%s cascade using real engine bu
     expect(mockCreate).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["WebGPU not available", "No GPU adapter found", "Model download HTTP 404"])("Auto skips permanent init failure and Browser surfaces it: %s", async message => {
+  it.each(["WebGPU not available", "No GPU adapter found", "Memory error: model is too large for this device."])("Auto skips permanent init failure and Browser surfaces it: %s", async message => {
     mockCreate.mockRejectedValue(new Error(message));
     const translateOnChain = jest.fn().mockResolvedValue({ ok: "これはフォールバックで翻訳された記事です。" });
     const actorRef = { current: { translateOnChain } as unknown as _SERVICE };

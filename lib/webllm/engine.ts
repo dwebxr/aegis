@@ -8,6 +8,7 @@ import { isWebGPUAvailable } from "@/lib/utils/webgpu";
 import {
   LOCAL_SCORE_TIMEOUT_MS,
   LOCAL_INIT_COOLDOWN_MS,
+  LOCAL_INIT_DEADLINE_MS,
   LocalEngineInitFailedError,
   LocalEngineUnavailableError,
   LocalEngineInitPendingError,
@@ -27,6 +28,7 @@ const MODEL_ID = "Llama-3.1-8B-Instruct-q4f16_1-MLC";
 
 let engine: MLCEngine | null = null;
 let enginePromise: Promise<MLCEngine> | null = null;
+let initDeadline: ReturnType<typeof setTimeout> | undefined;
 let generation = 0;
 let initFailure: { error: LocalEngineInitFailedError | LocalEngineUnavailableError; retryAt: number } | null = null;
 
@@ -61,8 +63,21 @@ export async function getOrCreateEngine(): Promise<MLCEngine> {
 
   const initGeneration = generation;
   const isCurrent = () => initGeneration === generation;
-  // Assign immediately so concurrent callers share the same promise.
-  const pending = (async () => {
+  let deadline: ReturnType<typeof setTimeout>;
+  const expired = new Promise<never>((_, reject) => {
+    deadline = setTimeout(() => {
+      const error = new LocalEngineInitFailedError("webllm", "The browser AI model initialization timed out. Please retry shortly.", undefined);
+      if (isCurrent()) {
+        // Retire this attempt before any late result can publish an instance.
+        generation++;
+        emitStatus({ loading: false, error: error.message });
+      }
+      reject(error);
+    }, LOCAL_INIT_DEADLINE_MS);
+    initDeadline = deadline;
+  });
+  // Assign immediately so concurrent callers share the same promise and deadline.
+  const pending = Promise.race([expired, (async () => {
     emitStatus({ loading: true, progress: 0, error: undefined });
     try {
       const usable = await isWebGPUUsable();
@@ -91,13 +106,16 @@ export async function getOrCreateEngine(): Promise<MLCEngine> {
       emitStatus({ loading: false, error: String(err) });
       throw createLocalEngineInitError("webllm", errMsg(err), err);
     }
-  })();
+  })()]).finally(() => {
+    clearTimeout(deadline);
+    if (initDeadline === deadline) initDeadline = undefined;
+  });
   enginePromise = pending;
 
   void pending.catch((error) => {
     if (enginePromise === pending) {
       enginePromise = null;
-      initFailure = { error, retryAt: error instanceof LocalEngineInitFailedError ? Date.now() + LOCAL_INIT_COOLDOWN_MS : Infinity };
+      initFailure = { error, retryAt: error instanceof LocalEngineUnavailableError ? Infinity : Date.now() + LOCAL_INIT_COOLDOWN_MS };
     }
   });
   return pending;
@@ -139,6 +157,8 @@ export async function destroyEngine(expected?: MLCEngine): Promise<void> {
   // A safety teardown retains recovery; user toggles/model changes clear it.
   if (!expected) clearLocalEngineRecovery("webllm");
   generation++;
+  clearTimeout(initDeadline);
+  initDeadline = undefined;
   const previous = engine;
   engine = null;
   enginePromise = null;

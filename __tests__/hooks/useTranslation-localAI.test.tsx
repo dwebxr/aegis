@@ -12,6 +12,7 @@ import { translateContent } from "@/lib/translation/engine";
 import type { TranslationBackend, TranslationLanguage } from "@/lib/translation/types";
 
 const mockInit = jest.fn();
+const mockCreate = jest.fn();
 const mockInfer = jest.fn();
 const mockNotify = jest.fn();
 let mockBrowser: "mediapipe" | "webllm" = "mediapipe";
@@ -31,7 +32,9 @@ jest.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ isAuthenticated: 
 jest.mock("@/contexts/NotificationContext", () => ({ useNotify: () => ({ addNotification: mockNotify }) }));
 jest.mock("@/lib/mediapipe/engine", () => ({ getOrCreateInference: () => mockInit(), destroyInference: mockDestroy }));
 jest.mock("@/lib/webllm/engine", () => ({ getOrCreateEngine: () => mockInit(), destroyEngine: mockDestroy }));
-jest.mock("@/lib/mediapipe/storage", () => ({ isMediaPipeEnabled: () => mockBrowser === "mediapipe" }));
+jest.mock("@mediapipe/tasks-genai", () => ({ FilesetResolver: { forGenAiTasks: async () => ({}) }, LlmInference: { createFromOptions: () => mockCreate() } }));
+jest.mock("@mlc-ai/web-llm", () => ({ CreateMLCEngine: () => mockCreate() }));
+jest.mock("@/lib/mediapipe/storage", () => ({ isMediaPipeEnabled: () => mockBrowser === "mediapipe", getSelectedMediaPipeModelId: () => "gemma-3-1b" }));
 jest.mock("@/lib/webllm/storage", () => ({ isWebLLMEnabled: () => mockBrowser === "webllm" }));
 jest.mock("@/lib/ollama/storage", () => ({ isOllamaEnabled: () => false }));
 jest.mock("@/lib/apiKey/storage", () => ({ getUserApiKey: () => mockApiKey }));
@@ -60,12 +63,15 @@ beforeEach(() => {
   mockApiKey = null;
   mockLanguage = "ja";
   mockInit.mockReset().mockResolvedValue(mockInstance);
+  mockCreate.mockReset();
   mockInfer.mockReset().mockImplementation(() => new Promise(resolve => setTimeout(() => resolve("この記事は科学の進歩について説明しています。"), 1_000)));
   mockNotify.mockReset();
   mockBackend = "auto";
 });
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  await jest.requireActual<typeof import("@/lib/mediapipe/engine")>("@/lib/mediapipe/engine").destroyInference();
+  await jest.requireActual<typeof import("@/lib/webllm/engine")>("@/lib/webllm/engine").destroyEngine();
   resetLocalEngine(mockInstance);
   clearLocalEngineRecovery(mockBrowser);
   globalThis.fetch = originalFetch;
@@ -161,6 +167,38 @@ describe.each(["mediapipe", "webllm"] as const)("%s translation retries with rea
     rerender();
     await act(async () => { await jest.advanceTimersByTimeAsync(1_000); });
     expect(patch).toHaveBeenCalledTimes(2); // new target language gets a fresh budget
+  });
+
+  it.each(["unclassified error", "stalled init"])("caps Auto retries with a real %s even when BYOK rejects", async failure => {
+    Object.defineProperty(navigator, "gpu", { value: { requestAdapter: async () => ({}) }, configurable: true });
+    mockInit.mockImplementation(browser === "mediapipe"
+      ? jest.requireActual<typeof import("@/lib/mediapipe/engine")>("@/lib/mediapipe/engine").getOrCreateInference
+      : jest.requireActual<typeof import("@/lib/webllm/engine")>("@/lib/webllm/engine").getOrCreateEngine);
+    if (failure === "stalled init") mockCreate.mockReturnValue(new Promise(() => {}));
+    else mockCreate.mockRejectedValue({ type: "error" });
+    mockApiKey = "test-key";
+    mockLanguage = "fr"; // Runaway text is a soft rejection, not a definitive script mismatch.
+    globalThis.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ translation: "x".repeat(1_000) }) });
+    const { result, items, patch, rerender } = harness(1);
+    await act(async () => {
+      result.current.requestAutoTranslate(items[0].id);
+      await jest.advanceTimersByTimeAsync(40 * 60_000);
+    });
+    expect(mockCreate).toHaveBeenCalledTimes(3);
+    expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining("Translateで再試行"), "info");
+    expect(patch).not.toHaveBeenCalled();
+    expect(mockInfer).not.toHaveBeenCalled();
+    const byokCalls = (globalThis.fetch as jest.Mock).mock.calls.filter(([url]) => url === "/api/translate").length;
+    expect(byokCalls).toBeGreaterThanOrEqual(3);
+    const initCalls = mockInit.mock.calls.length;
+    rerender();
+    await act(async () => {
+      result.current.requestAutoTranslate(items[0].id);
+      await jest.advanceTimersByTimeAsync(20 * 60_000);
+    });
+    expect((globalThis.fetch as jest.Mock).mock.calls.filter(([url]) => url === "/api/translate")).toHaveLength(byokCalls);
+    expect(mockInit).toHaveBeenCalledTimes(initCalls);
+    expect(mockCreate).toHaveBeenCalledTimes(3);
   });
 
   // Adapted from the external slow2 probe: exercise the real queue and retry timer,

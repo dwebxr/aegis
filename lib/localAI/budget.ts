@@ -1,6 +1,7 @@
 import { withTimeout } from "@/lib/utils/timeout";
 
 export const LOCAL_INIT_WAIT_MS = 15_000;
+export const LOCAL_INIT_DEADLINE_MS = 10 * 60_000;
 export const LOCAL_QUEUE_WAIT_MS = 15_000;
 export const LOCAL_INTERRUPT_GRACE_MS = 5_000;
 export const LOCAL_INIT_COOLDOWN_MS = 60_000;
@@ -42,13 +43,12 @@ export class LocalEngineUnavailableError extends Error {
   }
 }
 
-/** Retry only known temporary failures; unsupported hardware/models need a change. */
+/** Only known hardware/browser/memory limits require a configuration change. */
 export function createLocalEngineInitError(engine: LocalEngine, message: string, cause: unknown): LocalEngineInitFailedError | LocalEngineUnavailableError {
-  const permanent = /WebGPU not available|No GPU adapter found|not supported|unsupported|out of memory|allocation failed|\b40[01345]\b/i.test(message);
-  const transient = /Failed to fetch|Load failed|NetworkError|network (?:request failed|error)|fetch failed|ECONNRESET|ECONNREFUSED|timed?\s*out|\btimeout\b|\b(?:408|429|5\d\d)\b|device (?:was )?lost/i.test(message);
-  return !permanent && transient
-    ? new LocalEngineInitFailedError(engine, message, cause)
-    : new LocalEngineUnavailableError(engine, message, cause);
+  const permanent = /WebGPU not available|No GPU adapter|Browser not supported: Safari|out of memory|\bOOM\b|(?:Array buffer|memory) allocation failed|too large for this device/i.test(message);
+  return permanent
+    ? new LocalEngineUnavailableError(engine, message, cause)
+    : new LocalEngineInitFailedError(engine, message, cause);
 }
 
 export class LocalEngineRecoveringError extends LocalEngineTransientError {

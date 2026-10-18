@@ -203,15 +203,16 @@ it("has independent engine slots and a common transient error type", async () =>
   }
 });
 
-describe("initialization failure classification", () => {
-  it.each(["Failed to fetch", "Load failed", "NetworkError", "network request failed", "fetch failed", "ECONNRESET", "request timed out", "HTTP 408", "HTTP 429", "HTTP 503", "GPU device lost"])("keeps a temporary failure retryable: %s", message => {
+describe.each(["mediapipe", "webllm"] as const)("%s initialization failure classification", engine => {
+  it.each(["Failed to fetch", "Load failed", "NetworkError", "network request failed", "fetch failed", "ECONNRESET", "request timed out", "HTTP 408", "HTTP 429", "HTTP 503", "GPU device lost", "WebGPU/wasm error: error", "unknown error", "unsupported feature", "operation not supported", "fetch failed: HTTP 404", "HTTP 401", "HTTP 403"])("keeps a temporary or unrecognized failure retryable: %s", message => {
     const cause = new Error(message);
-    const error = createLocalEngineInitError("mediapipe", message, cause);
+    const error = createLocalEngineInitError(engine, message, cause);
     expect(error).toBeInstanceOf(LocalEngineInitFailedError);
+    expect(error).toBeInstanceOf(LocalEngineTransientError);
     expect(error.cause).toBe(cause);
   });
 
-  it.each(["WebGPU not available", "No GPU adapter found", "unsupported feature", "out of memory", "Array buffer allocation failed", "fetch failed: HTTP 404", "unknown error"])("makes a permanent or unrecognized failure terminal: %s", message => {
-    expect(createLocalEngineInitError("webllm", message, null)).toBeInstanceOf(LocalEngineUnavailableError);
+  it.each(["WebGPU not available", "No GPU adapter found", "Browser not supported: Safari's WebGPU lacks features required by MediaPipe.", "out of memory", "OOM", "Array buffer allocation failed", "Memory allocation failed", "Memory error: model is too large for this device."])("makes only a known permanent failure terminal: %s", message => {
+    expect(createLocalEngineInitError(engine, message, null)).toBeInstanceOf(LocalEngineUnavailableError);
   });
 });

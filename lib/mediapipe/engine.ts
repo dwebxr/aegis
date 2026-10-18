@@ -11,6 +11,7 @@ import { withTimeout } from "@/lib/utils/timeout";
 import {
   LOCAL_SCORE_TIMEOUT_MS,
   LOCAL_INIT_COOLDOWN_MS,
+  LOCAL_INIT_DEADLINE_MS,
   LocalEngineInitFailedError,
   LocalEngineUnavailableError,
   LocalEngineInitPendingError,
@@ -29,6 +30,7 @@ export const MEDIAPIPE_GENAI_VERSION = "0.10.29";
 
 let inference: LlmInference | null = null;
 let inferencePromise: Promise<LlmInference> | null = null;
+let initDeadline: ReturnType<typeof setTimeout> | undefined;
 let loadedModelId: MediaPipeModelId | null = null;
 let initializingModelId: MediaPipeModelId | null = null;
 let generation = 0;
@@ -108,7 +110,20 @@ export async function getOrCreateInference(): Promise<LlmInference> {
     if (!isCurrent()) throw new LocalEngineInitPendingError("mediapipe");
   };
 
-  const pending = (async () => {
+  let deadline: ReturnType<typeof setTimeout>;
+  const expired = new Promise<never>((_, reject) => {
+    deadline = setTimeout(() => {
+      const error = new LocalEngineInitFailedError("mediapipe", "The browser AI model initialization timed out. Please retry shortly.", undefined);
+      if (isCurrent()) {
+        // Retire this attempt before any late result can publish an instance.
+        generation++;
+        emitStatus({ loading: false, error: error.message, modelId: selectedId });
+      }
+      reject(error);
+    }, LOCAL_INIT_DEADLINE_MS);
+    initDeadline = deadline;
+  });
+  const pending = Promise.race([expired, (async () => {
     let resolvingFiles = false;
     emitStatus({ loading: true, error: undefined, modelId: selectedId });
     try {
@@ -164,7 +179,10 @@ export async function getOrCreateInference(): Promise<LlmInference> {
       }
       throw createLocalEngineInitError("mediapipe", msg, err);
     }
-  })();
+  })()]).finally(() => {
+    clearTimeout(deadline);
+    if (initDeadline === deadline) initDeadline = undefined;
+  });
   inferencePromise = pending;
 
   void pending.catch((err) => {
@@ -172,7 +190,7 @@ export async function getOrCreateInference(): Promise<LlmInference> {
       console.warn("[mediapipe] Engine creation failed:", describeError(err));
       inferencePromise = null;
       initializingModelId = null;
-      initFailure = { modelId: selectedId, error: err, retryAt: err instanceof LocalEngineInitFailedError ? Date.now() + LOCAL_INIT_COOLDOWN_MS : Infinity };
+      initFailure = { modelId: selectedId, error: err, retryAt: err instanceof LocalEngineUnavailableError ? Infinity : Date.now() + LOCAL_INIT_COOLDOWN_MS };
     }
   });
   return pending;
@@ -206,6 +224,8 @@ export async function destroyInference(expected?: LlmInference): Promise<void> {
   // A safety teardown retains recovery; user toggles/model changes clear it.
   if (!expected) clearLocalEngineRecovery("mediapipe");
   generation++;
+  clearTimeout(initDeadline);
+  initDeadline = undefined;
   const previous = inference;
   inference = null;
   inferencePromise = null;
