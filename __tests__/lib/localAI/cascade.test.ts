@@ -7,12 +7,15 @@ if (!AbortSignal.timeout) AbortSignal.timeout = () => new AbortController().sign
 const mockCreate = jest.fn();
 const mockGenerate = jest.fn();
 let mockBrowser: "mediapipe" | "webllm" = "mediapipe";
-const mockInstance = {
+const makeInstance = () => ({
   generateResponse: mockGenerate,
+  cancelProcessing: jest.fn(),
+  interruptGenerate: jest.fn(),
   close: jest.fn(),
   chat: { completions: { create: async () => ({ choices: [{ message: { content: await mockGenerate() } }] }) } },
   unload: jest.fn().mockResolvedValue(undefined),
-};
+});
+let mockInstance = makeInstance();
 jest.mock("@mediapipe/tasks-genai", () => ({ FilesetResolver: { forGenAiTasks: async () => ({}) }, LlmInference: { createFromOptions: () => mockCreate() } }));
 jest.mock("@mlc-ai/web-llm", () => ({ CreateMLCEngine: () => mockCreate() }));
 jest.mock("@/lib/mediapipe/storage", () => ({ isMediaPipeEnabled: () => mockBrowser === "mediapipe", getSelectedMediaPipeModelId: () => "gemma-3-1b" }));
@@ -39,6 +42,7 @@ beforeEach(async () => {
   jest.useFakeTimers();
   await destroyInference();
   await destroyEngine();
+  mockInstance = makeInstance();
   _resetIcLlmCircuit();
   mockCreate.mockReset().mockResolvedValue(mockInstance);
   mockGenerate.mockReset().mockResolvedValue(score);
@@ -64,7 +68,7 @@ describe.each(["mediapipe", "webllm"] as const)("%s cascade using real engine bu
       await jest.advanceTimersByTimeAsync(0);
     }
     const cascade = runScoringCascade("article", null, { current: null }, false);
-    await jest.advanceTimersByTimeAsync(stage === "init" ? 15_000 : stage === "timeout" ? 45_000 : 0);
+    await jest.advanceTimersByTimeAsync(stage === "timeout" ? 45_000 : 15_000);
     expect(await cascade).toMatchObject({ scoringEngine: "claude-server" });
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     if (stage === "init") {
@@ -89,24 +93,37 @@ describe.each(["mediapipe", "webllm"] as const)("%s cascade using real engine bu
     await expect(translateContent({ ...options, backend })).resolves.toMatchObject({ backend: browser });
   });
 
-  it("shares the busy guard between scoring and translation, and gives translation 60s", async () => {
+  it("shares the queue between scoring and translation, and gives translation 60s", async () => {
     let finish!: (value: string) => void;
     mockGenerate.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
     const translation = translateContent({ ...options, backend: "browser" });
     const rejected = expect(translation).rejects.toBeInstanceOf(LocalEngineTimeoutError);
     await jest.advanceTimersByTimeAsync(0);
     const scoreContent = browser === "mediapipe" ? scoreWithMediaPipe : scoreWithWebLLM;
-    await expect(scoreContent("article", [])).rejects.toBeInstanceOf(LocalEngineBusyError);
+    const busy = expect(scoreContent("article", [])).rejects.toBeInstanceOf(LocalEngineBusyError);
+    await jest.advanceTimersByTimeAsync(15_000);
+    await busy;
     let settled = false;
     void translation.catch(() => { settled = true; });
-    await jest.advanceTimersByTimeAsync(59_999);
+    await jest.advanceTimersByTimeAsync(44_999);
     expect(settled).toBe(false);
     await jest.advanceTimersByTimeAsync(1);
     await rejected;
-    await expect(scoreContent("article", [])).rejects.toBeInstanceOf(LocalEngineBusyError);
+    const next = scoreContent("article", []);
     finish("遅れた翻訳です。");
     await jest.advanceTimersByTimeAsync(0);
-    await expect(scoreContent("article", [])).resolves.toMatchObject({ verdict: "quality" });
+    await expect(next).resolves.toMatchObject({ verdict: "quality" });
+  });
+
+  it("queues scoring behind fast translation without falling to the server tier", async () => {
+    mockGenerate.mockImplementationOnce(() => new Promise(resolve => setTimeout(() => resolve("これは翻訳された記事です。"), 1_000)));
+    const translation = translateContent({ ...options, backend: "browser" });
+    await jest.advanceTimersByTimeAsync(0);
+    const cascade = runScoringCascade("article", null, { current: null }, false);
+    await jest.advanceTimersByTimeAsync(1_000);
+    await translation;
+    expect(await cascade).toMatchObject({ scoringEngine: browser });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it.each([true, false])("Auto tries IC after a local transient (IC success: %s)", async succeeds => {

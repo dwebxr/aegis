@@ -64,7 +64,7 @@ async function translateWithOllama(prompt: string): Promise<string> {
 }
 
 async function translateWithWebLLM(prompt: string): Promise<string> {
-  const { getOrCreateEngine } = await import("@/lib/webllm/engine");
+  const { getOrCreateEngine, destroyEngine } = await import("@/lib/webllm/engine");
   const response = await runWithLocalEngine({
     engine: "webllm",
     init: getOrCreateEngine,
@@ -74,17 +74,21 @@ async function translateWithWebLLM(prompt: string): Promise<string> {
       max_tokens: 4000,
     }),
     inferTimeoutMs: LOCAL_TRANSLATE_TIMEOUT_MS,
+    interrupt: eng => eng.interruptGenerate(),
+    destroy: destroyEngine,
   });
   return response.choices[0]?.message?.content?.trim() ?? "";
 }
 
 async function translateWithMediaPipe(prompt: string): Promise<string> {
-  const { getOrCreateInference } = await import("@/lib/mediapipe/engine");
+  const { getOrCreateInference, destroyInference } = await import("@/lib/mediapipe/engine");
   const raw = await runWithLocalEngine({
     engine: "mediapipe",
     init: getOrCreateInference,
     infer: inf => inf.generateResponse(prompt),
     inferTimeoutMs: LOCAL_TRANSLATE_TIMEOUT_MS,
+    interrupt: inf => inf.cancelProcessing(),
+    destroy: destroyInference,
   });
   return raw.trim();
 }
@@ -510,7 +514,6 @@ async function translateContentInner(
     }
     const skipReason = definitiveSkipReason(attempt.name, outcome.reason, targetLanguage, text);
     if (skipReason) {
-      if (skipReason !== "already-in-target" && localTransient) throw localTransient;
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "skip", reason: `untranslatable: ${outcome.reason}`, elapsedMs,
@@ -526,7 +529,8 @@ async function translateContentInner(
     });
   }
 
-  // Keep browser loading/busy/timeouts retryable even alongside validator failures.
+  // Definitive outcomes above always win. Retry local failures only when the
+  // cascade has produced no success, already-in-target, or definitive rejection.
   if (localTransient) {
     span.setAttribute("translate.result", "local-transient");
     throw localTransient;

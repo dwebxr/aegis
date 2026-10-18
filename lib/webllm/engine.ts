@@ -5,7 +5,8 @@ import { buildScoringPrompt } from "@/lib/scoring/prompt";
 import { parseScoreResponse } from "@/lib/scoring/parseResponse";
 import { createStatusEmitter } from "@/lib/utils/statusEmitter";
 import { isWebGPUAvailable } from "@/lib/utils/webgpu";
-import { LOCAL_SCORE_TIMEOUT_MS, LocalEngineInitPendingError, runWithLocalEngine } from "@/lib/localAI/budget";
+import { LOCAL_SCORE_TIMEOUT_MS, LOCAL_INIT_COOLDOWN_MS, LocalEngineInitFailedError, LocalEngineInitPendingError, resetLocalEngine, runWithLocalEngine } from "@/lib/localAI/budget";
+import { errMsg } from "@/lib/utils/errors";
 
 // Re-exported so existing callers (and tests) can keep importing from
 // "@/lib/webllm/engine".
@@ -16,6 +17,7 @@ const MODEL_ID = "Llama-3.1-8B-Instruct-q4f16_1-MLC";
 let engine: MLCEngine | null = null;
 let enginePromise: Promise<MLCEngine> | null = null;
 let generation = 0;
+let initFailure: { error: LocalEngineInitFailedError; retryAt: number } | null = null;
 
 const { emit: emitStatus, onStatusChange } = createStatusEmitter<WebLLMStatus>({
   available: false,
@@ -42,6 +44,7 @@ export async function isWebGPUUsable(): Promise<boolean> {
 export async function getOrCreateEngine(): Promise<MLCEngine> {
   if (engine) return engine;
   if (enginePromise) return enginePromise;
+  if (initFailure && Date.now() < initFailure.retryAt) throw initFailure.error;
 
   const initGeneration = generation;
   const isCurrent = () => initGeneration === generation;
@@ -71,14 +74,18 @@ export async function getOrCreateEngine(): Promise<MLCEngine> {
       emitStatus({ loaded: true, loading: false, progress: 100, error: undefined });
       return created;
     } catch (err) {
-      if (isCurrent()) emitStatus({ loading: false, error: String(err) });
-      throw err;
+      if (!isCurrent()) throw err;
+      emitStatus({ loading: false, error: String(err) });
+      throw new LocalEngineInitFailedError("webllm", errMsg(err), err);
     }
   })();
   enginePromise = pending;
 
-  void pending.catch(() => {
-    if (enginePromise === pending) enginePromise = null;
+  void pending.catch((error) => {
+    if (enginePromise === pending) {
+      enginePromise = null;
+      initFailure = { error, retryAt: Date.now() + LOCAL_INIT_COOLDOWN_MS };
+    }
   });
   return pending;
 }
@@ -99,6 +106,8 @@ export async function scoreWithWebLLM(
       max_tokens: 500,
     }),
     inferTimeoutMs: LOCAL_SCORE_TIMEOUT_MS,
+    interrupt: eng => eng.interruptGenerate(),
+    destroy: destroyEngine,
   });
 
   const raw = response.choices[0]?.message?.content || "";
@@ -111,11 +120,14 @@ export function isWebLLMLoaded(): boolean {
   return engine !== null;
 }
 
-export async function destroyEngine(): Promise<void> {
+export async function destroyEngine(expected?: MLCEngine): Promise<void> {
+  if (expected && engine !== expected) return;
   generation++;
   const previous = engine;
   engine = null;
   enginePromise = null;
+  initFailure = null;
+  if (previous) resetLocalEngine(previous);
   emitStatus({ loaded: false, loading: false, progress: 0, error: undefined });
   await previous?.unload();
 }

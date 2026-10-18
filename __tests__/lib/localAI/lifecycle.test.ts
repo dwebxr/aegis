@@ -22,16 +22,20 @@ function deferred<T>() {
 }
 
 function instance() {
-  return { close: jest.fn(), unload: jest.fn().mockResolvedValue(undefined) };
+  const infer = jest.fn().mockResolvedValue('{"composite":8,"verdict":"quality"}');
+  return { close: jest.fn(), unload: jest.fn().mockResolvedValue(undefined),
+    cancelProcessing: jest.fn(), interruptGenerate: jest.fn(), generateResponse: infer,
+    chat: { completions: { create: async () => ({ choices: [{ message: { content: await infer() } }] }) } },
+  };
 }
 
 function load(name: "mediapipe" | "webllm") {
   if (name === "mediapipe") {
     const engine = require("@/lib/mediapipe/engine") as typeof import("@/lib/mediapipe/engine");
-    return { init: engine.getOrCreateInference, destroy: engine.destroyInference, loaded: engine.isMediaPipeLoaded, subscribe: engine.onStatusChange };
+    return { score: engine.scoreWithMediaPipe, init: engine.getOrCreateInference, destroy: engine.destroyInference, loaded: engine.isMediaPipeLoaded, subscribe: engine.onStatusChange };
   }
   const engine = require("@/lib/webllm/engine") as typeof import("@/lib/webllm/engine");
-  return { init: engine.getOrCreateEngine, destroy: engine.destroyEngine, loaded: engine.isWebLLMLoaded, subscribe: engine.onStatusChange };
+  return { score: engine.scoreWithWebLLM, init: engine.getOrCreateEngine, destroy: engine.destroyEngine, loaded: engine.isWebLLMLoaded, subscribe: engine.onStatusChange };
 }
 
 const originalFetch = globalThis.fetch;
@@ -51,6 +55,85 @@ afterEach(() => {
 });
 
 describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
+  it("shares the stored transient init failure for 60s without another init", async () => {
+    mockCreate.mockRejectedValueOnce(new Error("download failed")).mockResolvedValue(instance());
+    const engine = load(name);
+    const { LocalEngineTransientError } = require("@/lib/localAI/budget");
+    const failure = await engine.init().catch(error => error);
+    expect(failure).toBeInstanceOf(LocalEngineTransientError);
+    await Promise.all(Array.from({ length: 4 }, () => expect(engine.init()).rejects.toBe(failure)));
+    await jest.advanceTimersByTimeAsync(59_999);
+    await expect(engine.init()).rejects.toBe(failure);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(navigator.gpu!.requestAdapter).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    await engine.init();
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("off/on clears the init failure cooldown immediately", async () => {
+    mockCreate.mockRejectedValueOnce(new Error("download failed")).mockResolvedValue(instance());
+    const engine = load(name);
+    await expect(engine.init()).rejects.toThrow("download failed");
+    await engine.destroy();
+    await engine.init();
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("interrupts timed-out inference and reuses the slot after cancellation settles", async () => {
+    const inf = instance();
+    const running = deferred<string>();
+    inf.generateResponse.mockReturnValueOnce(running.promise);
+    const interrupt = name === "mediapipe" ? inf.cancelProcessing : inf.interruptGenerate;
+    interrupt.mockImplementation(() => { running.reject(new Error("cancelled")); });
+    mockCreate.mockResolvedValue(inf);
+    const engine = load(name);
+    const timedOut = expect(engine.score("first", [])).rejects.toThrow("timed out");
+    await jest.advanceTimersByTimeAsync(45_000);
+    await timedOut;
+    expect(interrupt).toHaveBeenCalledTimes(1);
+    await expect(engine.score("second", [])).resolves.toMatchObject({ composite: 8 });
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it("safety release destroys a hung instance and the next request re-initializes", async () => {
+    const hung = instance();
+    const fresh = instance();
+    hung.generateResponse.mockReturnValue(new Promise(() => {}));
+    mockCreate.mockResolvedValueOnce(hung).mockResolvedValueOnce(fresh);
+    const engine = load(name);
+    const timedOut = expect(engine.score("first", [])).rejects.toThrow("timed out");
+    await jest.advanceTimersByTimeAsync(49_999);
+    await timedOut;
+    expect(engine.loaded()).toBe(true);
+    const queued = expect(engine.score("queued", [])).rejects.toThrow("still loading");
+    await jest.advanceTimersByTimeAsync(1);
+    await queued;
+    expect(engine.loaded()).toBe(false);
+    expect(name === "mediapipe" ? hung.close : hung.unload).toHaveBeenCalledTimes(1);
+    await expect(engine.score("fresh", [])).resolves.toMatchObject({ composite: 8 });
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(hung.generateResponse).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it("destroy interrupts active inference, clears waiters and permits immediate re-init", async () => {
+    const hung = instance();
+    hung.generateResponse.mockReturnValue(new Promise(() => {}));
+    mockCreate.mockResolvedValueOnce(hung).mockResolvedValueOnce(instance());
+    const engine = load(name);
+    const cancelled = [engine.score("active", []), engine.score("waiting", [])]
+      .map(p => expect(p).rejects.toThrow("still loading"));
+    await jest.advanceTimersByTimeAsync(0);
+    await engine.destroy();
+    await Promise.all(cancelled);
+    expect(name === "mediapipe" ? hung.cancelProcessing : hung.interruptGenerate).toHaveBeenCalledTimes(1);
+    expect(hung.generateResponse).toHaveBeenCalledTimes(1);
+    await expect(engine.score("fresh", [])).resolves.toMatchObject({ composite: 8 });
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
   it.each(["adapter", "import", "create"])("clears loading on %s failure and clears the error on retry", async stage => {
     const failure = new Error(`${stage} failed`);
     if (stage === "adapter") (navigator.gpu!.requestAdapter as jest.Mock).mockRejectedValueOnce(failure);
@@ -60,9 +143,10 @@ describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
     const engine = load(name);
     const status = jest.fn();
     engine.subscribe(status);
-    await expect(engine.init()).rejects.toBe(failure);
+    await expect(engine.init()).rejects.toMatchObject({ cause: failure });
     expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ loading: false, error: expect.stringContaining(`${stage} failed`) }));
     mockImportError = undefined;
+    await jest.advanceTimersByTimeAsync(60_000);
     const retry = engine.init();
     expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ loading: true, error: undefined }));
     await retry;
@@ -135,6 +219,16 @@ describe.each(["mediapipe", "webllm"] as const)("%s lifecycle", name => {
   });
 });
 
+it("changing MediaPipe models clears the failed model's cooldown", async () => {
+  mockCreate.mockRejectedValueOnce(new Error("model too large")).mockResolvedValue(instance());
+  const engine = load("mediapipe");
+  await expect(engine.init()).rejects.toThrow("model too large");
+  mockModel = "gemma-4-e2b";
+  await engine.init();
+  expect(mockCreate).toHaveBeenCalledTimes(2);
+  expect(mockCreate.mock.calls[1][1].baseOptions.modelAssetPath).toContain("gemma-4-E2B");
+});
+
 it.each([false, true])("discards MediaPipe init after model change (new request: %s)", async newRequest => {
   const old = deferred<ReturnType<typeof instance>>();
   const next = deferred<ReturnType<typeof instance>>();
@@ -165,11 +259,12 @@ it.each(["fileset", "create"])("reports version skew after a %s failure only whe
   const engine = load("mediapipe");
   const status = jest.fn();
   engine.subscribe(status);
-  await expect(engine.init()).rejects.toThrow("AI engine files were updated — reload the page to use the new version.");
+  await expect(engine.init()).rejects.toThrow("AI engine files are missing or were updated — reload the page. (Developers: start with `npm run dev`, which copies them.)");
   expect(globalThis.fetch).toHaveBeenCalledWith("/vendor/mediapipe/tasks-genai@0.10.29/wasm/genai_wasm_internal.js", { method: "HEAD" });
   expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ loading: false, error: expect.stringContaining("reload the page") }));
   (globalThis.fetch as jest.Mock).mockResolvedValue({ status: 200 });
-  await expect(engine.init()).rejects.toBe(failure);
+  await jest.advanceTimersByTimeAsync(60_000);
+  await expect(engine.init()).rejects.toMatchObject({ cause: failure });
   expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ loading: false, error: "wasm failed" }));
 });
 

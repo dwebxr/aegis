@@ -24,6 +24,10 @@ const serwist = new Serwist({
       matcher: /\/api\//,
       handler: new NetworkOnly(),
     },
+    {
+      matcher: ({ url }) => url.pathname.startsWith("/vendor/mediapipe/"),
+      handler: new NetworkOnly(),
+    },
     ...defaultCache,
   ],
   fallbacks: {

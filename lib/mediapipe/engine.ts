@@ -8,7 +8,7 @@ import { createStatusEmitter } from "@/lib/utils/statusEmitter";
 import type { ScoreParseResult } from "@/lib/scoring/types";
 import { isWebGPUAvailable } from "@/lib/utils/webgpu";
 import { withTimeout } from "@/lib/utils/timeout";
-import { LOCAL_SCORE_TIMEOUT_MS, LocalEngineInitPendingError, runWithLocalEngine } from "@/lib/localAI/budget";
+import { LOCAL_SCORE_TIMEOUT_MS, LOCAL_INIT_COOLDOWN_MS, LocalEngineInitFailedError, LocalEngineInitPendingError, resetLocalEngine, runWithLocalEngine } from "@/lib/localAI/budget";
 
 // Re-exported so existing callers (and tests) can keep importing from
 // "@/lib/mediapipe/engine".
@@ -21,6 +21,7 @@ let inferencePromise: Promise<LlmInference> | null = null;
 let loadedModelId: MediaPipeModelId | null = null;
 let initializingModelId: MediaPipeModelId | null = null;
 let generation = 0;
+let initFailure: { modelId: MediaPipeModelId; error: LocalEngineInitFailedError; retryAt: number } | null = null;
 
 const { emit: emitStatus, onStatusChange } = createStatusEmitter<MediaPipeStatus>({
   available: false,
@@ -81,6 +82,8 @@ export async function getOrCreateInference(): Promise<LlmInference> {
   }
   if (inference) return inference;
   if (inferencePromise) return inferencePromise;
+  if (initFailure?.modelId !== selectedId) initFailure = null;
+  if (initFailure && Date.now() < initFailure.retryAt) throw initFailure.error;
 
   const initGeneration = generation;
   initializingModelId = selectedId;
@@ -141,12 +144,12 @@ export async function getOrCreateInference(): Promise<LlmInference> {
           // A failed probe cannot distinguish offline from a version change.
         }
         if (missing && isCurrent()) {
-          const updated = new Error("AI engine files were updated — reload the page to use the new version.");
+          const updated = new LocalEngineInitFailedError("mediapipe", "AI engine files are missing or were updated — reload the page. (Developers: start with `npm run dev`, which copies them.)", err);
           emitStatus({ loading: false, error: updated.message, modelId: selectedId });
           throw updated;
         }
       }
-      throw err;
+      throw new LocalEngineInitFailedError("mediapipe", msg, err);
     }
   })();
   inferencePromise = pending;
@@ -156,6 +159,7 @@ export async function getOrCreateInference(): Promise<LlmInference> {
       console.warn("[mediapipe] Engine creation failed:", describeError(err));
       inferencePromise = null;
       initializingModelId = null;
+      initFailure = { modelId: selectedId, error: err, retryAt: Date.now() + LOCAL_INIT_COOLDOWN_MS };
     }
   });
   return pending;
@@ -171,6 +175,8 @@ export async function scoreWithMediaPipe(
     init: getOrCreateInference,
     infer: inf => inf.generateResponse(prompt),
     inferTimeoutMs: LOCAL_SCORE_TIMEOUT_MS,
+    interrupt: inf => inf.cancelProcessing(),
+    destroy: destroyInference,
   });
   const result = parseScoreResponse(raw);
   if (!result) throw new Error("No JSON object found in MediaPipe response");
@@ -181,13 +187,16 @@ export function isMediaPipeLoaded(): boolean {
   return inference !== null;
 }
 
-export async function destroyInference(): Promise<void> {
+export async function destroyInference(expected?: LlmInference): Promise<void> {
+  if (expected && inference !== expected) return;
   generation++;
   const previous = inference;
   inference = null;
   inferencePromise = null;
   loadedModelId = null;
   initializingModelId = null;
+  initFailure = null;
+  if (previous) resetLocalEngine(previous);
   emitStatus({ loaded: false, loading: false, modelId: undefined, error: undefined });
   previous?.close();
 }

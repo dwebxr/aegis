@@ -22,6 +22,7 @@ import { LocalEngineTransientError } from "@/lib/localAI/budget";
 // reaches any backend. Manual Translate bypasses this queue.
 const MAX_CONCURRENT = 4;
 const RETRY_INTERVAL_MS = 60_000;
+const MAX_LOCAL_TRANSIENT_ATTEMPTS = 3;
 
 // Cap on how long we wait for the IC actor before starting auto-
 // translate without it in the cascade. Prevents stranding items if
@@ -81,11 +82,11 @@ export function useTranslation(
   itemsRef.current = items;
 
   // Attempted-item sets, keyed by target language so a language switch resets them.
-  const attemptedRef = useRef<{ lang: string; skip: Set<string>; failed: Set<string> }>({
-    lang: "", skip: new Set(), failed: new Set(),
+  const attemptedRef = useRef<{ lang: string; skip: Set<string>; failed: Set<string>; localAttempts: Map<string, number> }>({
+    lang: "", skip: new Set(), failed: new Set(), localAttempts: new Map(),
   });
   if (attemptedRef.current.lang !== prefs.targetLanguage) {
-    attemptedRef.current = { lang: prefs.targetLanguage, skip: new Set(), failed: new Set() };
+    attemptedRef.current = { lang: prefs.targetLanguage, skip: new Set(), failed: new Set(), localAttempts: new Map() };
   }
 
   const autoQueueRef = useRef<string[]>([]);
@@ -149,6 +150,7 @@ export function useTranslation(
 
   const runTranslation = useCallback(async (item: ContentItem, callerKind: TranslationCallerKind) => {
     const p = prefsRef.current;
+    const attempted = attemptedRef.current;
     const opts: TranslateOptions = {
       text: item.text,
       reason: item.reason,
@@ -171,9 +173,14 @@ export function useTranslation(
     try {
       outcome = await translateContent(opts);
     } catch (err) {
-      attemptedRef.current.failed.add(item.id);
+      attempted.failed.add(item.id);
       if (err instanceof LocalEngineTransientError) {
-        if (localPendingNotifiedLangRef.current !== p.targetLanguage) {
+        const attempts = (attempted.localAttempts.get(item.id) ?? 0) + 1;
+        if (callerKind === "auto") attempted.localAttempts.set(item.id, attempts);
+        if (callerKind === "auto" && attempts >= MAX_LOCAL_TRANSIENT_ATTEMPTS) {
+          attempted.failed.delete(item.id);
+          outcome = { status: "skip", reason: "all-backends-failed", attempted: attempts };
+        } else if (localPendingNotifiedLangRef.current !== p.targetLanguage) {
           localPendingNotifiedLangRef.current = p.targetLanguage;
           notifyRef.current(callerKind === "auto" ? `${err.message} Translation will retry automatically.` : err.message, "info");
         }
@@ -197,9 +204,12 @@ export function useTranslation(
     });
 
     if (outcome && !isTranslationSkip(outcome)) {
+      attempted.failed.delete(item.id);
+      attempted.localAttempts.delete(item.id);
       patchRef.current(item.id, { translation: outcome });
     } else if (outcome && isTranslationSkip(outcome)) {
-      attemptedRef.current.skip.add(item.id);
+      attempted.failed.delete(item.id);
+      attempted.skip.add(item.id);
       // no-backend notifies for BOTH caller kinds: a manual Translate tap with
       // no usable backend produces no visible change at all, which is the same
       // invisible failure as the auto path — and the message is the actionable
@@ -315,6 +325,7 @@ export function useTranslation(
       const retryIds = new Set([...attemptedRef.current.failed, ...attemptedRef.current.skip]);
       attemptedRef.current.failed.clear();
       attemptedRef.current.skip.clear();
+      attemptedRef.current.localAttempts.clear();
       failNotifiedLangRef.current = "";
       reenqueueRequestedIds(retryIds);
       pumpRef.current();
