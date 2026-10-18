@@ -1,89 +1,94 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import withSerwist from "@serwist/next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 import { buildContentSecurityPolicy } from "./lib/security/csp.cjs";
 
-/**
- * @type {import('next').NextConfig}
- *
- */
-const nextConfig = {
-  serverExternalPackages: ["ws"],
-  env: {
-    // Expose the Vercel build SHA to client code so the diagnostic panel
-    // can show which build the user is running. Falls back to "local"
-    // when the env var is not set (dev / non-Vercel build).
-    NEXT_PUBLIC_BUILD_SHA: process.env.VERCEL_GIT_COMMIT_SHA || "local",
-  },
-  async headers() {
-    return [
-      // static.cloudflareinsights.com in script-src: Cloudflare proxies this
-      // domain and injects its Web Analytics beacon into every response. The
-      // CSP was blocking it, so the beacon failed to load on every page load —
-      // an error in each visitor's console and zero data collected. Allowing it
-      // grants Cloudflare nothing it does not already have: it terminates TLS
-      // here and is the party inserting the tag. The beacon posts to
-      // cloudflareinsights.com, which connect-src 'self' https: already covers.
-      {
-        source: "/(.*)",
-        headers: [
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "X-XSS-Protection", value: "1; mode=block" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          { key: "Content-Security-Policy", value: buildContentSecurityPolicy(process.env.NODE_ENV) },
-        ],
-      },
-    ];
-  },
-  webpack: (config, { isServer }) => {
-    config.experiments = {
-      ...config.experiments,
-      asyncWebAssembly: true,
-      layers: true,
-    };
-
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
-        dns: false,
-        child_process: false,
+export default (phase) => {
+  const isDevServer = phase === PHASE_DEVELOPMENT_SERVER;
+  // Serwist accepts an object config; build it before applying either wrapper.
+  /**
+   * @type {import('next').NextConfig}
+   *
+   */
+  const nextConfig = {
+    serverExternalPackages: ["ws"],
+    env: {
+      // Expose the Vercel build SHA to client code so the diagnostic panel
+      // can show which build the user is running. Falls back to "local"
+      // when the env var is not set (dev / non-Vercel build).
+      NEXT_PUBLIC_BUILD_SHA: process.env.VERCEL_GIT_COMMIT_SHA || "local",
+    },
+    async headers() {
+      return [
+        // static.cloudflareinsights.com in script-src: Cloudflare proxies this
+        // domain and injects its Web Analytics beacon into every response. The
+        // CSP was blocking it, so the beacon failed to load on every page load —
+        // an error in each visitor's console and zero data collected. Allowing it
+        // grants Cloudflare nothing it does not already have: it terminates TLS
+        // here and is the party inserting the tag. The beacon posts to
+        // cloudflareinsights.com, which connect-src 'self' https: already covers.
+        {
+          source: "/(.*)",
+          headers: [
+            { key: "X-Content-Type-Options", value: "nosniff" },
+            { key: "X-Frame-Options", value: "DENY" },
+            { key: "X-XSS-Protection", value: "1; mode=block" },
+            { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+            { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+            { key: "Content-Security-Policy", value: buildContentSecurityPolicy(phase) },
+          ],
+        },
+      ];
+    },
+    webpack: (config, { isServer }) => {
+      config.experiments = {
+        ...config.experiments,
+        asyncWebAssembly: true,
+        layers: true,
       };
-    }
 
-    return config;
-  },
+      if (!isServer) {
+        config.resolve.fallback = {
+          ...config.resolve.fallback,
+          fs: false,
+          net: false,
+          tls: false,
+          dns: false,
+          child_process: false,
+        };
+      }
+
+      return config;
+    },
+  };
+
+  const withPWA = withSerwist({
+    // Service-worker source resolved by Serwist at build time. Static-analysis
+    // tools (knip) cannot follow this string reference and may flag app/sw.ts
+    // as unused — keep this comment as a deletion guard.
+    swSrc: "app/sw.ts",
+    swDest: "public/sw.js",
+    maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+    disable: isDevServer,
+  });
+
+  return withSentryConfig(withPWA(nextConfig), {
+    silent: true,
+    org: process.env.SENTRY_ORG || "",
+    project: process.env.SENTRY_PROJECT || "",
+    disableSourceMapUpload: !process.env.SENTRY_AUTH_TOKEN,
+    webpack: {
+      // Stop the Sentry plugin wrapping every route handler / app-dir component at
+      // build time. The wrapper pulled the 2.68MB @sentry/node + OpenTelemetry
+      // chunk into routes that never import Sentry (/api/health among them), so
+      // each cold start evaluated it before serving anything. Uncaught errors are
+      // still reported: Next hands them to onRequestError in instrumentation.ts,
+      // and explicit reports go through lib/observability.ts.
+      // What this gives up is automatic transaction/span instrumentation, which was
+      // already sampled at 0.1 and is not what the DSN is configured for.
+      autoInstrumentServerFunctions: false,
+      autoInstrumentAppDirectory: false,
+      autoInstrumentMiddleware: false,
+    },
+  });
 };
-
-const withPWA = withSerwist({
-  // Service-worker source resolved by Serwist at build time. Static-analysis
-  // tools (knip) cannot follow this string reference and may flag app/sw.ts
-  // as unused — keep this comment as a deletion guard.
-  swSrc: "app/sw.ts",
-  swDest: "public/sw.js",
-  maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
-  disable: process.env.NODE_ENV === "development",
-});
-
-export default withSentryConfig(withPWA(nextConfig), {
-  silent: true,
-  org: process.env.SENTRY_ORG || "",
-  project: process.env.SENTRY_PROJECT || "",
-  disableSourceMapUpload: !process.env.SENTRY_AUTH_TOKEN,
-  webpack: {
-    // Stop the Sentry plugin wrapping every route handler / app-dir component at
-    // build time. The wrapper pulled the 2.68MB @sentry/node + OpenTelemetry
-    // chunk into routes that never import Sentry (/api/health among them), so
-    // each cold start evaluated it before serving anything. Uncaught errors are
-    // still reported: Next hands them to onRequestError in instrumentation.ts,
-    // and explicit reports go through lib/observability.ts.
-    // What this gives up is automatic transaction/span instrumentation, which was
-    // already sampled at 0.1 and is not what the DSN is configured for.
-    autoInstrumentServerFunctions: false,
-    autoInstrumentAppDirectory: false,
-    autoInstrumentMiddleware: false,
-  },
-});

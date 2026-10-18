@@ -66,7 +66,7 @@ test.describe("State Persistence", () => {
   test.fixme("filter selection persists within session after tab switch", {
     annotation: {
       type: "bug",
-      description: "components/tabs/DashboardTab.tsx:296 keeps verdictFilter in component state; app/page.tsx:761 unmounts the dashboard on tab changes, resetting it to quality. The old test selected the default and hid this bug.",
+      description: "https://github.com/dwebxr/aegis/issues/43 — components/tabs/DashboardTab.tsx:296 keeps verdictFilter in component state; app/page.tsx:761 unmounts the dashboard on tab changes, resetting it to quality. The old test selected the default and hid this bug.",
     },
   }, async ({ seededDashboardPage }) => {
     const dashboard = seededDashboardPage;

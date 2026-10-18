@@ -132,3 +132,40 @@ export const MOCK_CONTENT_ITEMS: ContentItem[] = [
     scoringEngine: "heuristic",
   },
 ];
+
+/**
+ * A mediocre-but-not-slop item that lands in the Briefing's "Filtered Out" list.
+ *
+ * The Briefing only sees items that survive the filter pipeline
+ * (lib/filtering/pipeline.ts burns anything with composite < qualityThreshold, 4.0 by
+ * default — so `e2e-slop-1` at 1.7 never reaches BriefingTab). Surviving items are
+ * re-weighted by WoT trust (composite x 0.75 with no graph), and generateBriefing applies
+ * the same 4.0 threshold to the weighted score. 4.6 passes the burn (4.6 >= 4.0) but
+ * weights to 3.45 < 4.0, so it is excluded from the priority list and shows up only
+ * behind the "Filtered Out" toggle.
+ */
+export const MOCK_FILTERED_ITEM: ContentItem = {
+  id: "e2e-filtered-1",
+  owner: "e2e-test",
+  author: "Jordan Lee",
+  avatar: "",
+  text: "A quick roundup of this week's AI model releases, with links to the announcement posts.",
+  source: "rss" as const,
+  sourceUrl: "https://example.com/weekly-ai-roundup",
+  scores: { originality: 5, insight: 4, credibility: 5, composite: 4.6 },
+  verdict: "quality" as const,
+  reason: "Useful aggregation but little original analysis",
+  createdAt: Date.now() - 180_000,
+  validated: false,
+  flagged: false,
+  timestamp: new Date().toISOString(),
+  topics: ["AI"],
+  vSignal: 4.5,
+  cContext: 4.0,
+  lSlop: 4.0,
+  scoredByAI: true,
+  scoringEngine: "heuristic",
+};
+
+/** Seed for the authenticated Briefing: one priority item, one burned slop item, one filtered-out item. */
+export const MOCK_BRIEFING_CONTENT_ITEMS: ContentItem[] = [...MOCK_CONTENT_ITEMS, MOCK_FILTERED_ITEM];

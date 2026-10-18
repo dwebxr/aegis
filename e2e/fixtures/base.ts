@@ -1,9 +1,9 @@
-import { test as base } from "@playwright/test";
+import { test as base, expect } from "@playwright/test";
 import { setupApiMocks } from "./api-mocks";
 import { setupAuthMock } from "./auth-mock";
 import { isolateNetwork } from "./network-isolation";
 import { seedContentCache, emptyDemoFeed } from "./content-cache";
-import { MOCK_CONTENT_ITEMS } from "./test-data";
+import { MOCK_CONTENT_ITEMS, MOCK_BRIEFING_CONTENT_ITEMS } from "./test-data";
 import { LandingPage } from "../pages/landing.page";
 import { DashboardPage } from "../pages/dashboard.page";
 import { IncineratorPage } from "../pages/incinerator.page";
@@ -130,16 +130,13 @@ export const test = base.extend<Fixtures>({
     await use(new BriefingPage(page));
   },
 
-  analyticsPage: async ({ page }, use, testInfo) => {
+  analyticsPage: async ({ page, isMobile }, use, testInfo) => {
+    testInfo.skip(isMobile, "Analytics not in mobile demo nav");
     await setupApiMocks(page);
     await page.goto("/");
     await enterDemoMode(page);
     const navOk = await clickNav(page, "analytics");
-    if (!navOk) {
-      testInfo.skip(true, "Analytics not in mobile demo nav");
-      await use(new AnalyticsPage(page));
-      return;
-    }
+    expect(navOk, "Desktop Analytics navigation must be available").toBe(true);
     await page.getByTestId("aegis-analytics-heading").waitFor({ state: "visible", timeout: TIMEOUTS.navigation });
     await use(new AnalyticsPage(page));
   },
@@ -185,6 +182,10 @@ export const test = base.extend<Fixtures>({
   authBriefingPage: async ({ page }, use) => {
     await setupAuthMock(page, true);
     await setupApiMocks(page);
+    // Seed includes MOCK_FILTERED_ITEM: it survives the pipeline burn but falls below the
+    // briefing threshold after WoT weighting, so the "Filtered Out" toggle renders on every run.
+    // (The slop item alone is not enough — the pipeline burns it before the Briefing sees it.)
+    await seedContentCache(page, MOCK_BRIEFING_CONTENT_ITEMS, "2vxsx-fae");
     await page.goto("/");
     await page.getByTestId("aegis-dashboard").waitFor({ state: "visible", timeout: TIMEOUTS.long });
     await clickNav(page, "briefing");

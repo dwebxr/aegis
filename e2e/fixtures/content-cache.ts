@@ -17,6 +17,11 @@ export async function seedContentCache(page: Page, items: readonly ContentItem[]
 export async function readContentCache(page: Page, principal = "anon"): Promise<ContentItem[]> {
   return page.evaluate(principal => new Promise<ContentItem[]>((resolve, reject) => {
     const request = indexedDB.open("aegis-storage", 1);
+    request.onupgradeneeded = () => {
+      // Reading before app initialization must not create a DB without stores.
+      request.transaction?.abort();
+      resolve([]);
+    };
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
       const db = request.result;

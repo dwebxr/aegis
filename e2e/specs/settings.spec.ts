@@ -94,11 +94,15 @@ test.describe("Settings — Feeds Interactions", () => {
     await expect(authSettingsPage.page.getByTestId("aegis-settings-apikey-save")).toBeDisabled();
   });
 
-  test("Ollama toggle is visible on all devices and WebLLM toggle on desktop", async ({ authSettingsPage, isMobile }) => {
+  test("AI toggles match the device: Ollama, desktop WebLLM, and mobile MediaPipe", async ({ authSettingsPage, isMobile }) => {
     await authSettingsPage.switchSubTab("feeds");
     await expect(authSettingsPage.page.getByTestId("aegis-settings-ollama-toggle")).toBeVisible();
-    if (!isMobile) {
+    if (isMobile) {
+      await expect(authSettingsPage.page.getByTestId("aegis-settings-webllm-toggle")).toHaveCount(0);
+      await expect(authSettingsPage.page.getByTestId("aegis-settings-mediapipe-toggle")).toBeVisible();
+    } else {
       await expect(authSettingsPage.page.getByTestId("aegis-settings-webllm-toggle")).toBeVisible();
+      await expect(authSettingsPage.page.getByTestId("aegis-settings-mediapipe-toggle")).toHaveCount(0);
     }
   });
 });

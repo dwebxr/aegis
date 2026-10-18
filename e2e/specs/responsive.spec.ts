@@ -21,6 +21,7 @@ test.describe("Responsive Layout", () => {
   test("mobile landing page renders with full-width CTA", async ({ page }) => {
     const tryDemo = page.getByTestId("aegis-landing-try-demo");
     await tryDemo.waitFor({ state: "visible", timeout: TIMEOUTS.long });
+    // Wait for mobile sizing after hydration; mismatch tracked in https://github.com/dwebxr/aegis/issues/44.
     await expect.poll(async () => (await tryDemo.boundingBox())?.width ?? 0).toBeGreaterThan(300);
   });
 
