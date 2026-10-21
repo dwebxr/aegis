@@ -126,11 +126,21 @@ export async function safeFetch(
     const pre = await preCheckHost(parsed.hostname);
     if (pre) throw new Error(pre);
     type UndiciInit = NonNullable<Parameters<typeof undiciFetch>[1]>;
-    const res = await undiciFetch(current, {
-      ...(currentInit as unknown as UndiciInit),
-      redirect: "manual",
-      dispatcher: ssrfDispatcher,
-    });
+    let res: Awaited<ReturnType<typeof undiciFetch>>;
+    try {
+      res = await undiciFetch(current, {
+        ...(currentInit as unknown as UndiciInit),
+        redirect: "manual",
+        dispatcher: ssrfDispatcher,
+      });
+    } catch (err) {
+      // undici wraps the refusal in TypeError("fetch failed"); surface it so
+      // logs can tell it apart from ordinary network failures.
+      if ((err as { cause?: { message?: string } })?.cause?.message === BROTLI_REFUSED) {
+        throw new Error(BROTLI_REFUSED);
+      }
+      throw err;
+    }
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get("location");
       if (!location) return res as unknown as Response;
