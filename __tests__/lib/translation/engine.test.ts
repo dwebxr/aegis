@@ -414,25 +414,22 @@ describe("translateContent", () => {
       expect(expectResult(result).backend).toBe("mediapipe");
     });
 
-    it("skips MediaPipe in auto cascade when enabled but not loaded (silent skip, no MediaPipe download)", async () => {
+    it("initializes MediaPipe in auto cascade when enabled but not loaded", async () => {
       mockMediaPipeEnabled = true;
       mockMediaPipeLoaded = false;
       mockOllamaEnabled = false;
       mockWebLLMEnabled = false;
       mockApiKey = null;
-      // With no loaded local backend and no BYOK, the cascade is empty
-      // post-hotfix-17 (claude-server no longer a free fallback) →
-      // silent skip, no MediaPipe download triggered.
       const fetchSpy = jest.fn();
       globalThis.fetch = fetchSpy;
 
       const result = await translateContent({
-        text: "Skip unloaded MediaPipe",
+        text: "Initialize unloaded MediaPipe",
         targetLanguage: "ja",
         backend: "auto",
       });
 
-      expectSkip(result, "no-backend", 0);
+      expect(expectResult(result).backend).toBe("mediapipe");
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 

@@ -38,6 +38,10 @@ export default (phase) => {
             { key: "Content-Security-Policy", value: buildContentSecurityPolicy(phase) },
           ],
         },
+        {
+          source: "/vendor/mediapipe/:path*",
+          headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+        },
       ];
     },
     webpack: (config, { isServer }) => {
@@ -68,6 +72,8 @@ export default (phase) => {
     // as unused — keep this comment as a deletion guard.
     swSrc: "app/sw.ts",
     swDest: "public/sw.js",
+    // Public scanning uses node-glob: exclude MediaPipe with directory extglobs.
+    globPublicPatterns: ["*", "!(vendor)/**/*", "vendor/!(mediapipe)/**/*"],
     maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
     disable: isDevServer,
   });

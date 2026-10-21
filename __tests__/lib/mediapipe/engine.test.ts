@@ -294,7 +294,7 @@ describe("getOrCreateInference", () => {
     let lastStatus: Record<string, unknown> = {};
     onStatusChange((s: Record<string, unknown>) => { lastStatus = s; });
 
-    await expect(getOrCreateInference()).rejects.toBe(eventError);
+    await expect(getOrCreateInference()).rejects.toMatchObject({ cause: eventError });
     expect(lastStatus.error).toContain("WebGPU/wasm error");
     expect(lastStatus.error).not.toBe("[object Object]");
   });
@@ -311,7 +311,7 @@ describe("getOrCreateInference", () => {
     let lastStatus: Record<string, unknown> = {};
     onStatusChange((s: Record<string, unknown>) => { lastStatus = s; });
 
-    await expect(getOrCreateInference()).rejects.toBe(eventError);
+    await expect(getOrCreateInference()).rejects.toMatchObject({ cause: eventError });
     expect(lastStatus.error).toContain("Safari");
     expect(lastStatus.error).toContain("iOS 26");
   });
@@ -338,11 +338,11 @@ describe("getOrCreateInference", () => {
     let lastStatus: Record<string, unknown> = {};
     onStatusChange((s: Record<string, unknown>) => { lastStatus = s; });
 
-    await expect(getOrCreateInference()).rejects.toBe("raw string error");
+    await expect(getOrCreateInference()).rejects.toMatchObject({ cause: "raw string error" });
     expect(lastStatus.error).toBe("raw string error");
   });
 
-  it("allows retry after failure (inferencePromise is cleared)", async () => {
+  it("allows retry after failure when explicitly reset", async () => {
     mockCreateFromOptions.mockRejectedValueOnce(new Error("transient failure"));
     const mockInf = makeMockInference(VALID_JSON_RESPONSE);
     mockCreateFromOptions.mockResolvedValueOnce(mockInf);
@@ -350,6 +350,7 @@ describe("getOrCreateInference", () => {
     const { getOrCreateInference } = require("@/lib/mediapipe/engine");
 
     await expect(getOrCreateInference()).rejects.toThrow("transient failure");
+    await require("@/lib/mediapipe/engine").destroyInference();
     const inf = await getOrCreateInference();
     expect(inf).toBe(mockInf);
     expect(mockCreateFromOptions).toHaveBeenCalledTimes(2);
@@ -387,7 +388,7 @@ describe("getOrCreateInference", () => {
     await getOrCreateInference();
 
     expect(mockForGenAiTasks).toHaveBeenCalledWith(
-      `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@${MEDIAPIPE_GENAI_VERSION}/wasm`,
+      `/vendor/mediapipe/tasks-genai@${MEDIAPIPE_GENAI_VERSION}/wasm`,
     );
     expect(mockCreateFromOptions.mock.calls[0][0]).toBe(wasmFileset);
   });
@@ -563,7 +564,7 @@ describe("destroyInference", () => {
     await destroyInference();
     expect(lastStatus.loaded).toBe(false);
     expect(lastStatus.loading).toBe(false);
-    expect(lastStatus.modelId).toBeUndefined();
+    expect(lastStatus.modelId).toBe(mockModelId);
     expect(lastStatus.error).toBeUndefined();
   });
 

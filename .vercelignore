@@ -4,3 +4,4 @@ Makefile
 dfx.json
 canister_ids.json
 packages/
+public/vendor/mediapipe/

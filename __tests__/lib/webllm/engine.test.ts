@@ -236,7 +236,7 @@ describe("getOrCreateEngine", () => {
     expect(mockCreateMLCEngine).toHaveBeenCalledTimes(1);
   });
 
-  it("resets on failure, allows retry", async () => {
+  it("allows retry after failure when explicitly reset", async () => {
     mockCreateMLCEngine.mockRejectedValueOnce(new Error("model download failed"));
     const { getOrCreateEngine, onStatusChange } = require("@/lib/webllm/engine");
 
@@ -249,7 +249,8 @@ describe("getOrCreateEngine", () => {
     expect(errorStatus).toBeDefined();
     expect(errorStatus!.loading).toBe(false);
 
-    // Retry should work
+    // An explicit off/on reset clears the init cooldown.
+    await require("@/lib/webllm/engine").destroyEngine();
     const mockEngine = makeMockEngine(VALID_JSON_RESPONSE);
     mockCreateMLCEngine.mockResolvedValue(mockEngine);
     const eng = await getOrCreateEngine();

@@ -14,6 +14,12 @@ import type { ContentItem } from "@/lib/types/content";
 import type { ContentSyncStatus } from "@/contexts/content/types";
 import type { _SERVICE } from "@/lib/ic/declarations";
 import { errMsg } from "@/lib/utils/errors";
+import {
+  LocalEngineTransientError,
+  LocalEngineTimeoutError,
+  LocalEngineInitFailedError,
+  LocalEngineUnavailableError,
+} from "@/lib/localAI/budget";
 
 // Auto-translation queue concurrency. Rendered cards enqueue their own
 // item IDs; the queue pumps at most four in-flight translations and
@@ -21,6 +27,7 @@ import { errMsg } from "@/lib/utils/errors";
 // reaches any backend. Manual Translate bypasses this queue.
 const MAX_CONCURRENT = 4;
 const RETRY_INTERVAL_MS = 60_000;
+const MAX_LOCAL_FAILURES = 3;
 
 // Cap on how long we wait for the IC actor before starting auto-
 // translate without it in the cascade. Prevents stranding items if
@@ -32,7 +39,7 @@ const AUTO_NO_BACKEND_MESSAGE =
 const EXPLICIT_BACKEND_UNAVAILABLE_MESSAGE = (backendLabel: string) =>
   `選択した翻訳バックエンド(${backendLabel})が利用できません — Settings→Translationで変更してください`;
 const AUTO_ALL_BACKENDS_FAILED_MESSAGE =
-  "一部の記事を翻訳できませんでした(IC LLMが不安定な場合があります)。未翻訳の記事は展開してTranslateで再試行できます";
+  "一部の記事を翻訳できませんでした。未翻訳の記事は展開してTranslateで再試行できます";
 
 const BACKEND_LABELS: Record<TranslationBackend, string> = {
   auto: "Auto",
@@ -80,11 +87,11 @@ export function useTranslation(
   itemsRef.current = items;
 
   // Attempted-item sets, keyed by target language so a language switch resets them.
-  const attemptedRef = useRef<{ lang: string; skip: Set<string>; failed: Set<string> }>({
-    lang: "", skip: new Set(), failed: new Set(),
+  const attemptedRef = useRef<{ lang: string; skip: Set<string>; failed: Set<string>; localAttempts: Map<string, number> }>({
+    lang: "", skip: new Set(), failed: new Set(), localAttempts: new Map(),
   });
   if (attemptedRef.current.lang !== prefs.targetLanguage) {
-    attemptedRef.current = { lang: prefs.targetLanguage, skip: new Set(), failed: new Set() };
+    attemptedRef.current = { lang: prefs.targetLanguage, skip: new Set(), failed: new Set(), localAttempts: new Map() };
   }
 
   const autoQueueRef = useRef<string[]>([]);
@@ -118,6 +125,7 @@ export function useTranslation(
   // Debounce infrastructure error notifications per language; skip-based
   // visibility notifications are once per hook session.
   const failNotifiedLangRef = useRef("");
+  const localPendingNotifiedLangRef = useRef("");
   const autoNoBackendNotifiedRef = useRef(false);
   const explicitBackendUnavailableNotifiedRef = useRef(false);
   const autoAllBackendsFailedNotifiedRef = useRef(false);
@@ -147,6 +155,7 @@ export function useTranslation(
 
   const runTranslation = useCallback(async (item: ContentItem, callerKind: TranslationCallerKind) => {
     const p = prefsRef.current;
+    const attempted = attemptedRef.current;
     const opts: TranslateOptions = {
       text: item.text,
       reason: item.reason,
@@ -169,8 +178,27 @@ export function useTranslation(
     try {
       outcome = await translateContent(opts);
     } catch (err) {
-      attemptedRef.current.failed.add(item.id);
-      if (err instanceof TranslationBackendUnavailableError) {
+      attempted.failed.add(item.id);
+      if (err instanceof LocalEngineTransientError) {
+        // Queue contention, model downloads and recovery waits are not failures.
+        const countsTowardCap = err instanceof LocalEngineTimeoutError || err instanceof LocalEngineInitFailedError;
+        const attempts = (attempted.localAttempts.get(item.id) ?? 0) + (countsTowardCap ? 1 : 0);
+        if (callerKind === "auto") attempted.localAttempts.set(item.id, attempts);
+        if (callerKind === "auto" && attempts >= MAX_LOCAL_FAILURES) {
+          attempted.failed.delete(item.id);
+          outcome = { status: "skip", reason: "all-backends-failed", attempted: attempts };
+        } else if (localPendingNotifiedLangRef.current !== p.targetLanguage) {
+          localPendingNotifiedLangRef.current = p.targetLanguage;
+          notifyRef.current(callerKind === "auto" ? `${err.message} Translation will retry automatically.` : err.message, "info");
+        }
+      } else if (err instanceof LocalEngineUnavailableError) {
+        attempted.failed.delete(item.id);
+        attempted.skip.add(item.id);
+        if (failNotifiedLangRef.current !== p.targetLanguage) {
+          failNotifiedLangRef.current = p.targetLanguage;
+          notifyRef.current(`Translation failed: ${err.message}`, "error");
+        }
+      } else if (err instanceof TranslationBackendUnavailableError) {
         if (!explicitBackendUnavailableNotifiedRef.current) {
           explicitBackendUnavailableNotifiedRef.current = true;
           notifyRef.current(EXPLICIT_BACKEND_UNAVAILABLE_MESSAGE(BACKEND_LABELS[p.backend]), "error");
@@ -189,10 +217,23 @@ export function useTranslation(
       return next;
     });
 
+    // The target language changed while this request was in flight: its
+    // result belongs to the discarded language, and the language-change
+    // effect skipped this item because it was still active. Drop the stale
+    // result and queue the item again for the current language.
+    if (attemptedRef.current !== attempted) {
+      if (callerKind === "auto" && autoRequestedIdsRef.current.has(item.id)) enqueueAutoRequest(item.id, false);
+      pumpRef.current();
+      return;
+    }
+
     if (outcome && !isTranslationSkip(outcome)) {
+      attempted.failed.delete(item.id);
+      attempted.localAttempts.delete(item.id);
       patchRef.current(item.id, { translation: outcome });
     } else if (outcome && isTranslationSkip(outcome)) {
-      attemptedRef.current.skip.add(item.id);
+      attempted.failed.delete(item.id);
+      attempted.skip.add(item.id);
       // no-backend notifies for BOTH caller kinds: a manual Translate tap with
       // no usable backend produces no visible change at all, which is the same
       // invisible failure as the auto path — and the message is the actionable
@@ -227,7 +268,7 @@ export function useTranslation(
     // slots would otherwise strand queued auto items until an unrelated
     // content/prefs change.
     pumpRef.current();
-  }, [actorRef]);
+  }, [actorRef, enqueueAutoRequest]);
 
   const pumpAutoQueue = useCallback(() => {
     if (!isReadyRef.current) return;
@@ -308,6 +349,7 @@ export function useTranslation(
       const retryIds = new Set([...attemptedRef.current.failed, ...attemptedRef.current.skip]);
       attemptedRef.current.failed.clear();
       attemptedRef.current.skip.clear();
+      attemptedRef.current.localAttempts.clear();
       failNotifiedLangRef.current = "";
       reenqueueRequestedIds(retryIds);
       pumpRef.current();

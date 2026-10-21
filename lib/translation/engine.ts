@@ -20,12 +20,16 @@ import {
 } from "@/lib/ic/icLlmCircuitBreaker";
 import { getOllamaConfig, isOllamaEnabled } from "@/lib/ollama/storage";
 import { isWebLLMEnabled } from "@/lib/webllm/storage";
-import { isWebLLMLoaded } from "@/lib/webllm/engine";
 import { isMediaPipeEnabled } from "@/lib/mediapipe/storage";
-import { isMediaPipeLoaded } from "@/lib/mediapipe/engine";
 import { getUserApiKey } from "@/lib/apiKey/storage";
 import { withTimeout } from "@/lib/utils/timeout";
 import { errMsg } from "@/lib/utils/errors";
+import {
+  LOCAL_TRANSLATE_TIMEOUT_MS,
+  LocalEngineTransientError,
+  LocalEngineUnavailableError,
+  runWithLocalEngine,
+} from "@/lib/localAI/budget";
 
 // iOS Safari throws `TypeError: Load failed` from `fetch()` during app
 // state transitions (wifi → cellular, background → foreground, Service
@@ -65,20 +69,32 @@ async function translateWithOllama(prompt: string): Promise<string> {
 }
 
 async function translateWithWebLLM(prompt: string): Promise<string> {
-  const { getOrCreateEngine } = await import("@/lib/webllm/engine");
-  const eng = await getOrCreateEngine();
-  const response = await eng.chat.completions.create({
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.2,
-    max_tokens: 4000,
+  const { getOrCreateEngine, destroyEngine } = await import("@/lib/webllm/engine");
+  const response = await runWithLocalEngine({
+    engine: "webllm",
+    init: getOrCreateEngine,
+    infer: eng => eng.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      max_tokens: 4000,
+    }),
+    inferTimeoutMs: LOCAL_TRANSLATE_TIMEOUT_MS,
+    interrupt: eng => eng.interruptGenerate(),
+    destroy: destroyEngine,
   });
   return response.choices[0]?.message?.content?.trim() ?? "";
 }
 
 async function translateWithMediaPipe(prompt: string): Promise<string> {
-  const { getOrCreateInference } = await import("@/lib/mediapipe/engine");
-  const inf = await getOrCreateInference();
-  const raw = await inf.generateResponse(prompt);
+  const { getOrCreateInference, destroyInference } = await import("@/lib/mediapipe/engine");
+  const raw = await runWithLocalEngine({
+    engine: "mediapipe",
+    init: getOrCreateInference,
+    infer: inf => inf.generateResponse(prompt),
+    inferTimeoutMs: LOCAL_TRANSLATE_TIMEOUT_MS,
+    interrupt: inf => inf.cancelProcessing(),
+    destroy: destroyInference,
+  });
   return raw.trim();
 }
 
@@ -384,9 +400,9 @@ async function translateContentInner(
   if (isOllamaEnabled()) {
     attempts.push({ name: "ollama", fn: () => translateWithOllama(prompt) });
   }
-  if (isMediaPipeEnabled() && isMediaPipeLoaded()) {
+  if (isMediaPipeEnabled()) {
     attempts.push({ name: "mediapipe", fn: () => translateWithMediaPipe(prompt) });
-  } else if (isWebLLMEnabled() && isWebLLMLoaded()) {
+  } else if (isWebLLMEnabled()) {
     attempts.push({ name: "webllm", fn: () => translateWithWebLLM(prompt) });
   }
   const byokKey = getUserApiKey();
@@ -422,7 +438,8 @@ async function translateContentInner(
     return makeSkip("no-backend", 0);
   }
 
-  const failures: Array<{ name: string; reason: string }> = [];
+  const failures: Array<{ name: string; reason: string; permanent?: boolean }> = [];
+  let localTransient: LocalEngineTransientError | undefined;
   let attempted = 0;
 
   for (const attempt of attempts) {
@@ -432,9 +449,10 @@ async function translateContentInner(
     try {
       raw = await attempt.fn();
     } catch (err) {
+      if (err instanceof LocalEngineTransientError) localTransient = err;
       const reason = errMsg(err);
       console.warn(`[translate] ${attempt.name} transport error:`, reason);
-      failures.push({ name: attempt.name, reason });
+      failures.push({ name: attempt.name, reason, permanent: err instanceof LocalEngineUnavailableError });
       recordTranslationAttempt({
         itemHint, targetLanguage, backend: attempt.name,
         outcome: "transport-error", reason, elapsedMs: Date.now() - startedAt,
@@ -516,6 +534,13 @@ async function translateContentInner(
     });
   }
 
+  // Definitive outcomes above always win. Retry local failures only when the
+  // cascade has produced no success, already-in-target, or definitive rejection.
+  if (localTransient) {
+    span.setAttribute("translate.result", "local-transient");
+    throw localTransient;
+  }
+
   // Cascade exhausted. Throw a user-visible notification only when
   // every failure looks like real infrastructure trouble (HTTP error,
   // network failure, timeout, abort). Canister application-level
@@ -523,7 +548,10 @@ async function translateContentInner(
   // silent-skip — retrying the same input against the same backends
   // in 60s won't change the outcome.
   const summary = failures.map(f => `${f.name}: ${f.reason}`).join(" | ");
-  if (failures.length > 0 && failures.every(f => INFRA_ERROR_RE.test(f.reason))) {
+  // A permanently unavailable tier (no WebGPU, no adapter) can never answer,
+  // so it must not veto a retry the remaining tiers' infra failures deserve.
+  const retryable = failures.filter(f => !f.permanent);
+  if (retryable.length > 0 && retryable.every(f => INFRA_ERROR_RE.test(f.reason))) {
     span.setAttribute("translate.result", "infra-error");
     const error = new Error(
       failures.length === 1
