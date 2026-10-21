@@ -21,6 +21,7 @@ module.exports = {
   Agent: class Agent {
     constructor() {}
     dispatch() {}
+    compose() { return this; }
     close() {}
     destroy() {}
   },

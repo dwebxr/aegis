@@ -18,6 +18,29 @@ beforeEach(() => {
 });
 
 describe("safeFetch", () => {
+  it("asks for gzip/deflate only, so honest servers don't answer with Brotli", async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse(200));
+    await safeFetch("https://example.com/feed");
+    expect(new Headers(mockFetch.mock.calls[0][1].headers).get("accept-encoding")).toBe("gzip, deflate");
+  });
+
+  it("keeps a caller's own Accept-Encoding and sends it on every redirect hop", async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse(302, { location: "https://other.example.com/feed" }))
+      .mockResolvedValueOnce(mockResponse(200));
+    await safeFetch("https://example.com/feed", { headers: { "accept-encoding": "identity" } });
+    expect(new Headers(mockFetch.mock.calls[0][1].headers).get("accept-encoding")).toBe("identity");
+    expect(new Headers(mockFetch.mock.calls[1][1].headers).get("accept-encoding")).toBe("identity");
+  });
+
+  it("still sends gzip/deflate after a cross-origin redirect", async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse(302, { location: "https://other.example.com/feed" }))
+      .mockResolvedValueOnce(mockResponse(200));
+    await safeFetch("https://example.com/feed");
+    expect(new Headers(mockFetch.mock.calls[1][1].headers).get("accept-encoding")).toBe("gzip, deflate");
+  });
+
   it("returns response for non-redirect status", async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(200));
     const res = await safeFetch("https://example.com/feed");
@@ -102,8 +125,8 @@ describe("safeFetch", () => {
     expect(mockFetch).toHaveBeenCalledWith("https://example.com/", expect.objectContaining({
       method: "POST",
       redirect: "manual",
-      headers: { "X-Custom": "value" },
     }));
+    expect(new Headers(mockFetch.mock.calls[0][1].headers).get("x-custom")).toBe("value");
   });
 
   it("handles multi-hop redirect chain", async () => {
