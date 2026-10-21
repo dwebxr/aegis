@@ -176,9 +176,9 @@ describe("POST /api/fetch/rss — branch coverage", () => {
     });
 
     it("sends both etag and lastModified headers when both provided", async () => {
-      let capturedHeaders: Record<string, string> = {};
+      let capturedHeaders = new Headers();
       global.fetch = jest.fn().mockImplementation(async (_url: string, opts: RequestInit) => {
-        capturedHeaders = { ...(opts.headers as Record<string, string>) };
+        capturedHeaders = new Headers(opts.headers as HeadersInit);
         return {
           ok: true,
           status: 200,
@@ -192,8 +192,8 @@ describe("POST /api/fetch/rss — branch coverage", () => {
         etag: '"abc"',
         lastModified: "Sat, 01 Jan 2022 00:00:00 GMT",
       }));
-      expect(capturedHeaders["If-None-Match"]).toBe('"abc"');
-      expect(capturedHeaders["If-Modified-Since"]).toBe("Sat, 01 Jan 2022 00:00:00 GMT");
+      expect(capturedHeaders.get("If-None-Match")).toBe('"abc"');
+      expect(capturedHeaders.get("If-Modified-Since")).toBe("Sat, 01 Jan 2022 00:00:00 GMT");
     });
   });
 

@@ -22,10 +22,9 @@ describe("POST /api/fetch/rss — conditional requests", () => {
   });
 
   it("sends If-None-Match header when etag is provided", async () => {
-    let capturedHeaders: Record<string, string> = {};
+    let capturedHeaders = new Headers();
     global.fetch = jest.fn().mockImplementation(async (_url: string, opts: RequestInit) => {
-      const h = opts.headers as Record<string, string>;
-      capturedHeaders = { ...h };
+      capturedHeaders = new Headers(opts.headers as HeadersInit);
       return {
         ok: true,
         status: 200,
@@ -35,14 +34,13 @@ describe("POST /api/fetch/rss — conditional requests", () => {
     });
 
     await POST(makeRequest({ feedUrl: "https://example.com/feed.xml", etag: '"abc123"' }));
-    expect(capturedHeaders["If-None-Match"]).toBe('"abc123"');
+    expect(capturedHeaders.get("If-None-Match")).toBe('"abc123"');
   });
 
   it("sends If-Modified-Since header when lastModified is provided", async () => {
-    let capturedHeaders: Record<string, string> = {};
+    let capturedHeaders = new Headers();
     global.fetch = jest.fn().mockImplementation(async (_url: string, opts: RequestInit) => {
-      const h = opts.headers as Record<string, string>;
-      capturedHeaders = { ...h };
+      capturedHeaders = new Headers(opts.headers as HeadersInit);
       return {
         ok: true,
         status: 200,
@@ -52,7 +50,7 @@ describe("POST /api/fetch/rss — conditional requests", () => {
     });
 
     await POST(makeRequest({ feedUrl: "https://example.com/feed.xml", lastModified: "Tue, 01 Jan 2025 00:00:00 GMT" }));
-    expect(capturedHeaders["If-Modified-Since"]).toBe("Tue, 01 Jan 2025 00:00:00 GMT");
+    expect(capturedHeaders.get("If-Modified-Since")).toBe("Tue, 01 Jan 2025 00:00:00 GMT");
   });
 
   it("returns notModified:true for 304 response", async () => {
