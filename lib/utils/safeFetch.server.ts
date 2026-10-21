@@ -18,6 +18,8 @@ function contentEncodingHasBrotli(rawHeaders: unknown): boolean {
   return false;
 }
 
+const BODYLESS_STATUS = new Set([204, 205, 304]);
+
 type Handlers = Dispatcher.DispatchHandlers;
 
 // Forwards every callback to fetch's own handler, except response headers that
@@ -36,7 +38,9 @@ class RejectBrotliHandler implements Handlers {
   }
 
   onHeaders(statusCode: number, headers: Buffer[], resume: () => void, statusText: string): boolean {
-    if (contentEncodingHasBrotli(headers)) {
+    // Interim and bodyless responses carry nothing to decode (fetch skips the
+    // decoder for them too), and refusing a 304 would break RSS revalidation.
+    if (statusCode >= 200 && !BODYLESS_STATUS.has(statusCode) && contentEncodingHasBrotli(headers)) {
       this.#abort?.(new Error(BROTLI_REFUSED));
       return false;
     }

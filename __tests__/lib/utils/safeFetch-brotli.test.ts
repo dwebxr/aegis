@@ -35,6 +35,9 @@ beforeAll(async () => {
       case "/redirect-br":
         res.writeHead(302, { location: "/plain", "content-encoding": "br" });
         return res.end(zlib.brotliCompressSync("moved"));
+      case "/not-modified-br":
+        res.writeHead(304, { "content-encoding": "br", etag: '"v1"' });
+        return res.end();
       case "/head-br":
         res.writeHead(200, { "content-encoding": "br" });
         return res.end();
@@ -72,6 +75,12 @@ describe("rejectBrotli", () => {
   it("passes gzip and identity responses through unchanged", async () => {
     await expect((await get("/gzip")).text()).resolves.toBe("hello");
     await expect((await get("/plain")).text()).resolves.toBe("hello");
+    expect(brotliCalls).not.toHaveBeenCalled();
+  });
+
+  it("lets a 304 carrying Brotli metadata through, so RSS revalidation still works", async () => {
+    const res = await get("/not-modified-br");
+    expect(res.status).toBe(304);
     expect(brotliCalls).not.toHaveBeenCalled();
   });
 
