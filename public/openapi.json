@@ -1,0 +1,394 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Aegis API",
+    "version": "1.0.0",
+    "description": "Paid x402 API of Aegis, an AI content quality filter. This document lists only the endpoint published for x402 discovery. The full API reference is at https://aegis-ai.xyz/openapi.yaml.",
+    "x-guidance": "GET /api/d2a/briefing-jpyc returns an AI-curated content briefing. Without payment it returns HTTP 402. Read the PAYMENT-REQUIRED response header (base64 JSON, x402 v2) for the current USDC on Base terms, which override the price in this document, then retry the same URL with the signed payload in the PAYMENT-SIGNATURE header. Without `principal` you get a global index of contributors and their top items; set `principal` to a contributors[].principal value for that contributor's full briefing. Filter with `since` and `topics`, page with `limit` and `offset`. A briefing that cannot be built returns 4xx or 5xx and is not charged. On 503, retry only if Retry-After is present, reusing the same signed payload. JPYC on Polygon is also accepted through the OpenPay X-PAYMENT flow; see the 402 JSON body."
+  },
+  "servers": [
+    {
+      "url": "https://aegis-ai.xyz"
+    }
+  ],
+  "paths": {
+    "/api/d2a/briefing-jpyc": {
+      "get": {
+        "operationId": "getD2ABriefingJpyc",
+        "summary": "AI-curated content briefing, paid with x402",
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.006"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "parameters": [
+          {
+            "name": "principal",
+            "in": "query",
+            "required": false,
+            "description": "IC principal (text form). Omit it for the global index of contributors. Set it to a contributors[].principal value for that contributor's full briefing. A malformed value returns 400 without settling the payment.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "description": "ISO 8601 timestamp. Global index: keeps contributors whose briefing was generated at or after it. Single briefing: returns no items if the briefing is older. An unparsable value is ignored.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "topics",
+            "in": "query",
+            "required": false,
+            "description": "Comma-separated topics, case-insensitive, matching any of them. Global index: keeps contributors with a matching top item. Single briefing: keeps matching items.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Entries per page. Global index: 1 to 10, default 5. Single briefing: 1 to 100, default 50. Out-of-range values are clamped.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Entries to skip.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The global index when `principal` is omitted, otherwise that contributor's full briefing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/GlobalBriefingResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/D2ABriefingResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required, or a payment was rejected. On the USDC rail this means no funds moved. On the JPYC rail a settlement timeout also returns 402 and the transfer may still land, so check the chain before signing a new authorization.",
+            "headers": {
+              "PAYMENT-REQUIRED": {
+                "description": "Base64-encoded x402 v2 PaymentRequired object for USDC on Base. `accepts[].amount` is in USDC atomic units.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentRequiredResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PaymentRequiredResponse": {
+        "type": "object",
+        "description": "x402 v1 challenge. Lists JPYC on Polygon and USDC on Base.",
+        "required": ["x402Version", "accepts", "error"],
+        "properties": {
+          "x402Version": {
+            "type": "integer",
+            "enum": [1]
+          },
+          "accepts": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "BriefingSummary": {
+        "type": "object",
+        "required": ["totalEvaluated", "totalBurned", "qualityRate"],
+        "properties": {
+          "totalEvaluated": {
+            "type": "integer"
+          },
+          "totalBurned": {
+            "type": "integer"
+          },
+          "qualityRate": {
+            "type": "number"
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "required": ["offset", "limit", "total", "hasMore"],
+        "properties": {
+          "offset": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Verdict": {
+        "type": "string",
+        "enum": ["quality", "slop"]
+      },
+      "D2ABriefingItem": {
+        "type": "object",
+        "required": ["title", "content", "source", "sourceUrl", "scores", "verdict", "reason", "topics", "briefingScore"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "First ~80 characters of the item text; a trailing ellipsis marks truncation."
+          },
+          "content": {
+            "type": "string",
+            "description": "Full item text."
+          },
+          "source": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "scores": {
+            "type": "object",
+            "required": ["originality", "insight", "credibility", "composite"],
+            "properties": {
+              "originality": {
+                "type": "number"
+              },
+              "insight": {
+                "type": "number"
+              },
+              "credibility": {
+                "type": "number"
+              },
+              "composite": {
+                "type": "number"
+              },
+              "vSignal": {
+                "type": "number"
+              },
+              "cContext": {
+                "type": "number"
+              },
+              "lSlop": {
+                "type": "number"
+              }
+            }
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "briefingScore": {
+            "type": "number",
+            "description": "Briefing-relative rank score: 1 is the top item. On serendipityPick it is a separate serendipity score instead."
+          }
+        }
+      },
+      "D2ABriefingResponse": {
+        "type": "object",
+        "description": "One contributor's full briefing.",
+        "required": ["version", "generatedAt", "source", "sourceUrl", "summary", "serendipityPick", "meta", "pagination", "items"],
+        "properties": {
+          "version": {
+            "type": "string",
+            "enum": ["1.0"]
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["aegis"]
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/BriefingSummary"
+          },
+          "serendipityPick": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/D2ABriefingItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "type": "object",
+            "required": ["scoringModel", "nostrPubkey", "topics"],
+            "properties": {
+              "scoringModel": {
+                "type": "string"
+              },
+              "nostrPubkey": {
+                "type": ["string", "null"]
+              },
+              "topics": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/D2ABriefingItem"
+            }
+          }
+        }
+      },
+      "GlobalBriefingContributor": {
+        "type": "object",
+        "required": ["principal", "generatedAt", "summary", "topItems"],
+        "properties": {
+          "principal": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/BriefingSummary"
+          },
+          "topItems": {
+            "type": "array",
+            "description": "Top 3 items. Request this contributor's `principal` for the full items.",
+            "items": {
+              "type": "object",
+              "required": ["title", "sourceUrl", "topics", "briefingScore", "verdict"],
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "sourceUrl": {
+                  "type": "string",
+                  "description": "Article URL, or an empty string when the item has none."
+                },
+                "topics": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "briefingScore": {
+                  "type": "number"
+                },
+                "verdict": {
+                  "$ref": "#/components/schemas/Verdict"
+                }
+              }
+            }
+          }
+        }
+      },
+      "GlobalBriefingResponse": {
+        "type": "object",
+        "description": "Global index of contributors.",
+        "required": ["version", "type", "generatedAt", "pagination", "contributors", "aggregatedTopics", "totalEvaluated", "totalQualityRate"],
+        "properties": {
+          "version": {
+            "type": "string",
+            "enum": ["1.0"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["global"]
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "contributors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlobalBriefingContributor"
+            }
+          },
+          "aggregatedTopics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "totalEvaluated": {
+            "type": "integer"
+          },
+          "totalQualityRate": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}
