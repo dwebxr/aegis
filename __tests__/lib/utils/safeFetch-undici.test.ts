@@ -74,3 +74,51 @@ describe("safeFetch — real undici connect-time DNS pinning", () => {
     expect(handedToSocket).toEqual([]);
   });
 });
+
+describe("safeFetch — hostile response headers on real undici", () => {
+  const net = jest.requireActual<typeof import("node:net")>("node:net");
+  const realConnect = net.connect;
+  let server: import("node:net").Server;
+
+  beforeEach(async () => {
+    (preCheckLookup as jest.Mock).mockResolvedValue([{ address: "8.8.8.8", family: 4 }]);
+    jest.mocked(connectLookup).mockImplementation(((_host: string, _opts: unknown,
+      callback: (error: Error | null, addresses: Address[]) => void) => {
+      callback(null, [{ address: "1.1.1.1", family: 4 }]);
+    }) as typeof connectLookup);
+
+    // GHSA-xjj6-f33q-929c: below undici 6.29.1 this response rejects fetch and
+    // then kills the process, because the early close raises an unhandled
+    // 'error' on a body stream nothing listens to. Catching the rejection in
+    // safeFetch's callers does not help.
+    server = net.createServer(socket => {
+      socket.once("data", () => {
+        socket.write(
+          "HTTP/1.1 200 OK\r\n"
+          + "Content-Encoding: gzip, gzip, gzip, gzip, gzip, gzip\r\n"
+          + "Content-Length: 100\r\n\r\n",
+        );
+        setTimeout(() => socket.destroy(), 10);
+      });
+    });
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", () => resolve()));
+    const { port } = server.address() as import("node:net").AddressInfo;
+    jest.spyOn(net, "connect").mockImplementation(((options: import("node:net").NetConnectOpts) =>
+      realConnect({ ...(options as import("node:net").TcpNetConnectOpts), host: "127.0.0.1", port, lookup: undefined })
+    ) as typeof net.connect);
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  it("rejects too many content-codings without an uncaught stream error", async () => {
+    await expect(safeFetch("http://attacker.example.test/feed.xml")).rejects.toMatchObject({
+      cause: { message: expect.stringMatching(/too many content-encodings/) },
+    });
+    // The crash arrives after the rejection, once the server closes the socket.
+    // Jest fails this test if an uncaught error lands inside this window.
+    await new Promise(resolve => setTimeout(resolve, 100));
+  });
+});
