@@ -65,7 +65,7 @@ sources ──► ingestion ──► quick filter ──► AI scoring cascade 
 
 ### Prerequisites
 
-- Node.js **≥ 22.12.0** (Node **24** for development, CI, and production)
+- Node.js **24.x**. `engines` pins it so Vercel stays on the same major as development and CI. An open range such as `>=22.12.0` overrides the Project Settings and moves production to the newest major as soon as Vercel offers it. Do not go below 22.12.0: sanitize-html requires it, because it loads the ESM-only htmlparser2 through `require()`.
 - npm (other package managers untested; only `npm` is used in scripts)
 - (Optional) [`dfx`](https://internetcomputer.org/docs/current/developer-docs/setup/install/) **0.30.2+** if you plan to modify the Motoko canister
 
