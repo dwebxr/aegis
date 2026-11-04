@@ -2,6 +2,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 import withSerwist from "@serwist/next";
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 import { buildContentSecurityPolicy } from "./lib/security/csp.cjs";
+import { x402BazaarTraceIncludes } from "./lib/build/x402TraceIncludes.cjs";
 
 export default (phase) => {
   const isDevServer = phase === PHASE_DEVELOPMENT_SERVER;
@@ -12,6 +13,9 @@ export default (phase) => {
    */
   const nextConfig = {
     serverExternalPackages: ["ws"],
+    // @x402/next loads @x402/extensions/bazaar with a webpackIgnore'd native
+    // import that Next does not trace. See lib/build/x402TraceIncludes.cjs.
+    outputFileTracingIncludes: x402BazaarTraceIncludes(),
     env: {
       // Expose the Vercel build SHA to client code so the diagnostic panel
       // can show which build the user is running. Falls back to "local"
