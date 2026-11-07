@@ -27,12 +27,16 @@ Check the build log for the preview: there must be no install or build command. 
 
 After the production deploy, run **Purge Everything** in Cloudflare for the `aegis-ai.xyz` zone. Do not use the open-pay.jp zone; the two are easy to confuse.
 
-## Roll back
+## No rollback
 
-Promote the last app deployment (Next.js, paid routes already disabled):
+The app cannot come back. The IC canister was deleted on 2026-11-08, every environment variable was removed from the Vercel project, and every older deployment was deleted. The end page is the only deployment left. Do not deploy from the repository root: without the canister and the keys, the app would come up broken.
 
-```bash
-npx -y vercel@latest promote aegis-dw63y82ba-cipherwebs-projects.vercel.app
-```
+## End of the domain
 
-Deploying from the repository root (`vercel --prod`) also brings back the full app.
+`aegis-ai.xyz` will not be renewed. The registration ends on 2027-03-28, and the end page stays up until then. Before that date:
+
+1. Remove the domains (`aegis-ai.xyz`, `www.aegis-ai.xyz`, `aegis.dwebxr.xyz`) from the Vercel project, then delete the project.
+2. Delete the `aegis.dwebxr.xyz` DNS record in the `dwebxr.xyz` zone, so no record points at Vercel after the project is gone.
+3. Delete the `aegis-ai.xyz` zone from Cloudflare.
+
+After 2027-03-28 someone else may register `aegis-ai.xyz`. Treat anything served there as unrelated to this project.

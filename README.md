@@ -4,7 +4,7 @@
 
 Aegis ingests content from RSS, Nostr, and public web pages, scores each item with an AI quality model (Value / Context / Slop), and surfaces only the signal — not the noise. It runs as a Next.js app backed by an Internet Computer canister.
 
-**Status:** the Aegis service ended on 2026-11-08. <https://aegis-ai.xyz> now serves only an end-of-service page (see [`shutdown-site/`](shutdown-site/README.md)), the paid D2A APIs are off, and the IC canister `rluf3-eiaaa-aaaam-qgjuq-cai` is being deleted. The code below is kept as an archive.
+**Status:** the Aegis service ended on 2026-11-08. The paid D2A APIs are off, and the IC canister `rluf3-eiaaa-aaaam-qgjuq-cai` and all of its data were deleted. `aegis-ai.xyz` serves only an end-of-service page (see [`shutdown-site/`](shutdown-site/README.md)) until the domain expires on 2027-03-28; it will not be renewed, so do not trust that domain after that date. The code below is kept as an archive.
 
 - **License:** MIT
 
