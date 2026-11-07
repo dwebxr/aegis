@@ -33,10 +33,11 @@ The app cannot come back. The IC canister was deleted on 2026-11-08, every envir
 
 ## End of the domain
 
-`aegis-ai.xyz` will not be renewed. The registration ends on 2027-03-28, and the end page stays up until then. Before that date:
+`aegis-ai.xyz` will not be renewed. The registration ends on 2027-03-28. After that date, the end page stays up at `https://aegis.dwebxr.xyz` (the `dwebxr.xyz` domain is kept). Before 2027-03-28, do these steps in this order:
 
-1. Remove the domains (`aegis-ai.xyz`, `www.aegis-ai.xyz`, `aegis.dwebxr.xyz`) from the Vercel project, then delete the project.
-2. Delete the `aegis.dwebxr.xyz` DNS record in the `dwebxr.xyz` zone, so no record points at Vercel after the project is gone.
-3. Delete the `aegis-ai.xyz` zone from Cloudflare.
+1. In the Vercel project's domain settings, change `aegis.dwebxr.xyz` and `aegis-kappa-eight.vercel.app` from "Redirect to aegis-ai.xyz" (307) to serving the production deployment directly. Do this first: a redirect left pointing at an expired domain sends visitors to whoever registers it next. After this, the `/sw.js` kill switch also reaches the `aegis.dwebxr.xyz` origin.
+2. Remove `aegis-ai.xyz` and `www.aegis-ai.xyz` from the project.
+3. Delete the `aegis-ai.xyz` zone from Cloudflare. Do not touch the `open-pay.jp` zone.
+4. Change the GitHub repository's website URL and the links in `README.md` to `https://aegis.dwebxr.xyz`.
 
-After 2027-03-28 someone else may register `aegis-ai.xyz`. Treat anything served there as unrelated to this project.
+After 2027-03-28 someone else may register `aegis-ai.xyz`. Treat anything served there as unrelated to this project. If the end page is ever retired completely, delete the Vercel project and the `aegis` record in the `dwebxr.xyz` zone together, so no DNS record keeps pointing at Vercel.
