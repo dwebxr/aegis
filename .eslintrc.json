@@ -5,7 +5,8 @@
     "__tests__/**",
     "e2e/**",
     "next-env.d.ts",
-    "public/sw.js"
+    "public/sw.js",
+    "shutdown-site/**"
   ],
   "overrides": [
     {
