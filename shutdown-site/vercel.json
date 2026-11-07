@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "public",
+  "routes": [
+    {
+      "src": "/(.*)",
+      "continue": true,
+      "headers": {
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer"
+      }
+    },
+    {
+      "src": "^/sw\\.js$",
+      "headers": {
+        "Cache-Control": "no-cache, max-age=0"
+      },
+      "dest": "/sw.js"
+    },
+    {
+      "src": "/(.*)",
+      "status": 410,
+      "headers": {
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex",
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+      },
+      "dest": "/index.html"
+    }
+  ]
+}
